@@ -8,7 +8,9 @@ use walrus::{
     ir::{LoadKind, MemArg, StoreKind},
 };
 
-use super::{TranslationError, types_stack::TypesStack};
+use super::{
+    TranslationError, intermediate_types::error::IntermediateTypeError, types_stack::TypesStack,
+};
 
 use crate::{
     CompilationContext, UserDefinedType,
@@ -17,6 +19,12 @@ use crate::{
 };
 
 use super::{intermediate_types::IntermediateType, table::FunctionId};
+
+#[derive(Debug, thiserror::Error)]
+pub enum MappedFunctionError {
+    #[error("an error ocurred while processing an intermediate type")]
+    IntermediateType(#[from] IntermediateTypeError),
+}
 
 #[derive(Debug, Clone)]
 pub struct JumpTableData {
@@ -56,7 +64,7 @@ impl MappedFunction {
         move_locals: &[SignatureToken],
         function_definition: &FunctionDefinition,
         handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
-    ) -> Result<Self, TranslationError> {
+    ) -> Result<Self, MappedFunctionError> {
         let signature = ISignature::from_signatures(move_args, move_rets, handles_map)?;
         let results = signature.get_return_wasm_types();
 
@@ -155,7 +163,7 @@ pub fn add_unpack_function_return_values_instructions(
     module: &mut Module,
     returns: &[IntermediateType],
     memory: MemoryId,
-) -> Result<(), TranslationError> {
+) -> Result<(), IntermediateTypeError> {
     if returns.is_empty() {
         return Ok(());
     }

@@ -260,7 +260,7 @@ pub fn add_external_contract_call_fn(
                         calldata_reference_pointer,
                         compilation_ctx,
                     )
-                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?;
+                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?;
 
                 builder
                     .local_get(writer_pointer)
@@ -277,7 +277,7 @@ pub fn add_external_contract_call_fn(
                         calldata_reference_pointer,
                         compilation_ctx,
                     )
-                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?;
+                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?;
 
                 builder
                     .local_get(writer_pointer)
@@ -491,7 +491,7 @@ pub fn add_external_contract_call_fn(
                             calldata_reader_pointer,
                             compilation_ctx,
                         )
-                        .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())));
+                        .map_err(|e| NativeFunctionError::Abi(Rc::new(e)));
 
                     let abi_decoded_call_result = if result_type == &IntermediateType::IU64 {
                         module.locals.add(ValType::I64)

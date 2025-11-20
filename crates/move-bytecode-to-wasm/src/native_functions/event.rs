@@ -122,7 +122,7 @@ pub fn add_emit_log_fn(
                         abi_encoded_data_calldata_reference_pointer,
                         compilation_ctx,
                     )
-                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?;
+                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?;
 
                 // Use the allocator to get a pointer to the end of the data
                 builder
@@ -196,7 +196,7 @@ pub fn add_emit_log_fn(
                             abi_encoded_data_calldata_reference_pointer,
                             compilation_ctx,
                         )
-                        .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?;
+                        .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?;
                 } else {
                     field
                         .add_pack_instructions(
@@ -207,7 +207,7 @@ pub fn add_emit_log_fn(
                             abi_encoded_data_calldata_reference_pointer,
                             compilation_ctx,
                         )
-                        .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?;
+                        .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?;
                 }
 
                 // Use the allocator to get a pointer to the end of the data
@@ -331,7 +331,7 @@ pub fn add_emit_log_fn(
                         calldata_reference_pointer,
                         compilation_ctx,
                     )
-                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?;
+                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?;
 
                 // Add 32 to the writer pointer to write the next topic
                 builder

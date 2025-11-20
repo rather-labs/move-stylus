@@ -635,7 +635,12 @@ fn translate_instruction(
                 &module_data.datatype_handles_map,
             )?;
 
-            constant_type.load_constant_instructions(module, builder, &mut data, compilation_ctx);
+            constant_type.load_constant_instructions(
+                module,
+                builder,
+                &mut data,
+                compilation_ctx,
+            )?;
 
             types_stack.push(constant_type);
             assert!(
@@ -857,7 +862,7 @@ fn translate_instruction(
                         builder,
                         module,
                         compilation_ctx,
-                    );
+                    )?;
 
                     // Every time `dynamic_fields::borrow_mut` or
                     // `dynamic_fields_named_id::borrow_mut` are called, we must register a unique
@@ -912,7 +917,7 @@ fn translate_instruction(
                         builder,
                         module,
                         compilation_ctx,
-                    );
+                    )?;
 
                     if vm_handled_types::dynamic_fields::Field::is_borrow_mut_fn(
                         &function_id.module_id,
@@ -1030,7 +1035,7 @@ fn translate_instruction(
                         builder,
                         module,
                         compilation_ctx,
-                    );
+                    )?;
                 }
                 // Otherwise
                 // If the function is not native, we add it to the table and declare it for translating
@@ -1132,7 +1137,7 @@ fn translate_instruction(
                         builder,
                         module,
                         compilation_ctx,
-                    );
+                    )?;
                 };
             }
 
@@ -1148,7 +1153,7 @@ fn translate_instruction(
             if let IntermediateType::IRef(_) | IntermediateType::IMutRef(_) = local_type {
                 builder.local_set(local);
             } else {
-                local_type.box_local_instructions(module, builder, compilation_ctx, local);
+                local_type.box_local_instructions(module, builder, compilation_ctx, local)?;
             }
 
             // At the moment of calculating the local types for the function, we can't know if the
@@ -1221,7 +1226,7 @@ fn translate_instruction(
             // TODO: Find a way to ensure they will not be used again, the Move compiler should do the work for now
             let local = function_locals[*local_id as usize];
             let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
-            local_type.move_local_instructions(builder, compilation_ctx, local);
+            local_type.move_local_instructions(builder, compilation_ctx, local)?;
 
             // If we find that the local type we are moving is the UID or NamedId struct, we need
             // to push it in the stacks type with the parent struct information (needed for example,
@@ -1649,7 +1654,7 @@ fn translate_instruction(
                 builder,
                 compilation_ctx,
                 *num_elements as i32,
-            );
+            )?;
 
             // Remove the packing values from types stack and check if the types are correct
             let mut n = *num_elements as usize;
@@ -1914,7 +1919,7 @@ fn translate_instruction(
                 builder,
                 &mapped_function.signature.returns,
                 compilation_ctx,
-            );
+            )?;
 
             // We dont pop the return values from the stack, we just check if the types match
             assert!(
@@ -2947,7 +2952,7 @@ fn call_indirect(
     builder: &mut InstrSeqBuilder,
     module: &mut Module,
     compilation_ctx: &CompilationContext,
-) {
+) -> Result<(), TranslationError> {
     builder
         .i32_const(function_entry.index)
         .call_indirect(function_entry.type_id, wasm_table_id);
@@ -2957,7 +2962,9 @@ fn call_indirect(
         module,
         function_returns,
         compilation_ctx.memory_id,
-    );
+    )?;
+
+    Ok(())
 }
 
 fn process_fn_local_variables(
@@ -3017,7 +3024,7 @@ pub fn box_args(
         match ty {
             IntermediateType::IU64 => {
                 let outer_ptr = module.locals.add(ValType::I32);
-                ty.box_local_instructions(module, builder, compilation_ctx, outer_ptr);
+                ty.box_local_instructions(module, builder, compilation_ctx, outer_ptr)?;
 
                 if let Some(index) = function_locals.iter().position(|&id| id == *local) {
                     updates.push((index, outer_ptr));
@@ -3026,7 +3033,7 @@ pub fn box_args(
                 }
             }
             _ => {
-                ty.box_local_instructions(module, builder, compilation_ctx, *local);
+                ty.box_local_instructions(module, builder, compilation_ctx, *local)?;
             }
         }
     }

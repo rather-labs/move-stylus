@@ -414,26 +414,33 @@ fn copy_data_to_memory(
     data: LocalId,
 ) -> Result<(), NativeFunctionError> {
     let load_value_to_stack = |field: &IntermediateType, builder: &mut InstrSeqBuilder<'_>| {
-        if field.stack_data_size() == 8 {
-            builder.load(
-                compilation_ctx.memory_id,
-                LoadKind::I64 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
-        } else {
-            builder.load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
+        match field.stack_data_size() {
+            Ok(8) => {
+                builder.load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I64 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            }
+            Err(e) => return Err(e),
+            _ => {
+                builder.load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            }
         }
+
+        Ok(())
     };
+
     // Copy the data after the parent addresss
     match itype {
         IntermediateType::IAddress => {
@@ -552,7 +559,7 @@ fn copy_data_to_memory(
                 );
 
                 if field.is_stack_type() {
-                    load_value_to_stack(field, builder);
+                    load_value_to_stack(field, builder)?;
                 }
 
                 builder.local_set(field_data);

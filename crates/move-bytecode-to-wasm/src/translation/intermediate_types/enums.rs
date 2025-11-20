@@ -317,7 +317,7 @@ impl IEnum {
         compilation_ctx: &CompilationContext,
     ) -> Result<Vec<u32>, StorageError> {
         // Compute the storage size for each possible slot offset (0-31)
-        Ok((0..32)
+        (0..32)
             .map(|offset| {
                 crate::storage::storage_layout::compute_enum_storage_size(
                     self,
@@ -325,7 +325,7 @@ impl IEnum {
                     compilation_ctx,
                 )
             })
-            .collect::<Result<Vec<u32>, StorageError>>()?)
+            .collect::<Result<Vec<u32>, StorageError>>()
     }
 
     /// Iterates all variants and runs `on_match` only for the active one

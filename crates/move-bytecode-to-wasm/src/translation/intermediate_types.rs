@@ -504,7 +504,7 @@ impl IntermediateType {
         builder: &mut InstrSeqBuilder,
         pointer: LocalId,
         memory: MemoryId,
-    ) -> Result<LocalId, TranslationError> {
+    ) -> Result<LocalId, IntermediateTypeError> {
         match self {
             IntermediateType::IBool
             | IntermediateType::IU8
@@ -552,9 +552,7 @@ impl IntermediateType {
 
                 Ok(local)
             }
-            IntermediateType::ITypeParameter(_) => {
-                return Err(TranslationError::FoundTypeParameter);
-            }
+            IntermediateType::ITypeParameter(_) => Err(IntermediateTypeError::FoundTypeParameter),
         }
     }
 

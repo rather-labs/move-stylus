@@ -11,6 +11,7 @@ use crate::{
         intermediate_types::{
             IntermediateType,
             enums::{IEnum, IEnumVariant},
+            error::IntermediateTypeError,
             structs::{IStruct, IStructType},
         },
         table::FunctionId,
@@ -38,6 +39,7 @@ use std::{
     collections::HashMap,
     fmt::{Debug, Display},
     hash::{Hash, Hasher},
+    rc::Rc,
 };
 use struct_data::StructData;
 
@@ -451,7 +453,7 @@ impl ModuleData {
                 .0
                 .iter()
                 .map(|t| IntermediateType::try_from_signature_token(t, datatype_handles_map))
-                .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
+                .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>()
                 .unwrap();
 
             module_generic_structs_instances
@@ -518,7 +520,7 @@ impl ModuleData {
                         .map(|t| {
                             IntermediateType::try_from_signature_token(t, datatype_handles_map)
                         })
-                        .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
+                        .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>()
                         .unwrap(),
                 ),
             );
@@ -548,7 +550,7 @@ impl ModuleData {
                             datatype_handles_map,
                         )
                     })
-                    .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
+                    .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>()
                     .unwrap();
 
                 variants.push(IEnumVariant::new(
@@ -608,7 +610,7 @@ impl ModuleData {
                 .0
                 .iter()
                 .map(|t| IntermediateType::try_from_signature_token(t, datatype_handles_map))
-                .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
+                .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>()
                 .unwrap();
 
             module_generic_enums_instances.push((enum_def_index, enum_instantiation_types.clone()));
@@ -687,7 +689,7 @@ impl ModuleData {
                     .0
                     .iter()
                     .map(|s| IntermediateType::try_from_signature_token(s, datatype_handles_map))
-                    .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
+                    .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>()
                     .unwrap(),
             );
 
@@ -698,7 +700,7 @@ impl ModuleData {
                     .0
                     .iter()
                     .map(|s| IntermediateType::try_from_signature_token(s, datatype_handles_map))
-                    .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
+                    .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>()
                     .unwrap(),
             );
 
@@ -760,14 +762,17 @@ impl ModuleData {
                     init = Some(function_id.clone());
                 }
 
-                function_information.push(MappedFunction::new(
-                    function_id.clone(),
-                    move_function_arguments,
-                    move_function_return,
-                    code_locals,
-                    function_def,
-                    datatype_handles_map,
-                ));
+                function_information.push(
+                    MappedFunction::new(
+                        function_id.clone(),
+                        move_function_arguments,
+                        move_function_return,
+                        code_locals,
+                        function_def,
+                        datatype_handles_map,
+                    )
+                    .map_err(|e| CompilationContextError::MappedFunction(Rc::new(e)))?,
+                );
 
                 function_definitions.insert(function_id.clone(), function_def);
             }
@@ -791,7 +796,7 @@ impl ModuleData {
                 .0
                 .iter()
                 .map(|s| IntermediateType::try_from_signature_token(s, datatype_handles_map))
-                .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
+                .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>()
                 .unwrap();
 
             let function_id = FunctionId {

@@ -115,7 +115,7 @@ impl IVector {
         builder.local_get(ptr_local);
         while (store_offset as usize) < needed_bytes {
             // Load the inner type
-            inner.load_constant_instructions(module, builder, bytes, compilation_ctx);
+            inner.load_constant_instructions(module, builder, bytes, compilation_ctx)?;
 
             if data_size == 4 {
                 // Store i32
@@ -949,7 +949,8 @@ mod tests {
             &mut builder,
             &mut data.into_iter(),
             &compilation_ctx,
-        );
+        )
+        .unwrap();
 
         let function = function_builder.finish(vec![], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
@@ -986,7 +987,8 @@ mod tests {
             &mut builder,
             &mut data_iter.into_iter(),
             &compilation_ctx,
-        );
+        )
+        .unwrap();
 
         // Set the capacity equal to the length in this case
         builder.i32_const(1);
@@ -1031,12 +1033,14 @@ mod tests {
         // Push elements to the stack
         for element_bytes in elements.iter() {
             let mut data_iter = element_bytes.clone().into_iter();
-            inner_type.load_constant_instructions(
-                &mut raw_module,
-                &mut builder,
-                &mut data_iter,
-                &compilation_ctx,
-            );
+            inner_type
+                .load_constant_instructions(
+                    &mut raw_module,
+                    &mut builder,
+                    &mut data_iter,
+                    &compilation_ctx,
+                )
+                .unwrap();
         }
 
         IVector::vec_pack_instructions(
@@ -1045,7 +1049,8 @@ mod tests {
             &mut builder,
             &compilation_ctx,
             elements.len() as i32,
-        );
+        )
+        .unwrap();
 
         let function = function_builder.finish(vec![], &mut raw_module.funcs);
         raw_module.exports.add("test_pack_vector", function);
@@ -1089,7 +1094,8 @@ mod tests {
             &mut builder,
             &mut data.into_iter(),
             &compilation_ctx,
-        );
+        )
+        .unwrap();
 
         builder.store(
             compilation_ctx.memory_id,
@@ -1185,7 +1191,8 @@ mod tests {
             &mut builder,
             &mut vector_data.into_iter(),
             &compilation_ctx,
-        );
+        )
+        .unwrap();
 
         // Stack:
         // [Vector pointer]
@@ -1205,12 +1212,14 @@ mod tests {
 
         let element_data = element_data.to_vec();
         let element_pointer = raw_module.locals.add(inner_type.clone().into());
-        inner_type.load_constant_instructions(
-            &mut raw_module,
-            &mut builder,
-            &mut element_data.into_iter(),
-            &compilation_ctx,
-        );
+        inner_type
+            .load_constant_instructions(
+                &mut raw_module,
+                &mut builder,
+                &mut element_data.into_iter(),
+                &compilation_ctx,
+            )
+            .unwrap();
         builder.local_tee(element_pointer);
 
         // Stack:
@@ -1301,7 +1310,8 @@ mod tests {
             &mut builder,
             &mut data.into_iter(),
             &compilation_ctx,
-        );
+        )
+        .unwrap();
 
         builder.store(
             compilation_ctx.memory_id,

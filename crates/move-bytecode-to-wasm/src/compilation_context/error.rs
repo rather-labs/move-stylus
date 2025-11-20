@@ -1,15 +1,23 @@
+use std::rc::Rc;
+
 use move_binary_format::file_format::{
     FieldHandleIndex, FieldInstantiationIndex, SignatureIndex, StructDefInstantiationIndex,
     StructDefinitionIndex,
 };
 
-use crate::error::{CompilationError, ICEError, ICEErrorKind};
+use crate::{
+    error::{CompilationError, ICEError, ICEErrorKind},
+    translation::functions::MappedFunctionError,
+};
 
 use super::ModuleId;
 
 #[derive(Debug, thiserror::Error)]
 #[allow(clippy::enum_variant_names)]
 pub enum CompilationContextError {
+    #[error("creating a mapped function")]
+    MappedFunction(#[source] Rc<MappedFunctionError>),
+
     #[error("struct with index {0} not found in compilation context")]
     StructNotFound(u16),
 

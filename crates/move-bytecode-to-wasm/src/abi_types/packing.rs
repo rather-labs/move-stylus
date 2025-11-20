@@ -18,7 +18,7 @@ use crate::{
     vm_handled_types::{VmHandledType, string::String_},
 };
 
-use super::error::AbiEncodingError;
+use super::error::{AbiEncodingError, AbiError};
 
 pub mod error;
 mod pack_enum;
@@ -46,7 +46,7 @@ pub trait Packable {
         writer_pointer: LocalId,
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), AbiPackError>;
+    ) -> Result<(), AbiError>;
 
     /// Adds the instructions to pack the value into memory according to Solidity's ABI encoding.
     ///
@@ -74,7 +74,7 @@ pub trait Packable {
         writer_pointer: LocalId,
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), AbiPackError>;
+    ) -> Result<(), AbiError>;
 
     /// Adds the instructions to load the value into a local variable.
     /// This is used to reverse the order of the stack before packing
@@ -85,7 +85,7 @@ pub trait Packable {
         &self,
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
-    ) -> Result<LocalId, AbiPackError>;
+    ) -> Result<LocalId, AbiError>;
 
     /// Returns the ABI encoded size of the type
     fn encoded_size(&self, compilation_ctx: &CompilationContext)
@@ -118,7 +118,7 @@ pub fn build_pack_instructions<T: Packable>(
     function_return_signature: &[T],
     module: &mut Module,
     compilation_ctx: &CompilationContext,
-) -> Result<(LocalId, LocalId), AbiPackError> {
+) -> Result<(LocalId, LocalId), AbiError> {
     // We need to load all return types into locals in order to reverse the read order
     // Otherwise they would be popped in reverse order
     let mut locals = Vec::new();
@@ -214,7 +214,7 @@ impl Packable for IntermediateType {
         &self,
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
-    ) -> Result<LocalId, AbiPackError> {
+    ) -> Result<LocalId, AbiError> {
         match self {
             IntermediateType::IBool
             | IntermediateType::IU8
@@ -240,7 +240,7 @@ impl Packable for IntermediateType {
                 builder.local_set(local);
                 Ok(local)
             }
-            IntermediateType::ITypeParameter(_) => Err(AbiPackError::PackingGenericTypeParameter),
+            IntermediateType::ITypeParameter(_) => Err(AbiPackError::PackingGenericTypeParameter)?,
         }
     }
 
@@ -252,7 +252,7 @@ impl Packable for IntermediateType {
         writer_pointer: LocalId,
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), AbiPackError> {
+    ) -> Result<(), AbiError> {
         match self {
             IntermediateType::IBool
             | IntermediateType::IU8
@@ -289,7 +289,7 @@ impl Packable for IntermediateType {
                 writer_pointer,
                 compilation_ctx.memory_id,
             )?,
-            IntermediateType::ISigner => return Err(AbiPackError::FoundSignerType),
+            IntermediateType::ISigner => return Err(AbiPackError::FoundSignerType)?,
             IntermediateType::IAddress => IAddress::add_pack_instructions(
                 builder,
                 module,
@@ -343,7 +343,7 @@ impl Packable for IntermediateType {
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
                 let enum_ = compilation_ctx.get_enum_by_intermediate_type(self).unwrap();
                 if !enum_.is_simple {
-                    return Err(AbiPackError::EnumIsNotSimple(enum_.identifier.clone()));
+                    return Err(AbiPackError::EnumIsNotSimple(enum_.identifier.clone()))?;
                 }
                 enum_.add_pack_instructions(
                     builder,
@@ -354,7 +354,7 @@ impl Packable for IntermediateType {
                 )?
             }
             IntermediateType::ITypeParameter(_) => {
-                return Err(AbiPackError::PackingGenericTypeParameter);
+                return Err(AbiPackError::PackingGenericTypeParameter)?;
             }
         }
 
@@ -369,7 +369,7 @@ impl Packable for IntermediateType {
         writer_pointer: LocalId,
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), AbiPackError> {
+    ) -> Result<(), AbiError> {
         match self {
             IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
                 // Load the intermediate pointer

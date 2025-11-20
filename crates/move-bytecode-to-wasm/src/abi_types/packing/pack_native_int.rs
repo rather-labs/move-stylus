@@ -3,9 +3,7 @@ use walrus::{
     ir::{MemArg, StoreKind},
 };
 
-use crate::runtime::RuntimeFunction;
-
-use super::error::AbiPackError;
+use crate::{abi_types::error::AbiError, runtime::RuntimeFunction};
 
 pub fn pack_i32_type_instructions(
     block: &mut InstrSeqBuilder,
@@ -13,7 +11,7 @@ pub fn pack_i32_type_instructions(
     memory: MemoryId,
     local: LocalId,
     writer_pointer: LocalId,
-) -> Result<(), AbiPackError> {
+) -> Result<(), AbiError> {
     block.local_get(writer_pointer);
 
     // Load the local value to the stack
@@ -42,7 +40,7 @@ pub fn pack_i64_type_instructions(
     memory: MemoryId,
     local: LocalId,
     writer_pointer: LocalId,
-) -> Result<(), AbiPackError> {
+) -> Result<(), AbiError> {
     block.local_get(writer_pointer);
 
     // Load the local value to the stack

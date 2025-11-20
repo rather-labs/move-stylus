@@ -303,12 +303,12 @@ fn load_struct_storage_id(
                 },
                 types,
             )
-            .map_err(|e| AbiUnpackError::NativeFunction(e))?;
+            .map_err(AbiUnpackError::NativeFunction)?;
 
             function_builder.call(compute_named_id_fn);
         }
         _ => {
-            return Err(AbiUnpackError::StorageObjectHasNoId(
+            Err(AbiUnpackError::StorageObjectHasNoId(
                 struct_.identifier.clone(),
             ))?;
         }

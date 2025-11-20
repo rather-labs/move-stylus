@@ -160,7 +160,7 @@ impl IVector {
                     data_reader_pointer,
                     calldata_reader_pointer,
                     compilation_ctx,
-                );
+                )?;
 
                 // store the value
                 if inner.stack_data_size()? == 4 {
