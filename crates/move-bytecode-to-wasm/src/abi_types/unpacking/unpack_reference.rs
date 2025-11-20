@@ -1,6 +1,7 @@
 use super::error::AbiUnpackError;
 use super::{Unpackable, load_struct_storage_id};
 use crate::CompilationContext;
+use crate::abi_types::error::AbiError;
 use crate::abi_types::unpacking::add_unpack_from_storage_instructions;
 use crate::translation::intermediate_types::IntermediateType;
 use crate::translation::intermediate_types::reference::{IMutRef, IRef};
@@ -17,7 +18,7 @@ impl IRef {
         reader_pointer: LocalId,
         calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), AbiUnpackError> {
+    ) -> Result<(), AbiError> {
         match inner {
             // If inner is a heap type, forward the pointer
             IntermediateType::IU128
@@ -92,10 +93,10 @@ impl IRef {
 
                 builder.store(
                     compilation_ctx.memory_id,
-                    match inner.stack_data_size() {
+                    match inner.stack_data_size()? {
                         4 => StoreKind::I32 { atomic: false },
                         8 => StoreKind::I64 { atomic: false },
-                        s => return Err(AbiUnpackError::RefInvalidStackDataSize(s)),
+                        s => return Err(AbiUnpackError::RefInvalidStackDataSize(s))?,
                     },
                     MemArg {
                         align: 0,
@@ -107,10 +108,10 @@ impl IRef {
             }
 
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                return Err(AbiUnpackError::RefInsideRef);
+                return Err(AbiUnpackError::RefInsideRef)?;
             }
             IntermediateType::ITypeParameter(_) => {
-                return Err(AbiUnpackError::UnpackingGenericTypeParameter);
+                return Err(AbiUnpackError::UnpackingGenericTypeParameter)?;
             }
         }
         Ok(())
@@ -125,7 +126,7 @@ impl IMutRef {
         reader_pointer: LocalId,
         calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), AbiUnpackError> {
+    ) -> Result<(), AbiError> {
         match inner {
             // If inner is a heap type, forward the pointer
             IntermediateType::IU128
@@ -153,7 +154,7 @@ impl IMutRef {
             | IntermediateType::IBool => {
                 let ptr_local = module.locals.add(walrus::ValType::I32);
 
-                builder.i32_const(inner.stack_data_size() as i32);
+                builder.i32_const(inner.stack_data_size()? as i32);
                 builder.call(compilation_ctx.allocator);
                 builder.local_tee(ptr_local);
 
@@ -167,10 +168,10 @@ impl IMutRef {
 
                 builder.store(
                     compilation_ctx.memory_id,
-                    match inner.stack_data_size() {
+                    match inner.stack_data_size()? {
                         4 => StoreKind::I32 { atomic: false },
                         8 => StoreKind::I64 { atomic: false },
-                        s => return Err(AbiUnpackError::RefInvalidStackDataSize(s)),
+                        s => return Err(AbiUnpackError::RefInvalidStackDataSize(s))?,
                     },
                     MemArg {
                         align: 0,
@@ -182,10 +183,10 @@ impl IMutRef {
             }
 
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                return Err(AbiUnpackError::RefInsideRef);
+                return Err(AbiUnpackError::RefInsideRef)?;
             }
             IntermediateType::ITypeParameter(_) => {
-                return Err(AbiUnpackError::UnpackingGenericTypeParameter);
+                return Err(AbiUnpackError::UnpackingGenericTypeParameter)?;
             }
         }
 

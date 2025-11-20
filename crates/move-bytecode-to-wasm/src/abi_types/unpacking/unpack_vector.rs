@@ -4,13 +4,14 @@ use walrus::{
 };
 
 use crate::{
+    abi_types::error::AbiError,
     runtime::RuntimeFunction,
     translation::intermediate_types::{IntermediateType, vector::IVector},
 };
 
 use crate::CompilationContext;
 
-use super::{Unpackable, error::AbiUnpackError};
+use super::Unpackable;
 
 impl IVector {
     pub fn add_unpack_instructions(
@@ -20,8 +21,8 @@ impl IVector {
         reader_pointer: LocalId,
         calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), AbiUnpackError> {
-        let mut inner_result: Result<(), AbiUnpackError> = Ok(());
+    ) -> Result<(), AbiError> {
+        let mut inner_result: Result<(), AbiError> = Ok(());
         // Big-endian to Little-endian
         let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
 
@@ -127,7 +128,7 @@ impl IVector {
             vector_pointer,
             length,
             length,
-            inner.stack_data_size() as i32,
+            inner.stack_data_size()? as i32,
         );
         block.local_get(vector_pointer);
         block.local_set(writer_pointer);
@@ -148,56 +149,60 @@ impl IVector {
         block.local_set(calldata_reader_pointer);
 
         block.loop_(None, |loop_block| {
-            let loop_block_id = loop_block.id();
+            inner_result = (|| {
+                let loop_block_id = loop_block.id();
 
-            loop_block.local_get(writer_pointer);
-            // This will leave in the stack [pointer/value i32/i64, length i32]
-            inner_result = inner.add_unpack_instructions(
-                loop_block,
-                module,
-                data_reader_pointer,
-                calldata_reader_pointer,
-                compilation_ctx,
-            );
-
-            // store the value
-            if inner.stack_data_size() == 4 {
-                loop_block.store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
+                loop_block.local_get(writer_pointer);
+                // This will leave in the stack [pointer/value i32/i64, length i32]
+                inner.add_unpack_instructions(
+                    loop_block,
+                    module,
+                    data_reader_pointer,
+                    calldata_reader_pointer,
+                    compilation_ctx,
                 );
-            } else if inner.stack_data_size() == 8 {
-                loop_block.store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I64 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-            } else {
-                unreachable!("Unsupported type size");
-            }
 
-            // increment writer pointer
-            loop_block.local_get(writer_pointer);
-            loop_block.i32_const(inner.stack_data_size() as i32);
-            loop_block.binop(BinaryOp::I32Add);
-            loop_block.local_set(writer_pointer);
+                // store the value
+                if inner.stack_data_size()? == 4 {
+                    loop_block.store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+                } else if inner.stack_data_size()? == 8 {
+                    loop_block.store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+                } else {
+                    unreachable!("Unsupported type size");
+                }
 
-            // increment i
-            loop_block.local_get(i);
-            loop_block.i32_const(1);
-            loop_block.binop(BinaryOp::I32Add);
-            loop_block.local_tee(i);
+                // increment writer pointer
+                loop_block.local_get(writer_pointer);
+                loop_block.i32_const(inner.stack_data_size()? as i32);
+                loop_block.binop(BinaryOp::I32Add);
+                loop_block.local_set(writer_pointer);
 
-            loop_block.local_get(length);
-            loop_block.binop(BinaryOp::I32LtU);
-            loop_block.br_if(loop_block_id);
+                // increment i
+                loop_block.local_get(i);
+                loop_block.i32_const(1);
+                loop_block.binop(BinaryOp::I32Add);
+                loop_block.local_tee(i);
+
+                loop_block.local_get(length);
+                loop_block.binop(BinaryOp::I32LtU);
+                loop_block.br_if(loop_block_id);
+
+                Ok(())
+            })();
         });
 
         // returned values

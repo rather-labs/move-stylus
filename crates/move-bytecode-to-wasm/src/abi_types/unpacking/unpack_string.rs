@@ -4,13 +4,11 @@ use walrus::{
 };
 
 use crate::{
-    runtime::RuntimeFunction, translation::intermediate_types::vector::IVector,
-    vm_handled_types::string::String_,
+    abi_types::error::AbiError, runtime::RuntimeFunction,
+    translation::intermediate_types::vector::IVector, vm_handled_types::string::String_,
 };
 
 use crate::CompilationContext;
-
-use super::error::AbiUnpackError;
 
 impl String_ {
     pub fn add_unpack_instructions(
@@ -19,7 +17,7 @@ impl String_ {
         reader_pointer: LocalId,
         calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), AbiUnpackError> {
+    ) -> Result<(), AbiError> {
         // Big-endian to Little-endian
         let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
 

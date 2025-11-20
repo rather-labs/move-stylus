@@ -26,6 +26,8 @@ use crate::{
     },
 };
 
+use super::error::AbiError;
+
 pub(crate) mod error;
 mod unpack_enum;
 mod unpack_heap_int;
@@ -52,7 +54,7 @@ pub trait Unpackable {
         reader_pointer: LocalId,
         calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), AbiUnpackError>;
+    ) -> Result<(), AbiError>;
 }
 
 /// Builds the instructions to unpack the abi encoded values to WASM function parameters
@@ -65,7 +67,7 @@ pub fn build_unpack_instructions<T: Unpackable>(
     function_arguments_signature: &[T],
     args_pointer: LocalId,
     compilation_ctx: &CompilationContext,
-) -> Result<(), AbiUnpackError> {
+) -> Result<(), AbiError> {
     let reader_pointer = module.locals.add(ValType::I32);
     let calldata_reader_pointer = module.locals.add(ValType::I32);
 
@@ -96,7 +98,7 @@ impl Unpackable for IntermediateType {
         reader_pointer: LocalId,
         calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), AbiUnpackError> {
+    ) -> Result<(), AbiError> {
         match self {
             IntermediateType::IBool => IBool::add_unpack_instructions(
                 function_builder,
@@ -236,7 +238,7 @@ impl Unpackable for IntermediateType {
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
                 let enum_ = compilation_ctx.get_enum_by_intermediate_type(self).unwrap();
                 if !enum_.is_simple {
-                    return Err(AbiUnpackError::EnumIsNotSimple(enum_.identifier.to_owned()));
+                    return Err(AbiUnpackError::EnumIsNotSimple(enum_.identifier.to_owned()))?;
                 }
 
                 IEnum::add_unpack_instructions(
@@ -248,7 +250,7 @@ impl Unpackable for IntermediateType {
                 )?
             }
             IntermediateType::ITypeParameter(_) => {
-                return Err(AbiUnpackError::UnpackingGenericTypeParameter);
+                return Err(AbiUnpackError::UnpackingGenericTypeParameter)?;
             }
         }
         Ok(())
@@ -268,7 +270,7 @@ fn load_struct_storage_id(
     calldata_reader_pointer: LocalId,
     compilation_ctx: &CompilationContext,
     struct_: &IStruct,
-) -> Result<(), AbiUnpackError> {
+) -> Result<(), AbiError> {
     match struct_.fields.first() {
         Some(IntermediateType::IStruct {
             module_id, index, ..
@@ -300,14 +302,15 @@ fn load_struct_storage_id(
                     module_name: SF_MODULE_NAME_OBJECT.to_owned(),
                 },
                 types,
-            )?;
+            )
+            .map_err(|e| AbiUnpackError::NativeFunction(e))?;
 
             function_builder.call(compute_named_id_fn);
         }
         _ => {
             return Err(AbiUnpackError::StorageObjectHasNoId(
                 struct_.identifier.clone(),
-            ));
+            ))?;
         }
     }
     Ok(())
@@ -321,7 +324,7 @@ fn add_unpack_from_storage_instructions(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
     unpack_frozen: bool,
-) -> Result<(), AbiUnpackError> {
+) -> Result<(), AbiError> {
     // Search for the object in the objects mappings
     let locate_storage_data_fn =
         RuntimeFunction::LocateStorageData.get(module, Some(compilation_ctx))?;

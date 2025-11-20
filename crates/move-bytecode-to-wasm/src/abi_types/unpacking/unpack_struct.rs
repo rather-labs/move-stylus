@@ -72,11 +72,12 @@ use walrus::{
 
 use crate::{
     CompilationContext,
+    abi_types::error::AbiError,
     runtime::RuntimeFunction,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
 };
 
-use super::{Unpackable, error::AbiUnpackError};
+use super::Unpackable;
 
 impl IStruct {
     pub fn add_unpack_instructions(
@@ -86,7 +87,7 @@ impl IStruct {
         reader_pointer: LocalId,
         calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), AbiUnpackError> {
+    ) -> Result<(), AbiError> {
         let struct_ptr = module.locals.add(ValType::I32);
         let val_32 = module.locals.add(ValType::I32);
         let val_64 = module.locals.add(ValType::I64);
@@ -177,7 +178,7 @@ impl IStruct {
                 | IntermediateType::IU16
                 | IntermediateType::IU32
                 | IntermediateType::IU64 => {
-                    let data_size = field.stack_data_size();
+                    let data_size = field.stack_data_size()?;
                     let (val, store_kind) = if data_size == 8 {
                         (val_64, StoreKind::I64 { atomic: false })
                     } else {
