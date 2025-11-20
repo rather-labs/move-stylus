@@ -495,7 +495,7 @@ fn translate_and_link_functions(
     }
     // If it is not present, we add an entry for it
     else {
-        function_table.add(module, function_id.clone(), function_information);
+        function_table.add(module, function_id.clone(), function_information)?;
     }
 
     let function_definition = function_definitions

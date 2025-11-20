@@ -52,6 +52,7 @@ use functions::{
 
 use intermediate_types::{
     IntermediateType, VmHandledStruct,
+    error::IntermediateTypeError,
     heap_integers::{IU128, IU256},
     simple_integers::{IU8, IU16, IU32, IU64},
     structs::IStruct,
@@ -190,7 +191,7 @@ pub fn translate_function(
     move_bytecode: &CodeUnit,
     dynamic_fields_global_variables: &mut Vec<(GlobalId, IntermediateType)>,
 ) -> Result<(WasmFunctionId, HashSet<FunctionId>), TranslationError> {
-    let params = function_information.signature.get_argument_wasm_types();
+    let params = function_information.signature.get_argument_wasm_types()?;
     let results = function_information.signature.get_return_wasm_types();
     let mut function = FunctionBuilder::new(&mut module.types, &params, &results);
 
@@ -199,7 +200,7 @@ pub fn translate_function(
 
     let mut builder = function.func_body();
 
-    let (arguments, locals) = process_fn_local_variables(function_information, module);
+    let (arguments, locals) = process_fn_local_variables(function_information, module)?;
 
     // All the function locals are compose by the argument locals concatenated with the local
     // variable locals
@@ -907,7 +908,7 @@ fn translate_instruction(
                 } else {
                     let table_id = function_table.get_table_id();
                     let f_entry =
-                        function_table.add(module, function_id.clone(), &function_information);
+                        function_table.add(module, function_id.clone(), &function_information)?;
                     functions_calls_to_link.push(function_id.clone());
 
                     call_indirect(
@@ -1127,7 +1128,7 @@ fn translate_instruction(
                 } else {
                     let table_id = function_table.get_table_id();
                     let f_entry =
-                        function_table.add(module, function_id.clone(), function_information);
+                        function_table.add(module, function_id.clone(), function_information)?;
                     functions_calls_to_link.push(function_id.clone());
 
                     call_indirect(
@@ -2970,8 +2971,8 @@ fn call_indirect(
 fn process_fn_local_variables(
     function_information: &MappedFunction,
     module: &mut Module,
-) -> (Vec<LocalId>, Vec<LocalId>) {
-    let wasm_arg_types = function_information.signature.get_argument_wasm_types();
+) -> Result<(Vec<LocalId>, Vec<LocalId>), TranslationError> {
+    let wasm_arg_types = function_information.signature.get_argument_wasm_types()?;
     let wasm_ret_types = function_information.signature.get_return_wasm_types();
 
     assert!(
@@ -2990,14 +2991,16 @@ fn process_fn_local_variables(
         .iter()
         .map(|ty| {
             match ty {
-                IntermediateType::IU64 => ValType::I32, // to store pointer instead of i64
-                other => ValType::from(other),
+                IntermediateType::IU64 => Ok(ValType::I32), // to store pointer instead of i64
+                other => ValType::try_from(other),
             }
         })
+        .collect::<Result<Vec<ValType>, IntermediateTypeError>>()?
+        .into_iter()
         .map(|ty| module.locals.add(ty))
         .collect();
 
-    (wasm_arg_locals, wasm_declared_locals)
+    Ok((wasm_arg_locals, wasm_declared_locals))
 }
 
 /// Converts value-based function arguments into heap-allocated pointers.

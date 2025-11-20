@@ -387,7 +387,7 @@ impl IStruct {
                         MemArg { align: 0, offset },
                     );
 
-                    if field.is_stack_type() {
+                    if field.is_stack_type()? {
                         load_value_to_stack(field, block)?;
                     }
 
@@ -398,7 +398,7 @@ impl IStruct {
                         MemArg { align: 0, offset },
                     );
 
-                    if field.is_stack_type() {
+                    if field.is_stack_type()? {
                         load_value_to_stack(field, block)?;
                     }
 

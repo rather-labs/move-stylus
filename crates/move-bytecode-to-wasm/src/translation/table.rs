@@ -11,7 +11,11 @@ use crate::{
     error::{CompilationError, ICEError, ICEErrorKind},
 };
 
-use super::{functions::MappedFunction, intermediate_types::IntermediateType};
+use super::{
+    TranslationError,
+    functions::MappedFunction,
+    intermediate_types::{IntermediateType, error::IntermediateTypeError},
+};
 
 /// Identifies a function inside a module
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
@@ -81,13 +85,13 @@ impl FunctionTable {
         module: &mut Module,
         function_id: FunctionId,
         function: &MappedFunction,
-    ) -> &TableEntry {
+    ) -> Result<&TableEntry, TranslationError> {
         let params: Vec<ValType> = function
             .signature
             .arguments
             .iter()
-            .map(ValType::from)
-            .collect();
+            .map(ValType::try_from)
+            .collect::<Result<Vec<ValType>, IntermediateTypeError>>()?;
 
         let results = function.signature.get_return_wasm_types();
         let type_id = module.types.add(&params, &results);
@@ -102,7 +106,7 @@ impl FunctionTable {
         let table = module.tables.get_mut(self.table_id);
         table.initial = self.entries.len() as u64;
 
-        &self.entries[self.entries.len() - 1]
+        Ok(&self.entries[self.entries.len() - 1])
     }
 
     pub fn add_to_wasm_table(

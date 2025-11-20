@@ -66,7 +66,7 @@ pub fn add_external_contract_call_fn(
     let swap_i32 = RuntimeFunction::SwapI32Bytes.get(module, None)?;
     let swap = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx))?;
 
-    let mut arguments = function_information.signature.get_argument_wasm_types();
+    let mut arguments = function_information.signature.get_argument_wasm_types()?;
 
     // Add the named ids into the arguments
     let named_id_args = named_ids.iter().map(|_| ValType::I32);
@@ -474,68 +474,73 @@ pub fn add_external_contract_call_fn(
             } = &function_information.signature.returns[0]
             {
                 if ContractCallResult::is_vm_type(module_id, *index, compilation_ctx) {
-                    let calldata_reader_pointer = module.locals.add(ValType::I32);
+                    inner_error = (|| {
+                        let calldata_reader_pointer = module.locals.add(ValType::I32);
 
-                    block
-                        .local_get(return_data_abi_encoded_ptr)
-                        .local_set(calldata_reader_pointer);
-
-                    let result_type = &types[0];
-
-                    // Unpack the value
-                    inner_error = result_type
-                        .add_unpack_instructions(
-                            block,
-                            module,
-                            return_data_abi_encoded_ptr,
-                            calldata_reader_pointer,
-                            compilation_ctx,
-                        )
-                        .map_err(|e| NativeFunctionError::Abi(Rc::new(e)));
-
-                    let abi_decoded_call_result = if result_type == &IntermediateType::IU64 {
-                        module.locals.add(ValType::I64)
-                    } else {
-                        module.locals.add(ValType::I32)
-                    };
-
-                    block.local_set(abi_decoded_call_result);
-
-                    // If the return type is a stack type, we need to create the intermediate pointer
-                    // for the struct field, otherwise it is already a pointer, we write it directly
-                    let data_ptr = if result_type.is_stack_type() {
-                        let call_result_value_ptr = module.locals.add(ValType::I32);
-                        let (store_kind, store_len) = if result_type == &IntermediateType::IU64 {
-                            (StoreKind::I64 { atomic: false }, 8)
-                        } else {
-                            (StoreKind::I32 { atomic: false }, 4)
-                        };
                         block
-                            .i32_const(store_len)
-                            .call(compilation_ctx.allocator)
-                            .local_tee(call_result_value_ptr)
-                            .local_get(abi_decoded_call_result)
-                            .store(
-                                compilation_ctx.memory_id,
-                                store_kind,
-                                MemArg {
-                                    align: 0,
-                                    offset: 0,
-                                },
-                            );
-                        call_result_value_ptr
-                    } else {
-                        abi_decoded_call_result
-                    };
+                            .local_get(return_data_abi_encoded_ptr)
+                            .local_set(calldata_reader_pointer);
 
-                    block.local_get(call_result).local_get(data_ptr).store(
-                        compilation_ctx.memory_id,
-                        StoreKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 4,
-                        },
-                    );
+                        let result_type = &types[0];
+
+                        // Unpack the value
+                        result_type
+                            .add_unpack_instructions(
+                                block,
+                                module,
+                                return_data_abi_encoded_ptr,
+                                calldata_reader_pointer,
+                                compilation_ctx,
+                            )
+                            .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?;
+
+                        let abi_decoded_call_result = if result_type == &IntermediateType::IU64 {
+                            module.locals.add(ValType::I64)
+                        } else {
+                            module.locals.add(ValType::I32)
+                        };
+
+                        block.local_set(abi_decoded_call_result);
+
+                        // If the return type is a stack type, we need to create the intermediate pointer
+                        // for the struct field, otherwise it is already a pointer, we write it directly
+                        let data_ptr = if result_type.is_stack_type()? {
+                            let call_result_value_ptr = module.locals.add(ValType::I32);
+                            let (store_kind, store_len) = if result_type == &IntermediateType::IU64
+                            {
+                                (StoreKind::I64 { atomic: false }, 8)
+                            } else {
+                                (StoreKind::I32 { atomic: false }, 4)
+                            };
+                            block
+                                .i32_const(store_len)
+                                .call(compilation_ctx.allocator)
+                                .local_tee(call_result_value_ptr)
+                                .local_get(abi_decoded_call_result)
+                                .store(
+                                    compilation_ctx.memory_id,
+                                    store_kind,
+                                    MemArg {
+                                        align: 0,
+                                        offset: 0,
+                                    },
+                                );
+                            call_result_value_ptr
+                        } else {
+                            abi_decoded_call_result
+                        };
+
+                        block.local_get(call_result).local_get(data_ptr).store(
+                            compilation_ctx.memory_id,
+                            StoreKind::I32 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 4,
+                            },
+                        );
+
+                        Ok(())
+                    })();
                 } else {
                     inner_error = Err(NativeFunctionError::ContractCallFunctionInvalidReturn(
                         function_information.function_id.clone(),

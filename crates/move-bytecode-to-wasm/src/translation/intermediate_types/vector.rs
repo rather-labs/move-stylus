@@ -639,7 +639,7 @@ impl IVector {
                 data_size,
             );
 
-            let temp_local = module.locals.add(inner.into());
+            let temp_local = module.locals.add(inner.try_into()?);
             for i in 0..num_elements {
                 builder.local_get(ptr_local);
                 builder.swap(ptr_local, temp_local);
@@ -647,7 +647,7 @@ impl IVector {
                 // Store at computed address
                 builder.store(
                     compilation_ctx.memory_id,
-                    match inner.into() {
+                    match inner.try_into()? {
                         ValType::I64 => StoreKind::I64 { atomic: false },
                         ValType::I32 => StoreKind::I32 { atomic: false },
                         _ => panic!("Unsupported ValType"),
@@ -809,7 +809,7 @@ impl IVector {
         compilation_ctx: &CompilationContext,
         module_data: &ModuleData,
     ) -> Result<(), IntermediateTypeError> {
-        let valtype = inner.into();
+        let valtype = inner.try_into()?;
         let size = inner.stack_data_size()? as i32;
         let vec_ref = module.locals.add(ValType::I32);
         let vec_ptr = module.locals.add(ValType::I32);
@@ -1211,7 +1211,7 @@ mod tests {
         builder.local_get(vec_ref);
 
         let element_data = element_data.to_vec();
-        let element_pointer = raw_module.locals.add(inner_type.clone().into());
+        let element_pointer = raw_module.locals.add((&inner_type).try_into().unwrap());
         inner_type
             .load_constant_instructions(
                 &mut raw_module,

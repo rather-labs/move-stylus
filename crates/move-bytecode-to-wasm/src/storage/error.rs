@@ -24,6 +24,9 @@ pub enum StorageError {
     #[error("compilation context error")]
     CompilationContext(#[from] CompilationContextError),
 
+    #[error("there was an error processing an intermediate type while accessing storage: {0:?}")]
+    IntermediateType(#[from] IntermediateTypeError),
+
     #[error("found a reference inside struct/enum variant fields")]
     FieldSizeFoundRef(IntermediateType),
 

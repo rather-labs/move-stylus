@@ -39,4 +39,10 @@ pub enum IntermediateTypeError {
 
     #[error("found reference inside enum with index {0}")]
     FoundReferenceInsideEnum(u16),
+
+    #[error("found a reference of a reference")]
+    FoundReferenceOfReference,
+
+    #[error("cannot perform WriteRef on signer type")]
+    CannotWriteRefOnSigner,
 }

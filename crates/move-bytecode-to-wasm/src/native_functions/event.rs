@@ -283,7 +283,7 @@ pub fn add_emit_log_fn(
         );
 
         // If it is a stack type, we need to perform another load
-        let local = if field.is_stack_type() {
+        let local = if field.is_stack_type()? {
             let (local, load_kind) = if field.stack_data_size()? == 8 {
                 (local_64, LoadKind::I64 { atomic: false })
             } else {
