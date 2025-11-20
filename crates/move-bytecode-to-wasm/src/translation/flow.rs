@@ -3,6 +3,8 @@ use move_binary_format::file_format::{Bytecode, CodeUnit};
 use relooper::{BranchMode, ShapedBlock};
 use std::collections::{HashMap, HashSet};
 
+use super::TranslationError;
+
 #[derive(Debug, Clone)]
 pub enum Flow<'code_unit> {
     Simple {
@@ -159,10 +161,10 @@ impl<'code_unit> Flow<'code_unit> {
         }
     }
 
-    pub fn get_label(&self) -> u16 {
+    pub fn get_label(&self) -> Result<u16, TranslationError> {
         match self {
-            Flow::Simple { label, .. } => *label,
-            _ => panic!("Only Simple flow has label"),
+            Flow::Simple { label, .. } => Ok(*label),
+            _ => Err(TranslationError::NotSimpleFlowWithLabel),
         }
     }
 

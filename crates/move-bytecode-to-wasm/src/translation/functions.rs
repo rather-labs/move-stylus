@@ -8,7 +8,9 @@ use walrus::{
     ir::{LoadKind, MemArg, StoreKind},
 };
 
-use super::types_stack::{TypesStack, TypesStackError};
+use super::{
+    TranslationError, intermediate_types::error::IntermediateTypeError, types_stack::TypesStack,
+};
 
 use crate::{
     CompilationContext, UserDefinedType,
@@ -17,6 +19,12 @@ use crate::{
 };
 
 use super::{intermediate_types::IntermediateType, table::FunctionId};
+
+#[derive(Debug, thiserror::Error)]
+pub enum MappedFunctionError {
+    #[error("an error ocurred while processing an intermediate type")]
+    IntermediateType(#[from] IntermediateTypeError),
+}
 
 #[derive(Debug, Clone)]
 pub struct JumpTableData {
@@ -56,8 +64,8 @@ impl MappedFunction {
         move_locals: &[SignatureToken],
         function_definition: &FunctionDefinition,
         handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
-    ) -> Self {
-        let signature = ISignature::from_signatures(move_args, move_rets, handles_map);
+    ) -> Result<Self, MappedFunctionError> {
+        let signature = ISignature::from_signatures(move_args, move_rets, handles_map)?;
         let results = signature.get_return_wasm_types();
 
         assert!(results.len() <= 1, "Multiple return values not supported");
@@ -85,7 +93,7 @@ impl MappedFunction {
             })
             .collect::<Vec<_>>();
 
-        Self {
+        Ok(Self {
             function_id,
             signature,
             locals,
@@ -94,7 +102,7 @@ impl MappedFunction {
             is_native: function_definition.is_native(),
             is_generic,
             jump_tables,
-        }
+        })
     }
 }
 
@@ -155,9 +163,9 @@ pub fn add_unpack_function_return_values_instructions(
     module: &mut Module,
     returns: &[IntermediateType],
     memory: MemoryId,
-) {
+) -> Result<(), IntermediateTypeError> {
     if returns.is_empty() {
-        return;
+        return Ok(());
     }
 
     let pointer = module.locals.add(ValType::I32);
@@ -166,13 +174,13 @@ pub fn add_unpack_function_return_values_instructions(
     let mut offset = 0;
     for return_ty in returns.iter() {
         builder.local_get(pointer);
-        if return_ty.stack_data_size() == 4 {
+        if return_ty.stack_data_size()? == 4 {
             builder.load(
                 memory,
                 LoadKind::I32 { atomic: false },
                 MemArg { align: 0, offset },
             );
-        } else if return_ty.stack_data_size() == 8 {
+        } else if return_ty.stack_data_size()? == 8 {
             builder.load(
                 memory,
                 LoadKind::I64 { atomic: false },
@@ -181,8 +189,10 @@ pub fn add_unpack_function_return_values_instructions(
         } else {
             unreachable!("Unsupported type size");
         }
-        offset += return_ty.stack_data_size();
+        offset += return_ty.stack_data_size()?;
     }
+
+    Ok(())
 }
 
 /// Packs the return values into a tuple if the function has return values
@@ -194,14 +204,14 @@ pub fn prepare_function_return(
     builder: &mut InstrSeqBuilder,
     returns: &[IntermediateType],
     compilation_ctx: &CompilationContext,
-) {
+) -> Result<(), TranslationError> {
     if !returns.is_empty() {
         let mut locals = Vec::new();
         let mut total_size = 0;
         for return_ty in returns.iter().rev() {
-            let local = return_ty.add_stack_to_local_instructions(module, builder);
+            let local = return_ty.add_stack_to_local_instructions(module, builder)?;
             locals.push(local);
-            total_size += return_ty.stack_data_size();
+            total_size += return_ty.stack_data_size()?;
         }
         locals.reverse();
 
@@ -216,13 +226,13 @@ pub fn prepare_function_return(
             builder.local_get(pointer);
             builder.local_get(*local);
 
-            if return_ty.stack_data_size() == 4 {
+            if return_ty.stack_data_size()? == 4 {
                 builder.store(
                     compilation_ctx.memory_id,
                     StoreKind::I32 { atomic: false },
                     MemArg { align: 0, offset },
                 );
-            } else if return_ty.stack_data_size() == 8 {
+            } else if return_ty.stack_data_size()? == 8 {
                 builder.store(
                     compilation_ctx.memory_id,
                     StoreKind::I64 { atomic: false },
@@ -231,13 +241,15 @@ pub fn prepare_function_return(
             } else {
                 unreachable!("Unsupported type size");
             }
-            offset += return_ty.stack_data_size();
+            offset += return_ty.stack_data_size()?;
         }
 
         builder.local_get(pointer);
     }
 
     builder.return_();
+
+    Ok(())
 }
 
 /// This function sets up the arguments for a function call.
@@ -252,7 +264,7 @@ pub fn prepare_function_arguments(
     arguments: &[IntermediateType],
     compilation_ctx: &CompilationContext,
     types_stack: &mut TypesStack,
-) -> Result<Vec<IntermediateType>, TypesStackError> {
+) -> Result<Vec<IntermediateType>, TranslationError> {
     let mut result = Vec::new();
     // Verify that the types currently on the types stack correspond to the expected argument types.
     // Additionally, determine if any of these arguments are references.
@@ -288,7 +300,7 @@ pub fn prepare_function_arguments(
                     },
                 );
             }
-            spilled.push(arg_ty.add_stack_to_local_instructions(module, builder));
+            spilled.push(arg_ty.add_stack_to_local_instructions(module, builder)?);
         }
 
         // ii. Rebuild the operand stack in call order (first .. last)

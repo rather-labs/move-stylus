@@ -3,10 +3,10 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
-use super::{error::AbiPackError, pack_native_int::pack_i32_type_instructions};
+use super::pack_native_int::pack_i32_type_instructions;
 use crate::{
-    CompilationContext, translation::intermediate_types::IntermediateType,
-    vm_handled_types::string::String_,
+    CompilationContext, abi_types::error::AbiError,
+    translation::intermediate_types::IntermediateType, vm_handled_types::string::String_,
 };
 
 impl String_ {
@@ -17,7 +17,7 @@ impl String_ {
         writer_pointer: LocalId,
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), AbiPackError> {
+    ) -> Result<(), AbiError> {
         let data_pointer = module.locals.add(ValType::I32);
         let inner_data_reference = module.locals.add(ValType::I32);
 
@@ -44,7 +44,7 @@ impl String_ {
             builder,
             local,
             compilation_ctx.memory_id,
-        );
+        )?;
 
         // Allocate space for the text, padding by 32 bytes plus 32 bytes for the length
         builder

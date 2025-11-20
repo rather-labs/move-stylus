@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use super::{NativeFunction, error::NativeFunctionError};
 use crate::{
     CompilationContext,
@@ -305,7 +307,9 @@ pub fn add_delete_storage_struct_instructions(
             // If the field is a UID or NamedId, do nothing as UIDs are not stored in storage
             continue;
         }
-        let field_size = field_size(field, compilation_ctx) as i32;
+        let field_size = field_size(field, compilation_ctx)
+            .map_err(|e| NativeFunctionError::Storage(Rc::new(e)))? as i32;
+
         add_delete_field_instructions(
             module,
             builder,
@@ -468,59 +472,64 @@ pub fn add_delete_storage_vector_instructions(
             .br_if(block_id);
 
         // Element size in STORAGE
-        let elem_size = field_size(inner, compilation_ctx) as i32;
+        match field_size(inner, compilation_ctx) {
+            Ok(elem_size) => {
+                // Calculate the slot of the first element: keccak(header)
+                block
+                    .local_get(slot_ptr)
+                    .i32_const(32)
+                    .local_get(elem_slot_ptr)
+                    .call(native_keccak);
 
-        // Calculate the slot of the first element: keccak(header)
-        block
-            .local_get(slot_ptr)
-            .i32_const(32)
-            .local_get(elem_slot_ptr)
-            .call(native_keccak);
+                // Set the aux locals to 0 to start the loop
+                let i = module.locals.add(ValType::I32);
+                let elem_slot_offset = module.locals.add(ValType::I32);
+                block.i32_const(0).local_set(i);
+                block.i32_const(0).local_set(elem_slot_offset);
 
-        // Set the aux locals to 0 to start the loop
-        let i = module.locals.add(ValType::I32);
-        let elem_slot_offset = module.locals.add(ValType::I32);
-        block.i32_const(0).local_set(i);
-        block.i32_const(0).local_set(elem_slot_offset);
+                block.block(None, |inner_block| {
+                    let inner_block_id = inner_block.id();
+                    inner_block.loop_(None, |loop_| {
+                        let loop_id = loop_.id();
 
-        block.block(None, |inner_block| {
-            let inner_block_id = inner_block.id();
-            inner_block.loop_(None, |loop_| {
-                let loop_id = loop_.id();
+                        inner_result = add_delete_field_instructions(
+                            module,
+                            loop_,
+                            compilation_ctx,
+                            elem_slot_ptr,
+                            elem_slot_offset,
+                            inner,
+                            elem_size as i32,
+                        );
 
-                inner_result = add_delete_field_instructions(
-                    module,
-                    loop_,
-                    compilation_ctx,
-                    elem_slot_ptr,
-                    elem_slot_offset,
-                    inner,
-                    elem_size,
-                );
+                        // If we reach the last element, we exit
+                        loop_
+                            .local_get(i)
+                            .local_get(len)
+                            .i32_const(1)
+                            .binop(BinaryOp::I32Sub)
+                            .binop(BinaryOp::I32Eq)
+                            .br_if(inner_block_id);
 
-                // If we reach the last element, we exit
-                loop_
-                    .local_get(i)
-                    .local_get(len)
-                    .i32_const(1)
-                    .binop(BinaryOp::I32Sub)
-                    .binop(BinaryOp::I32Eq)
-                    .br_if(inner_block_id);
-
-                // Else, increment i and continue the loop
-                loop_
-                    .local_get(i)
-                    .i32_const(1)
-                    .binop(BinaryOp::I32Add)
-                    .local_set(i)
-                    .br(loop_id);
-            });
-        });
-        // Delete the last slot before exiting
-        block
-            .local_get(elem_slot_ptr)
-            .i32_const(DATA_ZERO_OFFSET)
-            .call(storage_cache);
+                        // Else, increment i and continue the loop
+                        loop_
+                            .local_get(i)
+                            .i32_const(1)
+                            .binop(BinaryOp::I32Add)
+                            .local_set(i)
+                            .br(loop_id);
+                    });
+                });
+                // Delete the last slot before exiting
+                block
+                    .local_get(elem_slot_ptr)
+                    .i32_const(DATA_ZERO_OFFSET)
+                    .call(storage_cache);
+            }
+            Err(e) => {
+                inner_result = Err(NativeFunctionError::Storage(e.into()));
+            }
+        }
     });
     inner_result?;
 

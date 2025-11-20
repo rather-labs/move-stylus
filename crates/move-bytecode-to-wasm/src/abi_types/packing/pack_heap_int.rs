@@ -4,14 +4,13 @@ use walrus::{
 };
 
 use crate::{
+    abi_types::error::AbiError,
     runtime::RuntimeFunction,
     translation::intermediate_types::{
         address::IAddress,
         heap_integers::{IU128, IU256},
     },
 };
-
-use super::error::AbiPackError;
 
 impl IU128 {
     pub fn add_pack_instructions(
@@ -20,7 +19,7 @@ impl IU128 {
         local: LocalId,
         writer_pointer: LocalId,
         memory: MemoryId,
-    ) -> Result<(), AbiPackError> {
+    ) -> Result<(), AbiError> {
         // Little-endian to Big-endian
         let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None)?;
 
@@ -62,7 +61,7 @@ impl IU256 {
         local: LocalId,
         writer_pointer: LocalId,
         memory: MemoryId,
-    ) -> Result<(), AbiPackError> {
+    ) -> Result<(), AbiError> {
         // Little-endian to Big-endian
         let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None)?;
 

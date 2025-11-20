@@ -1,8 +1,9 @@
 use crate::{
     CompilationContext,
-    translation::TranslationError,
     translation::intermediate_types::{IntermediateType, enums::IEnum},
 };
+
+use super::error::StorageError;
 
 const SLOT_SIZE: u32 = 32;
 
@@ -30,7 +31,7 @@ pub fn compute_enum_storage_size(
     enum_: &IEnum,
     slot_offset: u32,
     compilation_ctx: &CompilationContext,
-) -> Result<u32, TranslationError> {
+) -> Result<u32, StorageError> {
     // Increment the offset by 1 to account for the variant index
     let slot_offset = (slot_offset + 1) % SLOT_SIZE;
 
@@ -72,7 +73,7 @@ fn compute_fields_storage_size(
     slot_offset: u32,
     compilation_ctx: &CompilationContext,
     error_context: FieldsErrorContext,
-) -> Result<u32, TranslationError> {
+) -> Result<u32, StorageError> {
     let mut size = 0u32;
     let mut offset = slot_offset;
 
@@ -81,7 +82,7 @@ fn compute_fields_storage_size(
             IntermediateType::ITypeParameter(type_parameter_index) => {
                 return Err(match error_context {
                     FieldsErrorContext::Struct { struct_index } => {
-                        TranslationError::FoundTypeParameterInsideStruct {
+                        StorageError::FoundTypeParameterInsideStruct {
                             struct_index,
                             type_parameter_index: *type_parameter_index,
                         }
@@ -89,7 +90,7 @@ fn compute_fields_storage_size(
                     FieldsErrorContext::Enum {
                         enum_index,
                         variant_index,
-                    } => TranslationError::FoundTypeParameterInsideEnumVariant {
+                    } => StorageError::FoundTypeParameterInsideEnumVariant {
                         enum_index,
                         variant_index,
                     },
@@ -98,17 +99,15 @@ fn compute_fields_storage_size(
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 return Err(match error_context {
                     FieldsErrorContext::Struct { struct_index } => {
-                        TranslationError::FoundReferenceInsideStruct { struct_index }
+                        StorageError::FoundReferenceInsideStruct { struct_index }
                     }
                     FieldsErrorContext::Enum { enum_index, .. } => {
-                        TranslationError::FoundReferenceInsideEnum { enum_index }
+                        StorageError::FoundReferenceInsideEnum { enum_index }
                     }
                 });
             }
             IntermediateType::IGenericStructInstance { .. } | IntermediateType::IStruct { .. } => {
-                let struct_ = compilation_ctx
-                    .get_struct_by_intermediate_type(field)
-                    .expect("struct not found");
+                let struct_ = compilation_ctx.get_struct_by_intermediate_type(field)?;
 
                 if struct_.has_key {
                     // Parent stores 32-byte UID when child has key
@@ -144,9 +143,7 @@ fn compute_fields_storage_size(
                 }
             }
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
-                let enum_ = compilation_ctx
-                    .get_enum_by_intermediate_type(field)
-                    .expect("enum not found");
+                let enum_ = compilation_ctx.get_enum_by_intermediate_type(field)?;
 
                 // Compute the size of the enum
                 let enum_size = compute_enum_storage_size(&enum_, offset, compilation_ctx)?;
@@ -158,7 +155,7 @@ fn compute_fields_storage_size(
                 offset = (offset + enum_size) % SLOT_SIZE;
             }
             _ => {
-                let field_size = field_size(field, compilation_ctx);
+                let field_size = field_size(field, compilation_ctx)?;
 
                 // free_bytes = SLOT_SIZE - used_bytes
                 let free_bytes = SLOT_SIZE - offset;
@@ -190,8 +187,11 @@ fn compute_fields_storage_size(
 /// - For structs without `key`, size is 0 because their inline size depends on fields;
 ///   callers compute layout using field-by-field accumulation.
 /// - For structs with `key`, at least 32 bytes are used to store the UID reference.
-pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext) -> u32 {
-    match field {
+pub fn field_size(
+    field: &IntermediateType,
+    compilation_ctx: &CompilationContext,
+) -> Result<u32, StorageError> {
+    let size = match field {
         IntermediateType::IBool | IntermediateType::IU8 => 1,
         // Enums have variable size depending on its fields. This is computed via compute_enum_storage_size
         IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => 0,
@@ -214,19 +214,19 @@ pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext
         | IntermediateType::IStruct {
             module_id, index, ..
         } => {
-            let s = compilation_ctx
-                .get_struct_by_index(module_id, *index)
-                .expect("struct not found");
+            let s = compilation_ctx.get_struct_by_index(module_id, *index)?;
 
             if s.has_key { 32 } else { 0 }
         }
         IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-            panic!("found reference inside struct")
+            return Err(StorageError::FieldSizeFoundRef(field.clone()));
         }
         IntermediateType::ITypeParameter(_) => {
-            panic!("cannot know the field size of a type parameter");
+            return Err(StorageError::FieldSizeFoundTypeParameter);
         }
-    }
+    };
+
+    Ok(size)
 }
 
 #[cfg(test)]
