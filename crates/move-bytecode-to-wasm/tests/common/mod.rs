@@ -211,3 +211,20 @@ pub fn translate_test_package_with_framework(path: &str, module_name: &str) -> M
 
     translate_single_module(package, module_name).unwrap()
 }
+
+#[allow(dead_code)]
+/// Translates a single test module and returns Result for error checking
+pub fn translate_test_package_with_framework_result(
+    path: &str,
+    module_name: &str,
+) -> Result<Module, move_bytecode_to_wasm::error::CompilationError> {
+    let path = Path::new(path);
+    let rerooted_path = reroot_path(path);
+    create_move_toml_with_framework(&rerooted_path, "../../stylus-framework");
+
+    let package = get_build_confing()
+        .compile_package(&rerooted_path, &mut Vec::new())
+        .unwrap();
+
+    translate_single_module(package, module_name)
+}
