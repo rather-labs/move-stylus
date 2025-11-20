@@ -57,4 +57,7 @@ pub enum IntermediateTypeError {
 
     #[error("store offset is not aligned with the needed bytes, needed {needed} got {actual}")]
     VectorStoreOffsetNotAligned { needed: usize, actual: usize },
+
+    #[error("type {0:?} not supported in vectors")]
+    VectorUnnsuportedType(IntermediateType),
 }
