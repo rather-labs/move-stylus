@@ -19,7 +19,7 @@ use crate::{
     runtime::RuntimeFunction,
     translation::{
         functions::MappedFunction,
-        intermediate_types::{IntermediateType, VmHandledStruct},
+        intermediate_types::{IntermediateType, VmHandledStruct, structs::IStruct},
     },
     vm_handled_types::{
         VmHandledType,
@@ -260,7 +260,7 @@ pub fn add_external_contract_call_fn(
                         calldata_reference_pointer,
                         compilation_ctx,
                     )
-                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?;
+                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?;
 
                 builder
                     .local_get(writer_pointer)
@@ -277,7 +277,7 @@ pub fn add_external_contract_call_fn(
                         calldata_reference_pointer,
                         compilation_ctx,
                     )
-                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?;
+                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?;
 
                 builder
                     .local_get(writer_pointer)
@@ -491,7 +491,7 @@ pub fn add_external_contract_call_fn(
                             calldata_reader_pointer,
                             compilation_ctx,
                         )
-                        .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())));
+                        .map_err(|e| NativeFunctionError::Abi(Rc::new(e)));
 
                     let abi_decoded_call_result = if result_type == &IntermediateType::IU64 {
                         module.locals.add(ValType::I64)
@@ -537,10 +537,9 @@ pub fn add_external_contract_call_fn(
                         },
                     );
                 } else {
-                    panic!(
-                        "invalid ContractCallResult type found in function {}",
-                        function_information.function_id
-                    );
+                    inner_error = Err(NativeFunctionError::ContractCallFunctionInvalidReturn(
+                        function_information.function_id.clone(),
+                    ));
                 }
             }
         });
@@ -609,58 +608,64 @@ pub fn add_external_contract_call_fn(
         })
         .collect();
 
-    let named_ids_storage_objects = named_ids.iter().enumerate().map(|(i, named_id)| {
-        if let IntermediateType::IGenericStructInstance {
-            module_id: _,
-            index: _,
-            types: _,
-            vm_handled_struct:
-                VmHandledStruct::StorageId {
-                    parent_module_id,
-                    parent_index,
-                    instance_types,
-                },
-        } = named_id
-        {
-            let (parent_struct_itype, parent_struct) = if let Some(instance_types) = instance_types
+    let named_ids_storage_objects = named_ids
+        .iter()
+        .enumerate()
+        .map(|(i, named_id)| {
+            if let IntermediateType::IGenericStructInstance {
+                module_id: _,
+                index: _,
+                types: _,
+                vm_handled_struct:
+                    VmHandledStruct::StorageId {
+                        parent_module_id,
+                        parent_index,
+                        instance_types,
+                    },
+            } = named_id
             {
-                let itype = IntermediateType::IGenericStructInstance {
-                    module_id: parent_module_id.clone(),
-                    index: *parent_index,
-                    types: instance_types.clone(),
-                    vm_handled_struct: VmHandledStruct::None,
-                };
+                let (parent_struct_itype, parent_struct) =
+                    if let Some(instance_types) = instance_types {
+                        let itype = IntermediateType::IGenericStructInstance {
+                            module_id: parent_module_id.clone(),
+                            index: *parent_index,
+                            types: instance_types.clone(),
+                            vm_handled_struct: VmHandledStruct::None,
+                        };
 
-                let struct_ = compilation_ctx
-                    .get_struct_by_index(parent_module_id, *parent_index)
-                    .unwrap();
-                struct_.instantiate(instance_types);
+                        let struct_ = compilation_ctx
+                            .get_struct_by_index(parent_module_id, *parent_index)
+                            .unwrap();
+                        struct_.instantiate(instance_types);
 
-                (itype, struct_)
+                        (itype, struct_)
+                    } else {
+                        let itype = IntermediateType::IStruct {
+                            module_id: parent_module_id.clone(),
+                            index: *parent_index,
+                            vm_handled_struct: VmHandledStruct::None,
+                        };
+
+                        let struct_ = compilation_ctx
+                            .get_struct_by_index(parent_module_id, *parent_index)
+                            .unwrap();
+
+                        (itype, struct_)
+                    };
+
+                Ok((
+                    // The named id arguments are located after the common arguments of the function
+                    function_args[i + function_information.signature.arguments.len()],
+                    parent_struct_itype,
+                    parent_struct,
+                ))
             } else {
-                let itype = IntermediateType::IStruct {
-                    module_id: parent_module_id.clone(),
-                    index: *parent_index,
-                    vm_handled_struct: VmHandledStruct::None,
-                };
-
-                let struct_ = compilation_ctx
-                    .get_struct_by_index(parent_module_id, *parent_index)
-                    .unwrap();
-
-                (itype, struct_)
-            };
-
-            (
-                // The named id arguments are located after the common arguments of the function
-                function_args[i + function_information.signature.arguments.len()],
-                parent_struct_itype,
-                parent_struct,
-            )
-        } else {
-            panic!("found an struct ({named_id:?}) that is not a named id in named_ids array");
-        }
-    });
+                Err(NativeFunctionError::ContractCallInvalidNamedId(
+                    named_id.clone(),
+                ))
+            }
+        })
+        .collect::<Result<Vec<(LocalId, IntermediateType, &IStruct)>, NativeFunctionError>>()?;
 
     storage_objects.extend(named_ids_storage_objects);
 

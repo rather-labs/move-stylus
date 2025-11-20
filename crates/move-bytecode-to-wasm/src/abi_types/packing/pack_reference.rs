@@ -1,6 +1,7 @@
 use super::Packable;
 use super::error::AbiPackError;
 use crate::CompilationContext;
+use crate::abi_types::error::AbiError;
 use crate::translation::intermediate_types::IntermediateType;
 use crate::translation::intermediate_types::reference::{IMutRef, IRef};
 use walrus::{
@@ -18,7 +19,7 @@ impl IRef {
         writer_pointer: LocalId,
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), AbiPackError> {
+    ) -> Result<(), AbiError> {
         match inner {
             IntermediateType::ISigner
             | IntermediateType::IU128
@@ -71,10 +72,10 @@ impl IRef {
 
                 builder.load(
                     compilation_ctx.memory_id,
-                    match inner.stack_data_size() {
+                    match inner.stack_data_size()? {
                         4 => LoadKind::I32 { atomic: false },
                         8 => LoadKind::I64 { atomic: false },
-                        s => return Err(AbiPackError::RefInvalidStackDataSize(s)),
+                        s => return Err(AbiPackError::RefInvalidStackDataSize(s))?,
                     },
                     MemArg {
                         align: 0,
@@ -82,10 +83,10 @@ impl IRef {
                     },
                 );
 
-                let value_local = module.locals.add(match inner.stack_data_size() {
+                let value_local = module.locals.add(match inner.stack_data_size()? {
                     4 => ValType::I32,
                     8 => ValType::I64,
-                    s => return Err(AbiPackError::RefInvalidStackDataSize(s)),
+                    s => return Err(AbiPackError::RefInvalidStackDataSize(s))?,
                 });
                 builder.local_set(value_local);
 
@@ -99,10 +100,10 @@ impl IRef {
                 )?;
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                return Err(AbiPackError::RefInsideRef);
+                return Err(AbiPackError::RefInsideRef)?;
             }
             IntermediateType::ITypeParameter(_) => {
-                return Err(AbiPackError::PackingGenericTypeParameter);
+                return Err(AbiPackError::PackingGenericTypeParameter)?;
             }
         }
 
@@ -120,7 +121,7 @@ impl IMutRef {
         writer_pointer: LocalId,
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), AbiPackError> {
+    ) -> Result<(), AbiError> {
         match inner {
             IntermediateType::IU128
             | IntermediateType::IU256
@@ -172,20 +173,20 @@ impl IMutRef {
 
                 builder.load(
                     compilation_ctx.memory_id,
-                    match inner.stack_data_size() {
+                    match inner.stack_data_size()? {
                         4 => LoadKind::I32 { atomic: false },
                         8 => LoadKind::I64 { atomic: false },
-                        s => return Err(AbiPackError::RefInvalidStackDataSize(s)),
+                        s => return Err(AbiPackError::RefInvalidStackDataSize(s))?,
                     },
                     MemArg {
                         align: 0,
                         offset: 0,
                     },
                 );
-                let value_local = module.locals.add(match inner.stack_data_size() {
+                let value_local = module.locals.add(match inner.stack_data_size()? {
                     4 => ValType::I32,
                     8 => ValType::I64,
-                    s => return Err(AbiPackError::RefInvalidStackDataSize(s)),
+                    s => return Err(AbiPackError::RefInvalidStackDataSize(s))?,
                 });
                 builder.local_set(value_local);
 
@@ -199,10 +200,10 @@ impl IMutRef {
                 )?;
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                return Err(AbiPackError::RefInsideRef);
+                return Err(AbiPackError::RefInsideRef)?;
             }
             IntermediateType::ITypeParameter(_) => {
-                return Err(AbiPackError::PackingGenericTypeParameter);
+                return Err(AbiPackError::PackingGenericTypeParameter)?;
             }
         }
 

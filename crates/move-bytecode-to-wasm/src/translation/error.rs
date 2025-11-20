@@ -13,7 +13,9 @@ use crate::{
 };
 
 use super::{
-    intermediate_types::IntermediateType, table::FunctionId, types_stack::TypesStackError,
+    intermediate_types::{IntermediateType, error::IntermediateTypeError},
+    table::FunctionId,
+    types_stack::TypesStackError,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -32,6 +34,14 @@ pub enum TranslationError {
 
     #[error("an abi error ocurred while translating a function")]
     AbiEncoding(#[from] AbiError),
+
+    #[error("an error ocurred while processing an intermediate type")]
+    IntermediateType(#[from] IntermediateTypeError),
+
+    //    #[error("an storage error ocurred while translating a function")]
+    //    Storage(#[from] StorageError),
+    #[error("a translation error ocurred translating instruction {0:?}")]
+    AtInstruction(Bytecode, #[source] Rc<TranslationError>),
 
     #[error(r#"function "{0}" not found in global functions table"#)]
     FunctionDefinitionNotFound(FunctionId),
@@ -80,6 +90,9 @@ pub enum TranslationError {
     #[error("found reference inside struct with index {struct_index}")]
     FoundReferenceInsideStruct { struct_index: u16 },
 
+    #[error("found reference inside enum with index {0}")]
+    FoundReferenceInsideEnum(u16),
+
     #[error(
         "found type parameter inside struct with index {struct_index} and type parameter index {type_parameter_index}"
     )]
@@ -96,9 +109,6 @@ pub enum TranslationError {
         identifier: String,
         module_id: ModuleId,
     },
-
-    #[error("found reference inside enum with index {enum_index}")]
-    FoundReferenceInsideEnum { enum_index: u16 },
 
     #[error("processing CallGeneric bytecode without type instantiations")]
     CallGenericWihtoutTypeInstantiations,
@@ -146,11 +156,11 @@ pub enum TranslationError {
     #[error("branch target not found")]
     BranchTargetNotFound(u16),
 
-    #[error("a translation error ocurred translating instruction {0:?}")]
-    AtInstruction(Bytecode, #[source] Rc<TranslationError>),
-
     #[error(r#"could not find original local "{0:?}" in function information"#)]
     LocalNotFound(LocalId),
+
+    #[error("trying to peform an operation on a type parameter")]
+    FoundTypeParameter,
 
     // Flow
     #[error("switch: more than one case returns a value, Move should have merged them")]
@@ -164,6 +174,9 @@ pub enum TranslationError {
 
     #[error("jump table for IfElse flow should contain exactly 2 elements")]
     IfElseJumpTableBranchesNumberMismatch,
+
+    #[error("only Simple flow has label")]
+    NotSimpleFlowWithLabel,
 
     // Unknown
 

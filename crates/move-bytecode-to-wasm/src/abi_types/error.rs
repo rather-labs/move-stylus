@@ -2,6 +2,7 @@ use crate::{
     compilation_context::CompilationContextError,
     error::{CompilationError, ICEError, ICEErrorKind},
     runtime::error::RuntimeFunctionError,
+    translation::intermediate_types::error::IntermediateTypeError,
 };
 
 use super::{
@@ -54,6 +55,9 @@ pub enum AbiError {
 
     #[error("compilation context error ocurred while ABI")]
     CompilationContext(#[from] CompilationContextError),
+
+    #[error("an error ocurred while processing an intermediate type")]
+    IntermediateType(#[from] IntermediateTypeError),
 }
 
 impl From<AbiError> for CompilationError {

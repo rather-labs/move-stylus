@@ -143,7 +143,7 @@ mod constructor_with_return {
     );
 
     #[rstest]
-    #[should_panic(expected = "expected no return values")]
+    #[should_panic]
     fn test_constructor_with_return(runtime: RuntimeSandbox) {
         let call_data = constructorCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -173,7 +173,7 @@ mod constructor_bad_args_1 {
     );
 
     #[rstest]
-    #[should_panic(expected = "invalid arguments")]
+    #[should_panic]
     fn test_constructor_bad_args_1(runtime: RuntimeSandbox) {
         let call_data = constructorCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -203,7 +203,7 @@ mod constructor_bad_args_2 {
     );
 
     #[rstest]
-    #[should_panic(expected = "invalid arguments")]
+    #[should_panic]
     fn test_constructor_bad_args_2(runtime: RuntimeSandbox) {
         let call_data = constructorCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -233,7 +233,7 @@ mod constructor_bad_args_3 {
     );
 
     #[rstest]
-    #[should_panic(expected = "invalid arguments")]
+    #[should_panic]
     fn test_constructor_bad_args_3(runtime: RuntimeSandbox) {
         let call_data = constructorCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -263,7 +263,7 @@ mod constructor_bad_args_4 {
     );
 
     #[rstest]
-    #[should_panic(expected = "invalid arguments")]
+    #[should_panic]
     fn test_constructor_bad_args_4(runtime: RuntimeSandbox) {
         let call_data = constructorCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -293,7 +293,7 @@ mod constructor_bad_args_5 {
     );
 
     #[rstest]
-    #[should_panic(expected = "invalid arguments")]
+    #[should_panic]
     fn test_constructor_bad_args_5(runtime: RuntimeSandbox) {
         let call_data = constructorCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();

@@ -6,14 +6,13 @@ use walrus::{
 
 use crate::{
     CompilationContext,
+    abi_types::error::AbiError,
     runtime::RuntimeFunction,
     translation::intermediate_types::{
         address::IAddress,
         heap_integers::{IU128, IU256},
     },
 };
-
-use super::error::AbiUnpackError;
 
 impl IU128 {
     pub fn add_unpack_instructions(
@@ -22,7 +21,7 @@ impl IU128 {
         reader_pointer: LocalId,
         _calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), AbiUnpackError> {
+    ) -> Result<(), AbiError> {
         let encoded_size =
             sol_data::Uint::<128>::ENCODED_SIZE.expect("U128 should have a fixed size") as i32;
 
@@ -63,7 +62,7 @@ impl IU256 {
         reader_pointer: LocalId,
         _calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), AbiUnpackError> {
+    ) -> Result<(), AbiError> {
         let encoded_size =
             sol_data::Uint::<256>::ENCODED_SIZE.expect("U256 should have a fixed size") as i32;
 

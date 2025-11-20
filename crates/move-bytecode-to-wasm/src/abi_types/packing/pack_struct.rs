@@ -89,11 +89,11 @@ use walrus::{
 
 use crate::{
     CompilationContext,
-    abi_types::packing::pack_native_int::pack_i32_type_instructions,
+    abi_types::{error::AbiError, packing::pack_native_int::pack_i32_type_instructions},
     translation::intermediate_types::{IntermediateType, structs::IStruct},
 };
 
-use super::{Packable, error::AbiPackError};
+use super::Packable;
 
 impl IStruct {
     #[allow(clippy::too_many_arguments)]
@@ -106,7 +106,7 @@ impl IStruct {
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
         base_calldata_reference_pointer: Option<LocalId>,
-    ) -> Result<(), AbiPackError> {
+    ) -> Result<(), AbiError> {
         let val_32 = module.locals.add(ValType::I32);
         let val_64 = module.locals.add(ValType::I64);
         let struct_ptr = local;
@@ -171,7 +171,7 @@ impl IStruct {
                 | IntermediateType::IU16
                 | IntermediateType::IU32
                 | IntermediateType::IU64 => {
-                    let (val, load_kind) = if field.stack_data_size() == 8 {
+                    let (val, load_kind) = if field.stack_data_size()? == 8 {
                         (val_64, LoadKind::I64 { atomic: false })
                     } else {
                         (val_32, LoadKind::I32 { atomic: false })
@@ -269,7 +269,7 @@ fn pack_child_struct(
     data_ptr: LocalId,
     inner_data_reference: LocalId,
     field: &IntermediateType,
-) -> Result<usize, AbiPackError> {
+) -> Result<usize, AbiError> {
     if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx)? {
         field.add_pack_instructions_dynamic(
             block,
