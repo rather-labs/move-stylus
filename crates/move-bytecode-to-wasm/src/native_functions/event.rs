@@ -169,13 +169,13 @@ pub fn add_emit_log_fn(
 
                 let is_dynamic = struct_
                     .solidity_abi_encode_is_dynamic(compilation_ctx)
-                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?;
+                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?;
                 let size = if is_dynamic {
                     32
                 } else {
                     struct_
                         .solidity_abi_encode_size(compilation_ctx)
-                        .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?
+                        .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?
                         as i32
                 };
 

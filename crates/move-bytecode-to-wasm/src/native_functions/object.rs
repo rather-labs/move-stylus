@@ -303,7 +303,7 @@ pub fn add_delete_storage_struct_instructions(
 
     // Iterate over the fields of the struct and delete them
     for field in struct_.fields.iter() {
-        if is_uid_or_named_id(&field, compilation_ctx)? {
+        if is_uid_or_named_id(field, compilation_ctx)? {
             // If the field is a UID or NamedId, do nothing as UIDs are not stored in storage
             continue;
         }

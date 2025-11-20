@@ -122,7 +122,7 @@ fn compute_fields_storage_size(
                     let mut filtered_fields: Vec<IntermediateType> = Vec::new();
 
                     for f in &struct_.fields {
-                        if !is_uid_or_named_id(&f, compilation_ctx)? {
+                        if !is_uid_or_named_id(f, compilation_ctx)? {
                             filtered_fields.push(f.clone())
                         }
                     }
@@ -205,7 +205,7 @@ pub fn field_size(
         IntermediateType::IAddress | IntermediateType::ISigner => 20,
         // Dynamic data occupies the whole slot, but the data is saved somewhere else
         IntermediateType::IVector(_) => 32,
-        field if is_uid_or_named_id(&field, compilation_ctx)? => 32,
+        field if is_uid_or_named_id(field, compilation_ctx)? => 32,
 
         // Structs default to size 0 since their size depends on whether their fields are dynamic or static.
         // The store function will handle this. If a struct has the 'key' ability, it at least occupies 32 bytes for the UID.

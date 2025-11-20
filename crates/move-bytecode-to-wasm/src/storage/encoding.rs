@@ -97,7 +97,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
     }
 
     for (index, field) in struct_.fields.iter().enumerate() {
-        if is_uid_or_named_id(&field, compilation_ctx)? {
+        if is_uid_or_named_id(field, compilation_ctx)? {
             // UIDs are not written in storage, except for referencing nested child structs (wrapped objects).
             continue;
         }

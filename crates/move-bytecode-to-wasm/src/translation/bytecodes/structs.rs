@@ -162,7 +162,7 @@ pub fn pack(
 
                     // If we find an UID or NamedId struct, in the 4 bytes before its pointer, we
                     // write the address of the struct holding it
-                    pack_type if is_uid_or_named_id(&pack_type, compilation_ctx)? => {
+                    pack_type if is_uid_or_named_id(pack_type, compilation_ctx)? => {
                         builder.local_set(ptr_to_data);
 
                         builder

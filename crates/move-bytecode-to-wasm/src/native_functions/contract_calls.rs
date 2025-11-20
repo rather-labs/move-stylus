@@ -225,13 +225,13 @@ pub fn add_external_contract_call_fn(
             // just 32 bytes (the value is the offset to where the values are packed)
             args_size += if signature_token
                 .is_dynamic(compilation_ctx)
-                .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?
+                .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?
             {
                 32
             } else {
                 signature_token
                     .encoded_size(compilation_ctx)
-                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?
+                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?
             };
         }
 
@@ -249,7 +249,7 @@ pub fn add_external_contract_call_fn(
 
             if argument
                 .is_dynamic(compilation_ctx)
-                .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?
+                .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?
             {
                 argument
                     .add_pack_instructions_dynamic(
@@ -284,7 +284,7 @@ pub fn add_external_contract_call_fn(
                     .i32_const(
                         argument
                             .encoded_size(compilation_ctx)
-                            .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?
+                            .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?
                             as i32,
                     )
                     .binop(BinaryOp::I32Add)
@@ -466,15 +466,15 @@ pub fn add_external_contract_call_fn(
                 "invalid contract call function, it can only return one value"
             );
 
-            if let IntermediateType::IGenericStructInstance {
-                module_id,
-                index,
-                types,
-                ..
-            } = &function_information.signature.returns[0]
-            {
-                if ContractCallResult::is_vm_type(module_id, *index, compilation_ctx)? {
-                    inner_error = (|| {
+            inner_error = (|| {
+                if let IntermediateType::IGenericStructInstance {
+                    module_id,
+                    index,
+                    types,
+                    ..
+                } = &function_information.signature.returns[0]
+                {
+                    if ContractCallResult::is_vm_type(module_id, *index, compilation_ctx)? {
                         let calldata_reader_pointer = module.locals.add(ValType::I32);
 
                         block
@@ -540,13 +540,15 @@ pub fn add_external_contract_call_fn(
                         );
 
                         Ok(())
-                    })();
+                    } else {
+                        Err(NativeFunctionError::ContractCallFunctionInvalidReturn(
+                            function_information.function_id.clone(),
+                        ))
+                    }
                 } else {
-                    inner_error = Err(NativeFunctionError::ContractCallFunctionInvalidReturn(
-                        function_information.function_id.clone(),
-                    ));
+                    Ok(())
                 }
-            }
+            })();
         });
 
         inner_error?
@@ -555,63 +557,60 @@ pub fn add_external_contract_call_fn(
     // Before returning, if the call is a delegated call, we must load from storage the potentially
     // modified storage objects
     // We ignore the first argument since it is the #[external_call] object
-    let mut storage_objects: Vec<_> = arguments_types
-        .iter()
-        .enumerate()
-        .filter_map(|(i, itype)| {
-            let itype = if let IntermediateType::IMutRef(inner) = itype {
-                inner
-            } else if let IntermediateType::IRef(inner) = itype {
-                inner
-            } else {
-                itype
-            };
+    let mut storage_objects: Vec<_> = Vec::new();
+    for (i, itype) in arguments_types.iter().enumerate() {
+        let itype = if let IntermediateType::IMutRef(inner) = itype {
+            inner
+        } else if let IntermediateType::IRef(inner) = itype {
+            inner
+        } else {
+            itype
+        };
 
-            match itype {
-                IntermediateType::IStruct {
-                    module_id,
-                    index,
-                    vm_handled_struct:
-                        VmHandledStruct::StorageId {
-                            parent_module_id,
-                            parent_index,
-                            instance_types,
-                        },
-                } if Uid::is_vm_type(module_id, *index, compilation_ctx)? => {
-                    let (parent_struct_itype, parent_struct) =
-                        if let Some(instance_types) = instance_types {
-                            let itype = IntermediateType::IGenericStructInstance {
-                                module_id: parent_module_id.clone(),
-                                index: *parent_index,
-                                types: instance_types.clone(),
-                                vm_handled_struct: VmHandledStruct::None,
-                            };
-
-                            let struct_ = compilation_ctx
-                                .get_struct_by_index(parent_module_id, *parent_index)
-                                .unwrap();
-                            struct_.instantiate(instance_types);
-
-                            (itype, struct_)
-                        } else {
-                            let itype = IntermediateType::IStruct {
-                                module_id: parent_module_id.clone(),
-                                index: *parent_index,
-                                vm_handled_struct: VmHandledStruct::None,
-                            };
-                            let struct_ = compilation_ctx
-                                .get_struct_by_index(parent_module_id, *parent_index)
-                                .unwrap();
-
-                            (itype, struct_)
+        match itype {
+            IntermediateType::IStruct {
+                module_id,
+                index,
+                vm_handled_struct:
+                    VmHandledStruct::StorageId {
+                        parent_module_id,
+                        parent_index,
+                        instance_types,
+                    },
+            } if Uid::is_vm_type(module_id, *index, compilation_ctx)? => {
+                let (parent_struct_itype, parent_struct) =
+                    if let Some(instance_types) = instance_types {
+                        let itype = IntermediateType::IGenericStructInstance {
+                            module_id: parent_module_id.clone(),
+                            index: *parent_index,
+                            types: instance_types.clone(),
+                            vm_handled_struct: VmHandledStruct::None,
                         };
 
-                    Some((function_args[i], parent_struct_itype, parent_struct))
-                }
-                _ => None,
+                        let struct_ = compilation_ctx
+                            .get_struct_by_index(parent_module_id, *parent_index)
+                            .unwrap();
+                        struct_.instantiate(instance_types);
+
+                        (itype, struct_)
+                    } else {
+                        let itype = IntermediateType::IStruct {
+                            module_id: parent_module_id.clone(),
+                            index: *parent_index,
+                            vm_handled_struct: VmHandledStruct::None,
+                        };
+                        let struct_ = compilation_ctx
+                            .get_struct_by_index(parent_module_id, *parent_index)
+                            .unwrap();
+
+                        (itype, struct_)
+                    };
+
+                storage_objects.push((function_args[i], parent_struct_itype, parent_struct))
             }
-        })
-        .collect();
+            _ => continue,
+        }
+    }
 
     let named_ids_storage_objects = named_ids
         .iter()

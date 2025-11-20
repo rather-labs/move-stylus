@@ -1554,7 +1554,7 @@ fn translate_instruction(
 
             types_stack.pop_expecting(&IntermediateType::IVector(Box::new(inner.clone())))?;
 
-            IVector::vec_unpack_instructions(&inner, module, builder, compilation_ctx, *length);
+            IVector::vec_unpack_instructions(&inner, module, builder, compilation_ctx, *length)?;
 
             for _ in 0..*length {
                 types_stack.push(inner.clone());
@@ -1952,12 +1952,12 @@ fn translate_instruction(
         }
         Bytecode::CastU128 => {
             let original_type = types_stack.pop()?;
-            IU128::cast_from(builder, module, original_type, compilation_ctx);
+            IU128::cast_from(builder, module, original_type, compilation_ctx)?;
             types_stack.push(IntermediateType::IU128);
         }
         Bytecode::CastU256 => {
             let original_type = types_stack.pop()?;
-            IU256::cast_from(builder, module, original_type, compilation_ctx);
+            IU256::cast_from(builder, module, original_type, compilation_ctx)?;
             types_stack.push(IntermediateType::IU256);
         }
         Bytecode::Add => {
@@ -3184,7 +3184,7 @@ fn get_storage_structs_with_named_ids(
                     index,
                     types,
                     ..
-                }) if NamedId::is_vm_type(&module_id, *index, compilation_ctx)? => {
+                }) if NamedId::is_vm_type(module_id, *index, compilation_ctx)? => {
                     result.push((
                         IntermediateType::IGenericStructInstance {
                             module_id: module_id.clone(),
