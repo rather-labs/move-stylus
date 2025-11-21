@@ -1059,7 +1059,7 @@ fn translate_instruction(
                                     mapped_function,
                                     compilation_ctx,
                                     function_locals,
-                                )
+                                )?
                                 .into_iter()
                                 .fold(
                                     (Vec::new(), Vec::new()),
@@ -3154,19 +3154,83 @@ fn get_storage_structs_with_named_ids(
     mapped_function: &MappedFunction,
     compilation_ctx: &CompilationContext,
     function_locals: &[LocalId],
-) -> Vec<(IntermediateType, LocalId)> {
-    mapped_function
+) -> Result<Vec<(IntermediateType, LocalId)>, TranslationError> {
+    let mut result = Vec::new();
+    for (arg_index, fn_arg) in mapped_function.signature.arguments.iter().enumerate() {
+        let (itype, struct_) = match fn_arg {
+            IntermediateType::IMutRef(inner) => (
+                &**inner,
+                compilation_ctx.get_struct_by_intermediate_type(inner),
+            ),
+            t => (fn_arg, compilation_ctx.get_struct_by_intermediate_type(t)),
+        };
+
+        let struct_ = match struct_ {
+            Ok(s) => s,
+            Err(_) => continue,
+        };
+
+        let instance_types = if let IntermediateType::IGenericStructInstance { types, .. } = itype {
+            Some(types.clone())
+        } else {
+            None
+        };
+
+        let parent_module_id = match itype {
+            IntermediateType::IStruct { module_id, .. } => module_id,
+            IntermediateType::IGenericStructInstance { module_id, .. } => module_id,
+            _ => continue,
+        };
+
+        if struct_.has_key {
+            match struct_.fields.first() {
+                Some(IntermediateType::IGenericStructInstance {
+                    module_id,
+                    index,
+                    types,
+                    ..
+                }) if NamedId::is_vm_type(module_id, *index, compilation_ctx)? => {
+                    result.push((
+                        IntermediateType::IGenericStructInstance {
+                            module_id: module_id.clone(),
+                            index: *index,
+                            types: types.clone(),
+                            vm_handled_struct: VmHandledStruct::StorageId {
+                                parent_module_id: parent_module_id.clone(),
+                                parent_index: struct_.index(),
+                                instance_types,
+                            },
+                        },
+                        function_locals[arg_index],
+                    ));
+                }
+                _ => continue,
+            }
+        } else {
+            continue;
+        }
+    }
+
+    Ok(result)
+}
+/*
+fn get_storage_structs_with_named_ids(
+    mapped_function: &MappedFunction,
+    compilation_ctx: &CompilationContext,
+    function_locals: &[LocalId],
+) -> Result<Vec<(IntermediateType, LocalId)>, TranslationError> {
+    Ok(mapped_function
         .signature
         .arguments
         .iter()
         .enumerate()
-        .filter_map(|(arg_index, fn_arg)| {
+        .map(|(arg_index, fn_arg)| {
             let (itype, struct_) = match fn_arg {
                 IntermediateType::IMutRef(inner) => (
                     &**inner,
-                    compilation_ctx.get_struct_by_intermediate_type(inner),
+                    compilation_ctx.get_struct_by_intermediate_type(inner)?,
                 ),
-                t => (fn_arg, compilation_ctx.get_struct_by_intermediate_type(t)),
+                t => (fn_arg, compilation_ctx.get_struct_by_intermediate_type(t)?),
             };
 
             let instance_types =
@@ -3177,42 +3241,40 @@ fn get_storage_structs_with_named_ids(
                 };
 
             let parent_module_id = match itype {
-                IntermediateType::IStruct { module_id, .. } => Some(module_id),
-                IntermediateType::IGenericStructInstance { module_id, .. } => Some(module_id),
-                _ => None,
+                IntermediateType::IStruct { module_id, .. } => module_id,
+                IntermediateType::IGenericStructInstance { module_id, .. } => module_id,
+                _ => return Ok(None),
             };
 
-            if let (Ok(struct_), Some(parent_module_id)) = (struct_, parent_module_id) {
-                if struct_.has_key {
-                    match struct_.fields.first() {
-                        Some(IntermediateType::IGenericStructInstance {
-                            module_id,
-                            index,
-                            types,
-                            ..
-                        }) if NamedId::is_vm_type(module_id, *index, compilation_ctx).unwrap() => {
-                            Some((
-                                IntermediateType::IGenericStructInstance {
-                                    module_id: module_id.clone(),
-                                    index: *index,
-                                    types: types.clone(),
-                                    vm_handled_struct: VmHandledStruct::StorageId {
-                                        parent_module_id: parent_module_id.clone(),
-                                        parent_index: struct_.index(),
-                                        instance_types,
-                                    },
-                                },
-                                function_locals[arg_index],
-                            ))
-                        }
-                        _ => None,
-                    }
-                } else {
-                    None
+            if struct_.has_key {
+                match struct_.fields.first() {
+                    Some(IntermediateType::IGenericStructInstance {
+                        module_id,
+                        index,
+                        types,
+                        ..
+                    }) if NamedId::is_vm_type(module_id, *index, compilation_ctx)? => Ok(Some((
+                        IntermediateType::IGenericStructInstance {
+                            module_id: module_id.clone(),
+                            index: *index,
+                            types: types.clone(),
+                            vm_handled_struct: VmHandledStruct::StorageId {
+                                parent_module_id: parent_module_id.clone(),
+                                parent_index: struct_.index(),
+                                instance_types,
+                            },
+                        },
+                        function_locals[arg_index],
+                    ))),
+                    _ => Ok(None),
                 }
             } else {
-                None
+                Ok(None)
             }
         })
-        .collect::<Vec<(IntermediateType, LocalId)>>()
+        .collect::<Result<Vec<Option<(IntermediateType, LocalId)>>, TranslationError>>()?
+        .into_iter()
+        .flatten()
+        .collect::<Vec<(IntermediateType, LocalId)>>())
 }
+*/
