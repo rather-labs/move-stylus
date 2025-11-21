@@ -1357,7 +1357,7 @@ fn translate_instruction(
                 compilation_ctx,
                 struct_,
                 module_data,
-            );
+            )?;
 
             types_stack.push(IntermediateType::IRef(Box::new(field_type)));
         }
@@ -1445,7 +1445,7 @@ fn translate_instruction(
                 compilation_ctx,
                 &struct_,
                 module_data,
-            );
+            )?;
 
             types_stack.push(IntermediateType::IRef(Box::new(field_type)));
         }
@@ -1468,7 +1468,7 @@ fn translate_instruction(
                 compilation_ctx,
                 struct_,
                 module_data,
-            );
+            )?;
 
             types_stack.push(IntermediateType::IMutRef(Box::new(field_type)));
         }
@@ -1532,7 +1532,7 @@ fn translate_instruction(
                 compilation_ctx,
                 &struct_,
                 module_data,
-            );
+            )?;
 
             types_stack.push(IntermediateType::IMutRef(Box::new(field_type)));
         }
@@ -3107,15 +3107,15 @@ fn struct_field_borrow_add_storage_id_parent_information(
     compilation_ctx: &CompilationContext,
     struct_: &IStruct,
     module_data: &ModuleData,
-) -> IntermediateType {
+) -> Result<IntermediateType, TranslationError> {
     // If we borrow a UID, we fill the typestack with the parent struct information
     match &field_type {
         IntermediateType::IStruct {
             module_id,
             index,
             vm_handled_struct: VmHandledStruct::None,
-        } if Uid::is_vm_type(module_id, *index, compilation_ctx).unwrap() => {
-            IntermediateType::IStruct {
+        } if Uid::is_vm_type(module_id, *index, compilation_ctx)? => {
+            Ok(IntermediateType::IStruct {
                 module_id: module_id.clone(),
                 index: *index,
                 vm_handled_struct: VmHandledStruct::StorageId {
@@ -3123,15 +3123,15 @@ fn struct_field_borrow_add_storage_id_parent_information(
                     parent_index: struct_.index(),
                     instance_types: None,
                 },
-            }
+            })
         }
         IntermediateType::IGenericStructInstance {
             module_id,
             index,
             types,
             vm_handled_struct: VmHandledStruct::None,
-        } if NamedId::is_vm_type(module_id, *index, compilation_ctx).unwrap() => {
-            IntermediateType::IGenericStructInstance {
+        } if NamedId::is_vm_type(module_id, *index, compilation_ctx)? => {
+            Ok(IntermediateType::IGenericStructInstance {
                 module_id: module_id.clone(),
                 index: *index,
                 types: types.clone(),
@@ -3140,9 +3140,9 @@ fn struct_field_borrow_add_storage_id_parent_information(
                     parent_index: struct_.index(),
                     instance_types: Some(types.clone()),
                 },
-            }
+            })
         }
-        _ => field_type,
+        _ => Ok(field_type),
     }
 }
 
