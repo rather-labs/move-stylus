@@ -16,6 +16,17 @@ use crate::{
     types::Type,
 };
 
+use serde::Serialize;
+
+#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum FunctionType {
+    Constructor,
+    Fallback,
+    Receive,
+    Function,
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum Visibility {
     Public,
@@ -24,6 +35,7 @@ pub enum Visibility {
 
 #[derive(Debug)]
 pub struct Function {
+    pub(crate) function_type: FunctionType,
     pub(crate) identifier: String,
     pub(crate) parameters: Vec<NamedType>,
     pub(crate) return_types: Type,
@@ -108,11 +120,21 @@ impl Abi {
         let mut struct_to_process = HashSet::new();
 
         // First we filter the functions we are going to process
-        let functions = processing_module
+        let mut functions: Vec<_> = processing_module
             .functions
             .information
             .iter()
-            .filter(|f| f.is_entry);
+            .filter(|f| f.is_entry)
+            .collect();
+
+        // Add the init function to the functions list, which is not entry
+        if let Some(init) = processing_module.functions.init.as_ref() {
+            let init_information = processing_module
+                .functions
+                .get_information_by_identifier(&init.identifier)
+                .unwrap();
+            functions.push(init_information);
+        }
 
         'functions_loop: for function in functions {
             let parsed_function = processing_module
@@ -122,8 +144,18 @@ impl Abi {
                 .find(|f| f.name == function.function_id.identifier)
                 .expect("function not found");
 
-            // Function name
-            let function_name = snake_to_camel(&function.function_id.identifier);
+            // Determine the function type based on the function ID
+            let function_type = if processing_module.functions.init.as_ref()
+                == Some(&function.function_id)
+            {
+                FunctionType::Constructor
+            } else if processing_module.functions.receive.as_ref() == Some(&function.function_id) {
+                FunctionType::Receive
+            } else if processing_module.functions.fallback.as_ref() == Some(&function.function_id) {
+                FunctionType::Fallback
+            } else {
+                FunctionType::Function
+            };
 
             // Process fuction arguments
             let mut function_parameters = Vec::new();
@@ -323,7 +355,15 @@ impl Abi {
                 Visibility::Private
             };
 
+            // Function name
+            let function_name = if function_type == FunctionType::Constructor {
+                "constructor".to_string()
+            } else {
+                snake_to_camel(&function.function_id.identifier)
+            };
+
             result.push(Function {
+                function_type,
                 identifier: function_name,
                 parameters: function_parameters,
                 return_types: return_type,

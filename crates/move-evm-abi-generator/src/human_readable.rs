@@ -1,5 +1,5 @@
 use crate::{
-    abi::{Abi, Visibility},
+    abi::{Abi, FunctionType, Visibility},
     common::snake_to_upper_camel,
     types::Type,
 };
@@ -23,12 +23,20 @@ pub fn process_abi(abi: &Abi) -> String {
 
 pub fn process_functions(contract_abi: &mut String, abi: &Abi) {
     for function in &abi.functions {
-        if function.visibility == Visibility::Private && !function.is_entry {
+        if function.visibility == Visibility::Private
+            && !function.is_entry
+            && function.function_type != FunctionType::Constructor
+        {
             continue;
         }
-        // Identifier
-        contract_abi.push_str("    function ");
-        contract_abi.push_str(&function.identifier);
+
+        if function.function_type == FunctionType::Function {
+            contract_abi.push_str("    function ");
+            contract_abi.push_str(&function.identifier);
+        } else {
+            contract_abi.push_str("    ");
+            contract_abi.push_str(&function.identifier);
+        }
 
         // Params
         contract_abi.push('(');
@@ -48,7 +56,7 @@ pub fn process_functions(contract_abi: &mut String, abi: &Abi) {
             modifiers.push("public")
         }
 
-        // All functions we process are entry
+        // All functions we process are entry, except constructor
         if function.is_entry {
             modifiers.push("external");
         }

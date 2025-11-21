@@ -1,4 +1,4 @@
-use crate::abi::{Abi, Event, Function, Struct_};
+use crate::abi::{Abi, Event, Function, FunctionType, Struct_};
 use crate::types::Type;
 use move_bytecode_to_wasm::compilation_context::{ModuleData, ModuleId};
 use move_parse_special_attributes::function_modifiers::FunctionModifier;
@@ -8,26 +8,6 @@ use std::collections::HashMap;
 #[derive(Serialize)]
 struct JsonAbi {
     abi: Vec<JsonAbiItem>,
-}
-
-#[derive(Clone, Copy, Debug, Serialize)]
-#[serde(rename_all = "lowercase")]
-enum FunctionType {
-    Constructor,
-    Fallback,
-    Receive,
-    Function,
-}
-
-impl FunctionType {
-    fn from_identifier(identifier: &str) -> Self {
-        match identifier {
-            "constructor" => Self::Constructor,
-            "fallback" => Self::Fallback,
-            "receive" => Self::Receive,
-            _ => Self::Function,
-        }
-    }
 }
 
 // Todo: is it possible to get the FunctionType from within the Function variant to serialize the type as a string?
@@ -174,9 +154,7 @@ fn process_functions(
     functions
         .iter()
         .map(|f| {
-            let fn_type = FunctionType::from_identifier(&f.identifier);
-
-            let (name, inputs, outputs) = match fn_type {
+            let (name, inputs, outputs) = match f.function_type {
                 // Fallback and Receive have no name, inputs, or outputs
                 FunctionType::Fallback | FunctionType::Receive => (None, None, None),
                 // Constructor has no name, but has inputs
@@ -238,7 +216,7 @@ fn process_functions(
             let state_mutability = map_state_mutability(&f.modifiers).to_string();
 
             JsonAbiItem::Function {
-                type_: fn_type,
+                type_: f.function_type,
                 name,
                 inputs,
                 outputs,
