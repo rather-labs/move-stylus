@@ -81,7 +81,7 @@ pub enum CompilationContextError {
     DatatypeHanldeIndexNotFound(usize),
 
     #[error("there can be only a single init function per module")]
-    TwoOrMoreInits,
+    DuplicateInitFunction,
 
     #[error("found init funciton with no arguments")]
     InitFunctionNoAguments,

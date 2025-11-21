@@ -1,6 +1,6 @@
 mod common;
 
-use common::{runtime_sandbox::RuntimeSandbox, translate_test_package_with_framework_result};
+use common::{runtime_sandbox::RuntimeSandbox, translate_test_package_with_framework};
 use rstest::{fixture, rstest};
 
 mod receive {
@@ -14,7 +14,7 @@ mod receive {
         const SOURCE_PATH: &str = "tests/receive/receive.move";
 
         let mut translated_package =
-            translate_test_package_with_framework_result(SOURCE_PATH, MODULE_NAME).unwrap();
+            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
 
         RuntimeSandbox::new(&mut translated_package)
     }

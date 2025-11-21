@@ -685,18 +685,10 @@ impl ModuleData {
         let mut function_calls = Vec::new();
         let mut function_information = Vec::new();
 
-        // Special functions
-        struct ReservedFunctions {
-            init: Option<FunctionId>,
-            receive: Option<FunctionId>,
-            fallback: Option<FunctionId>,
-        }
-
-        let mut reserved_functions = ReservedFunctions {
-            init: None,
-            receive: None,
-            fallback: None,
-        };
+        // Special reserved functions
+        let mut init: Option<FunctionId> = None;
+        let mut receive: Option<FunctionId> = None;
+        let mut fallback: Option<FunctionId> = None;
 
         for (index, function) in move_module.function_handles().iter().enumerate() {
             let move_function_arguments = &move_module.signature_at(function.parameters);
@@ -772,11 +764,8 @@ impl ModuleData {
                     move_module_dependencies,
                 )?;
 
-                if is_init {
-                    if reserved_functions.init.is_some() {
-                        return Err(CompilationContextError::TwoOrMoreInits);
-                    }
-                    reserved_functions.init = Some(function_id.clone());
+                if is_init && init.replace(function_id.clone()).is_some() {
+                    return Err(CompilationContextError::DuplicateInitFunction);
                 }
 
                 let function_sa = special_attributes
@@ -794,20 +783,14 @@ impl ModuleData {
                     function_sa,
                 )?;
 
-                if is_receive {
-                    if reserved_functions.receive.is_some() {
-                        return Err(CompilationContextError::DuplicateReceiveFunction);
-                    }
-                    reserved_functions.receive = Some(function_id.clone());
+                if is_receive && receive.replace(function_id.clone()).is_some() {
+                    return Err(CompilationContextError::DuplicateReceiveFunction);
                 }
 
                 let is_fallback = Self::is_fallback(&function_id, function_def)?;
 
-                if is_fallback {
-                    if reserved_functions.fallback.is_some() {
-                        return Err(CompilationContextError::DuplicateFallbackFunction);
-                    }
-                    reserved_functions.fallback = Some(function_id.clone());
+                if is_fallback && fallback.replace(function_id.clone()).is_some() {
+                    return Err(CompilationContextError::DuplicateFallbackFunction);
                 }
 
                 function_information.push(
@@ -865,9 +848,9 @@ impl ModuleData {
             calls: function_calls,
             generic_calls: generic_function_calls,
             information: function_information,
-            init: reserved_functions.init,
-            receive: reserved_functions.receive,
-            fallback: reserved_functions.fallback,
+            init,
+            receive,
+            fallback,
         })
     }
 
@@ -1093,6 +1076,7 @@ impl ModuleData {
 
         // Must be payable
         if !function_sa.modifiers.contains(&FunctionModifier::Payable) {
+            println!("function_sa.modifiers: {:?}", function_sa.modifiers);
             return Err(CompilationContextError::ReceiveFunctionIsNotPayable);
         }
 
