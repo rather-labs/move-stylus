@@ -293,55 +293,19 @@ impl RuntimeFunction {
     ) -> Result<FunctionId, RuntimeFunctionError> {
         let function_id = match self {
             Self::EncodeAndSaveInStorage => {
-                if generics.len() != 1 {
-                    return Err(RuntimeFunctionError::WrongNumberOfTypeParameters {
-                        function_name: self.name().to_owned(),
-                        expected: 1,
-                        found: generics.len(),
-                    });
-                }
-
-                if generics.len() != 1 {
-                    return Err(RuntimeFunctionError::WrongNumberOfTypeParameters {
-                        function_name: self.name().to_owned(),
-                        expected: 1,
-                        found: generics.len(),
-                    });
-                }
-
+                Self::assert_generics_length(generics.len(), 1, self.name())?;
                 storage::add_encode_and_save_into_storage_fn(module, compilation_ctx, generics[0])?
             }
             Self::ReadAndDecodeFromStorage => {
-                if generics.len() != 1 {
-                    return Err(RuntimeFunctionError::WrongNumberOfTypeParameters {
-                        function_name: self.name().to_owned(),
-                        expected: 1,
-                        found: generics.len(),
-                    });
-                }
-
+                Self::assert_generics_length(generics.len(), 1, self.name())?;
                 storage::add_read_and_decode_from_storage_fn(module, compilation_ctx, generics[0])?
             }
             Self::DeleteFromStorage => {
-                if generics.len() != 1 {
-                    return Err(RuntimeFunctionError::WrongNumberOfTypeParameters {
-                        function_name: self.name().to_owned(),
-                        expected: 1,
-                        found: generics.len(),
-                    });
-                }
-
+                Self::assert_generics_length(generics.len(), 1, self.name())?;
                 storage::add_delete_struct_from_storage_fn(module, compilation_ctx, generics[0])?
             }
             Self::CheckAndDeleteStructTtoFields => {
-                if generics.len() != 1 {
-                    return Err(RuntimeFunctionError::WrongNumberOfTypeParameters {
-                        function_name: self.name().to_owned(),
-                        expected: 1,
-                        found: generics.len(),
-                    });
-                }
-
+                Self::assert_generics_length(generics.len(), 1, self.name())?;
                 storage::add_check_and_delete_struct_tto_fields_fn(
                     module,
                     compilation_ctx,
@@ -349,47 +313,19 @@ impl RuntimeFunction {
                 )?
             }
             Self::DeleteTtoObject => {
-                if generics.len() != 1 {
-                    return Err(RuntimeFunctionError::WrongNumberOfTypeParameters {
-                        function_name: self.name().to_owned(),
-                        expected: 1,
-                        found: generics.len(),
-                    });
-                }
-
+                Self::assert_generics_length(generics.len(), 1, self.name())?;
                 storage::add_delete_tto_object_fn(module, compilation_ctx, generics[0])?
             }
             Self::CacheStorageObjectChanges => {
-                if generics.len() != 1 {
-                    return Err(RuntimeFunctionError::WrongNumberOfTypeParameters {
-                        function_name: self.name().to_owned(),
-                        expected: 1,
-                        found: generics.len(),
-                    });
-                }
-
+                Self::assert_generics_length(generics.len(), 1, self.name())?;
                 storage::cache_storage_object_changes(module, compilation_ctx, generics[0])?
             }
             Self::GetStorageSizeByOffset => {
-                if generics.len() != 1 {
-                    return Err(RuntimeFunctionError::WrongNumberOfTypeParameters {
-                        function_name: self.name().to_owned(),
-                        expected: 1,
-                        found: generics.len(),
-                    });
-                }
-
+                Self::assert_generics_length(generics.len(), 1, self.name())?;
                 enums::get_storage_size_by_offset(module, compilation_ctx, generics[0])?
             }
             Self::ComputeEnumStorageTailPosition => {
-                if generics.len() != 1 {
-                    return Err(RuntimeFunctionError::WrongNumberOfTypeParameters {
-                        function_name: self.name().to_owned(),
-                        expected: 1,
-                        found: generics.len(),
-                    });
-                }
-
+                Self::assert_generics_length(generics.len(), 1, self.name())?;
                 enums::compute_enum_storage_tail_position(module, compilation_ctx, generics[0])?
             }
             _ => {
@@ -422,6 +358,22 @@ impl RuntimeFunction {
                 dynamic_fields_global_variables,
             )
         }
+    }
+
+    fn assert_generics_length(
+        len: usize,
+        expected: usize,
+        name: &str,
+    ) -> Result<(), RuntimeFunctionError> {
+        if expected != len {
+            return Err(RuntimeFunctionError::WrongNumberOfTypeParameters {
+                function_name: name.to_owned(),
+                expected,
+                found: len,
+            });
+        }
+
+        Ok(())
     }
 
     pub fn get_generic_function_name(
