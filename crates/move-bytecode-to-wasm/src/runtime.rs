@@ -293,46 +293,54 @@ impl RuntimeFunction {
     ) -> Result<FunctionId, RuntimeFunctionError> {
         let function_id = match self {
             Self::EncodeAndSaveInStorage => {
-                assert_eq!(
-                    1,
-                    generics.len(),
-                    "there was an error linking {} expected 1 type parameter, found {}",
-                    self.name(),
-                    generics.len(),
-                );
+                if generics.len() != 1 {
+                    return Err(RuntimeFunctionError::WrongNumberOfTypeParameters {
+                        function_name: self.name().to_owned(),
+                        expected: 1,
+                        found: generics.len(),
+                    });
+                }
+
+                if generics.len() != 1 {
+                    return Err(RuntimeFunctionError::WrongNumberOfTypeParameters {
+                        function_name: self.name().to_owned(),
+                        expected: 1,
+                        found: generics.len(),
+                    });
+                }
 
                 storage::add_encode_and_save_into_storage_fn(module, compilation_ctx, generics[0])?
             }
             Self::ReadAndDecodeFromStorage => {
-                assert_eq!(
-                    1,
-                    generics.len(),
-                    "there was an error linking {} expected 1 type parameter, found {}",
-                    self.name(),
-                    generics.len(),
-                );
+                if generics.len() != 1 {
+                    return Err(RuntimeFunctionError::WrongNumberOfTypeParameters {
+                        function_name: self.name().to_owned(),
+                        expected: 1,
+                        found: generics.len(),
+                    });
+                }
 
                 storage::add_read_and_decode_from_storage_fn(module, compilation_ctx, generics[0])?
             }
             Self::DeleteFromStorage => {
-                assert_eq!(
-                    1,
-                    generics.len(),
-                    "there was an error linking {} expected 1 type parameter, found {}",
-                    self.name(),
-                    generics.len(),
-                );
+                if generics.len() != 1 {
+                    return Err(RuntimeFunctionError::WrongNumberOfTypeParameters {
+                        function_name: self.name().to_owned(),
+                        expected: 1,
+                        found: generics.len(),
+                    });
+                }
 
                 storage::add_delete_struct_from_storage_fn(module, compilation_ctx, generics[0])?
             }
             Self::CheckAndDeleteStructTtoFields => {
-                assert_eq!(
-                    1,
-                    generics.len(),
-                    "there was an error linking {} expected 1 type parameter, found {}",
-                    self.name(),
-                    generics.len(),
-                );
+                if generics.len() != 1 {
+                    return Err(RuntimeFunctionError::WrongNumberOfTypeParameters {
+                        function_name: self.name().to_owned(),
+                        expected: 1,
+                        found: generics.len(),
+                    });
+                }
 
                 storage::add_check_and_delete_struct_tto_fields_fn(
                     module,
@@ -341,45 +349,47 @@ impl RuntimeFunction {
                 )?
             }
             Self::DeleteTtoObject => {
-                assert_eq!(
-                    1,
-                    generics.len(),
-                    "there was an error linking {} expected 1 type parameter, found {}",
-                    self.name(),
-                    generics.len(),
-                );
+                if generics.len() != 1 {
+                    return Err(RuntimeFunctionError::WrongNumberOfTypeParameters {
+                        function_name: self.name().to_owned(),
+                        expected: 1,
+                        found: generics.len(),
+                    });
+                }
 
                 storage::add_delete_tto_object_fn(module, compilation_ctx, generics[0])?
             }
             Self::CacheStorageObjectChanges => {
-                assert_eq!(
-                    1,
-                    generics.len(),
-                    "there was an error linking {} expected 1 type parameter, found {}",
-                    self.name(),
-                    generics.len(),
-                );
+                if generics.len() != 1 {
+                    return Err(RuntimeFunctionError::WrongNumberOfTypeParameters {
+                        function_name: self.name().to_owned(),
+                        expected: 1,
+                        found: generics.len(),
+                    });
+                }
 
                 storage::cache_storage_object_changes(module, compilation_ctx, generics[0])?
             }
             Self::GetStorageSizeByOffset => {
-                assert_eq!(
-                    1,
-                    generics.len(),
-                    "there was an error linking {} expected 1 type parameter, found {}",
-                    self.name(),
-                    generics.len(),
-                );
+                if generics.len() != 1 {
+                    return Err(RuntimeFunctionError::WrongNumberOfTypeParameters {
+                        function_name: self.name().to_owned(),
+                        expected: 1,
+                        found: generics.len(),
+                    });
+                }
+
                 enums::get_storage_size_by_offset(module, compilation_ctx, generics[0])?
             }
             Self::ComputeEnumStorageTailPosition => {
-                assert_eq!(
-                    1,
-                    generics.len(),
-                    "there was an error linking {} expected 1 type parameter, found {}",
-                    self.name(),
-                    generics.len(),
-                );
+                if generics.len() != 1 {
+                    return Err(RuntimeFunctionError::WrongNumberOfTypeParameters {
+                        function_name: self.name().to_owned(),
+                        expected: 1,
+                        found: generics.len(),
+                    });
+                }
+
                 enums::compute_enum_storage_tail_position(module, compilation_ctx, generics[0])?
             }
             _ => {
