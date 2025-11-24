@@ -179,6 +179,20 @@ pub enum TranslationError {
     #[error("only Simple flow has label")]
     NotSimpleFlowWithLabel,
 
+    #[error("invalid intermediate type {0:?} found in unpack function")]
+    InvalidTypeInUnpackFunction(IntermediateType),
+
+    #[error("{field_id} not found in {struct_identifier}")]
+    StructFieldNotFound {
+        field_id: usize,
+        struct_identifier: String,
+    },
+
+    #[error("{field_id} offset not found in {struct_identifier}")]
+    StructFieldOffsetNotFound {
+        field_id: usize,
+        struct_identifier: String,
+    },
     // Unknown
 
     // TODO: identify concrete errors and add its corresponding enum variant

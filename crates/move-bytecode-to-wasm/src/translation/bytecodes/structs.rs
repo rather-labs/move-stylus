@@ -1,4 +1,4 @@
-use move_binary_format::file_format::FieldHandleIndex;
+use move_binary_format::{file_format::FieldHandleIndex, internals::ModuleIndex};
 use walrus::{
     InstrSeqBuilder, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
@@ -14,7 +14,7 @@ use crate::{
     vm_handled_types::{VmHandledType, is_uid_or_named_id, named_id::NamedId, uid::Uid},
 };
 
-/// Borrows a field of a struct.
+/// (Mutably) Borrows a field of a struct.
 ///
 /// Leaves the value pointer in the stack.
 pub fn borrow_field(
@@ -22,19 +22,19 @@ pub fn borrow_field(
     field_id: &FieldHandleIndex,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
-) -> IntermediateType {
+) -> Result<IntermediateType, TranslationError> {
     let Some(field_type) = struct_.fields_types.get(field_id) else {
-        panic!(
-            "{field_id} not found in {}",
-            struct_.struct_definition_index
-        )
+        return Err(TranslationError::StructFieldNotFound {
+            field_id: field_id.into_index(),
+            struct_identifier: struct_.identifier.clone(),
+        });
     };
 
     let Some(field_offset) = struct_.field_offsets.get(field_id) else {
-        panic!(
-            "{field_id} offset not found in {}",
-            struct_.struct_definition_index
-        )
+        return Err(TranslationError::StructFieldOffsetNotFound {
+            field_id: field_id.into_index(),
+            struct_identifier: struct_.identifier.clone(),
+        });
     };
 
     builder
@@ -49,45 +49,7 @@ pub fn borrow_field(
         .i32_const(*field_offset as i32)
         .binop(BinaryOp::I32Add);
 
-    field_type.clone()
-}
-
-/// Mutably borrows a field of a struct.
-///
-/// Leaves the value pointer in the stack.
-pub fn mut_borrow_field(
-    struct_: &IStruct,
-    field_id: &FieldHandleIndex,
-    builder: &mut InstrSeqBuilder,
-    compilation_ctx: &CompilationContext,
-) -> IntermediateType {
-    let Some(field_type) = struct_.fields_types.get(field_id) else {
-        panic!(
-            "{field_id:?} not found in {}",
-            struct_.struct_definition_index
-        )
-    };
-
-    let Some(field_offset) = struct_.field_offsets.get(field_id) else {
-        panic!(
-            "{field_id:?} offset not found in {}",
-            struct_.struct_definition_index
-        )
-    };
-
-    builder
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
-        .i32_const(*field_offset as i32)
-        .binop(BinaryOp::I32Add);
-
-    field_type.clone()
+    Ok(field_type.clone())
 }
 
 /// Packs an struct.
@@ -262,7 +224,7 @@ pub fn unpack_fields(
     pointer: walrus::LocalId,
     parent_type: &IntermediateType,
     types_stack: &mut TypesStack,
-) -> Result<(), crate::translation::TranslationError> {
+) -> Result<(), TranslationError> {
     let mut offset = 0;
 
     for field in fields {
@@ -306,19 +268,15 @@ pub fn unpack_fields(
             | IntermediateType::IEnum { .. }
             | IntermediateType::IGenericEnumInstance { .. } => {}
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                return Err(
-                    crate::translation::TranslationError::FoundReferenceInsideStruct {
-                        struct_index: 0, // This will be overridden by the caller
-                    },
-                );
+                return Err(TranslationError::FoundReferenceInsideStruct {
+                    struct_index: 0, // This will be overridden by the caller
+                });
             }
             IntermediateType::ITypeParameter(index) => {
-                return Err(
-                    crate::translation::TranslationError::FoundTypeParameterInsideStruct {
-                        struct_index: 0, // This will be overridden by the caller
-                        type_parameter_index: *index,
-                    },
-                );
+                return Err(TranslationError::FoundTypeParameterInsideStruct {
+                    struct_index: 0, // This will be overridden by the caller
+                    type_parameter_index: *index,
+                });
             }
         }
 
@@ -342,9 +300,10 @@ pub fn unpack_fields(
                         types,
                         ..
                     } => (Some(types.clone()), parent_module_id.clone(), *parent_index),
-                    // TODO: Change to translation error
                     _ => {
-                        panic!("invalid intermediate type {parent_type:?} found in unpack function")
+                        return Err(TranslationError::InvalidTypeInUnpackFunction(
+                            parent_type.clone(),
+                        ));
                     }
                 };
 
@@ -377,9 +336,10 @@ pub fn unpack_fields(
                         types,
                         ..
                     } => (Some(types.clone()), parent_module_id.clone(), *parent_index),
-                    // TODO: Change to translation error
                     _ => {
-                        panic!("invalid intermediate type {parent_type:?} found in unpack function")
+                        return Err(TranslationError::InvalidTypeInUnpackFunction(
+                            parent_type.clone(),
+                        ));
                     }
                 };
 

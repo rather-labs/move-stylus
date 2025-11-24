@@ -1351,7 +1351,7 @@ fn translate_instruction(
             }
 
             let field_type =
-                bytecodes::structs::borrow_field(struct_, field_id, builder, compilation_ctx);
+                bytecodes::structs::borrow_field(struct_, field_id, builder, compilation_ctx)?;
             let field_type = struct_field_borrow_add_storage_id_parent_information(
                 field_type,
                 compilation_ctx,
@@ -1438,7 +1438,7 @@ fn translate_instruction(
                 struct_field_id,
                 builder,
                 compilation_ctx,
-            );
+            )?;
             let field_type = replace_type_parameters(&field_type, &instantiation_types);
             let field_type = struct_field_borrow_add_storage_id_parent_information(
                 field_type,
@@ -1462,7 +1462,7 @@ fn translate_instruction(
             )))?;
 
             let field_type =
-                bytecodes::structs::mut_borrow_field(struct_, field_id, builder, compilation_ctx);
+                bytecodes::structs::borrow_field(struct_, field_id, builder, compilation_ctx)?;
             let field_type = struct_field_borrow_add_storage_id_parent_information(
                 field_type,
                 compilation_ctx,
@@ -1519,12 +1519,12 @@ fn translate_instruction(
                 },
             )))?;
 
-            let field_type = bytecodes::structs::mut_borrow_field(
+            let field_type = bytecodes::structs::borrow_field(
                 &struct_,
                 struct_field_id,
                 builder,
                 compilation_ctx,
-            );
+            )?;
 
             let field_type = replace_type_parameters(&field_type, &instantiation_types);
             let field_type = struct_field_borrow_add_storage_id_parent_information(
