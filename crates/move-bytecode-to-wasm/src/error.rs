@@ -5,7 +5,7 @@ use move_parse_special_attributes::SpecialAttributeError;
 
 use crate::{
     abi_types::error::AbiError,
-    compilation_context::CompilationContextError,
+    compilation_context::{CompilationContextError, ModuleId},
     constructor::ConstructorError,
     hostio::error::HostIOError,
     native_functions::error::NativeFunctionError,
@@ -74,6 +74,9 @@ impl Display for ICEError {
 pub enum DependencyError {
     #[error("could not find dependency {0}")]
     DependencyNotFound(String),
+
+    #[error("processed the same dependency ({0}) twice in different contexts")]
+    DependencyProcessedMoreThanOnce(ModuleId),
 }
 
 impl From<DependencyError> for DependencyProcessingError {

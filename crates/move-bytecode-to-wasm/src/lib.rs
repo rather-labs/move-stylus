@@ -421,12 +421,12 @@ pub fn process_dependency_tree<'move_package>(
             DependencyProcessingError::ICE(ICEError::new(ICEErrorKind::CompilationContext(e)))
         })?;
 
-        let processed_dependency = dependencies_data.insert(module_id, dependency_module_data);
+        let processed_dependency =
+            dependencies_data.insert(module_id.clone(), dependency_module_data);
 
-        assert!(
-            processed_dependency.is_none(),
-            "processed the same dep twice in different contexts"
-        );
+        if processed_dependency.is_some() {
+            Err(DependencyError::DependencyProcessedMoreThanOnce(module_id))?;
+        }
     }
 
     if errors.is_empty() {
