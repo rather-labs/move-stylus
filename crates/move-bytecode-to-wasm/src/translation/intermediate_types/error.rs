@@ -1,7 +1,10 @@
 use move_binary_format::file_format::DatatypeHandleIndex;
 use walrus::ValType;
 
-use crate::{compilation_context::CompilationContextError, runtime::error::RuntimeFunctionError};
+use crate::{
+    compilation_context::CompilationContextError, runtime::error::RuntimeFunctionError,
+    wasm_builder_extensions::WasmBuilderExtensionError,
+};
 
 use super::IntermediateType;
 
@@ -12,6 +15,9 @@ pub enum IntermediateTypeError {
 
     #[error("compilation context error")]
     CompilationContextError(#[from] CompilationContextError),
+
+    #[error("wasm extensions error")]
+    WasmBuilderExtension(#[from] WasmBuilderExtensionError),
 
     #[error("found type parameter where concrete type was expected")]
     FoundTypeParameter,

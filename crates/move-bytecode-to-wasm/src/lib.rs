@@ -42,7 +42,6 @@ mod translation;
 mod utils;
 mod vm_handled_types;
 mod wasm_builder_extensions;
-mod wasm_helpers;
 mod wasm_validation;
 
 pub use translation::functions::MappedFunction;

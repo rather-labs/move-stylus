@@ -644,10 +644,9 @@ fn translate_instruction(
             )?;
 
             types_stack.push(constant_type);
-            assert!(
-                data.next().is_none(),
-                "Constant data not consumed: {data:?}"
-            );
+            if data.next().is_some() {
+                return Err(TranslationError::ConstantDataNotConsumed);
+            }
         }
         // Load literals
         Bytecode::LdFalse => {
@@ -1923,12 +1922,12 @@ fn translate_instruction(
             )?;
 
             // We dont pop the return values from the stack, we just check if the types match
-            assert!(
-                types_stack.0.ends_with(&mapped_function.signature.returns),
-                "types stack does not match function return types\ntypes stack {:?}\nfunction return {:?}",
-                types_stack.0.last(),
-                &mapped_function.signature.returns,
-            );
+            if !types_stack.0.ends_with(&mapped_function.signature.returns) {
+                Err(TypesStackError::FunctionReturnTypeMismatch {
+                    stack: types_stack.0.last().cloned(),
+                    function: mapped_function.signature.returns.clone(),
+                })?;
+            }
         }
         Bytecode::CastU8 => {
             let original_type = types_stack.pop()?;
@@ -2974,11 +2973,11 @@ fn process_fn_local_variables(
 ) -> Result<(Vec<LocalId>, Vec<LocalId>), TranslationError> {
     let wasm_arg_types = function_information.signature.get_argument_wasm_types()?;
     let wasm_ret_types = function_information.signature.get_return_wasm_types();
-
-    assert!(
-        wasm_ret_types.len() <= 1,
-        "Multiple return values not supported"
-    );
+    if wasm_ret_types.len() > 1 {
+        return Err(TranslationError::MultipleWasmReturnValues(
+            wasm_ret_types.len(),
+        ));
+    }
 
     // WASM locals for arguments
     let wasm_arg_locals: Vec<LocalId> = wasm_arg_types

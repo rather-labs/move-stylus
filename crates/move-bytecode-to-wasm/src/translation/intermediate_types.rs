@@ -231,11 +231,11 @@ impl IntermediateType {
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
         match self {
-            IntermediateType::IBool => IBool::load_constant_instructions(builder, bytes),
-            IntermediateType::IU8 => IU8::load_constant_instructions(builder, bytes),
-            IntermediateType::IU16 => IU16::load_constant_instructions(builder, bytes),
-            IntermediateType::IU32 => IU32::load_constant_instructions(builder, bytes),
-            IntermediateType::IU64 => IU64::load_constant_instructions(builder, bytes),
+            IntermediateType::IBool => IBool::load_constant_instructions(builder, bytes)?,
+            IntermediateType::IU8 => IU8::load_constant_instructions(builder, bytes)?,
+            IntermediateType::IU16 => IU16::load_constant_instructions(builder, bytes)?,
+            IntermediateType::IU32 => IU32::load_constant_instructions(builder, bytes)?,
+            IntermediateType::IU64 => IU64::load_constant_instructions(builder, bytes)?,
             IntermediateType::IU128 => {
                 IU128::load_constant_instructions(module, builder, bytes, compilation_ctx)
             }

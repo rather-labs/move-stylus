@@ -4,9 +4,7 @@ use walrus::{
 };
 
 use crate::{
-    CompilationContext,
-    runtime::RuntimeFunction,
-    wasm_helpers::{load_i32_from_bytes_instructions, load_i64_from_bytes_instructions},
+    CompilationContext, runtime::RuntimeFunction, wasm_builder_extensions::WasmBuilderExtension,
 };
 
 use super::{
@@ -24,9 +22,10 @@ impl IU8 {
     pub fn load_constant_instructions(
         builder: &mut InstrSeqBuilder,
         bytes: &mut std::vec::IntoIter<u8>,
-    ) {
+    ) -> Result<(), IntermediateTypeError> {
         let bytes = bytes.take(1).collect::<Vec<u8>>();
-        load_i32_from_bytes_instructions(builder, &bytes);
+        builder.load_i32_from_bytes(&bytes)?;
+        Ok(())
     }
 
     /// Adds the instructions to add two u8 values.
@@ -165,9 +164,10 @@ impl IU16 {
     pub fn load_constant_instructions(
         builder: &mut InstrSeqBuilder,
         bytes: &mut std::vec::IntoIter<u8>,
-    ) {
+    ) -> Result<(), IntermediateTypeError> {
         let bytes = bytes.take(2).collect::<Vec<u8>>();
-        load_i32_from_bytes_instructions(builder, &bytes);
+        builder.load_i32_from_bytes(&bytes)?;
+        Ok(())
     }
 
     /// Adds the instructions to add two u16 values.
@@ -309,9 +309,10 @@ impl IU32 {
     pub fn load_constant_instructions(
         builder: &mut InstrSeqBuilder,
         bytes: &mut std::vec::IntoIter<u8>,
-    ) {
+    ) -> Result<(), IntermediateTypeError> {
         let bytes = bytes.take(4).collect::<Vec<u8>>();
-        load_i32_from_bytes_instructions(builder, &bytes);
+        builder.load_i32_from_bytes(&bytes)?;
+        Ok(())
     }
 
     pub fn add(
@@ -429,9 +430,10 @@ impl IU64 {
     pub fn load_constant_instructions(
         builder: &mut InstrSeqBuilder,
         bytes: &mut std::vec::IntoIter<u8>,
-    ) {
+    ) -> Result<(), IntermediateTypeError> {
         let bytes = bytes.take(8).collect::<Vec<u8>>();
-        load_i64_from_bytes_instructions(builder, &bytes);
+        builder.load_i64_from_bytes(&bytes)?;
+        Ok(())
     }
 
     pub fn add(

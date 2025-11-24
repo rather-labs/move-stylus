@@ -42,8 +42,6 @@ pub enum TranslationError {
     #[error("an error ocurred while processing a vm handled type")]
     VmHandledType(#[from] VmHandledTypeError),
 
-    //    #[error("an storage error ocurred while translating a function")]
-    //    Storage(#[from] StorageError),
     #[error("a translation error ocurred translating instruction {0:?}")]
     AtInstruction(Bytecode, #[source] Rc<TranslationError>),
 
@@ -182,6 +180,9 @@ pub enum TranslationError {
     #[error("invalid intermediate type {0:?} found in unpack function")]
     InvalidTypeInUnpackFunction(IntermediateType),
 
+    #[error("constant data not consumed")]
+    ConstantDataNotConsumed,
+
     #[error("{field_id} not found in {struct_identifier}")]
     StructFieldNotFound {
         field_id: usize,
@@ -193,11 +194,9 @@ pub enum TranslationError {
         field_id: usize,
         struct_identifier: String,
     },
-    // Unknown
 
-    // TODO: identify concrete errors and add its corresponding enum variant
-    #[error("unknown error: {0}")]
-    Unknown(#[from] anyhow::Error),
+    #[error("multiple WASM return values not supported, found {0} return values")]
+    MultipleWasmReturnValues(usize),
 }
 
 impl From<TranslationError> for CompilationError {
