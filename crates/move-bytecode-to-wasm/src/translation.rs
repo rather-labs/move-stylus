@@ -215,7 +215,7 @@ pub fn translate_function(
         function_information,
     )?;
 
-    let flow = Flow::new(move_bytecode);
+    let flow = Flow::new(move_bytecode)?;
 
     let mut types_stack = TypesStack::new();
     let mut functions_to_link = HashSet::new();
@@ -3212,68 +3212,3 @@ fn get_storage_structs_with_named_ids(
 
     Ok(result)
 }
-/*
-fn get_storage_structs_with_named_ids(
-    mapped_function: &MappedFunction,
-    compilation_ctx: &CompilationContext,
-    function_locals: &[LocalId],
-) -> Result<Vec<(IntermediateType, LocalId)>, TranslationError> {
-    Ok(mapped_function
-        .signature
-        .arguments
-        .iter()
-        .enumerate()
-        .map(|(arg_index, fn_arg)| {
-            let (itype, struct_) = match fn_arg {
-                IntermediateType::IMutRef(inner) => (
-                    &**inner,
-                    compilation_ctx.get_struct_by_intermediate_type(inner)?,
-                ),
-                t => (fn_arg, compilation_ctx.get_struct_by_intermediate_type(t)?),
-            };
-
-            let instance_types =
-                if let IntermediateType::IGenericStructInstance { types, .. } = itype {
-                    Some(types.clone())
-                } else {
-                    None
-                };
-
-            let parent_module_id = match itype {
-                IntermediateType::IStruct { module_id, .. } => module_id,
-                IntermediateType::IGenericStructInstance { module_id, .. } => module_id,
-                _ => return Ok(None),
-            };
-
-            if struct_.has_key {
-                match struct_.fields.first() {
-                    Some(IntermediateType::IGenericStructInstance {
-                        module_id,
-                        index,
-                        types,
-                        ..
-                    }) if NamedId::is_vm_type(module_id, *index, compilation_ctx)? => Ok(Some((
-                        IntermediateType::IGenericStructInstance {
-                            module_id: module_id.clone(),
-                            index: *index,
-                            types: types.clone(),
-                            vm_handled_struct: VmHandledStruct::StorageId {
-                                parent_module_id: parent_module_id.clone(),
-                                parent_index: struct_.index(),
-                                instance_types,
-                            },
-                        },
-                        function_locals[arg_index],
-                    ))),
-                    _ => Ok(None),
-                }
-            } else {
-                Ok(None)
-            }
-        })
-        .collect::<Result<Vec<Option<(IntermediateType, LocalId)>>, TranslationError>>()?
-        .into_iter()
-        .flatten()
-        .collect::<Vec<(IntermediateType, LocalId)>>())
-}
-*/

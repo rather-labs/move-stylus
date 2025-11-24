@@ -165,6 +165,9 @@ pub enum TranslationError {
     #[error("switch: more than one case returns a value, Move should have merged them")]
     SwitchMoreThanOneCase,
 
+    #[error("switch: all cases must be Simple in a Switch flow")]
+    SwitchCasesNotSimple,
+
     #[error("IfElse result mismatch: then={0:?}, else={1:?}")]
     IfElseMismatch(Vec<ValType>, Vec<ValType>),
 
@@ -177,6 +180,7 @@ pub enum TranslationError {
     #[error("only Simple flow has label")]
     NotSimpleFlowWithLabel,
 
+    // Misc
     #[error("invalid intermediate type {0:?} found in unpack function")]
     InvalidTypeInUnpackFunction(IntermediateType),
 
