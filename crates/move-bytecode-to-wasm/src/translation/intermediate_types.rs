@@ -243,7 +243,7 @@ impl IntermediateType {
                 IU256::load_constant_instructions(module, builder, bytes, compilation_ctx)
             }
             IntermediateType::IAddress => {
-                IAddress::load_constant_instructions(module, builder, bytes, compilation_ctx)
+                IAddress::load_constant_instructions(module, builder, bytes, compilation_ctx)?
             }
             IntermediateType::ISigner => return Err(IntermediateTypeError::SignerCannotBeConstant),
             IntermediateType::IVector(inner) => {

@@ -77,4 +77,7 @@ pub enum IntermediateTypeError {
 
     #[error("found vector of signer")]
     FoundVectorOfSigner,
+
+    #[error("constant address is larger than 20 bytes")]
+    ConstantAddressTooLarge,
 }
