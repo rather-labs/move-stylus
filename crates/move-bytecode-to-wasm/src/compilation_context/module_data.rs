@@ -914,7 +914,7 @@ impl ModuleData {
                                     && Address::from(m.unit.address.into_bytes())
                                         == STYLUS_FRAMEWORK_ADDRESS
                             })
-                            .expect("could not find stylus framework as dependency")
+                            .ok_or(ModuleDataError::StylusFrameworkDependencyNotFound)?
                             .1
                             .unit
                             .module;

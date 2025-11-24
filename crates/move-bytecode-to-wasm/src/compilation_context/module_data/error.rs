@@ -29,4 +29,7 @@ pub enum ModuleDataError {
 
     #[error("acquires global resource is not empty")]
     AcquiresGlobalResourceNotEmpty,
+
+    #[error("could not find stylus framework as dependency")]
+    StylusFrameworkDependencyNotFound,
 }

@@ -578,9 +578,7 @@ pub fn add_delete_field_instructions(
             && !NamedId::is_vm_type(module_id, *index, compilation_ctx)? =>
         {
             // Get child struct by (module_id, index)
-            let child_struct = compilation_ctx
-                .get_struct_by_intermediate_type(itype)
-                .expect("struct not found");
+            let child_struct = compilation_ctx.get_struct_by_intermediate_type(itype)?;
 
             if child_struct.has_key {
                 // Child struct has 'key' ability: it's stored as a separate object with its own UID.
