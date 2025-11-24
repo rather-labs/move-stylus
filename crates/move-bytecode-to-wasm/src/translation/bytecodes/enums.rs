@@ -37,7 +37,7 @@ pub fn pack_variant(
 
     // This accounts for the variant that occupies most space in memory (plus the 4 bytes for the variant index)
     let heap_size = enum_
-        .heap_size
+        .heap_size()?
         .ok_or(TranslationError::PackingGenericEnumVariant {
             enum_index: enum_.index,
         })?;

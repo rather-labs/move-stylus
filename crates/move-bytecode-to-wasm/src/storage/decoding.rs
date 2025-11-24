@@ -253,13 +253,13 @@ pub fn add_read_and_decode_storage_enum_instructions(
         .get_generic(module, compilation_ctx, &[itype])?;
 
     // Get the IEnum representation
-    let enum_ = compilation_ctx
-        .get_enum_by_intermediate_type(itype)
-        .expect("enum not found");
+    let enum_ = compilation_ctx.get_enum_by_intermediate_type(itype)?;
 
     let heap_size = enum_
-        .heap_size
-        .expect("cannot decode enum with unresolved generic heap size") as i32;
+        .heap_size()?
+        .ok_or(StorageError::FoundTypeParameterInsideEnum {
+            enum_index: enum_.index,
+        })? as i32;
 
     // Compute the tail slot and tail offset for the enum
     let tail_slot_ptr = module.locals.add(ValType::I32);
@@ -743,9 +743,7 @@ pub fn add_decode_intermediate_type_instructions(
         }
         IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
             // Get base definition by (module_id, index)
-            let child_struct = compilation_ctx
-                .get_struct_by_intermediate_type(itype)
-                .expect("struct not found");
+            let child_struct = compilation_ctx.get_struct_by_intermediate_type(itype)?;
 
             if child_struct.has_key {
                 // Retrieve the 32-byte UID of the child struct from the current slot.

@@ -53,6 +53,9 @@ pub enum StorageError {
     )]
     FoundTypeParameterInsideEnumVariant { enum_index: u16, variant_index: u16 },
 
+    #[error("found type parameter inside enum with index {enum_index}")]
+    FoundTypeParameterInsideEnum { enum_index: u16 },
+
     #[error("found reference inside enum with index {enum_index}")]
     FoundReferenceInsideEnum { enum_index: u16 },
 }

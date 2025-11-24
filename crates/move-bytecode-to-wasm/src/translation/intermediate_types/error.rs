@@ -80,4 +80,8 @@ pub enum IntermediateTypeError {
 
     #[error("constant address is larger than 20 bytes")]
     ConstantAddressTooLarge,
+
+    // Enums
+    #[error("found type parameter inside enum")]
+    FoundTypeParameterInEnum,
 }
