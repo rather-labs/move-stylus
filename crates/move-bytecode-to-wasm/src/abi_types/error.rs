@@ -27,18 +27,10 @@ pub enum AbiEncodingError {
 
     #[error("cannot check if generic type parameter is dynamic at compile time")]
     GenericTypeParameterIsDynamic,
-
-    #[error("an error ocurred while generating a runtime function's code")]
-    RuntimeFunction(#[from] RuntimeFunctionError),
 }
 
 #[derive(thiserror::Error, Debug)]
 pub enum AbiError {
-    #[error(
-        "expected stylus::object::UID or stylus::object::NamedId as first field in {0} struct (it has key ability)"
-    )]
-    ExpectedUIDOrNamedId(String),
-
     #[error("there was an error performing abi unpack operation")]
     Unpack(#[from] AbiUnpackError),
 
@@ -62,6 +54,14 @@ pub enum AbiError {
 
     #[error("an error ocurred while processing a vm handled type")]
     VmHandledType(#[from] VmHandledTypeError),
+
+    #[error(
+        "expected stylus::object::UID or stylus::object::NamedId as first field in {0} struct (it has key ability)"
+    )]
+    ExpectedUIDOrNamedId(String),
+
+    #[error("unable to get type ABI size")]
+    UnableToGetTypeAbiSize,
 }
 
 impl From<AbiError> for CompilationError {

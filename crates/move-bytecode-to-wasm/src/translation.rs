@@ -32,7 +32,7 @@ use move_binary_format::{
 
 use crate::{
     CompilationContext,
-    abi_types::{error::AbiError, error_encoding::build_abort_error_message},
+    abi_types::error_encoding::build_abort_error_message,
     compilation_context::{ModuleData, ModuleId},
     data::DATA_ABORT_MESSAGE_PTR_OFFSET,
     generics::{replace_type_parameters, type_contains_generics},
@@ -2385,8 +2385,7 @@ fn translate_instruction(
             types_stack.pop_expecting(&IntermediateType::IU64)?;
 
             // Returns a ptr to the encoded error message
-            let ptr = build_abort_error_message(builder, module, compilation_ctx)
-                .map_err(AbiError::from)?;
+            let ptr = build_abort_error_message(builder, module, compilation_ctx)?;
 
             // Store the ptr at DATA_ABORT_MESSAGE_PTR_OFFSET
             builder

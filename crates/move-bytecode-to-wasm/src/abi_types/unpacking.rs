@@ -155,7 +155,7 @@ impl Unpackable for IntermediateType {
                 reader_pointer,
                 calldata_reader_pointer,
                 compilation_ctx,
-            ),
+            )?,
             IntermediateType::IVector(inner) => IVector::add_unpack_instructions(
                 inner,
                 function_builder,
@@ -283,7 +283,7 @@ fn load_struct_storage_id(
                 reader_pointer,
                 calldata_reader_pointer,
                 compilation_ctx,
-            );
+            )?;
         }
         Some(IntermediateType::IGenericStructInstance {
             module_id,
