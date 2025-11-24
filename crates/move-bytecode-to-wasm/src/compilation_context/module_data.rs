@@ -251,7 +251,9 @@ impl ModuleData {
             let idx = DatatypeHandleIndex::new(index as u16);
 
             // Assert the index we constructed is ok
-            assert_eq!(datatype_handle, module.datatype_handle_at(idx));
+            if datatype_handle != module.datatype_handle_at(idx) {
+                return Err(ModuleDataError::GeneratedInvalidDataTypeHandleIndex(index))?;
+            }
 
             // Check if the datatype is constructed in this module.
             if datatype_handle.module == module.self_handle_idx() {

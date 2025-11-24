@@ -24,6 +24,9 @@ pub enum ModuleDataError {
         variant_index: usize,
     },
 
+    #[error("generated invalid data type handle index {0}")]
+    GeneratedInvalidDataTypeHandleIndex(usize),
+
     #[error("acquires global resource is not empty")]
     AcquiresGlobalResourceNotEmpty,
 }

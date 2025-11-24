@@ -1,7 +1,7 @@
 use move_abstract_interpreter::control_flow_graph::{ControlFlowGraph, VMControlFlowGraph};
 use move_binary_format::file_format::{Bytecode, CodeUnit};
 use relooper::{BranchMode, ShapedBlock};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use super::TranslationError;
 

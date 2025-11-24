@@ -460,12 +460,6 @@ pub fn add_external_contract_call_fn(
                 .call(read_return_data)
                 .local_set(return_data_len);
 
-            assert_eq!(
-                1,
-                function_information.signature.returns.len(),
-                "invalid contract call function, it can only return one value"
-            );
-
             inner_error = (|| {
                 if let IntermediateType::IGenericStructInstance {
                     module_id,
