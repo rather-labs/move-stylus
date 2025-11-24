@@ -78,10 +78,9 @@ pub fn translate_package(
         package.root_compiled_units.iter().collect()
     };
 
-    assert!(
-        !root_compiled_units.is_empty(),
-        "Module not found in package"
-    );
+    if root_compiled_units.is_empty() {
+        return Err(CompilationError::NoFilesFound);
+    }
 
     let mut modules = HashMap::new();
 

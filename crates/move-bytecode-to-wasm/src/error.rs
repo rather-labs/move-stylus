@@ -14,23 +14,26 @@ use crate::{
 
 #[derive(thiserror::Error, Debug)]
 pub enum DependencyProcessingError {
-    #[error("{0}")]
+    #[error("internal compiler error(s) ocurred")]
     ICE(#[from] ICEError),
 
-    #[error("internal compiler error(s) ocurred")]
+    #[error("code error ocurred")]
     CodeError(Vec<CodeError>),
 }
 
 #[derive(thiserror::Error, Debug)]
 pub enum CompilationError {
-    #[error("{0}")]
+    #[error("internal compiler error(s) ocurred")]
     ICE(#[from] ICEError),
 
-    #[error("internal compiler error(s) ocurred")]
+    #[error("code error ocurred")]
     CodeError {
         mapped_files: MappedFiles,
         errors: Vec<CodeError>,
     },
+
+    #[error("no files found to compile")]
+    NoFilesFound,
 }
 
 #[derive(thiserror::Error, Debug)]
