@@ -93,11 +93,6 @@ impl<'code_unit> Flow<'code_unit> {
                     .map(|(k, v)| (*k, *v))
                     .collect();
 
-                assert_eq!(
-                    branches.len(),
-                    branches.keys().collect::<HashSet<_>>().len()
-                );
-
                 Ok(Flow::Simple {
                     label: simple_block.label,
                     instructions: simple_block_ctx,
