@@ -1,0 +1,139 @@
+{
+  "abi": [
+    {
+      "type": "function",
+      "name": "testGenericStructs",
+      "inputs": [
+        {
+          "name": "s1",
+          "type": "tuple",
+          "internalType": "struct Generics2.GenericStructUint32Uint64",
+          "components": [
+            {
+              "name": "a",
+              "type": "uint32",
+              "internalType": "uint32"
+            },
+            {
+              "name": "b",
+              "type": "uint64",
+              "internalType": "uint64"
+            }
+          ]
+        },
+        {
+          "name": "s2",
+          "type": "tuple",
+          "internalType": "struct Generics2.GenericStructUint128Uint256",
+          "components": [
+            {
+              "name": "a",
+              "type": "uint128",
+              "internalType": "uint128"
+            },
+            {
+              "name": "b",
+              "type": "uint256",
+              "internalType": "uint256"
+            }
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint32",
+          "internalType": "uint32"
+        },
+        {
+          "name": "",
+          "type": "uint64",
+          "internalType": "uint64"
+        },
+        {
+          "name": "",
+          "type": "uint128",
+          "internalType": "uint128"
+        },
+        {
+          "name": "",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "unpack1",
+      "inputs": [
+        {
+          "name": "s",
+          "type": "tuple",
+          "internalType": "struct Generics2.GenericStructUint32Uint64",
+          "components": [
+            {
+              "name": "a",
+              "type": "uint32",
+              "internalType": "uint32"
+            },
+            {
+              "name": "b",
+              "type": "uint64",
+              "internalType": "uint64"
+            }
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint32",
+          "internalType": "uint32"
+        },
+        {
+          "name": "",
+          "type": "uint64",
+          "internalType": "uint64"
+        }
+      ],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "unpack2",
+      "inputs": [
+        {
+          "name": "s",
+          "type": "tuple",
+          "internalType": "struct Generics2.GenericStructUint128Uint256",
+          "components": [
+            {
+              "name": "a",
+              "type": "uint128",
+              "internalType": "uint128"
+            },
+            {
+              "name": "b",
+              "type": "uint256",
+              "internalType": "uint256"
+            }
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint128",
+          "internalType": "uint128"
+        },
+        {
+          "name": "",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable"
+    }
+  ]
+}

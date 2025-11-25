@@ -1,0 +1,29 @@
+{
+    "abi": [
+		{
+			"inputs": [
+				{
+					"internalType": "string",
+					"name": "",
+					"type": "string"
+				}
+			],
+			"name": "SimpleError",
+			"type": "error"
+		},
+		{
+			"inputs": [
+				{
+					"internalType": "string",
+					"name": "s",
+					"type": "string"
+				}
+			],
+			"name": "revertSimpleError",
+			"outputs": [],
+			"stateMutability": "pure",
+			"type": "function"
+		}
+	]
+
+}

@@ -130,7 +130,7 @@ StylusFramework = { local = "./stylus-framework/" }
     .unwrap();
 }
 
-fn get_build_confing() -> BuildConfig {
+fn get_build_config() -> BuildConfig {
     BuildConfig {
         dev_mode: false,
         test_mode: false,
@@ -161,7 +161,7 @@ pub fn translate_test_package(path: &str, module_name: &str) -> Module {
     let rerooted_path = reroot_path(path);
     create_move_toml(&rerooted_path);
 
-    let package = get_build_confing()
+    let package = get_build_config()
         .compile_package(&rerooted_path, &mut Vec::new())
         .unwrap();
 
@@ -176,7 +176,7 @@ pub fn translate_test_complete_package(path: &str) -> HashMap<String, Module> {
     let rerooted_path = reroot_path(path);
     create_move_toml(&rerooted_path);
 
-    let package = get_build_confing()
+    let package = get_build_config()
         .compile_package(&rerooted_path, &mut Vec::new())
         .unwrap();
 
@@ -191,7 +191,7 @@ pub fn translate_test_complete_package_with_framework(path: &str) -> HashMap<Str
     let rerooted_path = reroot_path(path);
     create_move_toml_with_framework(&rerooted_path, "../../stylus-framework");
 
-    let package = get_build_confing()
+    let package = get_build_config()
         .compile_package(&rerooted_path, &mut Vec::new())
         .unwrap();
 
@@ -205,7 +205,7 @@ pub fn translate_test_package_with_framework(path: &str, module_name: &str) -> M
     let rerooted_path = reroot_path(path);
     create_move_toml_with_framework(&rerooted_path, "../../stylus-framework");
 
-    let package = get_build_confing()
+    let package = get_build_config()
         .compile_package(&rerooted_path, &mut Vec::new())
         .unwrap();
 

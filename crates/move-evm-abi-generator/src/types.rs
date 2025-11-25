@@ -34,6 +34,7 @@ pub enum Type {
     },
     Enum {
         identifier: String,
+        module_id: ModuleId,
     },
     Tuple(Vec<Type>),
     // This type represents a type that appears in Move but not in the ABI signature
@@ -166,6 +167,7 @@ impl Type {
                 if enum_.is_simple {
                     Type::Enum {
                         identifier: enum_.identifier.clone(),
+                        module_id: module_id.clone(),
                     }
                 } else {
                     Type::None
@@ -186,6 +188,7 @@ impl Type {
                 if enum_.is_simple {
                     Type::Enum {
                         identifier: enum_.identifier.clone(),
+                        module_id: module_id.clone(),
                     }
                 } else {
                     Type::None

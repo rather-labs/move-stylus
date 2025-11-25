@@ -1,5 +1,5 @@
 use crate::{
-    abi::{Abi, Visibility},
+    abi::{Abi, Event, Visibility},
     common::snake_to_upper_camel,
     types::Type,
 };
@@ -12,7 +12,13 @@ pub fn process_abi(abi: &Abi) -> String {
     result.push_str(" {\n\n");
 
     process_events(&mut result, abi);
+    if !abi.events.is_empty() {
+        result.push('\n');
+    }
     process_abi_errors(&mut result, abi);
+    if !abi.abi_errors.is_empty() {
+        result.push('\n');
+    }
     process_structs(&mut result, abi);
     process_functions(&mut result, abi);
 
@@ -22,7 +28,12 @@ pub fn process_abi(abi: &Abi) -> String {
 }
 
 pub fn process_functions(contract_abi: &mut String, abi: &Abi) {
-    for function in &abi.functions {
+    // Sort functions by identifier for deterministic output
+    let mut function_indices: Vec<usize> = (0..abi.functions.len()).collect();
+    function_indices.sort_by_key(|&i| &abi.functions[i].identifier);
+
+    for &i in &function_indices {
+        let function = &abi.functions[i];
         if function.visibility == Visibility::Private && !function.is_entry {
             continue;
         }
@@ -77,7 +88,12 @@ pub fn process_functions(contract_abi: &mut String, abi: &Abi) {
 }
 
 pub fn process_structs(contract_abi: &mut String, abi: &Abi) {
-    for struct_ in &abi.structs {
+    // Sort structs by identifier for deterministic output
+    let mut struct_indices: Vec<usize> = (0..abi.structs.len()).collect();
+    struct_indices.sort_by_key(|&i| &abi.structs[i].identifier);
+
+    for &i in &struct_indices {
+        let struct_ = &abi.structs[i];
         // Declaration
         contract_abi.push_str("    struct ");
         contract_abi.push_str(&struct_.identifier);
@@ -95,34 +111,57 @@ pub fn process_structs(contract_abi: &mut String, abi: &Abi) {
 }
 
 pub fn process_events(contract_abi: &mut String, abi: &Abi) {
-    for event in &abi.events {
+    // Helper function to format event signature
+    let format_signature = |event: &Event| -> String {
+        event
+            .fields
+            .iter()
+            .map(|f| {
+                format!(
+                    "{}{}{}",
+                    &f.named_type.type_.name(),
+                    if f.indexed { " indexed" } else { "" },
+                    if event.positional_fields {
+                        "".to_string()
+                    } else {
+                        format!(" {}", &f.named_type.identifier)
+                    }
+                )
+            })
+            .collect::<Vec<String>>()
+            .join(", ")
+    };
+
+    // Sort events by identifier and signature for deterministic output
+    // This handles event overloading (same name, different fields)
+    let mut event_indices: Vec<usize> = (0..abi.events.len()).collect();
+    event_indices.sort_by_key(|&i| {
+        let event = &abi.events[i];
+        (event.identifier.clone(), format_signature(event))
+    });
+
+    for &i in &event_indices {
+        let event = &abi.events[i];
         // Declaration
         contract_abi.push_str("    event ");
         contract_abi.push_str(&event.identifier);
         contract_abi.push('(');
-        contract_abi.push_str(
-            &event
-                .fields
-                .iter()
-                .map(|f| {
-                    format!(
-                        "{}{}{}",
-                        &f.named_type.type_.name(),
-                        if f.indexed { " indexed " } else { " " },
-                        &f.named_type.identifier
-                    )
-                })
-                .collect::<Vec<String>>()
-                .join(", "),
-        );
-
-        contract_abi.push_str(");\n");
+        contract_abi.push_str(&format_signature(event));
+        contract_abi.push(')');
+        if event.is_anonymous {
+            contract_abi.push_str(" anonymous");
+        }
+        contract_abi.push_str(";\n");
     }
-    contract_abi.push('\n');
 }
 
 pub fn process_abi_errors(contract_abi: &mut String, abi: &Abi) {
-    for error in &abi.abi_errors {
+    // Sort errors by identifier for deterministic output
+    let mut error_indices: Vec<usize> = (0..abi.abi_errors.len()).collect();
+    error_indices.sort_by_key(|&i| &abi.abi_errors[i].identifier);
+
+    for &i in &error_indices {
+        let error = &abi.abi_errors[i];
         // Declaration
         contract_abi.push_str("    error ");
         contract_abi.push_str(&error.identifier);
@@ -131,12 +170,21 @@ pub fn process_abi_errors(contract_abi: &mut String, abi: &Abi) {
             &error
                 .fields
                 .iter()
-                .map(|f| format!("{}{}{}", &f.type_.name(), " ", &f.identifier))
+                .map(|f| {
+                    format!(
+                        "{}{}",
+                        &f.type_.name(),
+                        if error.positional_fields {
+                            "".to_string()
+                        } else {
+                            format!(" {}", &f.identifier)
+                        }
+                    )
+                })
                 .collect::<Vec<String>>()
                 .join(", "),
         );
 
         contract_abi.push_str(");\n");
     }
-    contract_abi.push('\n');
 }

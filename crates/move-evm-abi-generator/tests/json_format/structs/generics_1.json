@@ -1,0 +1,67 @@
+{
+    "abi": [
+      {
+        "type": "function",
+        "name": "testGenericStructs",
+        "inputs": [
+          {
+            "name": "a1",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "a2",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "b1",
+            "type": "uint128",
+            "internalType": "uint128"
+          },
+          {
+            "name": "b2",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "",
+            "type": "tuple",
+            "internalType": "struct Generics1.GenericStructUint32Uint64",
+            "components": [
+              {
+                "name": "a",
+                "type": "uint32",
+                "internalType": "uint32"
+              },
+              {
+                "name": "b",
+                "type": "uint64",
+                "internalType": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "",
+            "type": "tuple",
+            "internalType": "struct Generics1.GenericStructUint128Uint256",
+            "components": [
+              {
+                "name": "a",
+                "type": "uint128",
+                "internalType": "uint128"
+              },
+              {
+                "name": "b",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          }
+        ],
+        "stateMutability": "nonpayable"
+      }
+    ]
+  }

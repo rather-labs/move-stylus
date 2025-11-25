@@ -30,7 +30,7 @@ public struct Baz<T: copy> has drop, copy {
     b: vector<u256>,
 }
 
-entry fun create_foo<T: copy>(g: T): Foo<T, u64> {
+fun create_foo<T: copy>(g: T): Foo<T, u64> {
     Foo {
         g,
         q: @0xcafe000000000000000000000000000000007357,
@@ -61,7 +61,7 @@ public struct Fu<T: copy> has drop, copy {
     b: vector<T>,
 }
 
-entry fun create_fu<T: copy>(t: T): Fu<T> {
+fun create_fu<T: copy>(t: T): Fu<T> {
     Fu {a: t, b: vector[t, t, t]}
 }
 
