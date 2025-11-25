@@ -134,7 +134,7 @@ impl IAddress {
 
         // increment reader pointer
         block.local_get(reader_pointer);
-        block.i32_const(encoded_size as i32);
+        block.i32_const(encoded_size);
         block.binop(BinaryOp::I32Add);
         block.local_set(reader_pointer);
 

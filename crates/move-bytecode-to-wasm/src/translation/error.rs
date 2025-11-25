@@ -180,6 +180,12 @@ pub enum TranslationError {
     #[error("only Simple flow has label")]
     NotSimpleFlowWithLabel,
 
+    #[error("jump table not found while translating Switch flow!")]
+    JumpTableNotFound,
+
+    #[error("Missing block id for jump-table label")]
+    MissingBlockIdForJumpTableLabel,
+
     // Misc
     #[error("invalid intermediate type {0:?} found in unpack function")]
     InvalidTypeInUnpackFunction(IntermediateType),

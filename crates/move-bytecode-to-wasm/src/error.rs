@@ -113,6 +113,15 @@ pub enum ICEErrorKind {
 
     #[error("an error ocurred while processing a contact's dependencies")]
     Dependency(#[from] DependencyError),
+
+    #[error("io error")]
+    Io(#[from] std::io::Error),
+
+    #[error("module not compiled: {0}")]
+    ModuleNotCompiled(String),
+
+    #[error("unexpected error: {0}")]
+    Unexpected(#[from] Box<dyn std::error::Error + Send + Sync>),
 }
 
 impl From<CodeError> for Diagnostic {

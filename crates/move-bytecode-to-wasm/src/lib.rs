@@ -61,7 +61,9 @@ pub fn translate_single_module(
 ) -> Result<Module, CompilationError> {
     let mut modules = translate_package(package, Some(module_name.to_string()))?;
 
-    Ok(modules.remove(module_name).expect("Module not compiled"))
+    Ok(modules
+        .remove(module_name)
+        .ok_or_else(|| ICEError::new(ICEErrorKind::ModuleNotCompiled(module_name.to_string())))?)
 }
 
 pub fn translate_package(
@@ -326,15 +328,16 @@ pub fn translate_package_cli(
     for (module_name, module) in modules.iter_mut() {
         module
             .emit_wasm_file(build_directory.join(format!("{module_name}.wasm")))
-            .unwrap();
+            .map_err(|e| ICEError::new(ICEErrorKind::Unexpected(e.into())))?;
 
         // Convert to WAT format
-        let wat = wasmprinter::print_bytes(module.emit_wasm()).expect("Failed to generate WAT");
+        let wat = wasmprinter::print_bytes(module.emit_wasm())
+            .map_err(|e| ICEError::new(ICEErrorKind::Unexpected(e.into())))?;
         std::fs::write(
             build_directory.join(format!("{module_name}.wat")),
             wat.as_bytes(),
         )
-        .expect("Failed to write WAT file");
+        .map_err(|e| ICEError::new(ICEErrorKind::Io(e)))?;
     }
 
     Ok(())

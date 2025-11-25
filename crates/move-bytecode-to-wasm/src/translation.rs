@@ -495,14 +495,14 @@ fn translate_flow(
                     let jump_table = ctx
                         .jump_table
                         .take()
-                        .expect("Jump table not found while translating Switch flow!");
+                        .ok_or(TranslationError::JumpTableNotFound)?;
 
                     // Build targets in exact jump-table order
                     let mut targets = Vec::with_capacity(jump_table.offsets.len());
                     for &label in &jump_table.offsets {
                         let id = *label_to_block
                             .get(&label)
-                            .expect("Missing block id for jump-table label");
+                            .ok_or(TranslationError::MissingBlockIdForJumpTableLabel)?;
 
                         targets.push(id);
                     }
