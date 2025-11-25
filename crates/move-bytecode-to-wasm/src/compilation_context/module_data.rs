@@ -1076,7 +1076,6 @@ impl ModuleData {
 
         // Must be payable
         if !function_sa.modifiers.contains(&FunctionModifier::Payable) {
-            println!("function_sa.modifiers: {:?}", function_sa.modifiers);
             return Err(CompilationContextError::ReceiveFunctionIsNotPayable);
         }
 
