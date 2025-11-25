@@ -6,10 +6,10 @@ use std::ascii::String;
 // Standard error type
 #[ext(abi_error)]
 #[allow(unused_field)]
-public struct Error(String) has copy, drop;
+public struct SimpleError(String) has copy, drop;
 
 entry fun revert_standard_error(s: String) {
-    let error = Error(s);
+    let error = SimpleError(s);
     revert(error);
 }
 

@@ -48,6 +48,6 @@ entry fun test_forward_generics_2(bar: &Bar, x: u128, foo: &mut Foo): (u128, &mu
     test_generics(bar, x, foo)
 }
 
-entry fun test_generics<T, U, V>(x: &T, b: U, y: &mut V): (U, &mut V, &T) {
+fun test_generics<T, U, V>(x: &T, b: U, y: &mut V): (U, &mut V, &T) {
     (b, y, x)
 }

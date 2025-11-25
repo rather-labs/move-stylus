@@ -1,0 +1,94 @@
+{
+    "abi": [
+      {
+        "type": "function",
+        "name": "testMisc",
+        "inputs": [
+          {
+            "name": "a",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "b",
+            "type": "uint128",
+            "internalType": "uint128"
+          },
+          {
+            "name": "c",
+            "type": "uint8",
+            "internalType": "enum MiscStructs.GenericEnum"
+          },
+          {
+            "name": "d",
+            "type": "uint8",
+            "internalType": "enum MiscStructs.SimpleEnum"
+          },
+          {
+            "name": "e",
+            "type": "tuple",
+            "internalType": "struct MiscStructs.NestedStructUint32Uint128",
+            "components": [
+              {
+                "name": "a",
+                "type": "bool",
+                "internalType": "bool"
+              },
+              {
+                "name": "b",
+                "type": "bool[]",
+                "internalType": "bool[]"
+              }
+            ]
+          }
+        ],
+        "outputs": [
+          {
+            "name": "",
+            "type": "tuple",
+            "internalType": "struct MiscStructs.GenericStructUint32Uint128",
+            "components": [
+              {
+                "name": "a",
+                "type": "uint32",
+                "internalType": "uint32"
+              },
+              {
+                "name": "b",
+                "type": "uint128",
+                "internalType": "uint128"
+              },
+              {
+                "name": "c",
+                "type": "uint8",
+                "internalType": "enum MiscStructs.GenericEnum"
+              },
+              {
+                "name": "d",
+                "type": "uint8",
+                "internalType": "enum MiscStructs.SimpleEnum"
+              },
+              {
+                "name": "e",
+                "type": "tuple",
+                "internalType": "struct MiscStructs.NestedStructUint32Uint128",
+                "components": [
+                  {
+                    "name": "a",
+                    "type": "bool",
+                    "internalType": "bool"
+                  },
+                  {
+                    "name": "b",
+                    "type": "bool[]",
+                    "internalType": "bool[]"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "stateMutability": "nonpayable"
+      }
+    ]
+  }

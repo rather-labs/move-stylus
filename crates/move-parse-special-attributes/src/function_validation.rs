@@ -16,6 +16,9 @@ pub enum FunctionValidationError {
 
     #[error("Function with Error type parameter must be a native revert function")]
     InvalidRevertFunction,
+
+    #[error("Generic functions cannot be entrypoints")]
+    GenericFunctionsIsEntry,
 }
 
 impl From<&FunctionValidationError> for DiagnosticInfo {
@@ -149,6 +152,7 @@ fn validate_revert_function(
 
 /// Validates that a function is correct:
 ///
+/// - If the function is generic, it cannot be an entrypoint.
 /// - If the function has an Event parameter, it must be an emit function; otherwise, it is invalid.
 /// - If the function has an AbiError parameter, it must be a revert function; otherwise, it is invalid.
 /// - If neither type is present, the function is always considered valid.
@@ -157,6 +161,14 @@ pub fn validate_function(
     events: &std::collections::HashMap<String, Event>,
     abi_errors: &std::collections::HashMap<String, AbiError>,
 ) -> Result<(), SpecialAttributeError> {
+    if !function.signature.type_parameters.is_empty() && function.entry.is_some() {
+        return Err(SpecialAttributeError {
+            kind: SpecialAttributeErrorKind::FunctionValidation(
+                FunctionValidationError::GenericFunctionsIsEntry,
+            ),
+            line_of_code: function.loc,
+        });
+    }
     let signature = crate::function_modifiers::Function::parse_signature(&function.signature);
 
     for param in &signature.parameters {

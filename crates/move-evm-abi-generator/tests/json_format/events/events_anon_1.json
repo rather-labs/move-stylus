@@ -1,0 +1,282 @@
+{
+"abi": [
+		{
+			"anonymous": true,
+			"inputs": [
+				{
+					"indexed": true,
+					"internalType": "uint32",
+					"name": "n",
+					"type": "uint32"
+				}
+			],
+			"name": "TestEvent1Anon",
+			"type": "event"
+		},
+		{
+			"anonymous": true,
+			"inputs": [
+				{
+					"indexed": true,
+					"internalType": "uint32",
+					"name": "a",
+					"type": "uint32"
+				},
+				{
+					"indexed": true,
+					"internalType": "address",
+					"name": "b",
+					"type": "address"
+				},
+				{
+					"indexed": true,
+					"internalType": "uint128",
+					"name": "c",
+					"type": "uint128"
+				}
+			],
+			"name": "TestEvent2Anon",
+			"type": "event"
+		},
+		{
+			"anonymous": true,
+			"inputs": [
+				{
+					"indexed": true,
+					"internalType": "uint32",
+					"name": "a",
+					"type": "uint32"
+				},
+				{
+					"indexed": true,
+					"internalType": "address",
+					"name": "b",
+					"type": "address"
+				},
+				{
+					"indexed": false,
+					"internalType": "uint128",
+					"name": "c",
+					"type": "uint128"
+				},
+				{
+					"indexed": false,
+					"internalType": "uint8[]",
+					"name": "d",
+					"type": "uint8[]"
+				}
+			],
+			"name": "TestEvent3Anon",
+			"type": "event"
+		},
+		{
+			"anonymous": true,
+			"inputs": [
+				{
+					"indexed": true,
+					"internalType": "uint32",
+					"name": "a",
+					"type": "uint32"
+				},
+				{
+					"indexed": true,
+					"internalType": "address",
+					"name": "b",
+					"type": "address"
+				},
+				{
+					"indexed": false,
+					"internalType": "uint128",
+					"name": "c",
+					"type": "uint128"
+				},
+				{
+					"indexed": false,
+					"internalType": "uint8[]",
+					"name": "d",
+					"type": "uint8[]"
+				},
+				{
+					"components": [
+						{
+							"internalType": "uint32",
+							"name": "a",
+							"type": "uint32"
+						},
+						{
+							"internalType": "address",
+							"name": "b",
+							"type": "address"
+						},
+						{
+							"internalType": "uint128",
+							"name": "c",
+							"type": "uint128"
+						}
+					],
+					"indexed": false,
+					"internalType": "struct EventsAnon1.NestedStruct",
+					"name": "e",
+					"type": "tuple"
+				}
+			],
+			"name": "TestEvent4Anon",
+			"type": "event"
+		},
+		{
+			"anonymous": true,
+			"inputs": [
+				{
+					"indexed": true,
+					"internalType": "uint32",
+					"name": "a",
+					"type": "uint32"
+				},
+				{
+					"indexed": true,
+					"internalType": "address",
+					"name": "b",
+					"type": "address"
+				},
+				{
+					"indexed": true,
+					"internalType": "uint8[]",
+					"name": "c",
+					"type": "uint8[]"
+				}
+			],
+			"name": "TestEvent5Anon",
+			"type": "event"
+		},
+		{
+			"inputs": [
+				{
+					"internalType": "uint32",
+					"name": "n",
+					"type": "uint32"
+				}
+			],
+			"name": "emitTestAnonEvent1",
+			"outputs": [],
+			"stateMutability": "nonpayable",
+			"type": "function"
+		},
+		{
+			"inputs": [
+				{
+					"internalType": "uint32",
+					"name": "a",
+					"type": "uint32"
+				},
+				{
+					"internalType": "address",
+					"name": "b",
+					"type": "address"
+				},
+				{
+					"internalType": "uint128",
+					"name": "c",
+					"type": "uint128"
+				}
+			],
+			"name": "emitTestAnonEvent2",
+			"outputs": [],
+			"stateMutability": "nonpayable",
+			"type": "function"
+		},
+		{
+			"inputs": [
+				{
+					"internalType": "uint32",
+					"name": "a",
+					"type": "uint32"
+				},
+				{
+					"internalType": "address",
+					"name": "b",
+					"type": "address"
+				},
+				{
+					"internalType": "uint128",
+					"name": "c",
+					"type": "uint128"
+				},
+				{
+					"internalType": "uint8[]",
+					"name": "d",
+					"type": "uint8[]"
+				}
+			],
+			"name": "emitTestAnonEvent3",
+			"outputs": [],
+			"stateMutability": "nonpayable",
+			"type": "function"
+		},
+		{
+			"inputs": [
+				{
+					"internalType": "uint32",
+					"name": "a",
+					"type": "uint32"
+				},
+				{
+					"internalType": "address",
+					"name": "b",
+					"type": "address"
+				},
+				{
+					"internalType": "uint128",
+					"name": "c",
+					"type": "uint128"
+				},
+				{
+					"internalType": "uint8[]",
+					"name": "d",
+					"type": "uint8[]"
+				},
+				{
+					"internalType": "uint32",
+					"name": "e",
+					"type": "uint32"
+				},
+				{
+					"internalType": "address",
+					"name": "f",
+					"type": "address"
+				},
+				{
+					"internalType": "uint128",
+					"name": "g",
+					"type": "uint128"
+				}
+			],
+			"name": "emitTestAnonEvent4",
+			"outputs": [],
+			"stateMutability": "nonpayable",
+			"type": "function"
+		},
+		{
+			"inputs": [
+				{
+					"internalType": "uint32",
+					"name": "a",
+					"type": "uint32"
+				},
+				{
+					"internalType": "address",
+					"name": "b",
+					"type": "address"
+				},
+				{
+					"internalType": "uint8[]",
+					"name": "c",
+					"type": "uint8[]"
+				}
+			],
+			"name": "emitTestAnonEvent5",
+			"outputs": [],
+			"stateMutability": "nonpayable",
+			"type": "function"
+		}
+	]
+}

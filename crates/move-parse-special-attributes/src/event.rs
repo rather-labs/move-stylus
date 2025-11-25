@@ -39,9 +39,6 @@ pub enum EventParseError {
     #[error(r#"not marked as an event"#)]
     NotAnEvent,
 
-    #[error(r#"events with generic type parameters are not supported"#)]
-    GenericEvent,
-
     #[error(r#"events with key are not supported"#)]
     EventWithKey,
 }
@@ -82,14 +79,6 @@ impl TryFrom<&StructDefinition> for Event {
                     },
                     _ => continue,
                 };
-
-                // Check if the event has generic types
-                if !value.type_parameters.is_empty() {
-                    return Err(SpecialAttributeError {
-                        kind: SpecialAttributeErrorKind::Event(EventParseError::GenericEvent),
-                        line_of_code: value.loc,
-                    });
-                }
 
                 // Check if the event has the key ability
                 if value.abilities.iter().any(|a| a.value == Ability_::Key) {
