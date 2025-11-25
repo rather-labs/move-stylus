@@ -1,7 +1,5 @@
 contract Generics2 {
 
-
-
     struct GenericStructUint128Uint256 {
         uint128 a;
         uint256 b;

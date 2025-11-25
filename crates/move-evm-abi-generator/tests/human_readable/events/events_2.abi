@@ -6,7 +6,6 @@ contract Events2 {
     event TestEvent4(uint64 indexed a, string b);
     event TestEvent5(uint64 indexed a, string indexed b);
 
-
     struct NestedStruct {
         uint32 a;
         address b;

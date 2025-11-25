@@ -1,7 +1,5 @@
 contract MiscStructs {
 
-
-
     struct GenericStructUint32Uint128 {
         uint32 a;
         uint128 b;

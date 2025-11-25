@@ -12,7 +12,13 @@ pub fn process_abi(abi: &Abi) -> String {
     result.push_str(" {\n\n");
 
     process_events(&mut result, abi);
+    if !abi.events.is_empty() {
+        result.push('\n');
+    }
     process_abi_errors(&mut result, abi);
+    if !abi.abi_errors.is_empty() {
+        result.push('\n');
+    }
     process_structs(&mut result, abi);
     process_functions(&mut result, abi);
 
@@ -139,7 +145,6 @@ pub fn process_events(contract_abi: &mut String, abi: &Abi) {
         contract_abi.push_str(&format_signature(event));
         contract_abi.push_str(");\n");
     }
-    contract_abi.push('\n');
 }
 
 pub fn process_abi_errors(contract_abi: &mut String, abi: &Abi) {
@@ -164,5 +169,4 @@ pub fn process_abi_errors(contract_abi: &mut String, abi: &Abi) {
 
         contract_abi.push_str(");\n");
     }
-    contract_abi.push('\n');
 }

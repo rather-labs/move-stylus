@@ -7,7 +7,6 @@ contract EventsAnon2 {
     event TestEvent3Anon(uint64 indexed a, string b);
     event TestEvent4Anon(uint64 indexed a, string indexed b);
 
-
     struct NestedStruct {
         uint32 a;
         address b;

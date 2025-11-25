@@ -1,6 +1,5 @@
 contract AbiError1 {
 
-
     error SimpleError(string pos0);
 
     function revertSimpleError(string s) pure external;

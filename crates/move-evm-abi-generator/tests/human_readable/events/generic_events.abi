@@ -3,7 +3,6 @@ contract GenericEvents {
     event TestEvent1(address indexed a, NestedStructBoolUint256 indexed b);
     event TestEvent1(uint16 indexed a, NestedStructUint32Uint64 indexed b);
 
-
     struct NestedStructBoolUint256 {
         bool a;
         uint256 b;

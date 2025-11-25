@@ -5,7 +5,6 @@ contract Events1 {
     event TestEvent3(uint32 indexed a, address indexed b, uint128 c, uint8[] d);
     event TestEvent4(uint32 indexed a, address indexed b, uint8[] indexed c);
 
-
     function emitTestEvent1(uint32 n) external;
     function emitTestEvent2(uint32 a, address b, uint128 c) external;
     function emitTestEvent3(uint32 a, address b, uint128 c, uint8[] d) external;

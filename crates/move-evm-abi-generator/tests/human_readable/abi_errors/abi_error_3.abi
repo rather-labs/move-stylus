@@ -1,6 +1,5 @@
 contract AbiError3 {
 
-
     error ErrorWithEnum(ErrorEnum a, ErrorEnum[] b);
     error ErrorWithNestedStructs(NestedStruct a, NestedStruct2 b);
     error ErrorWithVectors(uint32[] a, uint128[] b, uint64[][] c);
