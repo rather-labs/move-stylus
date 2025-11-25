@@ -1,0 +1,132 @@
+{
+ "abi": [
+		{
+			"inputs": [
+				{
+					"internalType": "string",
+					"name": "error_message",
+					"type": "string"
+				},
+				{
+					"internalType": "uint64",
+					"name": "error_code",
+					"type": "uint64"
+				}
+			],
+			"name": "CustomError",
+			"type": "error"
+		},
+		{
+			"inputs": [
+				{
+					"internalType": "bool",
+					"name": "a",
+					"type": "bool"
+				},
+				{
+					"internalType": "uint8",
+					"name": "b",
+					"type": "uint8"
+				},
+				{
+					"internalType": "uint16",
+					"name": "c",
+					"type": "uint16"
+				},
+				{
+					"internalType": "uint32",
+					"name": "d",
+					"type": "uint32"
+				},
+				{
+					"internalType": "uint64",
+					"name": "e",
+					"type": "uint64"
+				},
+				{
+					"internalType": "uint128",
+					"name": "f",
+					"type": "uint128"
+				},
+				{
+					"internalType": "uint256",
+					"name": "g",
+					"type": "uint256"
+				},
+				{
+					"internalType": "address",
+					"name": "h",
+					"type": "address"
+				}
+			],
+			"name": "CustomError2",
+			"type": "error"
+		},
+		{
+			"inputs": [
+				{
+					"internalType": "string",
+					"name": "s",
+					"type": "string"
+				},
+				{
+					"internalType": "uint64",
+					"name": "code",
+					"type": "uint64"
+				}
+			],
+			"name": "revertCustomError",
+			"outputs": [],
+			"stateMutability": "nonpayable",
+			"type": "function"
+		},
+		{
+			"inputs": [
+				{
+					"internalType": "bool",
+					"name": "a",
+					"type": "bool"
+				},
+				{
+					"internalType": "uint8",
+					"name": "b",
+					"type": "uint8"
+				},
+				{
+					"internalType": "uint16",
+					"name": "c",
+					"type": "uint16"
+				},
+				{
+					"internalType": "uint32",
+					"name": "d",
+					"type": "uint32"
+				},
+				{
+					"internalType": "uint64",
+					"name": "e",
+					"type": "uint64"
+				},
+				{
+					"internalType": "uint128",
+					"name": "f",
+					"type": "uint128"
+				},
+				{
+					"internalType": "uint256",
+					"name": "g",
+					"type": "uint256"
+				},
+				{
+					"internalType": "address",
+					"name": "h",
+					"type": "address"
+				}
+			],
+			"name": "revertCustomError2",
+			"outputs": [],
+			"stateMutability": "nonpayable",
+			"type": "function"
+		}
+	]
+}

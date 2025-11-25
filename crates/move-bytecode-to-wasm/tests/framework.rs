@@ -1451,7 +1451,7 @@ mod error {
     }
 
     sol!(
-        struct Error {
+        struct SimpleError {
             string e;
         }
 
@@ -1478,7 +1478,7 @@ mod error {
         }
 
         struct CustomError4 {
-            Error a;
+            SimpleError a;
             CustomError b;
         }
 
@@ -1501,7 +1501,7 @@ mod error {
     #[case(
         revertStandardErrorCall::new((String::from("Not enough Ether provided."),)),
         [
-            keccak256(b"Error(string)")[..4].to_vec(),
+            keccak256(b"SimpleError(string)")[..4].to_vec(),
             <sol!((string,))>::abi_encode_params(&("Not enough Ether provided.",)),
         ].concat()
     )]
