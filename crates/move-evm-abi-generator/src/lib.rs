@@ -334,15 +334,6 @@ fn find_struct_def_instantiation_index(
 /// Checks if two signature tokens match (for type parameter comparison)
 fn signature_tokens_match(token1: &SignatureToken, token2: &SignatureToken) -> bool {
     match (token1, token2) {
-        (SignatureToken::Bool, SignatureToken::Bool)
-        | (SignatureToken::U8, SignatureToken::U8)
-        | (SignatureToken::U16, SignatureToken::U16)
-        | (SignatureToken::U32, SignatureToken::U32)
-        | (SignatureToken::U64, SignatureToken::U64)
-        | (SignatureToken::U128, SignatureToken::U128)
-        | (SignatureToken::U256, SignatureToken::U256)
-        | (SignatureToken::Address, SignatureToken::Address)
-        | (SignatureToken::Signer, SignatureToken::Signer) => true,
         (SignatureToken::Vector(inner1), SignatureToken::Vector(inner2)) => {
             signature_tokens_match(inner1, inner2)
         }
@@ -368,6 +359,6 @@ fn signature_tokens_match(token1: &SignatureToken, token2: &SignatureToken) -> b
         (SignatureToken::MutableReference(inner1), SignatureToken::MutableReference(inner2)) => {
             signature_tokens_match(inner1, inner2)
         }
-        _ => false,
+        (t1, t2) => t1 == t2,
     }
 }
