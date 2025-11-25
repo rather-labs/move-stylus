@@ -71,7 +71,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
         // Save the type hash in the slot data at offset 24 (last 8 bytes)
         builder
             .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-            .i64_const(itype.get_hash(compilation_ctx) as i64)
+            .i64_const(itype.get_hash(compilation_ctx)? as i64)
             .store(
                 compilation_ctx.memory_id,
                 StoreKind::I64 { atomic: false },

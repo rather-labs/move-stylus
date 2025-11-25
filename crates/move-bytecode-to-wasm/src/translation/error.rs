@@ -48,6 +48,9 @@ pub enum TranslationError {
     #[error(r#"function "{0}" not found in global functions table"#)]
     FunctionDefinitionNotFound(FunctionId),
 
+    #[error("could not process byte array, wrong size")]
+    CouldNotProcessByteArray,
+
     #[error("types mistach: expected {expected:?} but found {found:?}")]
     TypeMismatch {
         expected: IntermediateType,

@@ -679,7 +679,7 @@ fn translate_instruction(
                 builder,
                 compilation_ctx,
                 &literal.to_le_bytes(),
-            );
+            )?;
             types_stack.push(IntermediateType::IU128);
         }
         Bytecode::LdU256(literal) => {
@@ -688,7 +688,7 @@ fn translate_instruction(
                 builder,
                 compilation_ctx,
                 &literal.to_le_bytes(),
-            );
+            )?;
             types_stack.push(IntermediateType::IU256);
         }
         // Function calls
