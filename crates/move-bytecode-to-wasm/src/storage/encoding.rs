@@ -12,7 +12,6 @@ use crate::{
     CompilationContext,
     data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET, DATA_ZERO_OFFSET},
     hostio::host_functions::{native_keccak256, storage_cache_bytes32, storage_load_bytes32},
-    native_functions::object::add_delete_field_instructions,
     runtime::RuntimeFunction,
     storage::storage_layout::field_size,
     translation::intermediate_types::IntermediateType,
@@ -20,7 +19,10 @@ use crate::{
     wasm_builder_extensions::WasmBuilderExtension,
 };
 
-use super::error::{EncodeError, StorageError};
+use super::{
+    common::add_delete_field_instructions,
+    error::{EncodeError, StorageError},
+};
 
 /// Emits WASM instructions that encode a struct and write it into storage.
 ///

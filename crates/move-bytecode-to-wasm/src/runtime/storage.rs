@@ -10,7 +10,7 @@ use crate::data::{
 use crate::hostio::host_functions::{
     self, storage_cache_bytes32, storage_flush_cache, storage_load_bytes32, tx_origin,
 };
-use crate::native_functions::object::add_delete_storage_struct_instructions;
+use crate::storage::common::add_delete_storage_struct_instructions;
 use crate::storage::decoding::add_read_and_decode_storage_struct_instructions;
 use crate::storage::encoding::add_encode_and_save_into_storage_struct_instructions;
 use crate::translation::intermediate_types::IntermediateType;
@@ -712,6 +712,7 @@ pub fn add_delete_struct_from_storage_fn(
         .i32_const(32)
         .call(equality_fn);
 
+    let mut inner_result = Ok(());
     builder.if_else(
         None,
         |then| {
@@ -741,17 +742,17 @@ pub fn add_delete_struct_from_storage_fn(
             else_.i32_const(8).local_set(slot_offset);
 
             // Delete the struct from storage
-            add_delete_storage_struct_instructions(
+            inner_result = add_delete_storage_struct_instructions(
                 module,
                 else_,
                 compilation_ctx,
                 slot_ptr,
                 slot_offset,
                 &struct_,
-            )
-            .unwrap(); // TODO: unwrap
+            );
         },
     );
+    inner_result?;
 
     // Wipe out the owner
     builder
