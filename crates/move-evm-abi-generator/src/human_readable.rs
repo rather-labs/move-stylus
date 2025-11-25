@@ -120,8 +120,12 @@ pub fn process_events(contract_abi: &mut String, abi: &Abi) {
                 format!(
                     "{}{}{}",
                     &f.named_type.type_.name(),
-                    if f.indexed { " indexed " } else { " " },
-                    &f.named_type.identifier
+                    if f.indexed { " indexed" } else { "" },
+                    if event.positional_fields {
+                        "".to_string()
+                    } else {
+                        format!(" {}", &f.named_type.identifier)
+                    }
                 )
             })
             .collect::<Vec<String>>()
@@ -166,7 +170,17 @@ pub fn process_abi_errors(contract_abi: &mut String, abi: &Abi) {
             &error
                 .fields
                 .iter()
-                .map(|f| format!("{}{}{}", &f.type_.name(), " ", &f.identifier))
+                .map(|f| {
+                    format!(
+                        "{}{}",
+                        &f.type_.name(),
+                        if error.positional_fields {
+                            "".to_string()
+                        } else {
+                            format!(" {}", &f.identifier)
+                        }
+                    )
+                })
                 .collect::<Vec<String>>()
                 .join(", "),
         );
