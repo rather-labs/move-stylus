@@ -294,7 +294,11 @@ fn process_io(
     abi: &Abi,
 ) {
     if type_ != Type::None {
-        let (abi_type, abi_internal_type, components) = encode_for_json_abi(type_.clone(), abi);
+        let JsonAbiData {
+            abi_type,
+            abi_internal_type,
+            components,
+        } = encode_for_json_abi(type_.clone(), abi);
 
         io.push(JsonIO {
             name: name.into(),
@@ -306,14 +310,19 @@ fn process_io(
     }
 }
 
+// A struct containing the ABI type, ABI internal type, and components.
+struct JsonAbiData {
+    abi_type: String,
+    abi_internal_type: String,
+    components: Option<Vec<JsonComponent>>,
+}
+
 /// Encodes a Type into the JSON ABI format.
 ///
-/// Returns a tuple of `(type_name, components)` where:
-/// - `type_name`: The ABI type string (e.g., "uint256", "tuple", "tuple[]")
-/// - `components`: `Some(Vec<JsonComponent>)` for struct types (tuples), `None` for primitive types
+/// Returns a JsonAbiData struct containing the ABI type, ABI internal type, and components.
 ///
 /// Recursively processes nested types (arrays, struct fields) to build the complete ABI representation.
-fn encode_for_json_abi(type_: Type, abi: &Abi) -> (String, String, Option<Vec<JsonComponent>>) {
+fn encode_for_json_abi(type_: Type, abi: &Abi) -> JsonAbiData {
     match &type_ {
         Type::Address
         | Type::Bool
@@ -324,14 +333,12 @@ fn encode_for_json_abi(type_: Type, abi: &Abi) -> (String, String, Option<Vec<Js
         | Type::Uint128
         | Type::Uint256
         | Type::Unit
-        | Type::Bytes32 => {
-            let abi_type = type_.name();
-            (abi_type.clone(), abi_type, None)
-        }
-        Type::String => {
-            let abi_type = type_.name();
-            (abi_type.clone(), abi_type, None)
-        }
+        | Type::Bytes32
+        | Type::String => JsonAbiData {
+            abi_type: type_.name(),
+            abi_internal_type: type_.name(),
+            components: None,
+        },
         Type::Enum {
             identifier,
             module_id,
@@ -342,17 +349,24 @@ fn encode_for_json_abi(type_: Type, abi: &Abi) -> (String, String, Option<Vec<Js
                 snake_to_upper_camel(&module_id.module_name),
                 identifier
             );
-            (abi_type, abi_internal_type, None)
+            JsonAbiData {
+                abi_type,
+                abi_internal_type,
+                components: None,
+            }
         }
         Type::Array(inner) => {
-            let (inner_abi_type, inner_internal_type, inner_components) =
-                encode_for_json_abi((**inner).clone(), abi);
+            let JsonAbiData {
+                abi_type,
+                abi_internal_type,
+                components,
+            } = encode_for_json_abi((**inner).clone(), abi);
 
-            (
-                format!("{inner_abi_type}[]"),
-                format!("{inner_internal_type}[]"),
-                inner_components,
-            )
+            JsonAbiData {
+                abi_type: format!("{abi_type}[]"),
+                abi_internal_type: format!("{abi_internal_type}[]"),
+                components,
+            }
         }
         Type::Struct { module_id, .. } => {
             // Find corresponding processed struct, searching by the name, which differs from the identifier in case of generic structs
@@ -366,14 +380,17 @@ fn encode_for_json_abi(type_: Type, abi: &Abi) -> (String, String, Option<Vec<Js
                 .fields
                 .iter()
                 .map(|named_type| {
-                    let (field_abi_type, field_abi_internal_type, field_comps) =
-                        encode_for_json_abi(named_type.type_.clone(), abi);
+                    let JsonAbiData {
+                        abi_type,
+                        abi_internal_type,
+                        components,
+                    } = encode_for_json_abi(named_type.type_.clone(), abi);
 
                     JsonComponent {
                         name: named_type.identifier.clone(),
-                        type_: field_abi_type,
-                        internal_type: field_abi_internal_type,
-                        components: field_comps,
+                        type_: abi_type,
+                        internal_type: abi_internal_type,
+                        components,
                     }
                 })
                 .collect();
@@ -384,7 +401,11 @@ fn encode_for_json_abi(type_: Type, abi: &Abi) -> (String, String, Option<Vec<Js
                 snake_to_upper_camel(&module_id.module_name),
                 type_.name()
             );
-            (abi_type, abi_internal_type, Some(components))
+            JsonAbiData {
+                abi_type,
+                abi_internal_type,
+                components: Some(components),
+            }
         }
         Type::Tuple(_) => {
             panic!("Found a Tuple type in the JSON ABI generation");
