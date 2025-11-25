@@ -242,10 +242,22 @@ fn process_functions(abi: &Abi) -> Vec<JsonAbiItem> {
         })
         .collect();
 
-    // Sort functions by name for deterministic output
-    functions.sort_by_key(|item| match item {
-        JsonAbiItem::Function { name, .. } => name.as_ref().unwrap().clone(),
-        _ => panic!(),
+    // Sort functions: special functions first (Constructor, Receive, Fallback), then regular functions by name
+    functions.sort_by_key(|item| {
+        match item {
+            JsonAbiItem::Function { type_, name, .. } => {
+                let priority = match type_ {
+                    FunctionType::Constructor => 0,
+                    FunctionType::Receive => 1,
+                    FunctionType::Fallback => 2,
+                    FunctionType::Function => 3,
+                };
+                // For regular functions, use the name; for special functions, use empty string
+                let name_key = name.as_ref().map(|n| n.clone()).unwrap_or_default();
+                (priority, name_key)
+            }
+            _ => panic!("Expected Function variant"),
+        }
     });
 
     functions
