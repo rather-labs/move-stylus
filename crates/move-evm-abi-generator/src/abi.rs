@@ -189,10 +189,8 @@ impl Abi {
                                                 modules_data,
                                             ),
                                         });
-                                        if let Some(struct_itype) =
-                                            Self::should_process_struct(itype, modules_data)
-                                        {
-                                            structs_to_process.insert(struct_itype);
+                                        if Self::should_process_struct(itype, modules_data) {
+                                            structs_to_process.insert(itype.clone());
                                         }
                                     }
                                 }
@@ -227,10 +225,8 @@ impl Abi {
                                     identifier: param.name.clone(),
                                     type_: Type::from_intermediate_type(itype, modules_data),
                                 });
-                                if let Some(struct_itype) =
-                                    Self::should_process_struct(itype, modules_data)
-                                {
-                                    structs_to_process.insert(struct_itype);
+                                if Self::should_process_struct(itype, modules_data) {
+                                    structs_to_process.insert(itype.clone());
                                 }
                             }
                         }
@@ -280,10 +276,8 @@ impl Abi {
             let return_type = if function.signature.returns.is_empty() {
                 Type::None
             } else if function.signature.returns.len() == 1 {
-                if let Some(struct_itype) =
-                    Self::should_process_struct(&function.signature.returns[0], modules_data)
-                {
-                    structs_to_process.insert(struct_itype);
+                if Self::should_process_struct(&function.signature.returns[0], modules_data) {
+                    structs_to_process.insert(function.signature.returns[0].clone());
                 }
 
                 Type::from_intermediate_type(&function.signature.returns[0], modules_data)
@@ -292,12 +286,12 @@ impl Abi {
                     .signature
                     .returns
                     .iter()
-                    .map(|t| {
-                        if let Some(struct_itype) = Self::should_process_struct(t, modules_data) {
-                            structs_to_process.insert(struct_itype);
+                    .inspect(|t| {
+                        if Self::should_process_struct(t, modules_data) {
+                            structs_to_process.insert((*t).clone());
                         }
-                        Type::from_intermediate_type(t, modules_data)
                     })
+                    .map(|t| Type::from_intermediate_type(t, modules_data))
                     .collect();
                 Type::Tuple(tuple_types)
             };
@@ -359,10 +353,8 @@ impl Abi {
                             identifier: param.name.clone(),
                             type_: Type::from_intermediate_type(struct_itype, modules_data),
                         });
-                        if let Some(struct_itype_to_add) =
-                            Self::should_process_struct(struct_itype, modules_data)
-                        {
-                            structs_to_process.insert(struct_itype_to_add);
+                        if Self::should_process_struct(struct_itype, modules_data) {
+                            structs_to_process.insert(struct_itype.clone());
                         }
                     }
                 }
@@ -391,10 +383,8 @@ impl Abi {
                             identifier: param.name.clone(),
                             type_: Type::from_intermediate_type(struct_itype, modules_data),
                         });
-                        if let Some(struct_itype_to_add) =
-                            Self::should_process_struct(struct_itype, modules_data)
-                        {
-                            structs_to_process.insert(struct_itype_to_add);
+                        if Self::should_process_struct(struct_itype, modules_data) {
+                            structs_to_process.insert(struct_itype.clone());
                         }
                     }
                 }
@@ -525,8 +515,8 @@ impl Abi {
 
             // Collect structs from event fields
             for field_itype in &event_struct.fields {
-                if let Some(struct_itype) = Self::should_process_struct(field_itype, modules_data) {
-                    structs_to_process.insert(struct_itype);
+                if Self::should_process_struct(field_itype, modules_data) {
+                    structs_to_process.insert(field_itype.clone());
                 }
             }
 
@@ -581,11 +571,13 @@ impl Abi {
                 .unwrap();
 
             // Collect structs from error fields
-            for field_itype in &error_struct.fields {
-                if let Some(struct_itype) = Self::should_process_struct(field_itype, modules_data) {
-                    structs_to_process.insert(struct_itype);
-                }
-            }
+            error_struct
+                .fields
+                .iter()
+                .filter(|field_itype| Self::should_process_struct(field_itype, modules_data))
+                .for_each(|field_itype| {
+                    structs_to_process.insert(field_itype.clone());
+                });
 
             result.push(Struct_ {
                 identifier: error_struct.identifier.to_string(),
@@ -606,43 +598,26 @@ impl Abi {
     }
 
     /// Helper function to check if a struct type should be added to the process HashSet.
-    /// Returns Some(IntermediateType) if it should be added, None otherwise.
+    /// Returns true if the struct is not a named_id or uid, false otherwise.
     fn should_process_struct(
         itype: &IntermediateType,
         modules_data: &HashMap<ModuleId, ModuleData>,
-    ) -> Option<IntermediateType> {
+    ) -> bool {
         match itype {
             IntermediateType::IStruct {
                 module_id, index, ..
-            } => {
-                let struct_module = modules_data.get(module_id).unwrap();
-                let struct_ = struct_module.structs.get_by_index(*index).unwrap();
-
-                // Only add if it's not a named_id or uid
-                if !is_named_id(&struct_.identifier, module_id)
-                    && !is_uid(&struct_.identifier, module_id)
-                {
-                    Some(itype.clone())
-                } else {
-                    None
-                }
             }
-            IntermediateType::IGenericStructInstance {
+            | IntermediateType::IGenericStructInstance {
                 module_id, index, ..
             } => {
                 let struct_module = modules_data.get(module_id).unwrap();
                 let struct_ = struct_module.structs.get_by_index(*index).unwrap();
 
-                // Only add if it's not a named_id or uid
-                if !is_named_id(&struct_.identifier, module_id)
+                // True if the struct is not a named_id or uid
+                !is_named_id(&struct_.identifier, module_id)
                     && !is_uid(&struct_.identifier, module_id)
-                {
-                    Some(itype.clone())
-                } else {
-                    None
-                }
             }
-            _ => None,
+            _ => false,
         }
     }
 }
