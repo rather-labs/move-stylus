@@ -12,7 +12,7 @@ use move_parse_special_attributes::function_modifiers::{FunctionModifier, Parame
 use crate::{
     ErrorStruct, EventStruct,
     common::snake_to_camel,
-    special_types::{is_named_id, is_uid},
+    special_types::{is_named_id, is_string, is_uid},
     types::Type,
 };
 
@@ -440,12 +440,8 @@ impl Abi {
                 .iter()
                 .zip(&parsed_struct.fields)
                 .map(|(field_itype, (name, _))| {
-                    match field_itype {
-                        IntermediateType::IStruct { .. }
-                        | IntermediateType::IGenericStructInstance { .. } => {
-                            child_structs_to_process.insert(field_itype.clone());
-                        }
-                        _ => {}
+                    if Self::should_process_struct(field_itype, modules_data) {
+                        child_structs_to_process.insert(field_itype.clone());
                     }
                     NamedType {
                         identifier: name.clone(),
@@ -598,7 +594,7 @@ impl Abi {
     }
 
     /// Helper function to check if a struct type should be added to the process HashSet.
-    /// Returns true if the struct is not a named_id or uid, false otherwise.
+    /// Returns true if the struct is not a named_id, uid or string, false otherwise.
     fn should_process_struct(
         itype: &IntermediateType,
         modules_data: &HashMap<ModuleId, ModuleData>,
@@ -613,9 +609,10 @@ impl Abi {
                 let struct_module = modules_data.get(module_id).unwrap();
                 let struct_ = struct_module.structs.get_by_index(*index).unwrap();
 
-                // True if the struct is not a named_id or uid
+                // True if the struct is not a named_id, uid or string
                 !is_named_id(&struct_.identifier, module_id)
                     && !is_uid(&struct_.identifier, module_id)
+                    && !is_string(&struct_.identifier, module_id)
             }
             _ => false,
         }

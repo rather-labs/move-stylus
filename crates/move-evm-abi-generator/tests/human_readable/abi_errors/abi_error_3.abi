@@ -14,10 +14,6 @@ contract AbiError3 {
         uint64 b;
     }
 
-    struct string {
-        uint8[] bytes;
-    }
-
     function revertErrorWithEnum(ErrorEnum a, ErrorEnum[] b) external;
     function revertErrorWithNestedStructs(string a, string b, uint64 c) pure external;
     function revertErrorWithVectors(uint32[] a, uint128[] b, uint64[][] c) pure external;

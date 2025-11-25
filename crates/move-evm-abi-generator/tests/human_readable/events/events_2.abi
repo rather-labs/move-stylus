@@ -13,10 +13,6 @@ contract Events2 {
         uint128 c;
     }
 
-    struct string {
-        uint8[] bytes;
-    }
-
     function emitTestEvent1(uint32 a, address b, uint128 c, uint8[] d, NestedStruct e) external;
     function emitTestEvent2(uint32 a, address b, NestedStruct c) external;
     function emitTestEvent3(uint32 a, uint8[] b, NestedStruct[] c) external;
