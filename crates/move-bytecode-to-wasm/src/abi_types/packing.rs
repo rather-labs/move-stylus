@@ -325,9 +325,7 @@ impl Packable for IntermediateType {
             )?,
 
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
-                let struct_ = compilation_ctx
-                    .get_struct_by_intermediate_type(self)
-                    .unwrap();
+                let struct_ = compilation_ctx.get_struct_by_intermediate_type(self)?;
 
                 struct_.add_pack_instructions(
                     builder,
@@ -340,7 +338,7 @@ impl Packable for IntermediateType {
                 )?
             }
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
-                let enum_ = compilation_ctx.get_enum_by_intermediate_type(self).unwrap();
+                let enum_ = compilation_ctx.get_enum_by_intermediate_type(self)?;
                 if !enum_.is_simple {
                     return Err(AbiPackError::EnumIsNotSimple(enum_.identifier.clone()))?;
                 }
@@ -407,9 +405,7 @@ impl Packable for IntermediateType {
                 )?;
             }
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
-                let struct_ = compilation_ctx
-                    .get_struct_by_intermediate_type(self)
-                    .unwrap();
+                let struct_ = compilation_ctx.get_struct_by_intermediate_type(self)?;
 
                 struct_.add_pack_instructions(
                     builder,

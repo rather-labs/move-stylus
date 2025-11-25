@@ -210,9 +210,7 @@ impl IStruct {
             let advancement = match field {
                 IntermediateType::IStruct { .. }
                 | IntermediateType::IGenericStructInstance { .. } => {
-                    let child_struct = compilation_ctx
-                        .get_struct_by_intermediate_type(field)
-                        .unwrap();
+                    let child_struct = compilation_ctx.get_struct_by_intermediate_type(field)?;
 
                     pack_child_struct(
                         &child_struct,

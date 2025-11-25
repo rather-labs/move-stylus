@@ -11,7 +11,6 @@ use crate::{
 use super::unpack_native_int::unpack_i32_type_instructions;
 
 impl IEnum {
-    // TODO: this only works for simple enums where the variant does not have fields
     pub fn add_unpack_instructions(
         enum_: &IEnum,
         block: &mut InstrSeqBuilder,
