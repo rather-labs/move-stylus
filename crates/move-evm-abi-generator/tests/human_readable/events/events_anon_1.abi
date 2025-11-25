@@ -1,10 +1,10 @@
 contract EventsAnon1 {
 
-    event TestEvent1Anon(uint32 indexed n);
-    event TestEvent2Anon(uint32 indexed a, address indexed b, uint128 indexed c);
-    event TestEvent3Anon(uint32 indexed a, address indexed b, uint128 c, uint8[] d);
-    event TestEvent4Anon(uint32 indexed a, address indexed b, uint128 c, uint8[] d, NestedStruct e);
-    event TestEvent5Anon(uint32 indexed a, address indexed b, uint8[] indexed c);
+    event TestEvent1Anon(uint32 indexed n) anonymous;
+    event TestEvent2Anon(uint32 indexed a, address indexed b, uint128 indexed c) anonymous;
+    event TestEvent3Anon(uint32 indexed a, address indexed b, uint128 c, uint8[] d) anonymous;
+    event TestEvent4Anon(uint32 indexed a, address indexed b, uint128 c, uint8[] d, NestedStruct e) anonymous;
+    event TestEvent5Anon(uint32 indexed a, address indexed b, uint8[] indexed c) anonymous;
 
     struct NestedStruct {
         uint32 a;

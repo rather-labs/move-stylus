@@ -143,7 +143,11 @@ pub fn process_events(contract_abi: &mut String, abi: &Abi) {
         contract_abi.push_str(&event.identifier);
         contract_abi.push('(');
         contract_abi.push_str(&format_signature(event));
-        contract_abi.push_str(");\n");
+        contract_abi.push(')');
+        if event.is_anonymous {
+            contract_abi.push_str(" anonymous");
+        }
+        contract_abi.push_str(";\n");
     }
 }
 
