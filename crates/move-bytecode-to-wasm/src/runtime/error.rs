@@ -1,7 +1,8 @@
 use std::rc::Rc;
 
 use crate::{
-    storage::error::StorageError, translation::intermediate_types::error::IntermediateTypeError,
+    compilation_context::CompilationContextError, storage::error::StorageError,
+    translation::intermediate_types::error::IntermediateTypeError,
 };
 
 #[derive(thiserror::Error, Debug)]
@@ -11,6 +12,9 @@ pub enum RuntimeFunctionError {
 
     #[error("an error ocurred while processing an intermediate type")]
     IntermediateType(#[source] Rc<IntermediateTypeError>),
+
+    #[error("compilation context error")]
+    CompilationContextError(#[from] CompilationContextError),
 
     #[error(r#"there was an error linking "{0}" runtime function, missing compilation context?"#)]
     CouldNotLink(String),

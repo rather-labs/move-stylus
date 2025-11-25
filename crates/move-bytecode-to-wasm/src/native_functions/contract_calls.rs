@@ -581,9 +581,8 @@ pub fn add_external_contract_call_fn(
                             vm_handled_struct: VmHandledStruct::None,
                         };
 
-                        let struct_ = compilation_ctx
-                            .get_struct_by_index(parent_module_id, *parent_index)
-                            .unwrap();
+                        let struct_ =
+                            compilation_ctx.get_struct_by_index(parent_module_id, *parent_index)?;
                         struct_.instantiate(instance_types);
 
                         (itype, struct_)
@@ -593,9 +592,8 @@ pub fn add_external_contract_call_fn(
                             index: *parent_index,
                             vm_handled_struct: VmHandledStruct::None,
                         };
-                        let struct_ = compilation_ctx
-                            .get_struct_by_index(parent_module_id, *parent_index)
-                            .unwrap();
+                        let struct_ =
+                            compilation_ctx.get_struct_by_index(parent_module_id, *parent_index)?;
 
                         (itype, struct_)
                     };
@@ -631,9 +629,8 @@ pub fn add_external_contract_call_fn(
                             vm_handled_struct: VmHandledStruct::None,
                         };
 
-                        let struct_ = compilation_ctx
-                            .get_struct_by_index(parent_module_id, *parent_index)
-                            .unwrap();
+                        let struct_ =
+                            compilation_ctx.get_struct_by_index(parent_module_id, *parent_index)?;
                         struct_.instantiate(instance_types);
 
                         (itype, struct_)
@@ -644,9 +641,8 @@ pub fn add_external_contract_call_fn(
                             vm_handled_struct: VmHandledStruct::None,
                         };
 
-                        let struct_ = compilation_ctx
-                            .get_struct_by_index(parent_module_id, *parent_index)
-                            .unwrap();
+                        let struct_ =
+                            compilation_ctx.get_struct_by_index(parent_module_id, *parent_index)?;
 
                         (itype, struct_)
                     };

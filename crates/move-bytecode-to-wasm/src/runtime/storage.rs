@@ -692,9 +692,7 @@ pub fn add_delete_struct_from_storage_fn(
         return Ok(function);
     };
 
-    let struct_ = compilation_ctx
-        .get_struct_by_intermediate_type(itype)
-        .unwrap();
+    let struct_ = compilation_ctx.get_struct_by_intermediate_type(itype)?;
 
     let locate_struct_slot_fn =
         RuntimeFunction::LocateStructSlot.get(module, Some(compilation_ctx))?;
@@ -810,9 +808,7 @@ pub fn add_check_and_delete_struct_tto_fields_fn(
     // Arguments
     let parent_struct_ptr = module.locals.add(ValType::I32);
 
-    let struct_ = compilation_ctx
-        .get_struct_by_intermediate_type(itype)
-        .unwrap();
+    let struct_ = compilation_ctx.get_struct_by_intermediate_type(itype)?;
 
     // Iterate over the fields of the struct
     let mut offset: i32 = 0;
@@ -995,9 +991,7 @@ pub fn add_delete_tto_object_fn(
     let parent_struct_ptr = module.locals.add(ValType::I32);
     let child_struct_ptr = module.locals.add(ValType::I32);
 
-    let struct_ = compilation_ctx
-        .get_struct_by_intermediate_type(itype)
-        .unwrap();
+    let struct_ = compilation_ctx.get_struct_by_intermediate_type(itype)?;
 
     // If the child struct has key, remove it from the original owner's storage if it's still there.
     if struct_.has_key {

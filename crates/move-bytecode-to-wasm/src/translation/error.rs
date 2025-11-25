@@ -189,6 +189,9 @@ pub enum TranslationError {
     #[error("Missing block id for jump-table label")]
     MissingBlockIdForJumpTableLabel,
 
+    #[error("block context not found")]
+    BlockContextNotFound,
+
     // Misc
     #[error("invalid intermediate type {0:?} found in unpack function")]
     InvalidTypeInUnpackFunction(IntermediateType),

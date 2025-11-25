@@ -35,9 +35,7 @@ pub fn add_revert_fn(
     };
 
     // Get the error type. Should be a struct, otherwise it panics.
-    let error_struct = compilation_ctx
-        .get_struct_by_intermediate_type(error_itype)
-        .unwrap();
+    let error_struct = compilation_ctx.get_struct_by_intermediate_type(error_itype)?;
 
     let IStructType::AbiError = error_struct.type_ else {
         return Err(NativeFunctionError::RevertFunctionNoError(

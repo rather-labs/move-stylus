@@ -528,9 +528,7 @@ fn copy_data_to_memory(
         | IntermediateType::IGenericStructInstance {
             module_id, index, ..
         } => {
-            let struct_ = compilation_ctx
-                .get_struct_by_index(module_id, *index)
-                .unwrap();
+            let struct_ = compilation_ctx.get_struct_by_index(module_id, *index)?;
 
             let struct_ = match itype {
                 IntermediateType::IGenericStructInstance { types, .. } => {

@@ -52,9 +52,7 @@ pub fn add_compute_named_id_fn(
             .call(compilation_ctx.allocator)
             .local_set(id_ptr);
 
-        let struct_ = compilation_ctx
-            .get_struct_by_index(module_id, *index)
-            .unwrap();
+        let struct_ = compilation_ctx.get_struct_by_index(module_id, *index)?;
 
         // Store the keccak256 hash of the counter key into linear memory at #counter_key_ptr
         keccak_string_to_memory(&mut builder, compilation_ctx, &struct_.identifier, id_ptr);

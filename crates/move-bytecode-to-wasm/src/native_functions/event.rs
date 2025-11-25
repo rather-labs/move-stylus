@@ -40,11 +40,8 @@ pub fn add_emit_log_fn(
         return Ok(function);
     };
 
-    let struct_ = compilation_ctx
-        .get_struct_by_intermediate_type(itype)
-        .unwrap();
+    let struct_ = compilation_ctx.get_struct_by_intermediate_type(itype)?;
 
-    // TODO: This should be a compile error not a panic
     let IStructType::Event {
         indexes,
         is_anonymous,
@@ -141,9 +138,7 @@ pub fn add_emit_log_fn(
             | IntermediateType::IGenericStructInstance {
                 module_id, index, ..
             } => {
-                let struct_ = compilation_ctx
-                    .get_struct_by_index(module_id, *index)
-                    .unwrap();
+                let struct_ = compilation_ctx.get_struct_by_index(module_id, *index)?;
 
                 let struct_ = if let IntermediateType::IGenericStructInstance { types, .. } = field
                 {
@@ -246,7 +241,8 @@ pub fn add_emit_log_fn(
         for (index, chunk) in data.chunks_exact(8).enumerate() {
             builder
                 .local_get(writer_pointer)
-                .i64_const(i64::from_le_bytes(chunk.try_into().unwrap()))
+                .i64_const(i64::from_le_bytes(chunk.try_into().unwrap())) // TODO: Check this
+                // unwrap
                 .store(
                     compilation_ctx.memory_id,
                     walrus::ir::StoreKind::I64 { atomic: false },

@@ -68,7 +68,9 @@ impl<'code_unit> Flow<'code_unit> {
     ) -> Result<Flow<'code_unit>, TranslationError> {
         match shaped_block {
             ShapedBlock::Simple(simple_block) => {
-                let simple_block_ctx = blocks_ctx.get(&simple_block.label).unwrap();
+                let simple_block_ctx = blocks_ctx
+                    .get(&simple_block.label)
+                    .ok_or(TranslationError::BlockContextNotFound)?;
 
                 // `Immediate` blocks are dominated by the current block
                 let immediate_flow = simple_block
