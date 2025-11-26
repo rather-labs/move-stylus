@@ -1360,9 +1360,7 @@ fn translate_instruction(
         Bytecode::ImmBorrowFieldGeneric(field_id) => {
             let (struct_field_id, instantiation_types) = module_data
                 .structs
-                .instantiated_fields_to_generic_fields
-                .get(field_id)
-                .unwrap();
+                .get_instantiated_field_generic_index(field_id)?;
 
             let instantiation_types = if instantiation_types.iter().any(type_contains_generics) {
                 match &types_stack.last() {
@@ -1471,9 +1469,7 @@ fn translate_instruction(
         Bytecode::MutBorrowFieldGeneric(field_id) => {
             let (struct_field_id, instantiation_types) = module_data
                 .structs
-                .instantiated_fields_to_generic_fields
-                .get(field_id)
-                .unwrap();
+                .get_instantiated_field_generic_index(field_id)?;
 
             let instantiation_types = if instantiation_types.iter().any(type_contains_generics) {
                 match &types_stack.last() {

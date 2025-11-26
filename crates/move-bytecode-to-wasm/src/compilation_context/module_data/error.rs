@@ -1,3 +1,5 @@
+use move_binary_format::file_format::FieldInstantiationIndex;
+
 #[derive(Debug, thiserror::Error)]
 pub enum ModuleDataError {
     #[error(
@@ -35,4 +37,7 @@ pub enum ModuleDataError {
 
     #[error("function {0} not found in module data")]
     FunctionByIdentifierNotFound(String),
+
+    #[error("generic field index not found for field instantiation index {0}")]
+    InstantiatedFieldGenericIndexNotFound(FieldInstantiationIndex),
 }
