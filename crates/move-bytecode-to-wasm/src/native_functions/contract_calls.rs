@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use move_parse_special_attributes::function_modifiers::FunctionModifier;
 use walrus::{
     FunctionBuilder, FunctionId, LocalId, Module, ValType,
@@ -189,8 +187,7 @@ pub fn add_external_contract_call_fn(
         &function_information.function_id.identifier,
         calldata_arguments,
         compilation_ctx,
-    )
-    .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?;
+    )?;
 
     // Save the function selector before the arguments
     builder
@@ -223,15 +220,10 @@ pub fn add_external_contract_call_fn(
             // definition, a tuple T is dynamic (T1,...,Tk) if Ti is dynamic for some 1 <= i <= k.
             // The encode size for a dynamically encoded field inside a dynamically encoded tuple is
             // just 32 bytes (the value is the offset to where the values are packed)
-            args_size += if signature_token
-                .is_dynamic(compilation_ctx)
-                .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?
-            {
+            args_size += if signature_token.is_dynamic(compilation_ctx)? {
                 32
             } else {
-                signature_token
-                    .encoded_size(compilation_ctx)
-                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?
+                signature_token.encoded_size(compilation_ctx)?
             };
         }
 
@@ -247,20 +239,15 @@ pub fn add_external_contract_call_fn(
                 _ => argument,
             };
 
-            if argument
-                .is_dynamic(compilation_ctx)
-                .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?
-            {
-                argument
-                    .add_pack_instructions_dynamic(
-                        &mut builder,
-                        module,
-                        *wasm_local,
-                        writer_pointer,
-                        calldata_reference_pointer,
-                        compilation_ctx,
-                    )
-                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?;
+            if argument.is_dynamic(compilation_ctx)? {
+                argument.add_pack_instructions_dynamic(
+                    &mut builder,
+                    module,
+                    *wasm_local,
+                    writer_pointer,
+                    calldata_reference_pointer,
+                    compilation_ctx,
+                )?;
 
                 builder
                     .local_get(writer_pointer)
@@ -268,25 +255,18 @@ pub fn add_external_contract_call_fn(
                     .binop(BinaryOp::I32Add)
                     .local_set(writer_pointer);
             } else {
-                argument
-                    .add_pack_instructions(
-                        &mut builder,
-                        module,
-                        *wasm_local,
-                        writer_pointer,
-                        calldata_reference_pointer,
-                        compilation_ctx,
-                    )
-                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?;
+                argument.add_pack_instructions(
+                    &mut builder,
+                    module,
+                    *wasm_local,
+                    writer_pointer,
+                    calldata_reference_pointer,
+                    compilation_ctx,
+                )?;
 
                 builder
                     .local_get(writer_pointer)
-                    .i32_const(
-                        argument
-                            .encoded_size(compilation_ctx)
-                            .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?
-                            as i32,
-                    )
+                    .i32_const(argument.encoded_size(compilation_ctx)? as i32)
                     .binop(BinaryOp::I32Add)
                     .local_set(writer_pointer);
             }
@@ -478,15 +458,13 @@ pub fn add_external_contract_call_fn(
                         let result_type = &types[0];
 
                         // Unpack the value
-                        result_type
-                            .add_unpack_instructions(
-                                block,
-                                module,
-                                return_data_abi_encoded_ptr,
-                                calldata_reader_pointer,
-                                compilation_ctx,
-                            )
-                            .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?;
+                        result_type.add_unpack_instructions(
+                            block,
+                            module,
+                            return_data_abi_encoded_ptr,
+                            calldata_reader_pointer,
+                            compilation_ctx,
+                        )?;
 
                         let abi_decoded_call_result = if result_type == &IntermediateType::IU64 {
                             module.locals.add(ValType::I64)

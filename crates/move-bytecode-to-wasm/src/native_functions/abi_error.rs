@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
     ir::{MemArg, StoreKind},
@@ -55,8 +53,7 @@ pub fn add_revert_fn(
         compilation_ctx,
         &error_struct,
         error_struct_ptr,
-    )
-    .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?;
+    )?;
 
     // Store the ptr at DATA_ABORT_MESSAGE_PTR_OFFSET
     builder

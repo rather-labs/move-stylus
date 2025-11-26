@@ -92,3 +92,9 @@ pub enum NativeFunctionError {
     #[error(r#"trying to revert with the struct "{0}" which is not an error"#)]
     RevertFunctionNoError(String),
 }
+
+impl From<AbiError> for NativeFunctionError {
+    fn from(value: AbiError) -> Self {
+        NativeFunctionError::Abi(Rc::new(value))
+    }
+}

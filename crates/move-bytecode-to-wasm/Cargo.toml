@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-anyhow.workspace = true
 move-package.workspace = true
 move-binary-format.workspace = true
 move-abstract-interpreter.workspace = true
@@ -22,9 +21,10 @@ relooper = "0.1.0"
 hashers = "1.0.1"
 
 [dev-dependencies]
-wasmtime = "31.0.0"
+anyhow.workspace = true
 move-packages-build.workspace = true
 rstest = "0.25.0"
+wasmtime = "31.0.0"
 
 [features]
 inject-host-debug-fns = []

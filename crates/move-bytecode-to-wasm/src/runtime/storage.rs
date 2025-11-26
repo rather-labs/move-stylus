@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use super::RuntimeFunction;
 use super::error::RuntimeFunctionError;
 use crate::data::{
@@ -600,8 +598,7 @@ pub fn add_encode_and_save_into_storage_fn(
         slot_offset,
         None,
         itype,
-    )
-    .map_err(|e| RuntimeFunctionError::Storage(Rc::new(e)))?;
+    )?;
 
     Ok(function.finish(vec![struct_ptr, slot_ptr], &mut module.funcs))
 }
@@ -663,8 +660,7 @@ pub fn add_read_and_decode_from_storage_fn(
         owner_ptr,
         Some(struct_id_ptr),
         itype,
-    )
-    .map_err(|e| RuntimeFunctionError::Storage(Rc::new(e)))?;
+    )?;
 
     builder.local_get(struct_ptr);
 

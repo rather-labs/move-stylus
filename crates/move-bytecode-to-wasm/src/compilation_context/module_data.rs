@@ -41,7 +41,6 @@ use std::{
     collections::HashMap,
     fmt::{Debug, Display},
     hash::{Hash, Hasher},
-    rc::Rc,
 };
 use struct_data::StructData;
 
@@ -771,17 +770,14 @@ impl ModuleData {
                     init = Some(function_id.clone());
                 }
 
-                function_information.push(
-                    MappedFunction::new(
-                        function_id.clone(),
-                        move_function_arguments,
-                        move_function_return,
-                        code_locals,
-                        function_def,
-                        datatype_handles_map,
-                    )
-                    .map_err(|e| CompilationContextError::MappedFunction(Rc::new(e)))?,
-                );
+                function_information.push(MappedFunction::new(
+                    function_id.clone(),
+                    move_function_arguments,
+                    move_function_return,
+                    code_locals,
+                    function_def,
+                    datatype_handles_map,
+                )?);
 
                 function_definitions.insert(function_id.clone(), function_def);
             }
