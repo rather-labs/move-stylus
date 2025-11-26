@@ -4,7 +4,7 @@
 
 use base::{
     abi_generate::AbiGenerate, build::Build, coverage::Coverage, deploy::Deploy,
-    disassemble::Disassemble, docgen::Docgen, info::Info, migrate::Migrate, new::New, test::Test,
+    disassemble::Disassemble, info::Info, migrate::Migrate, new::New, test::Test,
 };
 use move_package::BuildConfig;
 
@@ -62,7 +62,6 @@ pub enum Command {
     Coverage(Coverage),
     Disassemble(Disassemble),
     Deploy(Deploy),
-    Docgen(Docgen),
     Info(Info),
     Migrate(Migrate),
     New(New),
@@ -93,7 +92,6 @@ pub fn run_cli(
         Command::Disassemble(c) => {
             c.execute(move_args.package_path.as_deref(), move_args.build_config)
         }
-        Command::Docgen(c) => c.execute(move_args.package_path.as_deref(), move_args.build_config),
         Command::Info(c) => c.execute(move_args.package_path.as_deref(), move_args.build_config),
         Command::Migrate(c) => c.execute(move_args.package_path.as_deref(), move_args.build_config),
         Command::New(c) => c.execute_with_defaults(move_args.package_path.as_deref()),
