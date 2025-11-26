@@ -224,8 +224,7 @@ impl ModuleData {
                     .map(|t| IntermediateType::try_from_signature_token(t, &datatype_handles_map))
                     .collect::<std::result::Result<Vec<IntermediateType>, _>>()
             })
-            .collect::<std::result::Result<Vec<Vec<IntermediateType>>, _>>()
-            .unwrap();
+            .collect::<std::result::Result<Vec<Vec<IntermediateType>>, _>>()?;
 
         Ok(ModuleData {
             id: module_id,

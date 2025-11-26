@@ -1,3 +1,5 @@
+use super::ModuleId;
+
 #[derive(Debug, thiserror::Error)]
 pub enum ModuleDataError {
     #[error(
@@ -32,4 +34,7 @@ pub enum ModuleDataError {
 
     #[error("could not find stylus framework as dependency")]
     StylusFrameworkDependencyNotFound,
+
+    #[error("function {0} not found in module data")]
+    FunctionByIdentifierNotFound(String),
 }

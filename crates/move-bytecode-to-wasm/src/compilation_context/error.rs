@@ -62,9 +62,6 @@ pub enum CompilationContextError {
     #[error("expected enum")]
     ExpectedEnum,
 
-    #[error("function with identifier {0} not found in compilation context")]
-    FunctionByIdentifierNotFound(String),
-
     #[error(r#"datatype handle index "{0}" not found"#)]
     DatatypeHanldeIndexNotFound(usize),
 
