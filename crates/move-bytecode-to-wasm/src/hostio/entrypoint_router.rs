@@ -6,11 +6,12 @@ use walrus::{
 use crate::{
     CompilationContext,
     abi_types::{error_encoding::build_abort_error_message, public_function::PublicFunction},
-    runtime_error_codes::ERROR_NO_FUNCTION_MATCH,
     translation::intermediate_types::IntermediateType,
 };
 
 use super::{error::HostIOError, host_functions};
+
+const ERROR_NO_FUNCTION_MATCH: i64 = 100;
 
 /// Builds an entrypoint router for the list of public functions provided
 /// and adds it to the module exporting it as `user_entrypoint`

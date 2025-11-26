@@ -1,1 +1,0 @@
-pub const ERROR_NO_FUNCTION_MATCH: i64 = 100;

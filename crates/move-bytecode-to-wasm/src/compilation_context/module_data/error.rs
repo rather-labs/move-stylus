@@ -1,5 +1,3 @@
-use super::ModuleId;
-
 #[derive(Debug, thiserror::Error)]
 pub enum ModuleDataError {
     #[error(

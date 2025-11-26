@@ -62,6 +62,9 @@ pub enum CompilationContextError {
     #[error("expected enum")]
     ExpectedEnum,
 
+    #[error("could not find external datatype handler index")]
+    ExternalDatatypeHandlerIndexNotFound,
+
     #[error(r#"datatype handle index "{0}" not found"#)]
     DatatypeHanldeIndexNotFound(usize),
 
