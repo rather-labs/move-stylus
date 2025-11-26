@@ -10,6 +10,7 @@ use crate::{
     hostio::error::HostIOError,
     native_functions::error::NativeFunctionError,
     translation::{TranslationError, table::FunctionTableError},
+    wasm_validation::WasmValidationError,
 };
 
 #[derive(thiserror::Error, Debug)]
@@ -116,6 +117,9 @@ pub enum ICEErrorKind {
 
     #[error("io error")]
     Io(#[from] std::io::Error),
+
+    #[error("wasm validation error")]
+    WasmValidation(#[from] WasmValidationError),
 
     #[error("module not compiled: {0}")]
     ModuleNotCompiled(String),

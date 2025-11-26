@@ -208,7 +208,7 @@ pub fn translate_package(
         )?;
 
         function_table.ensure_all_functions_added()?;
-        validate_stylus_wasm(&mut module).unwrap();
+        validate_stylus_wasm(&mut module)?;
 
         modules.insert(module_name, module);
         modules_data.insert(root_module_id.clone(), root_module_data);

@@ -241,8 +241,11 @@ pub fn add_emit_log_fn(
         for (index, chunk) in data.chunks_exact(8).enumerate() {
             builder
                 .local_get(writer_pointer)
-                .i64_const(i64::from_le_bytes(chunk.try_into().unwrap())) // TODO: Check this
-                // unwrap
+                .i64_const(i64::from_le_bytes(
+                    chunk
+                        .try_into()
+                        .map_err(|_| NativeFunctionError::I64InvalidArraySize)?,
+                ))
                 .store(
                     compilation_ctx.memory_id,
                     walrus::ir::StoreKind::I64 { atomic: false },

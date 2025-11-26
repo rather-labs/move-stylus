@@ -63,6 +63,9 @@ pub enum NativeFunctionError {
     #[error("key type not supported {0:?}")]
     DynamicFieldWrongKeyType(IntermediateType),
 
+    #[error("there was an error creating i64, invalid array size")]
+    I64InvalidArraySize,
+
     #[error(
         "there was an error linking {module_id}::{function_name} expected {expected} type parameter(s), found {found}"
     )]
