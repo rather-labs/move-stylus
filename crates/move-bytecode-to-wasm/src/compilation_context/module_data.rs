@@ -799,7 +799,14 @@ impl ModuleData {
                     return Err(CompilationContextError::DuplicateReceiveFunction);
                 }
 
-                let is_fallback = Self::is_fallback(&function_id, function_def)?;
+                let is_fallback = Self::is_fallback(
+                    &function_id,
+                    move_function_arguments,
+                    move_function_return,
+                    function_def,
+                    datatype_handles_map,
+                    move_module_dependencies,
+                )?;
 
                 if is_fallback && fallback.replace(function_id.clone()).is_some() {
                     return Err(CompilationContextError::DuplicateFallbackFunction);
@@ -1069,7 +1076,14 @@ impl ModuleData {
     // Determines whether a function is a valid fallback function.
     // Returns true if the function is a valid fallback function, otherwise returns false.
     // If the function name is "Fallback" but does not fulfill the requirements, returns an error.
-    fn is_fallback(function_id: &FunctionId, function_def: &FunctionDefinition) -> Result<bool> {
+    fn is_fallback(
+        function_id: &FunctionId,
+        move_function_arguments: &Signature,
+        move_function_return: &Signature,
+        function_def: &FunctionDefinition,
+        datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
+        move_module_dependencies: &[(PackageName, CompiledUnitWithSource)],
+    ) -> Result<bool> {
         // Fallback function definition (see https://docs.soliditylang.org/en/latest/contracts.html#fallback-function):
         // A contract can have at most one fallback function, declared using either fallback () external [payable]
         // or fallback (bytes calldata input) external [payable] returns (bytes memory output) (both without the function keyword).
@@ -1083,9 +1097,98 @@ impl ModuleData {
             return Ok(false);
         }
 
+        // Since the function is named `fallback`, we must verify that it satisfies all specified constraints.
+        // If any requirement is not fulfilled, an error will be returned; otherwise return true.
+
         // Must have external visibility, i.e. it must be entry
         if !function_def.is_entry {
             return Err(CompilationContextError::FallbackFunctionBadVisibility);
+        }
+
+        // Helper function to check if a type is vector<u8>
+        let is_vector_u8 = |arg: &IntermediateType| -> bool {
+            matches!(arg, IntermediateType::IVector(inner) if **inner == IntermediateType::IU8)
+        };
+
+        // Validate arguments based on count
+        match move_function_arguments.len() {
+            0 => {
+                // No arguments: valid
+            }
+            1 => {
+                // 1 argument: must be either vector<u8> or TxContext
+                let first_arg = move_function_arguments
+                    .0
+                    .first()
+                    .and_then(|arg| {
+                        IntermediateType::try_from_signature_token(arg, datatype_handles_map).ok()
+                    })
+                    .ok_or(CompilationContextError::FallbackFunctionInvalidArgumentType(1))?;
+
+                // Check if it's vector<u8> or TxContext
+                if !(is_vector_u8(&first_arg)
+                    || is_tx_context_ref(&first_arg, move_module_dependencies))
+                {
+                    return Err(CompilationContextError::FallbackFunctionInvalidArgumentType(1));
+                }
+            }
+            2 => {
+                // 2 arguments: first must be vector<u8>, second must be TxContext
+                let first_arg = move_function_arguments
+                    .0
+                    .first()
+                    .and_then(|arg| {
+                        IntermediateType::try_from_signature_token(arg, datatype_handles_map).ok()
+                    })
+                    .ok_or(CompilationContextError::FallbackFunctionInvalidArgumentType(1))?;
+
+                let second_arg = move_function_arguments
+                    .0
+                    .last()
+                    .and_then(|arg| {
+                        IntermediateType::try_from_signature_token(arg, datatype_handles_map).ok()
+                    })
+                    .ok_or(CompilationContextError::FallbackFunctionInvalidArgumentType(2))?;
+
+                // First argument must be vector<u8>
+                if !is_vector_u8(&first_arg) {
+                    return Err(CompilationContextError::FallbackFunctionInvalidArgumentType(1));
+                }
+
+                // Second argument must be TxContext
+                if !is_tx_context_ref(&second_arg, move_module_dependencies) {
+                    return Err(CompilationContextError::FallbackFunctionInvalidArgumentType(2));
+                }
+            }
+            _ => {
+                // Already checked above, but this is unreachable
+                return Err(CompilationContextError::FallbackFunctionTooManyArguments);
+            }
+        }
+
+        // Validate return type: must be either empty or a single vector<u8>
+        match move_function_return.len() {
+            0 => {
+                // No return values: valid
+            }
+            1 => {
+                // 1 return value: must be vector<u8>
+                let return_type = move_function_return
+                    .0
+                    .first()
+                    .and_then(|arg| {
+                        IntermediateType::try_from_signature_token(arg, datatype_handles_map).ok()
+                    })
+                    .ok_or(CompilationContextError::FallbackFunctionInvalidReturnType)?;
+
+                if !is_vector_u8(&return_type) {
+                    return Err(CompilationContextError::FallbackFunctionInvalidReturnType);
+                }
+            }
+            _ => {
+                // More than 1 return value: invalid
+                return Err(CompilationContextError::FallbackFunctionInvalidReturnType);
+            }
         }
 
         Ok(true)
