@@ -4,6 +4,7 @@
 pub mod abi_generate;
 pub mod build;
 pub mod coverage;
+pub mod deploy;
 pub mod disassemble;
 pub mod docgen;
 pub mod info;

@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use base::{
-    abi_generate::AbiGenerate, build::Build, coverage::Coverage, disassemble::Disassemble,
-    docgen::Docgen, info::Info, migrate::Migrate, new::New, test::Test,
+    abi_generate::AbiGenerate, build::Build, coverage::Coverage, deploy::Deploy,
+    disassemble::Disassemble, docgen::Docgen, info::Info, migrate::Migrate, new::New, test::Test,
 };
 use move_package::BuildConfig;
 
@@ -61,6 +61,7 @@ pub enum Command {
     Build(Build),
     Coverage(Coverage),
     Disassemble(Disassemble),
+    Deploy(Deploy),
     Docgen(Docgen),
     Info(Info),
     Migrate(Migrate),
@@ -102,6 +103,7 @@ pub fn run_cli(
             natives,
             Some(cost_table.clone()),
         ),
+        Command::Deploy(c) => c.execute(),
     }
 }
 

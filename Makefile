@@ -158,3 +158,6 @@ install-wasm-tools:
 
 parse-rust-example:
 	wasm-tools print ./example-rust/target/wasm32-unknown-unknown/release/stylus_hello_world.wasm -o ./example-rust/target/wasm32-unknown-unknown/release/stylus_hello_world.wat
+
+install:
+	cargo install --locked --path crates/move-cli
