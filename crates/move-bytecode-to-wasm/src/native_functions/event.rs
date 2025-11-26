@@ -169,13 +169,13 @@ pub fn add_emit_log_fn(
 
                 let is_dynamic = struct_
                     .solidity_abi_encode_is_dynamic(compilation_ctx)
-                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?;
+                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?;
                 let size = if is_dynamic {
                     32
                 } else {
                     struct_
                         .solidity_abi_encode_size(compilation_ctx)
-                        .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?
+                        .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?
                         as i32
                 };
 
@@ -283,7 +283,7 @@ pub fn add_emit_log_fn(
         );
 
         // If it is a stack type, we need to perform another load
-        let local = if field.is_stack_type() {
+        let local = if field.is_stack_type()? {
             let (local, load_kind) = if field.stack_data_size()? == 8 {
                 (local_64, LoadKind::I64 { atomic: false })
             } else {

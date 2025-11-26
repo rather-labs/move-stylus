@@ -10,6 +10,7 @@ use crate::{
     error::{CompilationError, ICEError, ICEErrorKind},
     native_functions::error::NativeFunctionError,
     runtime::error::RuntimeFunctionError,
+    vm_handled_types::error::VmHandledTypeError,
 };
 
 use super::{
@@ -38,8 +39,9 @@ pub enum TranslationError {
     #[error("an error ocurred while processing an intermediate type")]
     IntermediateType(#[from] IntermediateTypeError),
 
-    //    #[error("an storage error ocurred while translating a function")]
-    //    Storage(#[from] StorageError),
+    #[error("an error ocurred while processing a vm handled type")]
+    VmHandledType(#[from] VmHandledTypeError),
+
     #[error("a translation error ocurred translating instruction {0:?}")]
     AtInstruction(Bytecode, #[source] Rc<TranslationError>),
 
@@ -63,9 +65,6 @@ pub enum TranslationError {
         operation: Bytecode,
         operand_type: IntermediateType,
     },
-
-    #[error("cast error: trying to cast {0:?}")]
-    InvalidCast(IntermediateType),
 
     #[error("unsupported operation: {operation:?}")]
     UnsupportedOperation { operation: Bytecode },
@@ -166,6 +165,9 @@ pub enum TranslationError {
     #[error("switch: more than one case returns a value, Move should have merged them")]
     SwitchMoreThanOneCase,
 
+    #[error("switch: all cases must be Simple in a Switch flow")]
+    SwitchCasesNotSimple,
+
     #[error("IfElse result mismatch: then={0:?}, else={1:?}")]
     IfElseMismatch(Vec<ValType>, Vec<ValType>),
 
@@ -178,11 +180,33 @@ pub enum TranslationError {
     #[error("only Simple flow has label")]
     NotSimpleFlowWithLabel,
 
-    // Unknown
+    #[error("jump table not found while translating Switch flow!")]
+    JumpTableNotFound,
 
-    // TODO: identify concrete errors and add its corresponding enum variant
-    #[error("unknown error: {0}")]
-    Unknown(#[from] anyhow::Error),
+    #[error("Missing block id for jump-table label")]
+    MissingBlockIdForJumpTableLabel,
+
+    // Misc
+    #[error("invalid intermediate type {0:?} found in unpack function")]
+    InvalidTypeInUnpackFunction(IntermediateType),
+
+    #[error("constant data not consumed")]
+    ConstantDataNotConsumed,
+
+    #[error("{field_id} not found in {struct_identifier}")]
+    StructFieldNotFound {
+        field_id: usize,
+        struct_identifier: String,
+    },
+
+    #[error("{field_id} offset not found in {struct_identifier}")]
+    StructFieldOffsetNotFound {
+        field_id: usize,
+        struct_identifier: String,
+    },
+
+    #[error("multiple WASM return values not supported, found {0} return values")]
+    MultipleWasmReturnValues(usize),
 }
 
 impl From<TranslationError> for CompilationError {

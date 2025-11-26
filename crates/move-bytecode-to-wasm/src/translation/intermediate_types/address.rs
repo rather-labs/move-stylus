@@ -19,11 +19,13 @@ impl IAddress {
         builder: &mut InstrSeqBuilder,
         bytes: &mut std::vec::IntoIter<u8>,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), IntermediateTypeError> {
         let bytes: [u8; 32] = bytes.take(32).collect::<Vec<u8>>().try_into().unwrap();
 
         // Ensure the first 12 bytes are 0. Abi encoding restricts the address to be 20 bytes
-        assert!(bytes[0..12].iter().all(|b| *b == 0));
+        if !bytes[0..12].iter().all(|b| *b == 0) {
+            return Err(IntermediateTypeError::ConstantAddressTooLarge);
+        }
 
         let pointer = module.locals.add(ValType::I32);
 
@@ -51,6 +53,8 @@ impl IAddress {
         }
 
         builder.local_get(pointer);
+
+        Ok(())
     }
 
     pub fn equality(

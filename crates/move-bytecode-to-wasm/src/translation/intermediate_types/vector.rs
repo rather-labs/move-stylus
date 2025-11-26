@@ -142,16 +142,18 @@ impl IVector {
 
                 store_offset += 8;
             } else {
-                panic!("Unsupported data size for vector: {data_size}");
+                return Err(IntermediateTypeError::VectorInvalidDataSize(data_size));
             }
 
             builder.local_get(ptr_local);
         }
 
-        assert_eq!(
-            needed_bytes, store_offset as usize,
-            "Store offset is not aligned with the needed bytes"
-        );
+        if needed_bytes != store_offset as usize {
+            return Err(IntermediateTypeError::VectorStoreOffsetNotAligned {
+                needed: needed_bytes,
+                actual: store_offset as usize,
+            });
+        }
 
         Ok(())
     }
@@ -249,198 +251,197 @@ impl IVector {
                 loop_block.vec_elem_ptr(dst_ptr, index, data_size); // where to store the element
                 loop_block.vec_elem_ptr(src_ptr, index, data_size); // where to read the element
 
-                match inner {
-                    IntermediateType::IBool
-                    | IntermediateType::IU8
-                    | IntermediateType::IU16
-                    | IntermediateType::IU32 => {
-                        loop_block.load(
-                            compilation_ctx.memory_id,
-                            LoadKind::I32 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        );
-                    }
-                    IntermediateType::IU64 => {
-                        loop_block.load(
-                            compilation_ctx.memory_id,
-                            LoadKind::I64 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        );
-                    }
-                    IntermediateType::IU128 => {
-                        // Set src
-                        loop_block
-                            .load(
-                                compilation_ctx.memory_id,
-                                LoadKind::I32 { atomic: false },
-                                MemArg {
-                                    align: 0,
-                                    offset: 0,
-                                },
-                            )
-                            .local_set(src_elem_ptr);
-
-                        // Allocate memory for dest
-                        loop_block
-                            .i32_const(16)
-                            .call(compilation_ctx.allocator)
-                            .local_tee(dst_elem_ptr);
-
-                        // Put dest (tee above), src and size to perform memory copy
-                        loop_block
-                            .local_get(src_elem_ptr)
-                            .i32_const(IU128::HEAP_SIZE);
-
-                        loop_block
-                            .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-
-                        loop_block.local_get(dst_elem_ptr);
-                    }
-                    IntermediateType::IU256 | IntermediateType::IAddress => {
-                        loop_block
-                            .load(
-                                compilation_ctx.memory_id,
-                                LoadKind::I32 { atomic: false },
-                                MemArg {
-                                    align: 0,
-                                    offset: 0,
-                                },
-                            )
-                            .local_set(src_elem_ptr);
-
-                        loop_block
-                            .i32_const(32)
-                            .call(compilation_ctx.allocator)
-                            .local_tee(dst_elem_ptr);
-
-                        // Put dest (tee above), src and size to perform memory copy
-                        loop_block.local_get(src_elem_ptr).i32_const(32);
-
-                        loop_block
-                            .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-
-                        loop_block.local_get(dst_elem_ptr);
-                    }
-                    IntermediateType::IVector(inner_) => {
-                        loop_block.load(
-                            compilation_ctx.memory_id,
-                            LoadKind::I32 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        );
-
-                        loop_block.i32_const(1); // We dont increase the capacity of nested vectors
-                        inner_result = IVector::copy_local_instructions(
-                            inner_,
-                            module,
-                            loop_block,
-                            compilation_ctx,
-                            module_data,
-                        );
-                    }
-                    IntermediateType::IStruct {
-                        module_id, index, ..
-                    } => {
-                        loop_block.load(
-                            compilation_ctx.memory_id,
-                            LoadKind::I32 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        );
-
-                        let struct_ = compilation_ctx
-                            .get_struct_by_index(module_id, *index)
-                            .unwrap();
-
-                        inner_result = struct_.copy_local_instructions(
-                            module,
-                            loop_block,
-                            compilation_ctx,
-                            module_data,
-                        );
-                    }
-
-                    IntermediateType::IGenericStructInstance {
-                        module_id,
-                        index,
-                        types,
-                        ..
-                    } => {
-                        loop_block.load(
-                            compilation_ctx.memory_id,
-                            LoadKind::I32 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        );
-
-                        let struct_ = compilation_ctx
-                            .get_struct_by_index(module_id, *index)
-                            .unwrap();
-                        let struct_ = struct_.instantiate(types);
-
-                        inner_result = struct_.copy_local_instructions(
-                            module,
-                            loop_block,
-                            compilation_ctx,
-                            module_data,
-                        );
-                    }
-                    IntermediateType::IEnum { index, .. } => {
-                        loop_block.load(
-                            compilation_ctx.memory_id,
-                            LoadKind::I32 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        );
-                        let enum_ = module_data.enums.get_enum_by_index(*index).unwrap();
-                        inner_result = enum_.copy_local_instructions(
-                            module,
-                            loop_block,
-                            compilation_ctx,
-                            module_data,
-                        );
-                    }
-
-                    t => panic!("unsupported vector type {t:?}"),
-                }
-
-                // === Store result from stack into memory ===
-                loop_block.store(
-                    compilation_ctx.memory_id,
+                inner_result = (|| {
                     match inner {
-                        IntermediateType::IU64 => StoreKind::I64 { atomic: false },
-                        _ => StoreKind::I32 { atomic: false },
-                    },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
+                        IntermediateType::IBool
+                        | IntermediateType::IU8
+                        | IntermediateType::IU16
+                        | IntermediateType::IU32 => {
+                            loop_block.load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I32 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            );
+                        }
+                        IntermediateType::IU64 => {
+                            loop_block.load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I64 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            );
+                        }
+                        IntermediateType::IU128 => {
+                            // Set src
+                            loop_block
+                                .load(
+                                    compilation_ctx.memory_id,
+                                    LoadKind::I32 { atomic: false },
+                                    MemArg {
+                                        align: 0,
+                                        offset: 0,
+                                    },
+                                )
+                                .local_set(src_elem_ptr);
 
-                // === index++ ===
-                loop_block.local_get(index);
-                loop_block.i32_const(1);
-                loop_block.binop(BinaryOp::I32Add);
-                loop_block.local_tee(index);
+                            // Allocate memory for dest
+                            loop_block
+                                .i32_const(16)
+                                .call(compilation_ctx.allocator)
+                                .local_tee(dst_elem_ptr);
 
-                // === Continue if index < len ===
-                loop_block.local_get(len);
-                loop_block.binop(BinaryOp::I32LtU);
-                loop_block.br_if(loop_block.id());
+                            // Put dest (tee above), src and size to perform memory copy
+                            loop_block
+                                .local_get(src_elem_ptr)
+                                .i32_const(IU128::HEAP_SIZE);
+
+                            loop_block
+                                .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
+                            loop_block.local_get(dst_elem_ptr);
+                        }
+                        IntermediateType::IU256 | IntermediateType::IAddress => {
+                            loop_block
+                                .load(
+                                    compilation_ctx.memory_id,
+                                    LoadKind::I32 { atomic: false },
+                                    MemArg {
+                                        align: 0,
+                                        offset: 0,
+                                    },
+                                )
+                                .local_set(src_elem_ptr);
+
+                            loop_block
+                                .i32_const(32)
+                                .call(compilation_ctx.allocator)
+                                .local_tee(dst_elem_ptr);
+
+                            // Put dest (tee above), src and size to perform memory copy
+                            loop_block.local_get(src_elem_ptr).i32_const(32);
+
+                            loop_block
+                                .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
+                            loop_block.local_get(dst_elem_ptr);
+                        }
+                        IntermediateType::IVector(inner_) => {
+                            loop_block.load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I32 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            );
+
+                            loop_block.i32_const(1); // We dont increase the capacity of nested vectors
+                            IVector::copy_local_instructions(
+                                inner_,
+                                module,
+                                loop_block,
+                                compilation_ctx,
+                                module_data,
+                            )?;
+                        }
+                        IntermediateType::IStruct {
+                            module_id, index, ..
+                        } => {
+                            loop_block.load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I32 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            );
+
+                            let struct_ = compilation_ctx.get_struct_by_index(module_id, *index)?;
+
+                            struct_.copy_local_instructions(
+                                module,
+                                loop_block,
+                                compilation_ctx,
+                                module_data,
+                            )?;
+                        }
+
+                        IntermediateType::IGenericStructInstance {
+                            module_id,
+                            index,
+                            types,
+                            ..
+                        } => {
+                            loop_block.load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I32 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            );
+
+                            let struct_ = compilation_ctx.get_struct_by_index(module_id, *index)?;
+                            let struct_ = struct_.instantiate(types);
+
+                            struct_.copy_local_instructions(
+                                module,
+                                loop_block,
+                                compilation_ctx,
+                                module_data,
+                            )?;
+                        }
+                        IntermediateType::IEnum { index, .. } => {
+                            loop_block.load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I32 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            );
+                            let enum_ = module_data.enums.get_enum_by_index(*index).unwrap();
+                            inner_result = enum_.copy_local_instructions(
+                                module,
+                                loop_block,
+                                compilation_ctx,
+                                module_data,
+                            );
+                        }
+
+                        t => return Err(IntermediateTypeError::VectorUnnsuportedType(t.clone())),
+                    }
+
+                    // === Store result from stack into memory ===
+                    loop_block.store(
+                        compilation_ctx.memory_id,
+                        match inner {
+                            IntermediateType::IU64 => StoreKind::I64 { atomic: false },
+                            _ => StoreKind::I32 { atomic: false },
+                        },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+
+                    // === index++ ===
+                    loop_block.local_get(index);
+                    loop_block.i32_const(1);
+                    loop_block.binop(BinaryOp::I32Add);
+                    loop_block.local_tee(index);
+
+                    // === Continue if index < len ===
+                    loop_block.local_get(len);
+                    loop_block.binop(BinaryOp::I32LtU);
+                    loop_block.br_if(loop_block.id());
+                    Ok(())
+                })();
             });
         });
 
@@ -577,13 +578,13 @@ impl IVector {
                             loop_result?;
                         }
                         IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                            panic!("Found vector of rereferences")
+                            return Err(IntermediateTypeError::FoundVectorOfReferences);
                         }
                         IntermediateType::ISigner => {
-                            panic!("Found vector of signers")
+                            return Err(IntermediateTypeError::FoundVectorOfSigner);
                         }
                         IntermediateType::ITypeParameter(_) => {
-                            panic!("Found vector of type parameters, expected a concrete type");
+                            return Err(IntermediateTypeError::FoundTypeParameter);
                         }
                     }
 
@@ -639,7 +640,7 @@ impl IVector {
                 data_size,
             );
 
-            let temp_local = module.locals.add(inner.into());
+            let temp_local = module.locals.add(inner.try_into()?);
             for i in 0..num_elements {
                 builder.local_get(ptr_local);
                 builder.swap(ptr_local, temp_local);
@@ -647,10 +648,10 @@ impl IVector {
                 // Store at computed address
                 builder.store(
                     compilation_ctx.memory_id,
-                    match inner.into() {
+                    match inner.try_into()? {
                         ValType::I64 => StoreKind::I64 { atomic: false },
                         ValType::I32 => StoreKind::I32 { atomic: false },
-                        _ => panic!("Unsupported ValType"),
+                        t => return Err(IntermediateTypeError::UnsupportedValType(t)),
                     },
                     MemArg {
                         align: 0,
@@ -671,79 +672,85 @@ impl IVector {
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
         length: u64,
-    ) {
+    ) -> Result<(), IntermediateTypeError> {
         let vec_ptr = module.locals.add(ValType::I32);
         builder.local_set(vec_ptr);
 
         let i = module.locals.add(ValType::I32);
         builder.i32_const(0).local_set(i);
 
+        let mut inner_result = Ok(());
         builder.block(None, |block| {
             let exit_loop_id = block.id();
 
             block.loop_(None, |loop_| {
                 let loop_id = loop_.id();
 
-                loop_
-                    .local_get(i)
-                    .i32_const(length as i32)
-                    .binop(BinaryOp::I32GeU)
-                    .br_if(exit_loop_id);
+                inner_result = (|| {
+                    loop_
+                        .local_get(i)
+                        .i32_const(length as i32)
+                        .binop(BinaryOp::I32GeU)
+                        .br_if(exit_loop_id);
 
-                match inner {
-                    IntermediateType::IBool
-                    | IntermediateType::IU8
-                    | IntermediateType::IU16
-                    | IntermediateType::IU32
-                    | IntermediateType::IU128
-                    | IntermediateType::IU256
-                    | IntermediateType::IAddress
-                    | IntermediateType::IVector(_)
-                    | IntermediateType::IStruct { .. }
-                    | IntermediateType::IGenericStructInstance { .. }
-                    | IntermediateType::IEnum { .. }
-                    | IntermediateType::IGenericEnumInstance { .. } => {
-                        loop_.vec_elem_ptr(vec_ptr, i, 4).load(
-                            compilation_ctx.memory_id,
-                            LoadKind::I32 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        );
+                    match inner {
+                        IntermediateType::IBool
+                        | IntermediateType::IU8
+                        | IntermediateType::IU16
+                        | IntermediateType::IU32
+                        | IntermediateType::IU128
+                        | IntermediateType::IU256
+                        | IntermediateType::IAddress
+                        | IntermediateType::IVector(_)
+                        | IntermediateType::IStruct { .. }
+                        | IntermediateType::IGenericStructInstance { .. }
+                        | IntermediateType::IEnum { .. }
+                        | IntermediateType::IGenericEnumInstance { .. } => {
+                            loop_.vec_elem_ptr(vec_ptr, i, 4).load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I32 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            );
+                        }
+                        IntermediateType::IU64 => {
+                            loop_.vec_elem_ptr(vec_ptr, i, 8).load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I64 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            );
+                        }
+                        IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                            return Err(IntermediateTypeError::FoundVectorOfReferences);
+                        }
+                        IntermediateType::ISigner => {
+                            return Err(IntermediateTypeError::FoundVectorOfSigner);
+                        }
+                        IntermediateType::ITypeParameter(_) => {
+                            return Err(IntermediateTypeError::FoundTypeParameter);
+                        }
                     }
-                    IntermediateType::IU64 => {
-                        loop_.vec_elem_ptr(vec_ptr, i, 8).load(
-                            compilation_ctx.memory_id,
-                            LoadKind::I64 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        );
-                    }
-                    IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                        panic!("vector of rereferences found")
-                    }
-                    IntermediateType::ISigner => {
-                        panic!("should not be possible to have a vector of signers")
-                    }
-                    IntermediateType::ITypeParameter(_) => {
-                        panic!(
-                            "cannot unpack a vector of type parameters, expected a concrete type"
-                        );
-                    }
-                }
 
-                loop_
-                    .local_get(i)
-                    .i32_const(1)
-                    .binop(BinaryOp::I32Add)
-                    .local_set(i);
+                    loop_
+                        .local_get(i)
+                        .i32_const(1)
+                        .binop(BinaryOp::I32Add)
+                        .local_set(i);
 
-                loop_.br(loop_id);
+                    loop_.br(loop_id);
+
+                    Ok(())
+                })();
             });
         });
+        inner_result?;
+
+        Ok(())
     }
 
     pub fn vec_borrow_instructions(
@@ -756,7 +763,7 @@ impl IVector {
 
         match inner {
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                panic!("VecImmBorrow operation is not allowed on reference types");
+                return Err(IntermediateTypeError::FoundVectorOfReferences);
             }
 
             IntermediateType::IBool
@@ -781,7 +788,7 @@ impl IVector {
                 builder.i32_const(1);
             }
             IntermediateType::ITypeParameter(_) => {
-                panic!("cannot borrow generic type parameters, expected a concrete type");
+                return Err(IntermediateTypeError::FoundTypeParameter);
             }
         }
 
@@ -809,7 +816,7 @@ impl IVector {
         compilation_ctx: &CompilationContext,
         module_data: &ModuleData,
     ) -> Result<(), IntermediateTypeError> {
-        let valtype = inner.into();
+        let valtype = inner.try_into()?;
         let size = inner.stack_data_size()? as i32;
         let vec_ref = module.locals.add(ValType::I32);
         let vec_ptr = module.locals.add(ValType::I32);
@@ -900,7 +907,7 @@ impl IVector {
                 match valtype {
                     ValType::I64 => StoreKind::I64 { atomic: false },
                     ValType::I32 => StoreKind::I32 { atomic: false },
-                    _ => panic!("Unsupported ValType"),
+                    _ => return Err(IntermediateTypeError::UnsupportedValType(valtype)),
                 },
                 MemArg {
                     align: 0,
@@ -1134,11 +1141,8 @@ mod tests {
                     .unwrap();
                 builder.call(swap_f);
             }
-            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                panic!("VecPopBack operation is not allowed on reference types");
-            }
-            IntermediateType::ITypeParameter(_) => {
-                panic!("cannot pop back a vector of type parameters, expected a concrete type");
+            _ => {
+                unreachable!("unreacable condition")
             }
         }
 
@@ -1211,7 +1215,7 @@ mod tests {
         builder.local_get(vec_ref);
 
         let element_data = element_data.to_vec();
-        let element_pointer = raw_module.locals.add(inner_type.clone().into());
+        let element_pointer = raw_module.locals.add((&inner_type).try_into().unwrap());
         inner_type
             .load_constant_instructions(
                 &mut raw_module,

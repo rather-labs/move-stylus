@@ -24,6 +24,9 @@ use super::{intermediate_types::IntermediateType, table::FunctionId};
 pub enum MappedFunctionError {
     #[error("an error ocurred while processing an intermediate type")]
     IntermediateType(#[from] IntermediateTypeError),
+
+    #[error("multiple WASM return values not supported")]
+    MultipleWasmReturnValues,
 }
 
 #[derive(Debug, Clone)]
@@ -68,7 +71,9 @@ impl MappedFunction {
         let signature = ISignature::from_signatures(move_args, move_rets, handles_map)?;
         let results = signature.get_return_wasm_types();
 
-        assert!(results.len() <= 1, "Multiple return values not supported");
+        if results.len() > 1 {
+            return Err(MappedFunctionError::MultipleWasmReturnValues);
+        }
 
         // Declared locals
         let locals = move_locals

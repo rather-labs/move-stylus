@@ -42,7 +42,6 @@ mod translation;
 mod utils;
 mod vm_handled_types;
 mod wasm_builder_extensions;
-mod wasm_helpers;
 mod wasm_validation;
 
 pub use translation::functions::MappedFunction;
@@ -62,7 +61,9 @@ pub fn translate_single_module(
 ) -> Result<Module, CompilationError> {
     let mut modules = translate_package(package, Some(module_name.to_string()))?;
 
-    Ok(modules.remove(module_name).expect("Module not compiled"))
+    Ok(modules
+        .remove(module_name)
+        .ok_or_else(|| ICEError::new(ICEErrorKind::ModuleNotCompiled(module_name.to_string())))?)
 }
 
 pub fn translate_package(
@@ -79,10 +80,9 @@ pub fn translate_package(
         package.root_compiled_units.iter().collect()
     };
 
-    assert!(
-        !root_compiled_units.is_empty(),
-        "Module not found in package"
-    );
+    if root_compiled_units.is_empty() {
+        return Err(CompilationError::NoFilesFound);
+    }
 
     let mut modules = HashMap::new();
 
@@ -328,15 +328,16 @@ pub fn translate_package_cli(
     for (module_name, module) in modules.iter_mut() {
         module
             .emit_wasm_file(build_directory.join(format!("{module_name}.wasm")))
-            .unwrap();
+            .map_err(|e| ICEError::new(ICEErrorKind::Unexpected(e.into())))?;
 
         // Convert to WAT format
-        let wat = wasmprinter::print_bytes(module.emit_wasm()).expect("Failed to generate WAT");
+        let wat = wasmprinter::print_bytes(module.emit_wasm())
+            .map_err(|e| ICEError::new(ICEErrorKind::Unexpected(e.into())))?;
         std::fs::write(
             build_directory.join(format!("{module_name}.wat")),
             wat.as_bytes(),
         )
-        .expect("Failed to write WAT file");
+        .map_err(|e| ICEError::new(ICEErrorKind::Io(e)))?;
     }
 
     Ok(())
@@ -422,12 +423,12 @@ pub fn process_dependency_tree<'move_package>(
             DependencyProcessingError::ICE(ICEError::new(ICEErrorKind::CompilationContext(e)))
         })?;
 
-        let processed_dependency = dependencies_data.insert(module_id, dependency_module_data);
+        let processed_dependency =
+            dependencies_data.insert(module_id.clone(), dependency_module_data);
 
-        assert!(
-            processed_dependency.is_none(),
-            "processed the same dep twice in different contexts"
-        );
+        if processed_dependency.is_some() {
+            Err(DependencyError::DependencyProcessedMoreThanOnce(module_id))?;
+        }
     }
 
     if errors.is_empty() {
@@ -495,7 +496,7 @@ fn translate_and_link_functions(
     }
     // If it is not present, we add an entry for it
     else {
-        function_table.add(module, function_id.clone(), function_information);
+        function_table.add(module, function_id.clone(), function_information)?;
     }
 
     let function_definition = function_definitions

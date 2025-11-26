@@ -51,7 +51,6 @@ pub(crate) fn print_error_diagnostic(error: CompilationError) -> ! {
             );
             exit(1)
         }
-
         CompilationError::CodeError {
             mapped_files,
             errors,
@@ -61,6 +60,13 @@ pub(crate) fn print_error_diagnostic(error: CompilationError) -> ! {
                 diagnostics.add(error.into());
             }
             report_diagnostics(mapped_files, diagnostics);
+        }
+        CompilationError::NoFilesFound => {
+            eprintln!("\x1B[1m\x1B[31mError:\x1B[0m no input files found to compile.");
+            eprintln!(
+                "\n\x1B[1m\x1B[34mNOTE\x1B[0m: If there are source files in the project, this is an internal error and we would appreciate a bug report: {GITHUB_URL}"
+            );
+            exit(1);
         }
     }
 }

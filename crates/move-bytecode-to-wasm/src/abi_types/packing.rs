@@ -88,8 +88,7 @@ pub trait Packable {
     ) -> Result<LocalId, AbiError>;
 
     /// Returns the ABI encoded size of the type
-    fn encoded_size(&self, compilation_ctx: &CompilationContext)
-    -> Result<usize, AbiEncodingError>;
+    fn encoded_size(&self, compilation_ctx: &CompilationContext) -> Result<usize, AbiError>;
 
     /// Returns true if the type to be encoded is dynamic
     ///
@@ -102,7 +101,7 @@ pub trait Packable {
     ///
     /// For more information:
     /// https://docs.soliditylang.org/en/develop/abi-spec.html#formal-specification-of-the-encoding
-    fn is_dynamic(&self, compilation_ctx: &CompilationContext) -> Result<bool, AbiEncodingError>;
+    fn is_dynamic(&self, compilation_ctx: &CompilationContext) -> Result<bool, AbiError>;
 }
 
 /// Builds the instructions to pack WASM return values into memory according to Solidity's ABI encoding.
@@ -397,7 +396,7 @@ impl Packable for IntermediateType {
             }
             IntermediateType::IStruct {
                 module_id, index, ..
-            } if String_::is_vm_type(module_id, *index, compilation_ctx) => {
+            } if String_::is_vm_type(module_id, *index, compilation_ctx)? => {
                 String_::add_pack_instructions(
                     builder,
                     module,
@@ -434,10 +433,7 @@ impl Packable for IntermediateType {
         Ok(())
     }
 
-    fn encoded_size(
-        &self,
-        compilation_ctx: &CompilationContext,
-    ) -> Result<usize, AbiEncodingError> {
+    fn encoded_size(&self, compilation_ctx: &CompilationContext) -> Result<usize, AbiError> {
         let size = match self {
             IntermediateType::IBool => sol_data::Bool::ENCODED_SIZE.unwrap(),
             // According to the official documentation, enum types are encoded as uint8
@@ -457,21 +453,19 @@ impl Packable for IntermediateType {
             IntermediateType::IRef(inner) => inner.encoded_size(compilation_ctx)?,
             IntermediateType::IMutRef(inner) => inner.encoded_size(compilation_ctx)?,
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
-                let struct_ = compilation_ctx
-                    .get_struct_by_intermediate_type(self)
-                    .unwrap();
+                let struct_ = compilation_ctx.get_struct_by_intermediate_type(self)?;
 
                 struct_.solidity_abi_encode_size(compilation_ctx)?
             }
             IntermediateType::ITypeParameter(_) => {
-                return Err(AbiEncodingError::GenericTypeParameterSize);
+                return Err(AbiEncodingError::GenericTypeParameterSize)?;
             }
         };
 
         Ok(size)
     }
 
-    fn is_dynamic(&self, compilation_ctx: &CompilationContext) -> Result<bool, AbiEncodingError> {
+    fn is_dynamic(&self, compilation_ctx: &CompilationContext) -> Result<bool, AbiError> {
         let is_dyn = match self {
             IntermediateType::IBool
             | IntermediateType::IU8
@@ -486,13 +480,11 @@ impl Packable for IntermediateType {
             | IntermediateType::IGenericEnumInstance { .. } => false,
             IntermediateType::IVector(_) => true,
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
-                let struct_ = compilation_ctx
-                    .get_struct_by_intermediate_type(self)
-                    .unwrap();
+                let struct_ = compilation_ctx.get_struct_by_intermediate_type(self)?;
                 struct_.solidity_abi_encode_is_dynamic(compilation_ctx)?
             }
             IntermediateType::ITypeParameter(_) => {
-                return Err(AbiEncodingError::GenericTypeParameterIsDynamic);
+                return Err(AbiEncodingError::GenericTypeParameterIsDynamic)?;
             }
             // References are dynamic if the inner type is dynamic!
             IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {

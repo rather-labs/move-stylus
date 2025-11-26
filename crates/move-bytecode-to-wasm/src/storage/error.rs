@@ -5,6 +5,7 @@ use crate::{
     native_functions::error::NativeFunctionError,
     runtime::error::RuntimeFunctionError,
     translation::intermediate_types::{IntermediateType, error::IntermediateTypeError},
+    vm_handled_types::error::VmHandledTypeError,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -23,6 +24,12 @@ pub enum StorageError {
 
     #[error("compilation context error")]
     CompilationContext(#[from] CompilationContextError),
+
+    #[error("there was an error processing an intermediate type while accessing storage: {0:?}")]
+    IntermediateType(#[from] IntermediateTypeError),
+
+    #[error("an error ocurred while processing a vm handled type")]
+    VmHandledType(#[from] VmHandledTypeError),
 
     #[error("found a reference inside struct/enum variant fields")]
     FieldSizeFoundRef(IntermediateType),
@@ -45,6 +52,9 @@ pub enum StorageError {
         "found type parameter inside enum variant with index {variant_index} and enum index {enum_index}"
     )]
     FoundTypeParameterInsideEnumVariant { enum_index: u16, variant_index: u16 },
+
+    #[error("found type parameter inside enum with index {enum_index}")]
+    FoundTypeParameterInsideEnum { enum_index: u16 },
 
     #[error("found reference inside enum with index {enum_index}")]
     FoundReferenceInsideEnum { enum_index: u16 },

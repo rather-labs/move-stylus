@@ -9,8 +9,8 @@ use crate::{
         intermediate_types::{IntermediateType, error::IntermediateTypeError},
         table::FunctionId,
     },
+    vm_handled_types::error::VmHandledTypeError,
 };
-
 #[derive(Debug, thiserror::Error)]
 pub enum NativeFunctionError {
     #[error("an error ocurred while generating a runtime function's code")]
@@ -27,6 +27,9 @@ pub enum NativeFunctionError {
 
     #[error("an error ocurred while processing an intermediate type")]
     IntermediateType(#[from] IntermediateTypeError),
+
+    #[error("an error ocurred while processing a vm handled type")]
+    VmHandledType(#[from] VmHandledTypeError),
 
     #[error(r#"host function "{0}" not supported yet"#)]
     HostFunctionNotSupported(String),
@@ -59,6 +62,16 @@ pub enum NativeFunctionError {
 
     #[error("key type not supported {0:?}")]
     DynamicFieldWrongKeyType(IntermediateType),
+
+    #[error(
+        "there was an error linking {module_id}::{function_name} expected {expected} type parameter(s), found {found}"
+    )]
+    WrongNumberOfTypeParameters {
+        module_id: ModuleId,
+        function_name: String,
+        expected: usize,
+        found: usize,
+    },
 
     // Emit function section
     #[error(r#"trying to emit log with the struct {0} which is not an event"#)]

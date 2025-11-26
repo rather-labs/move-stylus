@@ -1,4 +1,5 @@
 pub mod enum_data;
+pub mod error;
 pub mod function_data;
 pub mod struct_data;
 
@@ -18,6 +19,7 @@ use crate::{
     },
 };
 use enum_data::{EnumData, VariantData, VariantInstantiationData};
+use error::ModuleDataError;
 use function_data::FunctionData;
 use move_binary_format::{
     CompiledModule,
@@ -176,10 +178,10 @@ impl ModuleData {
             move_module_unit,
             &datatype_handles_map,
             &special_attributes,
-        );
+        )?;
 
         let (module_generic_structs_instances, generic_fields_to_struct_map) =
-            Self::process_generic_structs(move_module_unit, &datatype_handles_map);
+            Self::process_generic_structs(move_module_unit, &datatype_handles_map)?;
 
         let instantiated_fields_to_generic_fields =
             Self::process_generic_field_instances(move_module_unit, &datatype_handles_map);
@@ -194,7 +196,7 @@ impl ModuleData {
 
         // Module's enums
         let (module_enums, variants_to_enum_map) =
-            Self::process_concrete_enums(move_module_unit, &datatype_handles_map);
+            Self::process_concrete_enums(move_module_unit, &datatype_handles_map)?;
 
         let (module_generic_enum_instantiations, variants_instantiation_to_enum_map) =
             Self::process_generic_enums(move_module_unit, &datatype_handles_map);
@@ -249,7 +251,9 @@ impl ModuleData {
             let idx = DatatypeHandleIndex::new(index as u16);
 
             // Assert the index we constructed is ok
-            assert_eq!(datatype_handle, module.datatype_handle_at(idx));
+            if datatype_handle != module.datatype_handle_at(idx) {
+                return Err(ModuleDataError::GeneratedInvalidDataTypeHandleIndex(index))?;
+            }
 
             // Check if the datatype is constructed in this module.
             if datatype_handle.module == module.self_handle_idx() {
@@ -354,10 +358,10 @@ impl ModuleData {
         module: &CompiledModule,
         datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
         module_special_attributes: &SpecialAttributes,
-    ) -> (
+    ) -> Result<(
         Vec<IStruct>,
         HashMap<FieldHandleIndex, StructDefinitionIndex>,
-    ) {
+    )> {
         // Module's structs
         let mut module_structs: Vec<IStruct> = vec![];
         let mut fields_to_struct_map = HashMap::new();
@@ -370,8 +374,7 @@ impl ModuleData {
                     let intermediate_type = IntermediateType::try_from_signature_token(
                         &field.signature.0,
                         datatype_handles_map,
-                    )
-                    .unwrap();
+                    )?;
 
                     let field_index = module
                         .field_handles()
@@ -382,15 +385,19 @@ impl ModuleData {
                     // If field_index is None means the field is never referenced in the code
                     if let Some(field_index) = field_index {
                         let res = fields_map.insert(field_index, intermediate_type.clone());
-                        assert!(
-                            res.is_none(),
-                            "there was an error creating a field in struct {struct_index}, field with index {field_index} already exist"
-                        );
+                        if res.is_some() {
+                            return Err(ModuleDataError::FieldAlreadyExists {
+                                struct_index: struct_index.into_index(),
+                                field_index: field_index.into_index(),
+                            })?;
+                        }
                         let res = fields_to_struct_map.insert(field_index, struct_index);
-                        assert!(
-                            res.is_none(),
-                            "there was an error mapping field {field_index} to struct {struct_index}, already mapped"
-                        );
+                        if res.is_some() {
+                            return Err(ModuleDataError::FieldAlreadyMapped {
+                                struct_index: struct_index.into_index(),
+                                field_index: field_index.into_index(),
+                            })?;
+                        }
                         all_fields.push((Some(field_index), intermediate_type));
                     } else {
                         all_fields.push((None, intermediate_type));
@@ -431,17 +438,17 @@ impl ModuleData {
             ));
         }
 
-        (module_structs, fields_to_struct_map)
+        Ok((module_structs, fields_to_struct_map))
     }
 
     #[allow(clippy::type_complexity)]
     fn process_generic_structs(
         module: &CompiledModule,
         datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
-    ) -> (
+    ) -> Result<(
         Vec<(StructDefinitionIndex, Vec<IntermediateType>)>,
         HashMap<FieldInstantiationIndex, usize>,
-    ) {
+    )> {
         let mut module_generic_structs_instances = vec![];
         let mut generic_fields_to_struct_map = HashMap::new();
 
@@ -487,19 +494,22 @@ impl ModuleData {
                     // If field_index is None means the field is never referenced in the code
                     if let Some(generic_field_index) = generic_field_index {
                         let res = generic_fields_to_struct_map.insert(generic_field_index, index);
-                        assert!(
-                            res.is_none(),
-                            "there was an error mapping field {generic_field_index} to struct {struct_index}, already mapped"
-                        );
+
+                        if res.is_some() {
+                            return Err(ModuleDataError::FieldAlreadyMapped {
+                                struct_index: struct_index.into_index(),
+                                field_index: generic_field_index.into_index(),
+                            })?;
+                        }
                     }
                 }
             }
         }
 
-        (
+        Ok((
             module_generic_structs_instances,
             generic_fields_to_struct_map,
-        )
+        ))
     }
 
     fn process_generic_field_instances(
@@ -531,7 +541,7 @@ impl ModuleData {
     pub fn process_concrete_enums(
         module: &CompiledModule,
         datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
-    ) -> (Vec<IEnum>, HashMap<VariantHandleIndex, VariantData>) {
+    ) -> Result<(Vec<IEnum>, HashMap<VariantHandleIndex, VariantData>)> {
         // Module's enums
         let mut module_enums = vec![];
         let mut variants_to_enum_map = HashMap::new();
@@ -575,10 +585,13 @@ impl ModuleData {
                             index_inside_enum: variant_index,
                         },
                     );
-                    assert!(
-                        res.is_none(),
-                        "there was an error creating a variant in struct {variant_index}, variant with index {variant_index} already exist"
-                    );
+
+                    if res.is_some() {
+                        return Err(ModuleDataError::VariantAlreadyExists {
+                            enum_index: enum_index.into_index(),
+                            variant_index,
+                        })?;
+                    }
                 }
             }
 
@@ -587,7 +600,7 @@ impl ModuleData {
             module_enums.push(IEnum::new(identifier.to_string(), index as u16, variants).unwrap());
         }
 
-        (module_enums, variants_to_enum_map)
+        Ok((module_enums, variants_to_enum_map))
     }
 
     #[allow(clippy::type_complexity)]
@@ -733,10 +746,9 @@ impl ModuleData {
                 let function_def =
                     move_module.function_def_at(FunctionDefinitionIndex::new(index as u16));
 
-                assert!(
-                    function_def.acquires_global_resources.is_empty(),
-                    "Acquiring global resources is not supported yet"
-                );
+                if !function_def.acquires_global_resources.is_empty() {
+                    return Err(ModuleDataError::AcquiresGlobalResourceNotEmpty)?;
+                }
 
                 // Code can be empty (for example in native functions)
                 let code_locals = if let Some(code) = function_def.code.as_ref() {
@@ -902,7 +914,7 @@ impl ModuleData {
                                     && Address::from(m.unit.address.into_bytes())
                                         == STYLUS_FRAMEWORK_ADDRESS
                             })
-                            .expect("could not find stylus framework as dependency")
+                            .ok_or(ModuleDataError::StylusFrameworkDependencyNotFound)?
                             .1
                             .unit
                             .module;

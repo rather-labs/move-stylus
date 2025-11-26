@@ -22,7 +22,7 @@ impl IBool {
         _calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), AbiError> {
-        let encoded_size = sol_data::Bool::ENCODED_SIZE.expect("Bool should have a fixed size");
+        let encoded_size = sol_data::Bool::ENCODED_SIZE.ok_or(AbiError::UnableToGetTypeAbiSize)?;
         unpack_i32_type_instructions(
             block,
             module,
@@ -43,7 +43,8 @@ impl IU8 {
         _calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), AbiError> {
-        let encoded_size = sol_data::Uint::<8>::ENCODED_SIZE.expect("U8 should have a fixed size");
+        let encoded_size =
+            sol_data::Uint::<8>::ENCODED_SIZE.ok_or(AbiError::UnableToGetTypeAbiSize)?;
         unpack_i32_type_instructions(
             block,
             module,
@@ -65,7 +66,7 @@ impl IU16 {
         compilation_ctx: &CompilationContext,
     ) -> Result<(), AbiError> {
         let encoded_size =
-            sol_data::Uint::<16>::ENCODED_SIZE.expect("U16 should have a fixed size");
+            sol_data::Uint::<16>::ENCODED_SIZE.ok_or(AbiError::UnableToGetTypeAbiSize)?;
         unpack_i32_type_instructions(
             block,
             module,
@@ -87,7 +88,7 @@ impl IU32 {
         compilation_ctx: &CompilationContext,
     ) -> Result<(), AbiError> {
         let encoded_size =
-            sol_data::Uint::<32>::ENCODED_SIZE.expect("U32 should have a fixed size");
+            sol_data::Uint::<32>::ENCODED_SIZE.ok_or(AbiError::UnableToGetTypeAbiSize)?;
         unpack_i32_type_instructions(
             block,
             module,
@@ -109,7 +110,7 @@ impl IU64 {
         compilation_ctx: &CompilationContext,
     ) -> Result<(), AbiError> {
         let encoded_size =
-            sol_data::Uint::<64>::ENCODED_SIZE.expect("U64 should have a fixed size");
+            sol_data::Uint::<64>::ENCODED_SIZE.ok_or(AbiError::UnableToGetTypeAbiSize)?;
         unpack_i64_type_instructions(
             block,
             module,

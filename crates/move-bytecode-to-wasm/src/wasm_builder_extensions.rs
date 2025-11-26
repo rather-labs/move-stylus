@@ -5,6 +5,15 @@ use walrus::{
 
 use crate::data::DATA_SLOT_DATA_PTR_OFFSET;
 
+#[derive(Debug, thiserror::Error)]
+pub enum WasmBuilderExtensionError {
+    #[error("constant is too large to fit in u32")]
+    ConstantTooLargeToFitInU32,
+
+    #[error("constant is too large to fit in u64")]
+    ConstantTooLargeToFitInU64,
+}
+
 pub trait WasmBuilderExtension {
     /// Negates the result of a boolean operation. User must be sure that the last value in the
     /// stack contains result of a boolean operation (0 or 1).
@@ -52,6 +61,24 @@ pub trait WasmBuilderExtension {
 
     /// Adds the instructions to compute: DATA_SLOT_DATA_PTR_OFFSET + (32 - used_bytes_in_slot).
     fn add_slot_data_ptr_plus_offset(&mut self, used_bytes_in_slot: LocalId) -> &mut Self;
+
+    /// Loads a i32 constant from a byte slice.
+    ///
+    /// The byte slice must be at most 4 bytes long. If it is shorter, it will be padded with zeros
+    /// on the right.
+    ///
+    /// [..., ] --> load_i32_from_bytes() -> [..., i32_constant]
+    fn load_i32_from_bytes(&mut self, bytes: &[u8])
+    -> Result<&mut Self, WasmBuilderExtensionError>;
+
+    /// Loads a i64 constant from a byte slice.
+    ///
+    /// The byte slice must be at most 8 bytes long. If it is shorter, it will be padded with zeros
+    /// on the right.
+    ///
+    /// [..., ] --> load_i32_from_bytes() -> [..., i64_constant]
+    fn load_i64_from_bytes(&mut self, bytes: &[u8])
+    -> Result<&mut Self, WasmBuilderExtensionError>;
 }
 
 impl WasmBuilderExtension for InstrSeqBuilder<'_> {
@@ -117,5 +144,39 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
             .local_get(slot_offset)
             .binop(BinaryOp::I32Sub)
             .binop(BinaryOp::I32Add)
+    }
+
+    fn load_i32_from_bytes(
+        &mut self,
+        bytes: &[u8],
+    ) -> Result<&mut Self, WasmBuilderExtensionError> {
+        if bytes.len() > 4 {
+            return Err(WasmBuilderExtensionError::ConstantTooLargeToFitInU32);
+        }
+
+        // pad to 4 bytes on the right
+        let mut num_bytes = [0u8; 4];
+        num_bytes[..bytes.len()].copy_from_slice(bytes);
+
+        self.i32_const(i32::from_le_bytes(num_bytes));
+
+        Ok(self)
+    }
+
+    fn load_i64_from_bytes(
+        &mut self,
+        bytes: &[u8],
+    ) -> Result<&mut Self, WasmBuilderExtensionError> {
+        if bytes.len() > 8 {
+            return Err(WasmBuilderExtensionError::ConstantTooLargeToFitInU64);
+        }
+
+        // pad to 8 bytes on the right
+        let mut num_bytes = [0u8; 8];
+        num_bytes[..bytes.len()].copy_from_slice(bytes);
+
+        self.i64_const(i64::from_le_bytes(num_bytes));
+
+        Ok(self)
     }
 }

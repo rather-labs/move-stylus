@@ -156,7 +156,7 @@ impl IU128 {
         module: &mut walrus::Module,
         original_type: IntermediateType,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), IntermediateTypeError> {
         match original_type {
             IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {
                 let value_local = module.locals.add(ValType::I32);
@@ -256,8 +256,10 @@ impl IU128 {
                 }
                 builder.local_get(pointer);
             }
-            t => panic!("type stack error: trying to cast {t:?}"),
+            t => return Err(IntermediateTypeError::InvalidCast(t.clone())),
         }
+
+        Ok(())
     }
 
     pub fn add(
@@ -467,7 +469,7 @@ impl IU256 {
         module: &mut walrus::Module,
         original_type: IntermediateType,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), IntermediateTypeError> {
         match original_type {
             IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {
                 let value_local = module.locals.add(ValType::I32);
@@ -547,8 +549,10 @@ impl IU256 {
                 builder.local_get(pointer);
             }
             IntermediateType::IU256 => {}
-            t => panic!("type stack error: trying to cast {t:?}"),
+            t => return Err(IntermediateTypeError::InvalidCast(t.clone())),
         }
+
+        Ok(())
     }
 
     pub fn add(

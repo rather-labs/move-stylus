@@ -5,9 +5,7 @@ use walrus::{
 
 use crate::{
     CompilationContext,
-    abi_types::{
-        error::AbiError, error_encoding::build_abort_error_message, public_function::PublicFunction,
-    },
+    abi_types::{error_encoding::build_abort_error_message, public_function::PublicFunction},
     runtime_error_codes::ERROR_NO_FUNCTION_MATCH,
     translation::intermediate_types::IntermediateType,
 };
@@ -80,8 +78,7 @@ pub fn build_entrypoint_router(
 
     // Build no function match error message
     router_builder.i64_const(ERROR_NO_FUNCTION_MATCH);
-    let ptr = build_abort_error_message(&mut router_builder, module, compilation_ctx)
-        .map_err(AbiError::from)?;
+    let ptr = build_abort_error_message(&mut router_builder, module, compilation_ctx)?;
 
     // Write error data to memory
     router_builder

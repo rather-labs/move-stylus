@@ -7,16 +7,24 @@ use move_binary_format::file_format::{
 
 use crate::{
     error::{CompilationError, ICEError, ICEErrorKind},
-    translation::functions::MappedFunctionError,
+    translation::{
+        functions::MappedFunctionError, intermediate_types::error::IntermediateTypeError,
+    },
 };
 
-use super::ModuleId;
+use super::{ModuleId, module_data::error::ModuleDataError};
 
 #[derive(Debug, thiserror::Error)]
 #[allow(clippy::enum_variant_names)]
 pub enum CompilationContextError {
     #[error("creating a mapped function")]
     MappedFunction(#[source] Rc<MappedFunctionError>),
+
+    #[error("there was an error when processing an intermediate type")]
+    IntermediateType(#[source] Rc<IntermediateTypeError>),
+
+    #[error("processing module data")]
+    ModuleData(#[from] ModuleDataError),
 
     #[error("struct with index {0} not found in compilation context")]
     StructNotFound(u16),
@@ -85,5 +93,17 @@ pub enum CompilationContextError {
 impl From<CompilationContextError> for CompilationError {
     fn from(value: CompilationContextError) -> Self {
         CompilationError::ICE(ICEError::new(ICEErrorKind::CompilationContext(value)))
+    }
+}
+
+impl From<MappedFunctionError> for CompilationContextError {
+    fn from(value: MappedFunctionError) -> Self {
+        CompilationContextError::MappedFunction(value.into())
+    }
+}
+
+impl From<IntermediateTypeError> for CompilationContextError {
+    fn from(value: IntermediateTypeError) -> Self {
+        CompilationContextError::IntermediateType(value.into())
     }
 }
