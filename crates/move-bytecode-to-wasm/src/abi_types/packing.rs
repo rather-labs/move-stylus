@@ -431,20 +431,36 @@ impl Packable for IntermediateType {
 
     fn encoded_size(&self, compilation_ctx: &CompilationContext) -> Result<usize, AbiError> {
         let size = match self {
-            IntermediateType::IBool => sol_data::Bool::ENCODED_SIZE.unwrap(),
+            IntermediateType::IBool => {
+                sol_data::Bool::ENCODED_SIZE.ok_or(AbiError::UnableToGetTypeAbiSize)?
+            }
             // According to the official documentation, enum types are encoded as uint8
             IntermediateType::IU8
             | IntermediateType::IEnum { .. }
             | IntermediateType::IGenericEnumInstance { .. } => {
-                sol_data::Uint::<8>::ENCODED_SIZE.unwrap()
+                sol_data::Uint::<8>::ENCODED_SIZE.ok_or(AbiError::UnableToGetTypeAbiSize)?
             }
-            IntermediateType::IU16 => sol_data::Uint::<16>::ENCODED_SIZE.unwrap(),
-            IntermediateType::IU32 => sol_data::Uint::<32>::ENCODED_SIZE.unwrap(),
-            IntermediateType::IU64 => sol_data::Uint::<64>::ENCODED_SIZE.unwrap(),
-            IntermediateType::IU128 => sol_data::Uint::<128>::ENCODED_SIZE.unwrap(),
-            IntermediateType::IU256 => sol_data::Uint::<256>::ENCODED_SIZE.unwrap(),
-            IntermediateType::IAddress => sol_data::Address::ENCODED_SIZE.unwrap(),
-            IntermediateType::ISigner => sol_data::Address::ENCODED_SIZE.unwrap(),
+            IntermediateType::IU16 => {
+                sol_data::Uint::<16>::ENCODED_SIZE.ok_or(AbiError::UnableToGetTypeAbiSize)?
+            }
+            IntermediateType::IU32 => {
+                sol_data::Uint::<32>::ENCODED_SIZE.ok_or(AbiError::UnableToGetTypeAbiSize)?
+            }
+            IntermediateType::IU64 => {
+                sol_data::Uint::<64>::ENCODED_SIZE.ok_or(AbiError::UnableToGetTypeAbiSize)?
+            }
+            IntermediateType::IU128 => {
+                sol_data::Uint::<128>::ENCODED_SIZE.ok_or(AbiError::UnableToGetTypeAbiSize)?
+            }
+            IntermediateType::IU256 => {
+                sol_data::Uint::<256>::ENCODED_SIZE.ok_or(AbiError::UnableToGetTypeAbiSize)?
+            }
+            IntermediateType::IAddress => {
+                sol_data::Address::ENCODED_SIZE.ok_or(AbiError::UnableToGetTypeAbiSize)?
+            }
+            IntermediateType::ISigner => {
+                sol_data::Address::ENCODED_SIZE.ok_or(AbiError::UnableToGetTypeAbiSize)?
+            }
             IntermediateType::IVector(_) => 32,
             IntermediateType::IRef(inner) => inner.encoded_size(compilation_ctx)?,
             IntermediateType::IMutRef(inner) => inner.encoded_size(compilation_ctx)?,
