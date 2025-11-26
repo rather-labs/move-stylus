@@ -1,4 +1,4 @@
-use super::VmHandledType;
+use super::{VmHandledType, error::VmHandledTypeError};
 use crate::{
     CompilationContext,
     compilation_context::{
@@ -23,10 +23,13 @@ impl VmHandledType for String_ {
         // String are not injected, they are created by the user
     }
 
-    fn is_vm_type(module_id: &ModuleId, index: u16, compilation_ctx: &CompilationContext) -> bool {
+    fn is_vm_type(
+        module_id: &ModuleId,
+        index: u16,
+        compilation_ctx: &CompilationContext,
+    ) -> Result<bool, VmHandledTypeError> {
         let identifier = &compilation_ctx
-            .get_struct_by_index(module_id, index)
-            .unwrap()
+            .get_struct_by_index(module_id, index)?
             .identifier;
 
         if identifier == Self::IDENTIFIER {
@@ -34,10 +37,10 @@ impl VmHandledType for String_ {
                 || (module_id.module_name != STDLIB_MODULE_NAME_ASCII
                     && module_id.module_name != STDLIB_MODULE_NAME_STRING)
             {
-                panic!("invalid String found, only the one from the standard lib is valid");
+                return Err(VmHandledTypeError::InvalidStdLibType(Self::IDENTIFIER));
             }
-            return true;
+            return Ok(true);
         }
-        false
+        Ok(false)
     }
 }

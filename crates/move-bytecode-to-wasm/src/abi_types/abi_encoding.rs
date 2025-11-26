@@ -55,12 +55,12 @@ fn solidity_name(
         | IntermediateType::IU64
         | IntermediateType::IU128
         | IntermediateType::IU256
-        | IntermediateType::IAddress => argument.sol_name(compilation_ctx),
+        | IntermediateType::IAddress => argument.sol_name(compilation_ctx)?,
         IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
             let enum_ = compilation_ctx.get_enum_by_intermediate_type(argument)?;
 
             if enum_.is_simple {
-                argument.sol_name(compilation_ctx)
+                argument.sol_name(compilation_ctx)?
             } else {
                 None
             }
@@ -73,15 +73,15 @@ fn solidity_name(
         }
         IntermediateType::IStruct {
             module_id, index, ..
-        } if TxContext::is_vm_type(module_id, *index, compilation_ctx) => None,
+        } if TxContext::is_vm_type(module_id, *index, compilation_ctx)? => None,
         IntermediateType::IStruct {
             module_id, index, ..
-        } if String_::is_vm_type(module_id, *index, compilation_ctx) => {
-            argument.sol_name(compilation_ctx)
+        } if String_::is_vm_type(module_id, *index, compilation_ctx)? => {
+            argument.sol_name(compilation_ctx)?
         }
         IntermediateType::IStruct {
             module_id, index, ..
-        } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
+        } if Uid::is_vm_type(module_id, *index, compilation_ctx)? => {
             Some(sol_data::FixedBytes::<32>::SOL_NAME.to_string())
         }
         IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
@@ -106,12 +106,12 @@ fn sol_name_storage_ids(
     match struct_.fields.first() {
         Some(IntermediateType::IStruct {
             module_id, index, ..
-        }) if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
+        }) if Uid::is_vm_type(module_id, *index, compilation_ctx)? => {
             Ok(Some(sol_data::FixedBytes::<32>::SOL_NAME.to_string()))
         }
         Some(IntermediateType::IGenericStructInstance {
             module_id, index, ..
-        }) if NamedId::is_vm_type(module_id, *index, compilation_ctx) => Ok(None),
+        }) if NamedId::is_vm_type(module_id, *index, compilation_ctx)? => Ok(None),
 
         _ => Err(AbiError::ExpectedUIDOrNamedId(struct_.identifier.clone())),
     }

@@ -42,12 +42,12 @@ fn solidity_name(
         | IntermediateType::IU64
         | IntermediateType::IU128
         | IntermediateType::IU256
-        | IntermediateType::IAddress => argument.sol_name(compilation_ctx),
+        | IntermediateType::IAddress => argument.sol_name(compilation_ctx)?,
         IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
             let enum_ = compilation_ctx.get_enum_by_intermediate_type(argument)?;
 
             if enum_.is_simple {
-                argument.sol_name(compilation_ctx)
+                argument.sol_name(compilation_ctx)?
             } else {
                 None
             }
@@ -60,16 +60,16 @@ fn solidity_name(
         }
         IntermediateType::IStruct {
             module_id, index, ..
-        } if TxContext::is_vm_type(module_id, *index, compilation_ctx) => None,
+        } if TxContext::is_vm_type(module_id, *index, compilation_ctx)? => None,
         IntermediateType::IStruct {
             module_id, index, ..
-        } if String_::is_vm_type(module_id, *index, compilation_ctx) => {
-            argument.sol_name(compilation_ctx)
+        } if String_::is_vm_type(module_id, *index, compilation_ctx)? => {
+            argument.sol_name(compilation_ctx)?
         }
         IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
             let struct_ = compilation_ctx.get_struct_by_intermediate_type(argument)?;
 
-            struct_fields_sol_name(&struct_, compilation_ctx)
+            struct_fields_sol_name(&struct_, compilation_ctx)?
         }
         IntermediateType::ISigner | IntermediateType::ITypeParameter(_) => None,
     })
@@ -79,14 +79,14 @@ fn solidity_name(
 pub fn struct_fields_sol_name(
     struct_: &IStruct,
     compilation_ctx: &CompilationContext,
-) -> Option<String> {
-    struct_
+) -> Result<Option<String>, AbiError> {
+    Ok(struct_
         .fields
         .iter()
         .map(|field| SolName::sol_name(field, compilation_ctx))
-        .collect::<Option<Vec<String>>>()
+        .collect::<Result<Option<Vec<String>>, AbiError>>()?
         .map(|fields| fields.join(","))
-        .map(|fields| format!("({fields})"))
+        .map(|fields| format!("({fields})")))
 }
 
 #[cfg(test)]

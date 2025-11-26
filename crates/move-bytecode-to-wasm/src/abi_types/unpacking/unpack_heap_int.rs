@@ -23,7 +23,7 @@ impl IU128 {
         compilation_ctx: &CompilationContext,
     ) -> Result<(), AbiError> {
         let encoded_size =
-            sol_data::Uint::<128>::ENCODED_SIZE.expect("U128 should have a fixed size") as i32;
+            sol_data::Uint::<128>::ENCODED_SIZE.ok_or(AbiError::UnableToGetTypeAbiSize)? as i32;
 
         // The data is padded 16 bytes to the right
         block
@@ -64,7 +64,7 @@ impl IU256 {
         compilation_ctx: &CompilationContext,
     ) -> Result<(), AbiError> {
         let encoded_size =
-            sol_data::Uint::<256>::ENCODED_SIZE.expect("U256 should have a fixed size") as i32;
+            sol_data::Uint::<256>::ENCODED_SIZE.ok_or(AbiError::UnableToGetTypeAbiSize)? as i32;
 
         block.local_get(reader_pointer);
 
@@ -100,9 +100,9 @@ impl IAddress {
         reader_pointer: LocalId,
         _calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), AbiError> {
         let encoded_size =
-            sol_data::Address::ENCODED_SIZE.expect("Address should have a fixed size");
+            sol_data::Address::ENCODED_SIZE.ok_or(AbiError::UnableToGetTypeAbiSize)? as i32;
 
         block.i32_const(32);
         block.call(compilation_ctx.allocator);
@@ -134,11 +134,13 @@ impl IAddress {
 
         // increment reader pointer
         block.local_get(reader_pointer);
-        block.i32_const(encoded_size as i32);
+        block.i32_const(encoded_size);
         block.binop(BinaryOp::I32Add);
         block.local_set(reader_pointer);
 
         block.local_get(unpacked_pointer);
+
+        Ok(())
     }
 }
 

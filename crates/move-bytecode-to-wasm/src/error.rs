@@ -5,7 +5,7 @@ use move_parse_special_attributes::SpecialAttributeError;
 
 use crate::{
     abi_types::error::AbiError,
-    compilation_context::CompilationContextError,
+    compilation_context::{CompilationContextError, ModuleId},
     constructor::ConstructorError,
     hostio::error::HostIOError,
     native_functions::error::NativeFunctionError,
@@ -14,23 +14,26 @@ use crate::{
 
 #[derive(thiserror::Error, Debug)]
 pub enum DependencyProcessingError {
-    #[error("{0}")]
+    #[error("internal compiler error(s) ocurred")]
     ICE(#[from] ICEError),
 
-    #[error("internal compiler error(s) ocurred")]
+    #[error("code error ocurred")]
     CodeError(Vec<CodeError>),
 }
 
 #[derive(thiserror::Error, Debug)]
 pub enum CompilationError {
-    #[error("{0}")]
+    #[error("internal compiler error(s) ocurred")]
     ICE(#[from] ICEError),
 
-    #[error("internal compiler error(s) ocurred")]
+    #[error("code error ocurred")]
     CodeError {
         mapped_files: MappedFiles,
         errors: Vec<CodeError>,
     },
+
+    #[error("no files found to compile")]
+    NoFilesFound,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -74,6 +77,9 @@ impl Display for ICEError {
 pub enum DependencyError {
     #[error("could not find dependency {0}")]
     DependencyNotFound(String),
+
+    #[error("processed the same dependency ({0}) twice in different contexts")]
+    DependencyProcessedMoreThanOnce(ModuleId),
 }
 
 impl From<DependencyError> for DependencyProcessingError {
@@ -107,6 +113,15 @@ pub enum ICEErrorKind {
 
     #[error("an error ocurred while processing a contact's dependencies")]
     Dependency(#[from] DependencyError),
+
+    #[error("io error")]
+    Io(#[from] std::io::Error),
+
+    #[error("module not compiled: {0}")]
+    ModuleNotCompiled(String),
+
+    #[error("unexpected error: {0}")]
+    Unexpected(#[from] Box<dyn std::error::Error + Send + Sync>),
 }
 
 impl From<CodeError> for Diagnostic {

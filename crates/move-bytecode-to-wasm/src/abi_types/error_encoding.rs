@@ -12,7 +12,7 @@ use crate::{
     utils::snake_to_upper_camel,
 };
 
-use super::error::{AbiEncodingError, AbiError};
+use super::error::AbiError;
 
 // Error(string) abi encoded selector
 pub const ERROR_SELECTOR: [u8; 4] = [0x08, 0xc3, 0x79, 0xa0];
@@ -103,7 +103,7 @@ pub fn build_custom_error_message(
         );
 
         // If the field is a stack type, load the value from memory
-        if field.is_stack_type() {
+        if field.is_stack_type()? {
             if field.stack_data_size()? == 8 {
                 builder.load(
                     compilation_ctx.memory_id,
@@ -176,7 +176,7 @@ pub fn build_abort_error_message(
     builder: &mut InstrSeqBuilder,
     module: &mut Module,
     compilation_ctx: &CompilationContext,
-) -> Result<LocalId, AbiEncodingError> {
+) -> Result<LocalId, AbiError> {
     let ptr = module.locals.add(ValType::I32);
 
     // Convert error code to decimal string

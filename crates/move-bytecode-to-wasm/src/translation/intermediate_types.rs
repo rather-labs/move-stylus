@@ -1,3 +1,15 @@
+pub mod address;
+pub mod boolean;
+pub mod enums;
+pub mod error;
+pub mod heap_integers;
+pub mod reference;
+pub mod signer;
+pub mod simple_integers;
+pub mod structs;
+pub(crate) mod user_type_fields;
+pub mod vector;
+
 use std::{
     collections::HashMap,
     hash::{Hash, Hasher},
@@ -8,7 +20,6 @@ use crate::{
     compilation_context::{ModuleData, ModuleId, module_data::Address},
     hasher::get_hasher,
     runtime::RuntimeFunction,
-    vm_handled_types::{VmHandledType, named_id, uid},
     wasm_builder_extensions::WasmBuilderExtension,
 };
 
@@ -27,17 +38,6 @@ use walrus::{
 };
 
 use super::TranslationError;
-
-pub mod address;
-pub mod boolean;
-pub mod enums;
-pub mod error;
-pub mod heap_integers;
-pub mod reference;
-pub mod signer;
-pub mod simple_integers;
-pub mod structs;
-pub mod vector;
 
 #[derive(Clone, PartialEq, Debug, Eq, Hash)]
 pub enum VmHandledStruct {
@@ -231,11 +231,11 @@ impl IntermediateType {
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
         match self {
-            IntermediateType::IBool => IBool::load_constant_instructions(builder, bytes),
-            IntermediateType::IU8 => IU8::load_constant_instructions(builder, bytes),
-            IntermediateType::IU16 => IU16::load_constant_instructions(builder, bytes),
-            IntermediateType::IU32 => IU32::load_constant_instructions(builder, bytes),
-            IntermediateType::IU64 => IU64::load_constant_instructions(builder, bytes),
+            IntermediateType::IBool => IBool::load_constant_instructions(builder, bytes)?,
+            IntermediateType::IU8 => IU8::load_constant_instructions(builder, bytes)?,
+            IntermediateType::IU16 => IU16::load_constant_instructions(builder, bytes)?,
+            IntermediateType::IU32 => IU32::load_constant_instructions(builder, bytes)?,
+            IntermediateType::IU64 => IU64::load_constant_instructions(builder, bytes)?,
             IntermediateType::IU128 => {
                 IU128::load_constant_instructions(module, builder, bytes, compilation_ctx)
             }
@@ -243,7 +243,7 @@ impl IntermediateType {
                 IU256::load_constant_instructions(module, builder, bytes, compilation_ctx)
             }
             IntermediateType::IAddress => {
-                IAddress::load_constant_instructions(module, builder, bytes, compilation_ctx)
+                IAddress::load_constant_instructions(module, builder, bytes, compilation_ctx)?
             }
             IntermediateType::ISigner => return Err(IntermediateTypeError::SignerCannotBeConstant),
             IntermediateType::IVector(inner) => {
@@ -671,7 +671,7 @@ impl IntermediateType {
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), TranslationError> {
+    ) -> Result<(), IntermediateTypeError> {
         match self {
             IntermediateType::IBool
             | IntermediateType::IU8
@@ -789,14 +789,13 @@ impl IntermediateType {
                 );
             }
             IntermediateType::ISigner => {
-                panic!("This type cannot be mutated: {self:?}");
+                return Err(IntermediateTypeError::CannotWriteRefOnSigner);
             }
-            // TODO: Is this ok?
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                panic!("Cannot mutate a reference of a reference: {self:?}");
+                return Err(IntermediateTypeError::FoundReferenceOfReference);
             }
             IntermediateType::ITypeParameter(_) => {
-                panic!("cannot write to a type parameter, expected a concrete type");
+                return Err(IntermediateTypeError::FoundTypeParameter);
             }
         }
 
@@ -902,7 +901,7 @@ impl IntermediateType {
                     );
             }
             IntermediateType::ITypeParameter(_) => {
-                panic!("cannot box a type parameter, expected a concrete type");
+                return Err(IntermediateTypeError::FoundTypeParameter);
             }
         }
 
@@ -1035,10 +1034,10 @@ impl IntermediateType {
                         builder.local_get(ptr1).local_get(ptr2);
                     }
                     IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                        panic!("found reference of reference");
+                        return Err(IntermediateTypeError::FoundReferenceOfReference);
                     }
                     IntermediateType::ITypeParameter(_) => {
-                        panic!("Cannot compare a type parameter, expected a concrete type");
+                        return Err(IntermediateTypeError::FoundTypeParameter);
                     }
                 }
 
@@ -1046,7 +1045,7 @@ impl IntermediateType {
             }
 
             IntermediateType::ITypeParameter(_) => {
-                panic!("cannot compare a type parameter, expected a concrete type");
+                return Err(IntermediateTypeError::FoundTypeParameter);
             }
         }
 
@@ -1067,13 +1066,13 @@ impl IntermediateType {
 
     /// Returns true if the type is a stack type (the value is directly hanndled in wasm stack
     /// instead of handling a pointer), otherwise returns false.
-    pub fn is_stack_type(&self) -> bool {
+    pub fn is_stack_type(&self) -> Result<bool, IntermediateTypeError> {
         match self {
             IntermediateType::IBool
             | IntermediateType::IU8
             | IntermediateType::IU16
             | IntermediateType::IU32
-            | IntermediateType::IU64 => true,
+            | IntermediateType::IU64 => Ok(true),
             IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::IAddress
@@ -1084,17 +1083,16 @@ impl IntermediateType {
             | IntermediateType::IStruct { .. }
             | IntermediateType::IGenericStructInstance { .. }
             | IntermediateType::IEnum { .. }
-            | IntermediateType::IGenericEnumInstance { .. } => false,
-            IntermediateType::ITypeParameter(_) => {
-                panic!(
-                    "cannot check if a type parameter is a stack type, expected a concrete type"
-                );
-            }
+            | IntermediateType::IGenericEnumInstance { .. } => Ok(false),
+            IntermediateType::ITypeParameter(_) => Err(IntermediateTypeError::FoundTypeParameter),
         }
     }
 
-    pub fn get_name(&self, compilation_ctx: &CompilationContext) -> String {
-        match self {
+    pub fn get_name(
+        &self,
+        compilation_ctx: &CompilationContext,
+    ) -> Result<String, IntermediateTypeError> {
+        let name = match self {
             IntermediateType::IBool => "bool".to_string(),
             IntermediateType::IU8 => "u8".to_string(),
             IntermediateType::IU16 => "u16".to_string(),
@@ -1105,16 +1103,16 @@ impl IntermediateType {
             IntermediateType::IAddress => "address".to_string(),
             IntermediateType::ISigner => "signer".to_string(),
             IntermediateType::IVector(inner) => {
-                format!("vector<{}>", inner.get_name(compilation_ctx))
+                format!("vector<{}>", inner.get_name(compilation_ctx)?)
             }
-            IntermediateType::IRef(inner) => format!("&{}", inner.get_name(compilation_ctx)),
-            IntermediateType::IMutRef(inner) => format!("&mut {}", inner.get_name(compilation_ctx)),
+            IntermediateType::IRef(inner) => format!("&{}", inner.get_name(compilation_ctx)?),
+            IntermediateType::IMutRef(inner) => {
+                format!("&mut {}", inner.get_name(compilation_ctx)?)
+            }
             IntermediateType::IStruct {
                 module_id, index, ..
             } => {
-                let struct_ = compilation_ctx
-                    .get_struct_by_index(module_id, *index)
-                    .unwrap();
+                let struct_ = compilation_ctx.get_struct_by_index(module_id, *index)?;
 
                 struct_.identifier.clone()
             }
@@ -1124,25 +1122,26 @@ impl IntermediateType {
                 types,
                 ..
             } => {
-                let struct_ = compilation_ctx
-                    .get_struct_by_index(module_id, *index)
-                    .unwrap();
+                let struct_ = compilation_ctx.get_struct_by_index(module_id, *index)?;
 
                 let types = types
                     .iter()
                     .map(|t| t.get_name(compilation_ctx))
-                    .collect::<Vec<String>>()
+                    .collect::<Result<Vec<String>, IntermediateTypeError>>()?
                     .join(",");
 
                 format!("{}<{types}>", struct_.identifier.clone())
             }
             IntermediateType::ITypeParameter(_) => {
-                panic!("cannot get the name of a type parameter, expected a concrete type",)
+                return Err(IntermediateTypeError::FoundTypeParameter);
             }
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
-                todo!()
+                let enum_ = compilation_ctx.get_enum_by_intermediate_type(self)?;
+                enum_.identifier.clone()
             }
-        }
+        };
+
+        Ok(name)
     }
 
     // Returns the hash of the type
@@ -1212,28 +1211,14 @@ impl IntermediateType {
             }
         }
     }
-
-    /// Returns true if this `IntermediateType` represents a UID or NamedId struct
-    pub fn is_uid_or_named_id(&self, compilation_ctx: &CompilationContext) -> bool {
-        match self {
-            IntermediateType::IStruct {
-                module_id, index, ..
-            }
-            | IntermediateType::IGenericStructInstance {
-                module_id, index, ..
-            } => {
-                uid::Uid::is_vm_type(module_id, *index, compilation_ctx)
-                    || named_id::NamedId::is_vm_type(module_id, *index, compilation_ctx)
-            }
-            _ => false,
-        }
-    }
 }
 
-impl From<&IntermediateType> for ValType {
-    fn from(value: &IntermediateType) -> Self {
+impl TryFrom<&IntermediateType> for ValType {
+    type Error = IntermediateTypeError;
+
+    fn try_from(value: &IntermediateType) -> Result<Self, Self::Error> {
         match value {
-            IntermediateType::IU64 => ValType::I64, // If we change this, i64 will be stored as i32 for function arguments
+            IntermediateType::IU64 => Ok(ValType::I64),
             IntermediateType::IBool
             | IntermediateType::IU8
             | IntermediateType::IU16
@@ -1248,17 +1233,17 @@ impl From<&IntermediateType> for ValType {
             | IntermediateType::IStruct { .. }
             | IntermediateType::IGenericStructInstance { .. }
             | IntermediateType::IEnum { .. }
-            | IntermediateType::IGenericEnumInstance { .. } => ValType::I32,
-            IntermediateType::ITypeParameter(_) => {
-                panic!("cannot convert a type parameter to a wasm type, expected a concrete type");
-            }
+            | IntermediateType::IGenericEnumInstance { .. } => Ok(ValType::I32),
+            IntermediateType::ITypeParameter(_) => Err(IntermediateTypeError::FoundTypeParameter),
         }
     }
 }
 
-impl From<IntermediateType> for ValType {
-    fn from(value: IntermediateType) -> Self {
-        Self::from(&value)
+impl TryFrom<IntermediateType> for ValType {
+    type Error = IntermediateTypeError;
+
+    fn try_from(value: IntermediateType) -> Result<Self, Self::Error> {
+        Self::try_from(&value)
     }
 }
 
@@ -1301,7 +1286,7 @@ impl ISignature {
         }
     }
 
-    pub fn get_argument_wasm_types(&self) -> Vec<ValType> {
-        self.arguments.iter().map(ValType::from).collect()
+    pub fn get_argument_wasm_types(&self) -> Result<Vec<ValType>, IntermediateTypeError> {
+        self.arguments.iter().map(ValType::try_from).collect()
     }
 }

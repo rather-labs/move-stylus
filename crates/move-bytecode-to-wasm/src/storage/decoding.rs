@@ -13,6 +13,7 @@ use crate::{
     runtime::RuntimeFunction,
     storage::storage_layout::field_size,
     translation::intermediate_types::{IntermediateType, vector::IVector},
+    vm_handled_types::is_uid_or_named_id,
     wasm_builder_extensions::WasmBuilderExtension,
 };
 
@@ -124,7 +125,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
     // Iterate through the fields of the struct
     for (index, field) in struct_.fields.iter().enumerate() {
         // If the field is a UID or NamedId, don't call decode_intermediate_type_instructions and process it here
-        if field.is_uid_or_named_id(compilation_ctx) {
+        if is_uid_or_named_id(field, compilation_ctx)? {
             // Save the struct pointer before the UID
             builder
                 .i32_const(4)
@@ -252,13 +253,13 @@ pub fn add_read_and_decode_storage_enum_instructions(
         .get_generic(module, compilation_ctx, &[itype])?;
 
     // Get the IEnum representation
-    let enum_ = compilation_ctx
-        .get_enum_by_intermediate_type(itype)
-        .expect("enum not found");
+    let enum_ = compilation_ctx.get_enum_by_intermediate_type(itype)?;
 
     let heap_size = enum_
-        .heap_size
-        .expect("cannot decode enum with unresolved generic heap size") as i32;
+        .heap_size()?
+        .ok_or(StorageError::FoundTypeParameterInsideEnum {
+            enum_index: enum_.index,
+        })? as i32;
 
     // Compute the tail slot and tail offset for the enum
     let tail_slot_ptr = module.locals.add(ValType::I32);
@@ -462,7 +463,7 @@ pub fn add_read_and_decode_storage_vector_instructions(
     // Allocate memory for the vector and write the header data
     IVector::allocate_vector_with_header(builder, compilation_ctx, data_ptr, len, len, stack_size);
 
-    let mut inner_result = Ok(());
+    let mut inner_result: Result<(), StorageError> = Ok(());
     // Iterate through the vector reading and decoding the elements from storage.
     builder.block(None, |block| {
         let block_id = block.id();
@@ -500,79 +501,83 @@ pub fn add_read_and_decode_storage_vector_instructions(
             iblock.loop_(None, |loop_| {
                 let loop_id = loop_.id();
 
-                // Update the slot_offset to reflect the field size.
-                // If the entire slot has been read, advance to the next slot and load its data.
-                loop_
-                    .local_get(elem_slot_ptr)
-                    .local_get(slot_offset)
-                    .i32_const(elem_size)
-                    .call(accumulate_or_advance_slot_read_fn)
-                    .local_set(slot_offset);
+                inner_result = (|| {
+                    // Update the slot_offset to reflect the field size.
+                    // If the entire slot has been read, advance to the next slot and load its data.
+                    loop_
+                        .local_get(elem_slot_ptr)
+                        .local_get(slot_offset)
+                        .i32_const(elem_size)
+                        .call(accumulate_or_advance_slot_read_fn)
+                        .local_set(slot_offset);
 
-                // Decode the element and store it at elem_data_ptr
-                inner_result = add_decode_intermediate_type_instructions(
-                    module,
-                    loop_,
-                    compilation_ctx,
-                    elem_data_ptr,
-                    elem_slot_ptr,
-                    slot_offset,
-                    owner_ptr,
-                    inner,
-                );
+                    // Decode the element and store it at elem_data_ptr
+                    add_decode_intermediate_type_instructions(
+                        module,
+                        loop_,
+                        compilation_ctx,
+                        elem_data_ptr,
+                        elem_slot_ptr,
+                        slot_offset,
+                        owner_ptr,
+                        inner,
+                    )?;
 
-                // Destination address of the element in memory
-                loop_.vec_elem_ptr(data_ptr, i, stack_size);
+                    // Destination address of the element in memory
+                    loop_.vec_elem_ptr(data_ptr, i, stack_size);
 
-                // Get the decoded element
-                loop_.local_get(elem_data_ptr);
+                    // Get the decoded element
+                    loop_.local_get(elem_data_ptr);
 
-                // If the element is not heap, load the value from the intermediate pointer
-                if inner.is_stack_type() {
-                    loop_.load(
+                    // If the element is not heap, load the value from the intermediate pointer
+                    if inner.is_stack_type()? {
+                        loop_.load(
+                            compilation_ctx.memory_id,
+                            if stack_size == 8 {
+                                LoadKind::I64 { atomic: false }
+                            } else {
+                                LoadKind::I32 { atomic: false }
+                            },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        );
+                    };
+
+                    // Store the decoded element at data_ptr + i * stack_size
+                    loop_.store(
                         compilation_ctx.memory_id,
                         if stack_size == 8 {
-                            LoadKind::I64 { atomic: false }
+                            StoreKind::I64 { atomic: false }
                         } else {
-                            LoadKind::I32 { atomic: false }
+                            StoreKind::I32 { atomic: false }
                         },
                         MemArg {
                             align: 0,
                             offset: 0,
                         },
                     );
-                };
 
-                // Store the decoded element at data_ptr + i * stack_size
-                loop_.store(
-                    compilation_ctx.memory_id,
-                    if stack_size == 8 {
-                        StoreKind::I64 { atomic: false }
-                    } else {
-                        StoreKind::I32 { atomic: false }
-                    },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
+                    // If we reach the last element, we exit
+                    loop_
+                        .local_get(i)
+                        .local_get(len)
+                        .i32_const(1)
+                        .binop(BinaryOp::I32Sub)
+                        .binop(BinaryOp::I32Eq)
+                        .br_if(iblock_id);
 
-                // If we reach the last element, we exit
-                loop_
-                    .local_get(i)
-                    .local_get(len)
-                    .i32_const(1)
-                    .binop(BinaryOp::I32Sub)
-                    .binop(BinaryOp::I32Eq)
-                    .br_if(iblock_id);
+                    // Else, increment i and continue the loop
+                    loop_
+                        .local_get(i)
+                        .i32_const(1)
+                        .binop(BinaryOp::I32Add)
+                        .local_set(i)
+                        .br(loop_id);
 
-                // Else, increment i and continue the loop
-                loop_
-                    .local_get(i)
-                    .i32_const(1)
-                    .binop(BinaryOp::I32Add)
-                    .local_set(i)
-                    .br(loop_id);
+                    Ok(())
+                })();
             });
         });
     });
@@ -738,9 +743,7 @@ pub fn add_decode_intermediate_type_instructions(
         }
         IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
             // Get base definition by (module_id, index)
-            let child_struct = compilation_ctx
-                .get_struct_by_intermediate_type(itype)
-                .expect("struct not found");
+            let child_struct = compilation_ctx.get_struct_by_intermediate_type(itype)?;
 
             if child_struct.has_key {
                 // Retrieve the 32-byte UID of the child struct from the current slot.

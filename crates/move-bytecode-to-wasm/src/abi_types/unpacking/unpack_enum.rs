@@ -22,7 +22,8 @@ impl IEnum {
         let enum_ptr = module.locals.add(ValType::I32);
         let variant_number = module.locals.add(ValType::I32);
 
-        let encoded_size = sol_data::Uint::<8>::ENCODED_SIZE.expect("U8 should have a fixed size");
+        let encoded_size =
+            sol_data::Uint::<8>::ENCODED_SIZE.ok_or(AbiError::UnableToGetTypeAbiSize)?;
         unpack_i32_type_instructions(
             block,
             module,

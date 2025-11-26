@@ -1,4 +1,4 @@
-use super::VmHandledType;
+use super::{VmHandledType, error::VmHandledTypeError};
 use crate::{
     CompilationContext,
     compilation_context::{
@@ -21,21 +21,24 @@ impl VmHandledType for Uid {
         // UID is not injected, is created with a native function
     }
 
-    fn is_vm_type(module_id: &ModuleId, index: u16, compilation_ctx: &CompilationContext) -> bool {
+    fn is_vm_type(
+        module_id: &ModuleId,
+        index: u16,
+        compilation_ctx: &CompilationContext,
+    ) -> Result<bool, VmHandledTypeError> {
         let identifier = &compilation_ctx
-            .get_struct_by_index(module_id, index)
-            .unwrap()
+            .get_struct_by_index(module_id, index)?
             .identifier;
 
         if identifier == Self::IDENTIFIER {
             if module_id.address != STYLUS_FRAMEWORK_ADDRESS
                 || module_id.module_name != SF_MODULE_NAME_OBJECT
             {
-                panic!("invalid UID found, only the one from the stylus framework is valid");
+                return Err(VmHandledTypeError::InvalidFrameworkType(Self::IDENTIFIER));
             }
-            return true;
+            return Ok(true);
         }
-        false
+        Ok(false)
     }
 }
 

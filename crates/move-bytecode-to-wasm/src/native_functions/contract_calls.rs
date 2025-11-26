@@ -66,7 +66,7 @@ pub fn add_external_contract_call_fn(
     let swap_i32 = RuntimeFunction::SwapI32Bytes.get(module, None)?;
     let swap = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx))?;
 
-    let mut arguments = function_information.signature.get_argument_wasm_types();
+    let mut arguments = function_information.signature.get_argument_wasm_types()?;
 
     // Add the named ids into the arguments
     let named_id_args = named_ids.iter().map(|_| ValType::I32);
@@ -225,13 +225,13 @@ pub fn add_external_contract_call_fn(
             // just 32 bytes (the value is the offset to where the values are packed)
             args_size += if signature_token
                 .is_dynamic(compilation_ctx)
-                .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?
+                .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?
             {
                 32
             } else {
                 signature_token
                     .encoded_size(compilation_ctx)
-                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?
+                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?
             };
         }
 
@@ -249,7 +249,7 @@ pub fn add_external_contract_call_fn(
 
             if argument
                 .is_dynamic(compilation_ctx)
-                .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?
+                .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?
             {
                 argument
                     .add_pack_instructions_dynamic(
@@ -284,7 +284,7 @@ pub fn add_external_contract_call_fn(
                     .i32_const(
                         argument
                             .encoded_size(compilation_ctx)
-                            .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?
+                            .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?
                             as i32,
                     )
                     .binop(BinaryOp::I32Add)
@@ -369,7 +369,7 @@ pub fn add_external_contract_call_fn(
         }
         Some(IntermediateType::IGenericStructInstance {
             module_id, index, ..
-        }) if ContractCallResult::is_vm_type(module_id, *index, compilation_ctx) => {
+        }) if ContractCallResult::is_vm_type(module_id, *index, compilation_ctx)? => {
             builder
                 .i32_const(8)
                 .call(compilation_ctx.allocator)
@@ -377,7 +377,7 @@ pub fn add_external_contract_call_fn(
         }
         Some(IntermediateType::IStruct {
             module_id, index, ..
-        }) if ContractCallEmptyResult::is_vm_type(module_id, *index, compilation_ctx) => {
+        }) if ContractCallEmptyResult::is_vm_type(module_id, *index, compilation_ctx)? => {
             builder
                 .i32_const(4)
                 .call(compilation_ctx.allocator)
@@ -422,7 +422,7 @@ pub fn add_external_contract_call_fn(
         function_information.signature.returns.first(),
         Some(IntermediateType::IGenericStructInstance {
             module_id, index, ..
-        }) if ContractCallResult::is_vm_type(module_id, *index, compilation_ctx)
+        }) if ContractCallResult::is_vm_type(module_id, *index, compilation_ctx)?
     ) {
         let mut inner_error = Ok(());
         builder.block(None, |block| {
@@ -460,88 +460,89 @@ pub fn add_external_contract_call_fn(
                 .call(read_return_data)
                 .local_set(return_data_len);
 
-            assert_eq!(
-                1,
-                function_information.signature.returns.len(),
-                "invalid contract call function, it can only return one value"
-            );
+            inner_error = (|| {
+                if let IntermediateType::IGenericStructInstance {
+                    module_id,
+                    index,
+                    types,
+                    ..
+                } = &function_information.signature.returns[0]
+                {
+                    if ContractCallResult::is_vm_type(module_id, *index, compilation_ctx)? {
+                        let calldata_reader_pointer = module.locals.add(ValType::I32);
 
-            if let IntermediateType::IGenericStructInstance {
-                module_id,
-                index,
-                types,
-                ..
-            } = &function_information.signature.returns[0]
-            {
-                if ContractCallResult::is_vm_type(module_id, *index, compilation_ctx) {
-                    let calldata_reader_pointer = module.locals.add(ValType::I32);
-
-                    block
-                        .local_get(return_data_abi_encoded_ptr)
-                        .local_set(calldata_reader_pointer);
-
-                    let result_type = &types[0];
-
-                    // Unpack the value
-                    inner_error = result_type
-                        .add_unpack_instructions(
-                            block,
-                            module,
-                            return_data_abi_encoded_ptr,
-                            calldata_reader_pointer,
-                            compilation_ctx,
-                        )
-                        .map_err(|e| NativeFunctionError::Abi(Rc::new(e)));
-
-                    let abi_decoded_call_result = if result_type == &IntermediateType::IU64 {
-                        module.locals.add(ValType::I64)
-                    } else {
-                        module.locals.add(ValType::I32)
-                    };
-
-                    block.local_set(abi_decoded_call_result);
-
-                    // If the return type is a stack type, we need to create the intermediate pointer
-                    // for the struct field, otherwise it is already a pointer, we write it directly
-                    let data_ptr = if result_type.is_stack_type() {
-                        let call_result_value_ptr = module.locals.add(ValType::I32);
-                        let (store_kind, store_len) = if result_type == &IntermediateType::IU64 {
-                            (StoreKind::I64 { atomic: false }, 8)
-                        } else {
-                            (StoreKind::I32 { atomic: false }, 4)
-                        };
                         block
-                            .i32_const(store_len)
-                            .call(compilation_ctx.allocator)
-                            .local_tee(call_result_value_ptr)
-                            .local_get(abi_decoded_call_result)
-                            .store(
-                                compilation_ctx.memory_id,
-                                store_kind,
-                                MemArg {
-                                    align: 0,
-                                    offset: 0,
-                                },
-                            );
-                        call_result_value_ptr
-                    } else {
-                        abi_decoded_call_result
-                    };
+                            .local_get(return_data_abi_encoded_ptr)
+                            .local_set(calldata_reader_pointer);
 
-                    block.local_get(call_result).local_get(data_ptr).store(
-                        compilation_ctx.memory_id,
-                        StoreKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 4,
-                        },
-                    );
+                        let result_type = &types[0];
+
+                        // Unpack the value
+                        result_type
+                            .add_unpack_instructions(
+                                block,
+                                module,
+                                return_data_abi_encoded_ptr,
+                                calldata_reader_pointer,
+                                compilation_ctx,
+                            )
+                            .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?;
+
+                        let abi_decoded_call_result = if result_type == &IntermediateType::IU64 {
+                            module.locals.add(ValType::I64)
+                        } else {
+                            module.locals.add(ValType::I32)
+                        };
+
+                        block.local_set(abi_decoded_call_result);
+
+                        // If the return type is a stack type, we need to create the intermediate pointer
+                        // for the struct field, otherwise it is already a pointer, we write it directly
+                        let data_ptr = if result_type.is_stack_type()? {
+                            let call_result_value_ptr = module.locals.add(ValType::I32);
+                            let (store_kind, store_len) = if result_type == &IntermediateType::IU64
+                            {
+                                (StoreKind::I64 { atomic: false }, 8)
+                            } else {
+                                (StoreKind::I32 { atomic: false }, 4)
+                            };
+                            block
+                                .i32_const(store_len)
+                                .call(compilation_ctx.allocator)
+                                .local_tee(call_result_value_ptr)
+                                .local_get(abi_decoded_call_result)
+                                .store(
+                                    compilation_ctx.memory_id,
+                                    store_kind,
+                                    MemArg {
+                                        align: 0,
+                                        offset: 0,
+                                    },
+                                );
+                            call_result_value_ptr
+                        } else {
+                            abi_decoded_call_result
+                        };
+
+                        block.local_get(call_result).local_get(data_ptr).store(
+                            compilation_ctx.memory_id,
+                            StoreKind::I32 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 4,
+                            },
+                        );
+
+                        Ok(())
+                    } else {
+                        Err(NativeFunctionError::ContractCallFunctionInvalidReturn(
+                            function_information.function_id.clone(),
+                        ))
+                    }
                 } else {
-                    inner_error = Err(NativeFunctionError::ContractCallFunctionInvalidReturn(
-                        function_information.function_id.clone(),
-                    ));
+                    Ok(())
                 }
-            }
+            })();
         });
 
         inner_error?
@@ -550,63 +551,60 @@ pub fn add_external_contract_call_fn(
     // Before returning, if the call is a delegated call, we must load from storage the potentially
     // modified storage objects
     // We ignore the first argument since it is the #[external_call] object
-    let mut storage_objects: Vec<_> = arguments_types
-        .iter()
-        .enumerate()
-        .filter_map(|(i, itype)| {
-            let itype = if let IntermediateType::IMutRef(inner) = itype {
-                inner
-            } else if let IntermediateType::IRef(inner) = itype {
-                inner
-            } else {
-                itype
-            };
+    let mut storage_objects: Vec<_> = Vec::new();
+    for (i, itype) in arguments_types.iter().enumerate() {
+        let itype = if let IntermediateType::IMutRef(inner) = itype {
+            inner
+        } else if let IntermediateType::IRef(inner) = itype {
+            inner
+        } else {
+            itype
+        };
 
-            match itype {
-                IntermediateType::IStruct {
-                    module_id,
-                    index,
-                    vm_handled_struct:
-                        VmHandledStruct::StorageId {
-                            parent_module_id,
-                            parent_index,
-                            instance_types,
-                        },
-                } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
-                    let (parent_struct_itype, parent_struct) =
-                        if let Some(instance_types) = instance_types {
-                            let itype = IntermediateType::IGenericStructInstance {
-                                module_id: parent_module_id.clone(),
-                                index: *parent_index,
-                                types: instance_types.clone(),
-                                vm_handled_struct: VmHandledStruct::None,
-                            };
-
-                            let struct_ = compilation_ctx
-                                .get_struct_by_index(parent_module_id, *parent_index)
-                                .unwrap();
-                            struct_.instantiate(instance_types);
-
-                            (itype, struct_)
-                        } else {
-                            let itype = IntermediateType::IStruct {
-                                module_id: parent_module_id.clone(),
-                                index: *parent_index,
-                                vm_handled_struct: VmHandledStruct::None,
-                            };
-                            let struct_ = compilation_ctx
-                                .get_struct_by_index(parent_module_id, *parent_index)
-                                .unwrap();
-
-                            (itype, struct_)
+        match itype {
+            IntermediateType::IStruct {
+                module_id,
+                index,
+                vm_handled_struct:
+                    VmHandledStruct::StorageId {
+                        parent_module_id,
+                        parent_index,
+                        instance_types,
+                    },
+            } if Uid::is_vm_type(module_id, *index, compilation_ctx)? => {
+                let (parent_struct_itype, parent_struct) =
+                    if let Some(instance_types) = instance_types {
+                        let itype = IntermediateType::IGenericStructInstance {
+                            module_id: parent_module_id.clone(),
+                            index: *parent_index,
+                            types: instance_types.clone(),
+                            vm_handled_struct: VmHandledStruct::None,
                         };
 
-                    Some((function_args[i], parent_struct_itype, parent_struct))
-                }
-                _ => None,
+                        let struct_ = compilation_ctx
+                            .get_struct_by_index(parent_module_id, *parent_index)
+                            .unwrap();
+                        struct_.instantiate(instance_types);
+
+                        (itype, struct_)
+                    } else {
+                        let itype = IntermediateType::IStruct {
+                            module_id: parent_module_id.clone(),
+                            index: *parent_index,
+                            vm_handled_struct: VmHandledStruct::None,
+                        };
+                        let struct_ = compilation_ctx
+                            .get_struct_by_index(parent_module_id, *parent_index)
+                            .unwrap();
+
+                        (itype, struct_)
+                    };
+
+                storage_objects.push((function_args[i], parent_struct_itype, parent_struct))
             }
-        })
-        .collect();
+            _ => continue,
+        }
+    }
 
     let named_ids_storage_objects = named_ids
         .iter()

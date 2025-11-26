@@ -152,6 +152,14 @@ pub enum TypesStackError {
         found: IntermediateType,
     },
 
+    #[error(
+        "types stack does not match function return types\ntypes stack {stack:?}\nfunction return {function:?}"
+    )]
+    FunctionReturnTypeMismatch {
+        stack: Option<IntermediateType>,
+        function: Vec<IntermediateType>,
+    },
+
     #[error("expected {expected:?} but found {found:?}")]
     MatchError {
         expected: &'static str,

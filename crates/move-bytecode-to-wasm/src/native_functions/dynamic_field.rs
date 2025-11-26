@@ -372,7 +372,7 @@ pub fn add_hash_type_and_key_fn(
     // Copy the data after the parent addresss
     copy_data_to_memory(&mut builder, compilation_ctx, module, itype, key)?;
 
-    let type_name = itype.get_name(compilation_ctx);
+    let type_name = itype.get_name(compilation_ctx)?;
 
     for chunk in type_name.as_bytes() {
         builder.i32_const(1).call(compilation_ctx.allocator);
@@ -558,7 +558,7 @@ fn copy_data_to_memory(
                     },
                 );
 
-                if field.is_stack_type() {
+                if field.is_stack_type()? {
                     load_value_to_stack(field, builder)?;
                 }
 

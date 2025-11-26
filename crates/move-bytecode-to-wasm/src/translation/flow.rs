@@ -1,7 +1,7 @@
 use move_abstract_interpreter::control_flow_graph::{ControlFlowGraph, VMControlFlowGraph};
 use move_binary_format::file_format::{Bytecode, CodeUnit};
 use relooper::{BranchMode, ShapedBlock};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use super::TranslationError;
 
@@ -30,7 +30,7 @@ pub enum Flow<'code_unit> {
 }
 
 impl<'code_unit> Flow<'code_unit> {
-    pub fn new(code_unit: &'code_unit CodeUnit) -> Flow<'code_unit> {
+    pub fn new(code_unit: &'code_unit CodeUnit) -> Result<Flow<'code_unit>, TranslationError> {
         // Create the control flow graph from the code unit
         let cfg = VMControlFlowGraph::new(&code_unit.code, &code_unit.jump_tables);
 
@@ -65,7 +65,7 @@ impl<'code_unit> Flow<'code_unit> {
     fn build(
         shaped_block: &ShapedBlock<u16>,
         blocks_ctx: &HashMap<u16, &'code_unit [Bytecode]>,
-    ) -> Flow<'code_unit> {
+    ) -> Result<Flow<'code_unit>, TranslationError> {
         match shaped_block {
             ShapedBlock::Simple(simple_block) => {
                 let simple_block_ctx = blocks_ctx.get(&simple_block.label).unwrap();
@@ -75,6 +75,7 @@ impl<'code_unit> Flow<'code_unit> {
                     .immediate
                     .as_ref()
                     .map(|b| Self::build(b, blocks_ctx))
+                    .transpose()?
                     .unwrap_or(Flow::Empty);
 
                 // `Next` is the structured continuation after the current block, but not necessarily dominated by it.
@@ -82,6 +83,7 @@ impl<'code_unit> Flow<'code_unit> {
                     .next
                     .as_ref()
                     .map(|b| Self::build(b, blocks_ctx))
+                    .transpose()?
                     .unwrap_or(Flow::Empty);
 
                 // `Branches` represent the control flow edges from the current block to other blocks.
@@ -91,33 +93,29 @@ impl<'code_unit> Flow<'code_unit> {
                     .map(|(k, v)| (*k, *v))
                     .collect();
 
-                assert_eq!(
-                    branches.len(),
-                    branches.keys().collect::<HashSet<_>>().len()
-                );
-
-                Flow::Simple {
+                Ok(Flow::Simple {
                     label: simple_block.label,
                     instructions: simple_block_ctx,
                     immediate: Box::new(immediate_flow),
                     next: Box::new(next_flow),
                     branches,
-                }
+                })
             }
             ShapedBlock::Loop(loop_block) => {
-                let inner_flow = Self::build(&loop_block.inner, blocks_ctx);
+                let inner_flow = Self::build(&loop_block.inner, blocks_ctx)?;
 
                 let next_flow = loop_block
                     .next
                     .as_ref()
                     .map(|b| Self::build(b, blocks_ctx))
+                    .transpose()?
                     .unwrap_or(Flow::Empty);
 
-                Flow::Loop {
+                Ok(Flow::Loop {
                     loop_id: loop_block.loop_id,
                     inner: Box::new(inner_flow),
                     next: Box::new(next_flow),
-                }
+                })
             }
             ShapedBlock::Multiple(multiple_block) => {
                 // The relooper algorithm generates multiple blocks when a conditional jump is present.
@@ -130,13 +128,13 @@ impl<'code_unit> Flow<'code_unit> {
                     1 => Self::build(&multiple_block.handled[0].inner, blocks_ctx),
                     // If there are two branches, we create an if/else flow with the two handled blocks.
                     2 => {
-                        let then_arm = Self::build(&multiple_block.handled[0].inner, blocks_ctx);
-                        let else_arm = Self::build(&multiple_block.handled[1].inner, blocks_ctx);
+                        let then_arm = Self::build(&multiple_block.handled[0].inner, blocks_ctx)?;
+                        let else_arm = Self::build(&multiple_block.handled[1].inner, blocks_ctx)?;
 
-                        Flow::IfElse {
+                        Ok(Flow::IfElse {
                             then_body: Box::new(then_arm),
                             else_body: Box::new(else_arm),
-                        }
+                        })
                     }
                     _ => {
                         // Build all arms
@@ -144,17 +142,16 @@ impl<'code_unit> Flow<'code_unit> {
                             .handled
                             .iter()
                             .map(|b| Self::build(&b.inner, blocks_ctx))
-                            .collect();
+                            .collect::<Result<Vec<Flow>, TranslationError>>()?;
 
                         // Assumption: all cases are Simple.
                         // If this is not the case, panic.
                         // This is useful because we can get the label of the case and use it later on to translate the case.
-                        assert!(
-                            cases.iter().all(|c| matches!(c, Flow::Simple { .. })),
-                            "All cases must be Simple in a Switch flow"
-                        );
+                        if !cases.iter().all(|c| matches!(c, Flow::Simple { .. })) {
+                            return Err(TranslationError::SwitchCasesNotSimple);
+                        }
 
-                        Flow::Switch { cases }
+                        Ok(Flow::Switch { cases })
                     }
                 }
             }

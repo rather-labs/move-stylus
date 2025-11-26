@@ -16,6 +16,7 @@ use crate::{
     runtime::RuntimeFunction,
     storage::storage_layout::field_size,
     translation::intermediate_types::IntermediateType,
+    vm_handled_types::is_uid_or_named_id,
     wasm_builder_extensions::WasmBuilderExtension,
 };
 
@@ -96,7 +97,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
     }
 
     for (index, field) in struct_.fields.iter().enumerate() {
-        if field.is_uid_or_named_id(compilation_ctx) {
+        if is_uid_or_named_id(field, compilation_ctx)? {
             // UIDs are not written in storage, except for referencing nested child structs (wrapped objects).
             continue;
         }

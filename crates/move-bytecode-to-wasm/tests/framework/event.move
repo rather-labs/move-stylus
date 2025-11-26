@@ -2,17 +2,20 @@ module test::event;
 
 use stylus::event::emit;
 
+#[allow(unused_field)]
 public struct NestedStruct has copy, drop {
     a: u32,
     b: address,
     c: u128,
 }
 
+#[allow(unused_field)]
 #[ext(event, indexes = 1)]
 public struct TestEvent1 has copy, drop {
     n: u32
 }
 
+#[allow(unused_field)]
 #[ext(event, indexes = 3)]
 public struct TestEvent2 has copy, drop {
     a: u32,
@@ -20,6 +23,7 @@ public struct TestEvent2 has copy, drop {
     c: u128,
 }
 
+#[allow(unused_field)]
 #[ext(event, indexes = 2)]
 public struct TestEvent3 has copy, drop {
     a: u32,
@@ -28,6 +32,7 @@ public struct TestEvent3 has copy, drop {
     d: vector<u8>,
 }
 
+#[allow(unused_field)]
 #[ext(event, indexes = 2)]
 public struct TestEvent4 has copy, drop {
     a: u32,
@@ -37,6 +42,7 @@ public struct TestEvent4 has copy, drop {
     e: NestedStruct,
 }
 
+#[allow(unused_field)]
 #[ext(event, indexes = 3)]
 public struct TestEvent5 has copy, drop {
     a: u32,
@@ -44,6 +50,7 @@ public struct TestEvent5 has copy, drop {
     c: vector<u8>,
 }
 
+#[allow(unused_field)]
 #[ext(event, indexes = 3)]
 public struct TestEvent6 has copy, drop {
     a: u32,
@@ -51,6 +58,7 @@ public struct TestEvent6 has copy, drop {
     c: NestedStruct,
 }
 
+#[allow(unused_field)]
 #[ext(event, indexes = 3)]
 public struct TestEvent7 has copy, drop {
     a: u32,
@@ -58,12 +66,14 @@ public struct TestEvent7 has copy, drop {
     c: NestedStruct,
 }
 
+#[allow(unused_field)]
 #[ext(event, indexes = 1)]
 public struct TestEvent8 has copy, drop {
     a: u64,
     b: std::ascii::String,
 }
 
+#[allow(unused_field)]
 #[ext(event, indexes = 2)]
 public struct TestEvent9 has copy, drop {
     a: u64,
@@ -109,11 +119,13 @@ entry fun emit_test_event9(a: u64, b: std::ascii::String) {
     emit(TestEvent9 { a, b });
 }
 
+#[allow(unused_field)]
 #[ext(event, anonymous, indexes = 1)]
 public struct TestEvent1Anon has copy, drop {
     n: u32
 }
 
+#[allow(unused_field)]
 #[ext(event, anonymous, indexes = 3)]
 public struct TestEvent2Anon has copy, drop {
     a: u32,
@@ -121,6 +133,7 @@ public struct TestEvent2Anon has copy, drop {
     c: u128,
 }
 
+#[allow(unused_field)]
 #[ext(event, anonymous, indexes = 2)]
 public struct TestEvent3Anon has copy, drop {
     a: u32,
@@ -129,6 +142,7 @@ public struct TestEvent3Anon has copy, drop {
     d: vector<u8>,
 }
 
+#[allow(unused_field)]
 #[ext(event, anonymous, indexes = 2)]
 public struct TestEvent4Anon has copy, drop {
     a: u32,
@@ -138,6 +152,7 @@ public struct TestEvent4Anon has copy, drop {
     e: NestedStruct,
 }
 
+#[allow(unused_field)]
 #[ext(event, anonymous, indexes = 3)]
 public struct TestEvent5Anon has copy, drop {
     a: u32,
@@ -145,6 +160,7 @@ public struct TestEvent5Anon has copy, drop {
     c: vector<u8>,
 }
 
+#[allow(unused_field)]
 #[ext(event, anonymous, indexes = 3)]
 public struct TestEvent6Anon has copy, drop {
     a: u32,
@@ -152,6 +168,7 @@ public struct TestEvent6Anon has copy, drop {
     c: NestedStruct,
 }
 
+#[allow(unused_field)]
 #[ext(event, anonymous, indexes = 3)]
 public struct TestEvent7Anon has copy, drop {
     a: u32,
@@ -159,18 +176,21 @@ public struct TestEvent7Anon has copy, drop {
     c: NestedStruct,
 }
 
+#[allow(unused_field)]
 #[ext(event, anonymous, indexes = 1)]
 public struct TestEvent8Anon has copy, drop {
     a: u64,
     b: std::ascii::String,
 }
 
+#[allow(unused_field)]
 #[ext(event, anonymous, indexes = 2)]
 public struct TestEvent9Anon has copy, drop {
     a: u64,
     b: std::ascii::String,
 }
 
+#[allow(unused_field)]
 #[ext(event, anonymous, indexes = 4)]
 public struct Anonymous has copy, drop {
     a: u32,
@@ -179,6 +199,7 @@ public struct Anonymous has copy, drop {
     d: NestedStruct,
 }
 
+#[allow(unused_field)]
 #[ext(event, anonymous, indexes = 4)]
 public struct Anonymous2 has copy, drop {
     a: u32,
