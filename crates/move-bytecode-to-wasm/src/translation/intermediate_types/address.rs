@@ -20,7 +20,11 @@ impl IAddress {
         bytes: &mut std::vec::IntoIter<u8>,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
-        let bytes: [u8; 32] = bytes.take(32).collect::<Vec<u8>>().try_into().unwrap();
+        let bytes: [u8; 32] = bytes
+            .take(32)
+            .collect::<Vec<u8>>()
+            .try_into()
+            .map_err(|_| IntermediateTypeError::CouldNotProcessByteArray)?;
 
         // Ensure the first 12 bytes are 0. Abi encoding restricts the address to be 20 bytes
         if !bytes[0..12].iter().all(|b| *b == 0) {
@@ -38,7 +42,9 @@ impl IAddress {
         while offset < bytes.len() {
             builder.local_get(pointer);
             builder.i64_const(i64::from_le_bytes(
-                bytes[offset..offset + 8].try_into().unwrap(),
+                bytes[offset..offset + 8]
+                    .try_into()
+                    .map_err(|_| IntermediateTypeError::CouldNotProcessByteArray)?,
             ));
             builder.store(
                 compilation_ctx.memory_id,

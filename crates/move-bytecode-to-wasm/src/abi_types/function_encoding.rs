@@ -50,13 +50,13 @@ mod tests {
         let signature: &[IntermediateType] = &[IntermediateType::IU8, IntermediateType::IU16];
         assert_eq!(
             move_signature_to_abi_selector("test", signature, &compilation_ctx).unwrap(),
-            selector("test(uint8,uint16)")
+            selector("test(uint8,uint16)").unwrap()
         );
 
         let signature: &[IntermediateType] = &[IntermediateType::IAddress, IntermediateType::IU256];
         assert_eq!(
             move_signature_to_abi_selector("transfer", signature, &compilation_ctx).unwrap(),
-            selector("transfer(address,uint256)")
+            selector("transfer(address,uint256)").unwrap()
         );
 
         let signature: &[IntermediateType] = &[
@@ -67,7 +67,7 @@ mod tests {
         ];
         assert_eq!(
             move_signature_to_abi_selector("set_owner", signature, &compilation_ctx).unwrap(),
-            selector("setOwner(address,uint64,bool[])")
+            selector("setOwner(address,uint64,bool[])").unwrap()
         );
 
         let signature: &[IntermediateType] = &[
@@ -76,7 +76,7 @@ mod tests {
         ];
         assert_eq!(
             move_signature_to_abi_selector("test_array", signature, &compilation_ctx).unwrap(),
-            selector("testArray(uint128[],bool[])")
+            selector("testArray(uint128[],bool[])").unwrap()
         );
 
         let signature: &[IntermediateType] = &[
@@ -87,7 +87,7 @@ mod tests {
         ];
         assert_eq!(
             move_signature_to_abi_selector("test_array", signature, &compilation_ctx).unwrap(),
-            selector("testArray(uint128[][],bool[])")
+            selector("testArray(uint128[][],bool[])").unwrap()
         );
 
         let struct_1 = IStruct::new(
@@ -159,7 +159,7 @@ mod tests {
             move_signature_to_abi_selector("test_struct", signature, &compilation_ctx).unwrap(),
             selector(
                 "testStruct((address,uint32[],uint128[],bool,uint8,uint16,uint32,uint64,uint128,uint256,(uint32,uint128)),(uint32,uint128)[])"
-            )
+            ).unwrap()
         );
     }
 }

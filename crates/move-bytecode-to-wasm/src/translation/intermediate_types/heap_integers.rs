@@ -74,12 +74,12 @@ impl IU128 {
         builder: &mut InstrSeqBuilder,
         bytes: &mut std::vec::IntoIter<u8>,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), IntermediateTypeError> {
         let bytes: [u8; Self::HEAP_SIZE as usize] = bytes
             .take(Self::HEAP_SIZE as usize)
             .collect::<Vec<u8>>()
             .try_into()
-            .unwrap();
+            .map_err(|_| IntermediateTypeError::CouldNotProcessByteArray)?;
 
         let pointer = module.locals.add(ValType::I32);
 
@@ -92,7 +92,9 @@ impl IU128 {
         while offset < bytes.len() {
             builder.local_get(pointer);
             builder.i64_const(i64::from_le_bytes(
-                bytes[offset..offset + 8].try_into().unwrap(),
+                bytes[offset..offset + 8]
+                    .try_into()
+                    .map_err(|_| IntermediateTypeError::CouldNotProcessByteArray)?,
             ));
             builder.store(
                 compilation_ctx.memory_id,
@@ -107,6 +109,8 @@ impl IU128 {
         }
 
         builder.local_get(pointer);
+
+        Ok(())
     }
 
     pub fn bit_or(
@@ -387,12 +391,12 @@ impl IU256 {
         builder: &mut InstrSeqBuilder,
         bytes: &mut std::vec::IntoIter<u8>,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), IntermediateTypeError> {
         let bytes: [u8; Self::HEAP_SIZE as usize] = bytes
             .take(Self::HEAP_SIZE as usize)
             .collect::<Vec<u8>>()
             .try_into()
-            .unwrap();
+            .map_err(|_| IntermediateTypeError::CouldNotProcessByteArray)?;
 
         let pointer = module.locals.add(ValType::I32);
 
@@ -405,7 +409,9 @@ impl IU256 {
         while offset < bytes.len() {
             builder.local_get(pointer);
             builder.i64_const(i64::from_le_bytes(
-                bytes[offset..offset + 8].try_into().unwrap(),
+                bytes[offset..offset + 8]
+                    .try_into()
+                    .map_err(|_| IntermediateTypeError::CouldNotProcessByteArray)?,
             ));
             builder.store(
                 compilation_ctx.memory_id,
@@ -420,6 +426,8 @@ impl IU256 {
         }
 
         builder.local_get(pointer);
+
+        Ok(())
     }
 
     pub fn bit_or(

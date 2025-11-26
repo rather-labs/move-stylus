@@ -62,6 +62,9 @@ pub enum AbiError {
 
     #[error("unable to get type ABI size")]
     UnableToGetTypeAbiSize,
+
+    #[error("invalid selector size")]
+    InvalidSelectorSize,
 }
 
 impl From<AbiError> for CompilationError {

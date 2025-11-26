@@ -19,7 +19,7 @@ use translation::{
     TranslationError,
     intermediate_types::IntermediateType,
     table::{FunctionId, FunctionTable},
-    translate_function,
+    translate_and_link_functions,
 };
 
 use walrus::{GlobalId, Module, RefType};
@@ -36,7 +36,6 @@ mod hostio;
 mod memory;
 mod native_functions;
 mod runtime;
-mod runtime_error_codes;
 mod storage;
 mod translation;
 mod utils;
@@ -180,9 +179,9 @@ pub fn translate_package(
             if function_information.is_entry {
                 let wasm_function_id = function_table
                     .get_by_function_id(&function_information.function_id)
-                    .unwrap()
+                    .ok_or(TranslationError::EntryFunctionNotFound)?
                     .wasm_function_id
-                    .unwrap();
+                    .ok_or(TranslationError::EntryFunctionWasmIdNotFound)?;
 
                 public_functions.push(PublicFunction::new(
                     wasm_function_id,
@@ -208,8 +207,8 @@ pub fn translate_package(
             &dynamic_fields_global_variables,
         )?;
 
-        function_table.ensure_all_functions_added().unwrap();
-        validate_stylus_wasm(&mut module).unwrap();
+        function_table.ensure_all_functions_added()?;
+        validate_stylus_wasm(&mut module)?;
 
         modules.insert(module_name, module);
         modules_data.insert(root_module_id.clone(), root_module_data);
@@ -321,7 +320,8 @@ pub fn translate_package_cli(
 ) -> Result<(), CompilationError> {
     let build_directory = rerooted_path.join("build/wasm");
     // Create the build directory if it doesn't exist
-    std::fs::create_dir_all(&build_directory).unwrap();
+    std::fs::create_dir_all(&build_directory)
+        .map_err(|e| ICEError::new(ICEErrorKind::Unexpected(e.into())))?;
 
     let mut modules = translate_package(package, None)?;
 
@@ -439,101 +439,6 @@ pub fn process_dependency_tree<'move_package>(
 }
 
 // TODO: Move to translation.rs
-/// Trnaslates a function to WASM and links it to the WASM module
-///
-/// It also recursively translates and links all the functions called by this function
-fn translate_and_link_functions(
-    function_id: &FunctionId,
-    function_table: &mut FunctionTable,
-    function_definitions: &GlobalFunctionTable,
-    module: &mut walrus::Module,
-    compilation_ctx: &CompilationContext,
-    dynamic_fields_global_variables: &mut Vec<(GlobalId, IntermediateType)>,
-) -> Result<(), CompilationError> {
-    // Obtain the function information and module's data
-    let (function_information, module_data) = if let Some(fi) = compilation_ctx
-        .root_module_data
-        .functions
-        .information
-        .iter()
-        .find(|f| {
-            f.function_id.module_id == function_id.module_id
-                && f.function_id.identifier == function_id.identifier
-        }) {
-        (fi, compilation_ctx.root_module_data)
-    } else {
-        let module_data = compilation_ctx
-            .deps_data
-            .get(&function_id.module_id)
-            .unwrap();
-
-        let fi = module_data
-            .functions
-            .information
-            .iter()
-            .find(|f| f.function_id.identifier == function_id.identifier)
-            .unwrap();
-
-        (fi, module_data)
-    };
-
-    // If the function is generic, we instantiate the concrete types so we can translate it
-    let function_information = if function_information.is_generic {
-        &function_information.instantiate(function_id.type_instantiations.as_ref().unwrap())
-    } else {
-        function_information
-    };
-
-    // Process function defined in this module
-    // First we check if there is already an entry for this function
-    if let Some(table_entry) = function_table.get_by_function_id(&function_information.function_id)
-    {
-        // If it has asigned a wasm function id means that we already translated it, so we skip
-        // it
-        if table_entry.wasm_function_id.is_some() {
-            return Ok(());
-        }
-    }
-    // If it is not present, we add an entry for it
-    else {
-        function_table.add(module, function_id.clone(), function_information)?;
-    }
-
-    let function_definition = function_definitions
-        .get(&function_id.get_generic_fn_id())
-        .ok_or_else(|| TranslationError::FunctionDefinitionNotFound(function_id.clone()))?;
-
-    // If the function contains code we translate it
-    // If it does not it means is a native function, we do nothing, it is linked and called
-    // directly in the translation function
-    if let Some(move_bytecode) = function_definition.code.as_ref() {
-        let (wasm_function_id, functions_to_link) = translate_function(
-            module,
-            compilation_ctx,
-            module_data,
-            function_table,
-            function_information,
-            move_bytecode,
-            dynamic_fields_global_variables,
-        )?;
-
-        function_table.add_to_wasm_table(module, function_id, wasm_function_id)?;
-
-        // Recursively translate and link functions called by this function
-        for function_id in &functions_to_link {
-            translate_and_link_functions(
-                function_id,
-                function_table,
-                function_definitions,
-                module,
-                compilation_ctx,
-                dynamic_fields_global_variables,
-            )?;
-        }
-    }
-
-    Ok(())
-}
 
 #[cfg(feature = "inject-host-debug-fns")]
 fn inject_debug_fns(module: &mut walrus::Module) {

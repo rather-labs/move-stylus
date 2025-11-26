@@ -37,9 +37,7 @@ impl IRef {
                 )?;
             }
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
-                let struct_ = compilation_ctx
-                    .get_struct_by_intermediate_type(inner)
-                    .unwrap();
+                let struct_ = compilation_ctx.get_struct_by_intermediate_type(inner)?;
 
                 // This is the only place where we pass the flag unpack_frozen = true.
                 // This is because we only want to unpack frozen objects from the storage

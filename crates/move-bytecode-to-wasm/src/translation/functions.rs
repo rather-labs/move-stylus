@@ -79,8 +79,7 @@ impl MappedFunction {
         let locals = move_locals
             .iter()
             .map(|s| IntermediateType::try_from_signature_token(s, handles_map))
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
+            .collect::<Result<Vec<_>, _>>()?;
 
         let is_generic = signature.arguments.iter().any(type_contains_generics)
             || signature.returns.iter().any(type_contains_generics);

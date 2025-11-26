@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg},
@@ -40,11 +38,8 @@ pub fn add_emit_log_fn(
         return Ok(function);
     };
 
-    let struct_ = compilation_ctx
-        .get_struct_by_intermediate_type(itype)
-        .unwrap();
+    let struct_ = compilation_ctx.get_struct_by_intermediate_type(itype)?;
 
-    // TODO: This should be a compile error not a panic
     let IStructType::Event {
         indexes,
         is_anonymous,
@@ -113,16 +108,14 @@ pub fn add_emit_log_fn(
                     .local_tee(abi_encoded_data_writer_pointer)
                     .local_set(abi_encoded_data_calldata_reference_pointer);
 
-                field
-                    .add_pack_instructions(
-                        &mut builder,
-                        module,
-                        local,
-                        abi_encoded_data_writer_pointer,
-                        abi_encoded_data_calldata_reference_pointer,
-                        compilation_ctx,
-                    )
-                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?;
+                field.add_pack_instructions(
+                    &mut builder,
+                    module,
+                    local,
+                    abi_encoded_data_writer_pointer,
+                    abi_encoded_data_calldata_reference_pointer,
+                    compilation_ctx,
+                )?;
 
                 // Use the allocator to get a pointer to the end of the data
                 builder
@@ -141,9 +134,7 @@ pub fn add_emit_log_fn(
             | IntermediateType::IGenericStructInstance {
                 module_id, index, ..
             } => {
-                let struct_ = compilation_ctx
-                    .get_struct_by_index(module_id, *index)
-                    .unwrap();
+                let struct_ = compilation_ctx.get_struct_by_index(module_id, *index)?;
 
                 let struct_ = if let IntermediateType::IGenericStructInstance { types, .. } = field
                 {
@@ -167,16 +158,11 @@ pub fn add_emit_log_fn(
                 let abi_encoded_data_writer_pointer = module.locals.add(ValType::I32);
                 let abi_encoded_data_calldata_reference_pointer = module.locals.add(ValType::I32);
 
-                let is_dynamic = struct_
-                    .solidity_abi_encode_is_dynamic(compilation_ctx)
-                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?;
+                let is_dynamic = struct_.solidity_abi_encode_is_dynamic(compilation_ctx)?;
                 let size = if is_dynamic {
                     32
                 } else {
-                    struct_
-                        .solidity_abi_encode_size(compilation_ctx)
-                        .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?
-                        as i32
+                    struct_.solidity_abi_encode_size(compilation_ctx)? as i32
                 };
 
                 // Use the allocator to get a pointer to the end of the calldata
@@ -187,27 +173,23 @@ pub fn add_emit_log_fn(
                     .local_set(abi_encoded_data_calldata_reference_pointer);
 
                 if is_dynamic {
-                    field
-                        .add_pack_instructions_dynamic(
-                            &mut builder,
-                            module,
-                            local,
-                            abi_encoded_data_writer_pointer,
-                            abi_encoded_data_calldata_reference_pointer,
-                            compilation_ctx,
-                        )
-                        .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?;
+                    field.add_pack_instructions_dynamic(
+                        &mut builder,
+                        module,
+                        local,
+                        abi_encoded_data_writer_pointer,
+                        abi_encoded_data_calldata_reference_pointer,
+                        compilation_ctx,
+                    )?;
                 } else {
-                    field
-                        .add_pack_instructions(
-                            &mut builder,
-                            module,
-                            local,
-                            abi_encoded_data_writer_pointer,
-                            abi_encoded_data_calldata_reference_pointer,
-                            compilation_ctx,
-                        )
-                        .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?;
+                    field.add_pack_instructions(
+                        &mut builder,
+                        module,
+                        local,
+                        abi_encoded_data_writer_pointer,
+                        abi_encoded_data_calldata_reference_pointer,
+                        compilation_ctx,
+                    )?;
                 }
 
                 // Use the allocator to get a pointer to the end of the data
@@ -234,8 +216,7 @@ pub fn add_emit_log_fn(
 
     // If the event is not anonymous, we should emit its signature in the first topic
     if !is_anonymous {
-        let data = move_signature_to_event_signature_hash(&struct_, compilation_ctx)
-            .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?;
+        let data = move_signature_to_event_signature_hash(&struct_, compilation_ctx)?;
 
         builder
             .i32_const(32)
@@ -246,7 +227,11 @@ pub fn add_emit_log_fn(
         for (index, chunk) in data.chunks_exact(8).enumerate() {
             builder
                 .local_get(writer_pointer)
-                .i64_const(i64::from_le_bytes(chunk.try_into().unwrap()))
+                .i64_const(i64::from_le_bytes(
+                    chunk
+                        .try_into()
+                        .map_err(|_| NativeFunctionError::I64InvalidArraySize)?,
+                ))
                 .store(
                     compilation_ctx.memory_id,
                     walrus::ir::StoreKind::I64 { atomic: false },
@@ -322,16 +307,14 @@ pub fn add_emit_log_fn(
                     .local_tee(writer_pointer)
                     .local_set(calldata_reference_pointer);
 
-                field
-                    .add_pack_instructions(
-                        &mut builder,
-                        module,
-                        local,
-                        writer_pointer,
-                        calldata_reference_pointer,
-                        compilation_ctx,
-                    )
-                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?;
+                field.add_pack_instructions(
+                    &mut builder,
+                    module,
+                    local,
+                    writer_pointer,
+                    calldata_reference_pointer,
+                    compilation_ctx,
+                )?;
 
                 // Add 32 to the writer pointer to write the next topic
                 builder

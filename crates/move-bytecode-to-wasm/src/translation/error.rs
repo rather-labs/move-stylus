@@ -15,7 +15,7 @@ use crate::{
 
 use super::{
     intermediate_types::{IntermediateType, error::IntermediateTypeError},
-    table::FunctionId,
+    table::{FunctionId, FunctionTableError},
     types_stack::TypesStackError,
 };
 
@@ -39,6 +39,9 @@ pub enum TranslationError {
     #[error("an error ocurred while processing an intermediate type")]
     IntermediateType(#[from] IntermediateTypeError),
 
+    #[error("an error ocurred while using the function table")]
+    FunctionTable(#[from] FunctionTableError),
+
     #[error("an error ocurred while processing a vm handled type")]
     VmHandledType(#[from] VmHandledTypeError),
 
@@ -47,6 +50,9 @@ pub enum TranslationError {
 
     #[error(r#"function "{0}" not found in global functions table"#)]
     FunctionDefinitionNotFound(FunctionId),
+
+    #[error("could not process byte array, wrong size")]
+    CouldNotProcessByteArray,
 
     #[error("types mistach: expected {expected:?} but found {found:?}")]
     TypeMismatch {
@@ -161,6 +167,12 @@ pub enum TranslationError {
     #[error("trying to peform an operation on a type parameter")]
     FoundTypeParameter,
 
+    #[error("entry function not found in function table")]
+    EntryFunctionNotFound,
+
+    #[error("entry function WASM ID not found in function table")]
+    EntryFunctionWasmIdNotFound,
+
     // Flow
     #[error("switch: more than one case returns a value, Move should have merged them")]
     SwitchMoreThanOneCase,
@@ -186,6 +198,9 @@ pub enum TranslationError {
     #[error("Missing block id for jump-table label")]
     MissingBlockIdForJumpTableLabel,
 
+    #[error("block context not found")]
+    BlockContextNotFound,
+
     // Misc
     #[error("invalid intermediate type {0:?} found in unpack function")]
     InvalidTypeInUnpackFunction(IntermediateType),
@@ -207,6 +222,9 @@ pub enum TranslationError {
 
     #[error("multiple WASM return values not supported, found {0} return values")]
     MultipleWasmReturnValues(usize),
+
+    #[error("generic function {0}::{1} has no type instantiations")]
+    GenericFunctionNoTypeInstantiations(ModuleId, String),
 }
 
 impl From<TranslationError> for CompilationError {

@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use super::RuntimeFunction;
 use super::error::RuntimeFunctionError;
 use crate::data::{
@@ -10,7 +8,7 @@ use crate::data::{
 use crate::hostio::host_functions::{
     self, storage_cache_bytes32, storage_flush_cache, storage_load_bytes32, tx_origin,
 };
-use crate::native_functions::object::add_delete_storage_struct_instructions;
+use crate::storage::common::add_delete_storage_struct_instructions;
 use crate::storage::decoding::add_read_and_decode_storage_struct_instructions;
 use crate::storage::encoding::add_encode_and_save_into_storage_struct_instructions;
 use crate::translation::intermediate_types::IntermediateType;
@@ -600,8 +598,7 @@ pub fn add_encode_and_save_into_storage_fn(
         slot_offset,
         None,
         itype,
-    )
-    .map_err(|e| RuntimeFunctionError::Storage(Rc::new(e)))?;
+    )?;
 
     Ok(function.finish(vec![struct_ptr, slot_ptr], &mut module.funcs))
 }
@@ -663,8 +660,7 @@ pub fn add_read_and_decode_from_storage_fn(
         owner_ptr,
         Some(struct_id_ptr),
         itype,
-    )
-    .map_err(|e| RuntimeFunctionError::Storage(Rc::new(e)))?;
+    )?;
 
     builder.local_get(struct_ptr);
 
@@ -692,9 +688,7 @@ pub fn add_delete_struct_from_storage_fn(
         return Ok(function);
     };
 
-    let struct_ = compilation_ctx
-        .get_struct_by_intermediate_type(itype)
-        .unwrap();
+    let struct_ = compilation_ctx.get_struct_by_intermediate_type(itype)?;
 
     let locate_struct_slot_fn =
         RuntimeFunction::LocateStructSlot.get(module, Some(compilation_ctx))?;
@@ -714,6 +708,7 @@ pub fn add_delete_struct_from_storage_fn(
         .i32_const(32)
         .call(equality_fn);
 
+    let mut inner_result = Ok(());
     builder.if_else(
         None,
         |then| {
@@ -743,17 +738,17 @@ pub fn add_delete_struct_from_storage_fn(
             else_.i32_const(8).local_set(slot_offset);
 
             // Delete the struct from storage
-            add_delete_storage_struct_instructions(
+            inner_result = add_delete_storage_struct_instructions(
                 module,
                 else_,
                 compilation_ctx,
                 slot_ptr,
                 slot_offset,
                 &struct_,
-            )
-            .unwrap(); // TODO: unwrap
+            );
         },
     );
+    inner_result?;
 
     // Wipe out the owner
     builder
@@ -810,9 +805,7 @@ pub fn add_check_and_delete_struct_tto_fields_fn(
     // Arguments
     let parent_struct_ptr = module.locals.add(ValType::I32);
 
-    let struct_ = compilation_ctx
-        .get_struct_by_intermediate_type(itype)
-        .unwrap();
+    let struct_ = compilation_ctx.get_struct_by_intermediate_type(itype)?;
 
     // Iterate over the fields of the struct
     let mut offset: i32 = 0;
@@ -995,9 +988,7 @@ pub fn add_delete_tto_object_fn(
     let parent_struct_ptr = module.locals.add(ValType::I32);
     let child_struct_ptr = module.locals.add(ValType::I32);
 
-    let struct_ = compilation_ctx
-        .get_struct_by_intermediate_type(itype)
-        .unwrap();
+    let struct_ = compilation_ctx.get_struct_by_intermediate_type(itype)?;
 
     // If the child struct has key, remove it from the original owner's storage if it's still there.
     if struct_.has_key {

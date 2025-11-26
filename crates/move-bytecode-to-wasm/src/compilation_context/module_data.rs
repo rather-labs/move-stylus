@@ -41,7 +41,6 @@ use std::{
     collections::HashMap,
     fmt::{Debug, Display},
     hash::{Hash, Hasher},
-    rc::Rc,
 };
 use struct_data::StructData;
 
@@ -184,7 +183,7 @@ impl ModuleData {
             Self::process_generic_structs(move_module_unit, &datatype_handles_map)?;
 
         let instantiated_fields_to_generic_fields =
-            Self::process_generic_field_instances(move_module_unit, &datatype_handles_map);
+            Self::process_generic_field_instances(move_module_unit, &datatype_handles_map)?;
 
         let structs = StructData {
             structs: module_structs,
@@ -199,7 +198,7 @@ impl ModuleData {
             Self::process_concrete_enums(move_module_unit, &datatype_handles_map)?;
 
         let (module_generic_enum_instantiations, variants_instantiation_to_enum_map) =
-            Self::process_generic_enums(move_module_unit, &datatype_handles_map);
+            Self::process_generic_enums(move_module_unit, &datatype_handles_map)?;
 
         let enums = EnumData {
             enums: module_enums,
@@ -224,8 +223,7 @@ impl ModuleData {
                     .map(|t| IntermediateType::try_from_signature_token(t, &datatype_handles_map))
                     .collect::<std::result::Result<Vec<IntermediateType>, _>>()
             })
-            .collect::<std::result::Result<Vec<Vec<IntermediateType>>, _>>()
-            .unwrap();
+            .collect::<std::result::Result<Vec<Vec<IntermediateType>>, _>>()?;
 
         Ok(ModuleData {
             id: module_id,
@@ -318,7 +316,7 @@ impl ModuleData {
                     .position(|dth| {
                         external_module_source.identifier_at(dth.name) == external_data_name
                     })
-                    .unwrap();
+                    .ok_or(CompilationContextError::ExternalDatatypeHandlerIndexNotFound)?;
                 let external_dth_idx = DatatypeHandleIndex::new(external_dth_idx as u16);
 
                 if let Some(position) = external_module_source
@@ -460,8 +458,7 @@ impl ModuleData {
                 .0
                 .iter()
                 .map(|t| IntermediateType::try_from_signature_token(t, datatype_handles_map))
-                .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>()
-                .unwrap();
+                .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>()?;
 
             module_generic_structs_instances
                 .push((struct_instance.def, struct_instantiation_types));
@@ -515,7 +512,7 @@ impl ModuleData {
     fn process_generic_field_instances(
         module: &CompiledModule,
         datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
-    ) -> HashMap<FieldInstantiationIndex, (FieldHandleIndex, Vec<IntermediateType>)> {
+    ) -> Result<HashMap<FieldInstantiationIndex, (FieldHandleIndex, Vec<IntermediateType>)>> {
         // Map instantiated struct fields to indexes of generic fields
         let mut instantiated_fields_to_generic_fields = HashMap::new();
         for (index, field_instance) in module.field_instantiations().iter().enumerate() {
@@ -530,12 +527,12 @@ impl ModuleData {
                         .map(|t| {
                             IntermediateType::try_from_signature_token(t, datatype_handles_map)
                         })
-                        .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>()
-                        .unwrap(),
+                        .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>()?
                 ),
             );
         }
-        instantiated_fields_to_generic_fields
+
+        Ok(instantiated_fields_to_generic_fields)
     }
 
     pub fn process_concrete_enums(
@@ -560,8 +557,8 @@ impl ModuleData {
                             datatype_handles_map,
                         )
                     })
-                    .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>()
-                    .unwrap();
+                    .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>(
+                    )?;
 
                 variants.push(IEnumVariant::new(
                     variant_index as u16,
@@ -597,7 +594,7 @@ impl ModuleData {
 
             let enum_datatype_handle = module.datatype_handle_at(enum_def.enum_handle);
             let identifier = module.identifier_at(enum_datatype_handle.name);
-            module_enums.push(IEnum::new(identifier.to_string(), index as u16, variants).unwrap());
+            module_enums.push(IEnum::new(identifier.to_string(), index as u16, variants)?);
         }
 
         Ok((module_enums, variants_to_enum_map))
@@ -607,10 +604,10 @@ impl ModuleData {
     pub fn process_generic_enums(
         module: &CompiledModule,
         datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
-    ) -> (
+    ) -> Result<(
         Vec<(EnumDefinitionIndex, Vec<IntermediateType>)>,
         HashMap<VariantInstantiationHandleIndex, VariantInstantiationData>,
-    ) {
+    )> {
         let mut module_generic_enums_instances = vec![];
         let mut variants_instantiation_to_enum_map = HashMap::new();
 
@@ -623,8 +620,7 @@ impl ModuleData {
                 .0
                 .iter()
                 .map(|t| IntermediateType::try_from_signature_token(t, datatype_handles_map))
-                .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>()
-                .unwrap();
+                .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>()?;
 
             module_generic_enums_instances.push((enum_def_index, enum_instantiation_types.clone()));
 
@@ -648,7 +644,7 @@ impl ModuleData {
                         match &field.signature.0 {
                             SignatureToken::TypeParameter(param_idx) => {
                                 // This field uses one of the enum's type parameters
-                                enum_instantiation_types[*param_idx as usize].clone()
+                                Ok(enum_instantiation_types[*param_idx as usize].clone())
                             }
                             other_type => {
                                 // This field has a concrete type, resolve it normally
@@ -656,11 +652,11 @@ impl ModuleData {
                                     other_type,
                                     datatype_handles_map,
                                 )
-                                .unwrap()
                             }
                         }
                     })
-                    .collect();
+                    .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>(
+                    )?;
 
                 variants_instantiation_to_enum_map.insert(
                     VariantInstantiationHandleIndex::new(variant_instantiation_handle_index as u16),
@@ -674,10 +670,10 @@ impl ModuleData {
             }
         }
 
-        (
+        Ok((
             module_generic_enums_instances,
             variants_instantiation_to_enum_map,
-        )
+        ))
     }
 
     fn process_function_definitions<'move_package>(
@@ -702,8 +698,8 @@ impl ModuleData {
                     .0
                     .iter()
                     .map(|s| IntermediateType::try_from_signature_token(s, datatype_handles_map))
-                    .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>()
-                    .unwrap(),
+                    .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>(
+                    )?,
             );
 
             let move_function_return = &move_module.signature_at(function.return_);
@@ -713,8 +709,8 @@ impl ModuleData {
                     .0
                     .iter()
                     .map(|s| IntermediateType::try_from_signature_token(s, datatype_handles_map))
-                    .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>()
-                    .unwrap(),
+                    .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>(
+                    )?,
             );
 
             let function_name = move_module.identifier_at(function.name).as_str();
@@ -774,17 +770,14 @@ impl ModuleData {
                     init = Some(function_id.clone());
                 }
 
-                function_information.push(
-                    MappedFunction::new(
-                        function_id.clone(),
-                        move_function_arguments,
-                        move_function_return,
-                        code_locals,
-                        function_def,
-                        datatype_handles_map,
-                    )
-                    .map_err(|e| CompilationContextError::MappedFunction(Rc::new(e)))?,
-                );
+                function_information.push(MappedFunction::new(
+                    function_id.clone(),
+                    move_function_arguments,
+                    move_function_return,
+                    code_locals,
+                    function_def,
+                    datatype_handles_map,
+                )?);
 
                 function_definitions.insert(function_id.clone(), function_def);
             }
@@ -808,8 +801,7 @@ impl ModuleData {
                 .0
                 .iter()
                 .map(|s| IntermediateType::try_from_signature_token(s, datatype_handles_map))
-                .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>()
-                .unwrap();
+                .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>()?;
 
             let function_id = FunctionId {
                 identifier: function_name.to_string(),
@@ -891,9 +883,11 @@ impl ModuleData {
         }
 
         // Check TxContext in the last argument
-        let last_arg = move_function_arguments.0.last().map(|last| {
-            IntermediateType::try_from_signature_token(last, datatype_handles_map).unwrap()
-        });
+        let last_arg = move_function_arguments
+            .0
+            .last()
+            .map(|last| IntermediateType::try_from_signature_token(last, datatype_handles_map))
+            .transpose()?;
 
         // The compilation context is not available yet, so we can't use it to check if the
         // `TxContext` is the one from the stylus framework. It is done manually
@@ -1003,13 +997,10 @@ impl ModuleData {
             return false;
         }
 
-        if field_count == 1 {
-            let field = struct_def.field(0).unwrap();
-            if field.signature.0 != SignatureToken::Bool {
-                return false;
-            }
+        if let Some(field) = struct_def.field(0) {
+            field.signature.0 == SignatureToken::Bool
+        } else {
+            true
         }
-
-        true
     }
 }

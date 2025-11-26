@@ -84,3 +84,15 @@ pub enum EncodeError {
     #[error("trying to encode an invalid type")]
     InvalidType(IntermediateType),
 }
+
+impl From<IntermediateTypeError> for EncodeError {
+    fn from(err: IntermediateTypeError) -> Self {
+        EncodeError::IntermediateType(Rc::new(err))
+    }
+}
+
+impl From<IntermediateTypeError> for DecodeError {
+    fn from(err: IntermediateTypeError) -> Self {
+        DecodeError::IntermediateType(Rc::new(err))
+    }
+}

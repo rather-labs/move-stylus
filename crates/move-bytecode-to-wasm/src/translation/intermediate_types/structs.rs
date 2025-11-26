@@ -255,9 +255,7 @@ impl IStruct {
                 } if String_::is_vm_type(module_id, *index, compilation_ctx)? => return Ok(true),
                 IntermediateType::IStruct { .. }
                 | IntermediateType::IGenericStructInstance { .. } => {
-                    let child_struct = compilation_ctx
-                        .get_struct_by_intermediate_type(field)
-                        .unwrap();
+                    let child_struct = compilation_ctx.get_struct_by_intermediate_type(field)?;
 
                     if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx)? {
                         return Ok(true);
@@ -299,9 +297,7 @@ impl IStruct {
                 }
                 IntermediateType::IStruct { .. }
                 | IntermediateType::IGenericStructInstance { .. } => {
-                    let child_struct = compilation_ctx
-                        .get_struct_by_intermediate_type(field)
-                        .unwrap();
+                    let child_struct = compilation_ctx.get_struct_by_intermediate_type(field)?;
 
                     if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx)? {
                         size += 32;

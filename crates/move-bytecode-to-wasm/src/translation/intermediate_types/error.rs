@@ -62,6 +62,12 @@ pub enum IntermediateTypeError {
     #[error("unssuported ValType {0:?}")]
     UnsupportedValType(ValType),
 
+    #[error("empty bytes in vector")]
+    EmptyBytesInVector,
+
+    #[error("could not process byte array, wrong size")]
+    CouldNotProcessByteArray,
+
     // Vectors
     #[error("Unsupported data size for vector: {0}")]
     VectorInvalidDataSize(usize),
