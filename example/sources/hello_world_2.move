@@ -106,3 +106,22 @@ entry fun test_stack_3(): (Stack<u32>, u64){
     s.pop_back();
     (s, s.size())
 }
+
+#[ext(event, indexes = 1)]
+public struct ReceiveEvent has copy, drop {
+    sender: address,
+}
+
+#[ext(payable)]
+entry fun receive(ctx: &TxContext) {
+    emit(ReceiveEvent { sender: ctx.sender() });
+}
+
+#[ext(payable)]
+entry fun fallback(a: address, b: u32, ctx: &TxContext) {
+    if (b < 42) {
+        emit(ReceiveEvent { sender: a });
+    } else {
+        emit(ReceiveEvent { sender: ctx.sender() });
+    }
+}

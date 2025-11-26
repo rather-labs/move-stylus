@@ -928,9 +928,7 @@ impl ModuleData {
             .and_then(|last| {
                 IntermediateType::try_from_signature_token(last, datatype_handles_map).ok()
             })
-            .map_or(false, |arg| {
-                is_tx_context_ref(&arg, move_module_dependencies)
-            });
+            .is_some_and(|arg| is_tx_context_ref(&arg, move_module_dependencies));
 
         if !is_tx_context_ref {
             return Err(CompilationContextError::InitFunctionNoTxContext);

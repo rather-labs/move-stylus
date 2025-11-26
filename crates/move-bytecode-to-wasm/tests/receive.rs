@@ -33,7 +33,6 @@ mod receive {
     }
 }
 
-
 mod receive_with_tx_context {
     use alloy_sol_types::{SolCall, sol};
 

@@ -253,7 +253,7 @@ fn process_functions(abi: &Abi) -> Vec<JsonAbiItem> {
                     FunctionType::Function => 3,
                 };
                 // For regular functions, use the name; for special functions, use empty string
-                let name_key = name.as_ref().map(|n| n.clone()).unwrap_or_default();
+                let name_key = name.clone().unwrap_or_default();
                 (priority, name_key)
             }
             _ => panic!("Expected Function variant"),
