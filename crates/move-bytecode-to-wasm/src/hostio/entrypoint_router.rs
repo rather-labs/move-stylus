@@ -44,50 +44,24 @@ pub fn build_entrypoint_router(
     router_builder.local_tee(args_pointer);
     router_builder.call(read_args_function);
 
-    // If args_len < 4, try receive/fallback, injecting the selector in the args data
-    // If args_len >= 4: load selector from args (normal case)
+    // If args_len == 0, try receive, injecting the selector in the args data
+    // If args_len != 0: load selector from args (normal case)
     router_builder
         .local_get(args_len)
-        .i32_const(4)
-        .binop(BinaryOp::I32LtS)
+        .unop(UnaryOp::I32Eqz)
         .if_else(
             None,
             |then| {
-                // args_len < 4: check for receive or fallback
-                // If args_len == 0: try receive(), if no receive function, unreachable (should be a no match error instead?)
-                // Else (args_len > 0 but < 4): try fallback(), if no fallback function, unreachable
-
-                // Determine which function to use and set selector: receive (args_len == 0) or fallback (args_len > 0 but < 4)
-                then.local_get(args_len).unop(UnaryOp::I32Eqz).if_else(
-                    None,
-                    |receive_case| {
-                        // args_len == 0: try receive
-                        if let Some(receive_fn) = receive_function {
-                            receive_case
-                                .i32_const(i32::from_le_bytes(receive_fn.function_selector))
-                                .local_set(selector_variable);
-                        } else {
-                            receive_case.unreachable();
-                        }
-                    },
-                    |fallback_case| {
-                        // args_len > 0 but < 4: try fallback
-                        if let Some(fallback_fn) = fallback_function {
-                            fallback_case
-                                .i32_const(i32::from_le_bytes(fallback_fn.function_selector))
-                                .local_set(selector_variable);
-                        } else {
-                            fallback_case.unreachable();
-                        }
-                    },
-                );
+                // args_len == 0: try receive
+                // If no receive function, the selector_variable remains uninitialized and will not match any function
+                if let Some(receive_fn) = receive_function {
+                    then.i32_const(i32::from_le_bytes(receive_fn.function_selector))
+                        .local_set(selector_variable);
+                }
 
                 // Allocate buffer with selector prefix and update args_pointer/args_len
-                // Layout: [selector (4 bytes)][original args (if any)]
                 let args_pointer_ = module.locals.add(ValType::I32);
-                then.local_get(args_len)
-                    .i32_const(4)
-                    .binop(BinaryOp::I32Add)
+                then.i32_const(4)
                     .call(compilation_ctx.allocator)
                     .local_set(args_pointer_);
 
@@ -103,31 +77,12 @@ pub fn build_entrypoint_router(
                         },
                     );
 
-                // If args_len > 0, copy original args into new buffer starting at offset 4
-                then.local_get(args_len).unop(UnaryOp::I32Eqz).if_else(
-                    None,
-                    |_| {
-                        // args_len == 0: nothing to copy
-                    },
-                    |else_| {
-                        // args_len > 0: copy original args
-                        else_
-                            .local_get(args_pointer_)
-                            .i32_const(4)
-                            .binop(BinaryOp::I32Add)
-                            .local_get(args_pointer)
-                            .local_get(args_len)
-                            .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-                    },
-                );
-
                 // Update args_pointer to point to the new buffer
                 then.local_get(args_pointer_).local_set(args_pointer);
 
-                // Update args_len to args_len + 4
-                then.local_get(args_len)
+                // Update args_len to 4
+                then
                     .i32_const(4)
-                    .binop(BinaryOp::I32Add)
                     .local_set(args_len);
             },
             |else_| {
@@ -162,27 +117,12 @@ pub fn build_entrypoint_router(
         )?;
     }
 
-    // If no function matched and we have calldata of length >= 4, we might be in the
+    // If no function matched and we have calldata of length != 0, we might be in the
     // "fallback with arguments" case:
     //
     // - User sends non-empty calldata that does not start with a 4-byte selector
     // - Our normal selector-based routing finds no match
-    // - We still want to try the `fallback` entrypoint, which expects only ABI-encoded args.
-    //
-    // To reuse the existing `build_router_block` logic (which assumes layout
-    // `selector || abi_encoded_args`), we synthesize such a layout in memory:
-    //
-    //   [ fallback selector (4 bytes) ][ original args_len bytes of calldata ]
-    //
-    // and then:
-    //   - point `args_pointer` to the start of this new buffer
-    //   - set `args_len` to args_len + 4
-    //   - set `selector_variable` to the fallback's selector
-    //
-    // The fallback's router block will then:
-    //   - see the forced selector and match
-    //   - add 4 to `args_pointer` before decoding, so the Move function
-    //     still receives the original calldata (without selector) as args.
+    // - We still want to try the `fallback` entrypoint, which expects only ABI-encoded args
     if let Some(fallback_fn) = fallback_function {
         // selector_variable = fallback selector
         router_builder
