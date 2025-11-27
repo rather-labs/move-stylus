@@ -2,14 +2,14 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod base;
+pub(crate) mod build_config;
+pub(crate) mod error;
+
 use base::{
     abi_generate::AbiGenerate, build::Build, coverage::Coverage, deploy::Deploy,
-    disassemble::Disassemble, info::Info, migrate::Migrate, new::New, test::Test,
+    disassemble::Disassemble, info::Info, new::New, test::Test,
 };
-use move_package::BuildConfig;
-
-pub mod base;
-pub(crate) mod error;
 
 /// Default directory where saved Move resources live
 pub const DEFAULT_STORAGE_DIR: &str = "storage";
@@ -18,9 +18,9 @@ pub const DEFAULT_STORAGE_DIR: &str = "storage";
 pub const DEFAULT_BUILD_DIR: &str = ".";
 
 use anyhow::Result;
+use build_config::BuildConfig;
 use clap::Parser;
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
-use move_packages_build::implicit_dependencies;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_test_utils::gas_schedule::CostTable;
 use std::path::PathBuf;
@@ -63,7 +63,6 @@ pub enum Command {
     Disassemble(Disassemble),
     Deploy(Deploy),
     Info(Info),
-    Migrate(Migrate),
     New(New),
     Test(Test),
 }
@@ -71,33 +70,24 @@ pub enum Command {
 pub fn run_cli(
     natives: Vec<NativeFunctionRecord>,
     cost_table: &CostTable,
-    mut move_args: Move,
+    move_args: Move,
     cmd: Command,
 ) -> Result<()> {
-    move_args.build_config.implicit_dependencies = implicit_dependencies();
+    let build_config = move_package::BuildConfig::from(move_args.build_config);
 
     // TODO: right now, the gas metering story for move-cli (as a library) is a bit of a mess.
     //         1. It's still using the old CostTable.
     //         2. The CostTable only affects sandbox runs, but not unit tests, which use a unit cost table.
     match cmd {
-        Command::AbiGenerate(c) => c.execute(
-            move_args.package_path.as_deref(),
-            None,
-            move_args.build_config,
-        ),
-        Command::Build(c) => c.execute(move_args.package_path.as_deref(), move_args.build_config),
-        Command::Coverage(c) => {
-            c.execute(move_args.package_path.as_deref(), move_args.build_config)
-        }
-        Command::Disassemble(c) => {
-            c.execute(move_args.package_path.as_deref(), move_args.build_config)
-        }
-        Command::Info(c) => c.execute(move_args.package_path.as_deref(), move_args.build_config),
-        Command::Migrate(c) => c.execute(move_args.package_path.as_deref(), move_args.build_config),
+        Command::AbiGenerate(c) => c.execute(move_args.package_path.as_deref(), None, build_config),
+        Command::Build(c) => c.execute(move_args.package_path.as_deref(), build_config),
+        Command::Coverage(c) => c.execute(move_args.package_path.as_deref(), build_config),
+        Command::Disassemble(c) => c.execute(move_args.package_path.as_deref(), build_config),
+        Command::Info(c) => c.execute(move_args.package_path.as_deref(), build_config),
         Command::New(c) => c.execute_with_defaults(move_args.package_path.as_deref()),
         Command::Test(c) => c.execute(
             move_args.package_path.as_deref(),
-            move_args.build_config,
+            build_config,
             natives,
             Some(cost_table.clone()),
         ),

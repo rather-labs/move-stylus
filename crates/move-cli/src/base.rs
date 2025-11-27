@@ -7,7 +7,6 @@ pub mod coverage;
 pub mod deploy;
 pub mod disassemble;
 pub mod info;
-pub mod migrate;
 pub mod new;
 pub mod test;
 

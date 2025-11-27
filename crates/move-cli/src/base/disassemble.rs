@@ -43,6 +43,8 @@ impl Disassemble {
             debug,
             bytecode_map,
         } = self;
+        let install_dir = config.install_dir.clone();
+
         // Make sure the package is built
         let package = config.compile_package(&rerooted_path, &mut Vec::new())?;
 
@@ -88,7 +90,9 @@ impl Disassemble {
             }
         }
 
-        if let Err(compilation_error) = translate_package_cli(package, &rerooted_path) {
+        if let Err(compilation_error) =
+            translate_package_cli(package, &rerooted_path, install_dir, true)
+        {
             print_error_diagnostic(compilation_error)
         }
 

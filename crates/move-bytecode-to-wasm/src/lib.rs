@@ -317,8 +317,21 @@ pub fn package_module_data(
 pub fn translate_package_cli(
     package: CompiledPackage,
     rerooted_path: &Path,
+    install_dir: Option<PathBuf>,
+    emit_wat: bool,
 ) -> Result<(), CompilationError> {
-    let build_directory = rerooted_path.join("build/wasm");
+    let build_directory = if let Some(install_dir) = install_dir {
+        install_dir.join(format!(
+            "build/{}/wasm",
+            package.compiled_package_info.package_name
+        ))
+    } else {
+        rerooted_path.join(format!(
+            "build/{}/wasm",
+            package.compiled_package_info.package_name
+        ))
+    };
+
     // Create the build directory if it doesn't exist
     std::fs::create_dir_all(&build_directory)
         .map_err(|e| ICEError::new(ICEErrorKind::Unexpected(e.into())))?;
@@ -330,14 +343,16 @@ pub fn translate_package_cli(
             .emit_wasm_file(build_directory.join(format!("{module_name}.wasm")))
             .map_err(|e| ICEError::new(ICEErrorKind::Unexpected(e.into())))?;
 
-        // Convert to WAT format
-        let wat = wasmprinter::print_bytes(module.emit_wasm())
-            .map_err(|e| ICEError::new(ICEErrorKind::Unexpected(e.into())))?;
-        std::fs::write(
-            build_directory.join(format!("{module_name}.wat")),
-            wat.as_bytes(),
-        )
-        .map_err(|e| ICEError::new(ICEErrorKind::Io(e)))?;
+        if emit_wat {
+            // Convert to WAT format
+            let wat = wasmprinter::print_bytes(module.emit_wasm())
+                .map_err(|e| ICEError::new(ICEErrorKind::Unexpected(e.into())))?;
+            std::fs::write(
+                build_directory.join(format!("{module_name}.wat")),
+                wat.as_bytes(),
+            )
+            .map_err(|e| ICEError::new(ICEErrorKind::Io(e)))?;
+        }
     }
 
     Ok(())
