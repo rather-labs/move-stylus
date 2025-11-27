@@ -89,6 +89,17 @@ pub enum CompilationContextError {
     #[error("fallback function with bad visibility")]
     FallbackFunctionBadVisibility,
 
+    #[error("fallback function with too many arguments (must have 0, 1, or 2 arguments)")]
+    FallbackFunctionTooManyArguments,
+
+    #[error(
+        "fallback function with invalid argument type at position {0} (must be vector<u8> or TxContext)"
+    )]
+    FallbackFunctionInvalidArgumentType(usize),
+
+    #[error("fallback function with invalid return type (must be empty or a single vector<u8>)")]
+    FallbackFunctionInvalidReturnType,
+
     #[error(r#"datatype handle index "{0}" not found"#)]
     DatatypeHanldeIndexNotFound(usize),
 
