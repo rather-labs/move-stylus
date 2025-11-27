@@ -369,56 +369,70 @@ pub fn add_emit_log_fn(
         }
     }
 
-    // For the data left, we need to generate a "fake" IStruct with the fields that are not
-    // included in the topics.
-    let fields: Vec<(Option<FieldHandleIndex>, IntermediateType)> = struct_.fields
-        [indexes as usize..]
-        .iter()
-        .map(|t| (None, t.clone()))
-        .collect();
+    let data_fields: &[IntermediateType] = &struct_.fields[indexes as usize..];
 
-    let data_struct = IStruct::new(
-        move_binary_format::file_format::StructDefinitionIndex(0),
-        "DataStruct".to_owned(),
-        fields,
-        HashMap::new(),
-        false,
-        IStructType::Common,
-    );
+    if !data_fields.is_empty() {
+        // For the data left, we need to generate a "fake" IStruct with the fields that are not
+        // included in the topics.
+        let fields: Vec<(Option<FieldHandleIndex>, IntermediateType)> =
+            data_fields.iter().map(|t| (None, t.clone())).collect();
 
-    let abi_encoded_data_writer_pointer = module.locals.add(ValType::I32);
-    let abi_encoded_data_calldata_reference_pointer = module.locals.add(ValType::I32);
+        let data_struct = IStruct::new(
+            move_binary_format::file_format::StructDefinitionIndex(0),
+            "DataStruct".to_owned(),
+            fields,
+            HashMap::new(),
+            false,
+            IStructType::Common,
+        );
 
-    let data_struct_ptr = module.locals.add(ValType::I32);
+        let abi_encoded_data_writer_pointer = module.locals.add(ValType::I32);
+        let abi_encoded_data_calldata_reference_pointer = module.locals.add(ValType::I32);
 
-    builder
-        .local_get(struct_ptr)
-        .i32_const(4 * indexes as i32)
-        .binop(BinaryOp::I32Add)
-        .local_set(data_struct_ptr);
+        let data_struct_ptr = module.locals.add(ValType::I32);
 
-    if data_struct.solidity_abi_encode_is_dynamic(compilation_ctx)? {
-        data_struct.add_pack_instructions(
-            &mut builder,
-            module,
-            data_struct_ptr,
-            abi_encoded_data_writer_pointer,
-            abi_encoded_data_calldata_reference_pointer,
-            compilation_ctx,
-            Some(abi_encoded_data_calldata_reference_pointer),
-        )?;
-    } else {
-        data_struct.add_pack_instructions(
-            &mut builder,
-            module,
-            data_struct_ptr,
-            abi_encoded_data_writer_pointer,
-            abi_encoded_data_calldata_reference_pointer,
-            compilation_ctx,
-            None,
-        )?;
+        builder
+            .local_get(struct_ptr)
+            .i32_const(4 * indexes as i32)
+            .binop(BinaryOp::I32Add)
+            .local_set(data_struct_ptr);
+
+        let is_dynamic = data_struct.solidity_abi_encode_is_dynamic(compilation_ctx)?;
+        let size = if is_dynamic {
+            32
+        } else {
+            data_struct.solidity_abi_encode_size(compilation_ctx)? as i32
+        };
+
+        // Use the allocator to get a pointer to the end of the calldata
+        builder
+            .i32_const(size)
+            .call(compilation_ctx.allocator)
+            .local_tee(abi_encoded_data_writer_pointer)
+            .local_set(abi_encoded_data_calldata_reference_pointer);
+
+        if data_struct.solidity_abi_encode_is_dynamic(compilation_ctx)? {
+            data_struct.add_pack_instructions(
+                &mut builder,
+                module,
+                data_struct_ptr,
+                abi_encoded_data_writer_pointer,
+                abi_encoded_data_calldata_reference_pointer,
+                compilation_ctx,
+                Some(abi_encoded_data_calldata_reference_pointer),
+            )?;
+        } else {
+            data_struct.add_pack_instructions(
+                &mut builder,
+                module,
+                data_struct_ptr,
+                abi_encoded_data_writer_pointer,
+                abi_encoded_data_calldata_reference_pointer,
+                compilation_ctx,
+                Some(abi_encoded_data_calldata_reference_pointer),
+            )?;
+        }
     }
-
     // Beginning of the packed data
     builder.local_get(packed_data_begin);
 
