@@ -68,8 +68,11 @@ pub enum CompilationContextError {
     #[error("receive function with returns")]
     ReceiveFunctionHasReturns,
 
-    #[error("receive function with arguments")]
-    ReceiveFunctionHasArguments,
+    #[error("receive function with too many arguments")]
+    ReceiveFunctionTooManyArguments,
+
+    #[error("receive function with non-TxContext argument")]
+    ReceiveFunctionNonTxContextArgument,
 
     #[error("receive function with non-payable state mutability")]
     ReceiveFunctionIsNotPayable,
@@ -85,6 +88,7 @@ pub enum CompilationContextError {
 
     #[error("fallback function with bad visibility")]
     FallbackFunctionBadVisibility,
+
     #[error(r#"datatype handle index "{0}" not found"#)]
     DatatypeHanldeIndexNotFound(usize),
 

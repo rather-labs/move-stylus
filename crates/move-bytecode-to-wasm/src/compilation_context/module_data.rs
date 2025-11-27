@@ -781,7 +781,9 @@ impl ModuleData {
                     .iter()
                     .find(|f| f.name == function_name)
                     .or_else(|| special_attributes.external_calls.get(function_name))
-                    .expect("function not found in special attributes");
+                    .ok_or(ModuleDataError::FunctionByIdentifierNotFound(
+                        function_name.to_string(),
+                    ))?;
 
                 let is_receive = Self::is_receive(
                     &function_id,
@@ -789,6 +791,8 @@ impl ModuleData {
                     move_function_return,
                     function_def,
                     function_sa,
+                    datatype_handles_map,
+                    move_module_dependencies,
                 )?;
 
                 if is_receive && receive.replace(function_id.clone()).is_some() {
@@ -916,49 +920,17 @@ impl ModuleData {
         }
 
         // Check TxContext in the last argument
-        let last_arg = move_function_arguments
-            .0
-            .last()
-            .map(|last| IntermediateType::try_from_signature_token(last, datatype_handles_map))
-            .transpose()?;
-
         // The compilation context is not available yet, so we can't use it to check if the
         // `TxContext` is the one from the stylus framework. It is done manually
-        let is_tx_context_ref = match last_arg {
-            Some(IntermediateType::IRef(inner)) | Some(IntermediateType::IMutRef(inner)) => {
-                match inner.as_ref() {
-                    IntermediateType::IStruct {
-                        module_id, index, ..
-                    } if module_id.module_name == "tx_context"
-                        && module_id.address == STYLUS_FRAMEWORK_ADDRESS =>
-                    {
-                        // TODO: Look for this external module one time and pass it down to this
-                        // function
-                        let external_module_source = &move_module_dependencies
-                            .iter()
-                            .find(|(_, m)| {
-                                m.unit.name().as_str() == "tx_context"
-                                    && Address::from(m.unit.address.into_bytes())
-                                        == STYLUS_FRAMEWORK_ADDRESS
-                            })
-                            .ok_or(ModuleDataError::StylusFrameworkDependencyNotFound)?
-                            .1
-                            .unit
-                            .module;
-
-                        let struct_ = external_module_source
-                            .struct_def_at(StructDefinitionIndex::new(*index));
-                        let handle =
-                            external_module_source.datatype_handle_at(struct_.struct_handle);
-                        let identifier = external_module_source.identifier_at(handle.name);
-                        identifier.as_str() == "TxContext"
-                    }
-
-                    _ => false,
-                }
-            }
-            _ => false,
-        };
+        let is_tx_context_ref = move_function_arguments
+            .0
+            .last()
+            .and_then(|last| {
+                IntermediateType::try_from_signature_token(last, datatype_handles_map).ok()
+            })
+            .map_or(false, |arg| {
+                is_tx_context_ref(&arg, move_module_dependencies)
+            });
 
         if !is_tx_context_ref {
             return Err(CompilationContextError::InitFunctionNoTxContext);
@@ -1046,10 +1018,12 @@ impl ModuleData {
         move_function_return: &Signature,
         function_def: &FunctionDefinition,
         function_sa: &Function,
+        datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
+        move_module_dependencies: &[(PackageName, CompiledUnitWithSource)],
     ) -> Result<bool> {
         // Receive function definition (see https://docs.soliditylang.org/en/latest/contracts.html#receive-ether-function):
         // - A contract can have at most one receive function, declared using receive() external payable { ... } (without the function keyword).
-        // - This function cannot have arguments, cannot return anything and must have external visibility and payable state mutability.
+        // - This function cannot have arguments other than a TxContext parameter, cannot return anything and must have external visibility and payable state mutability.
         // - It can be virtual, can override and can have modifiers. (TODO: can we check this?)
 
         const RECEIVE_FUNCTION_NAME: &str = "receive";
@@ -1067,9 +1041,18 @@ impl ModuleData {
             return Err(CompilationContextError::ReceiveFunctionBadVisibility);
         }
 
-        // Must have no arguments
-        if !move_function_arguments.is_empty() {
-            return Err(CompilationContextError::ReceiveFunctionHasArguments);
+        // The function can only take a reference to the TxContext as its only argument.
+        if move_function_arguments.len() > 1 {
+            return Err(CompilationContextError::ReceiveFunctionTooManyArguments);
+        }
+        if let Some(first_arg) = move_function_arguments.0.first() {
+            if let Ok(arg) =
+                IntermediateType::try_from_signature_token(first_arg, datatype_handles_map)
+            {
+                if !is_tx_context_ref(&arg, move_module_dependencies) {
+                    return Err(CompilationContextError::ReceiveFunctionNonTxContextArgument);
+                }
+            }
         }
 
         // Must have no return values
@@ -1108,5 +1091,46 @@ impl ModuleData {
         }
 
         Ok(true)
+    }
+}
+
+/// Helper function to check if the argument is a reference to the TxContext.
+fn is_tx_context_ref(
+    argument: &IntermediateType,
+    move_module_dependencies: &[(PackageName, CompiledUnitWithSource)],
+) -> bool {
+    match argument {
+        IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
+            match inner.as_ref() {
+                IntermediateType::IStruct {
+                    module_id, index, ..
+                } if module_id.module_name == "tx_context"
+                    && module_id.address == STYLUS_FRAMEWORK_ADDRESS =>
+                {
+                    // TODO: Look for this external module one time and pass it down to this
+                    // function
+                    let external_module_source = &move_module_dependencies
+                        .iter()
+                        .find(|(_, m)| {
+                            m.unit.name().as_str() == "tx_context"
+                                && Address::from(m.unit.address.into_bytes())
+                                    == STYLUS_FRAMEWORK_ADDRESS
+                        })
+                        .expect("could not find stylus framework as dependency")
+                        .1
+                        .unit
+                        .module;
+
+                    let struct_ =
+                        external_module_source.struct_def_at(StructDefinitionIndex::new(*index));
+                    let handle = external_module_source.datatype_handle_at(struct_.struct_handle);
+                    let identifier = external_module_source.identifier_at(handle.name);
+                    identifier.as_str() == "TxContext"
+                }
+
+                _ => false,
+            }
+        }
+        _ => false,
     }
 }
