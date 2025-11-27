@@ -60,6 +60,7 @@ pub enum Command {
     AbiGenerate(AbiGenerate),
     Build(Build),
     Coverage(Coverage),
+    #[cfg(debug_assertions)]
     Disassemble(Disassemble),
     Deploy(Deploy),
     Info(Info),
@@ -82,6 +83,7 @@ pub fn run_cli(
         Command::AbiGenerate(c) => c.execute(move_args.package_path.as_deref(), None, build_config),
         Command::Build(c) => c.execute(move_args.package_path.as_deref(), build_config),
         Command::Coverage(c) => c.execute(move_args.package_path.as_deref(), build_config),
+        #[cfg(debug_assertions)]
         Command::Disassemble(c) => c.execute(move_args.package_path.as_deref(), build_config),
         Command::Info(c) => c.execute(move_args.package_path.as_deref(), build_config),
         Command::New(c) => c.execute_with_defaults(move_args.package_path.as_deref()),
