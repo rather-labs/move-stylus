@@ -78,7 +78,7 @@ pub fn add_emit_log_fn(
     // otherwise, we copy the whole encoding
     let mut event_fields_encoded_data = Vec::new();
 
-    for (field_index, field) in struct_.fields.iter().enumerate() {
+    for (field_index, field) in struct_.fields[..indexes as usize].iter().enumerate() {
         match field {
             IntermediateType::IBool
             | IntermediateType::IU8
@@ -256,7 +256,7 @@ pub fn add_emit_log_fn(
 
     // ABI pack the struct before emitting the event
     // First process the indexed ones
-    for ((field_index, field), abi_encoded_data) in struct_.fields[0..indexes as usize]
+    for ((field_index, field), abi_encoded_data) in struct_.fields[..indexes as usize]
         .iter()
         .enumerate()
         .zip(event_fields_encoded_data)
@@ -319,14 +319,6 @@ pub fn add_emit_log_fn(
                     calldata_reference_pointer,
                     compilation_ctx,
                 )?;
-
-                // Add 32 to the writer pointer to write the next topic
-                builder
-                    .i32_const(32)
-                    .local_get(writer_pointer)
-                    .binop(BinaryOp::I32Add)
-                    .local_tee(writer_pointer)
-                    .local_set(calldata_reference_pointer);
             }
             IntermediateType::IVector(_)
             | IntermediateType::IStruct { .. }
@@ -343,20 +335,16 @@ pub fn add_emit_log_fn(
 
                 // If the vector is indexed, we need to calculate the keccak256 of its values and
                 // store them in the topic
-                builder.i32_const(32).call(compilation_ctx.allocator).drop();
+                builder
+                    .i32_const(32)
+                    .call(compilation_ctx.allocator)
+                    .local_set(writer_pointer);
 
                 builder
                     .local_get(encode_start)
                     .local_get(abi_encoded_data_length)
                     .local_get(writer_pointer)
                     .call(native_keccak);
-
-                builder
-                    .i32_const(32)
-                    .local_get(writer_pointer)
-                    .binop(BinaryOp::I32Add)
-                    .local_tee(writer_pointer)
-                    .local_set(calldata_reference_pointer);
             }
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
                 todo!()
@@ -379,7 +367,7 @@ pub fn add_emit_log_fn(
 
         let data_struct = IStruct::new(
             move_binary_format::file_format::StructDefinitionIndex(0),
-            "DataStruct".to_owned(),
+            format!("{}Data", struct_.identifier),
             fields,
             HashMap::new(),
             false,
@@ -411,27 +399,15 @@ pub fn add_emit_log_fn(
             .local_tee(abi_encoded_data_writer_pointer)
             .local_set(abi_encoded_data_calldata_reference_pointer);
 
-        if data_struct.solidity_abi_encode_is_dynamic(compilation_ctx)? {
-            data_struct.add_pack_instructions(
-                &mut builder,
-                module,
-                data_struct_ptr,
-                abi_encoded_data_writer_pointer,
-                abi_encoded_data_calldata_reference_pointer,
-                compilation_ctx,
-                Some(abi_encoded_data_calldata_reference_pointer),
-            )?;
-        } else {
-            data_struct.add_pack_instructions(
-                &mut builder,
-                module,
-                data_struct_ptr,
-                abi_encoded_data_writer_pointer,
-                abi_encoded_data_calldata_reference_pointer,
-                compilation_ctx,
-                Some(abi_encoded_data_calldata_reference_pointer),
-            )?;
-        }
+        data_struct.add_pack_instructions(
+            &mut builder,
+            module,
+            data_struct_ptr,
+            abi_encoded_data_writer_pointer,
+            abi_encoded_data_calldata_reference_pointer,
+            compilation_ctx,
+            None,
+        )?;
     }
     // Beginning of the packed data
     builder.local_get(packed_data_begin);
