@@ -201,9 +201,7 @@ impl Unpackable for IntermediateType {
                 )?;
             }
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
-                let struct_ = compilation_ctx
-                    .get_struct_by_intermediate_type(self)
-                    .unwrap();
+                let struct_ = compilation_ctx.get_struct_by_intermediate_type(self)?;
 
                 if struct_.has_key {
                     load_struct_storage_id(
@@ -236,7 +234,7 @@ impl Unpackable for IntermediateType {
                 }
             }
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
-                let enum_ = compilation_ctx.get_enum_by_intermediate_type(self).unwrap();
+                let enum_ = compilation_ctx.get_enum_by_intermediate_type(self)?;
                 if !enum_.is_simple {
                     return Err(AbiUnpackError::EnumIsNotSimple(enum_.identifier.to_owned()))?;
                 }

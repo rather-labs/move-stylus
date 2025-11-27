@@ -237,10 +237,10 @@ impl IntermediateType {
             IntermediateType::IU32 => IU32::load_constant_instructions(builder, bytes)?,
             IntermediateType::IU64 => IU64::load_constant_instructions(builder, bytes)?,
             IntermediateType::IU128 => {
-                IU128::load_constant_instructions(module, builder, bytes, compilation_ctx)
+                IU128::load_constant_instructions(module, builder, bytes, compilation_ctx)?
             }
             IntermediateType::IU256 => {
-                IU256::load_constant_instructions(module, builder, bytes, compilation_ctx)
+                IU256::load_constant_instructions(module, builder, bytes, compilation_ctx)?
             }
             IntermediateType::IAddress => {
                 IAddress::load_constant_instructions(module, builder, bytes, compilation_ctx)?
@@ -946,9 +946,7 @@ impl IntermediateType {
                 types,
                 ..
             } => {
-                let struct_ = compilation_ctx
-                    .get_struct_by_index(module_id, *index)
-                    .unwrap();
+                let struct_ = compilation_ctx.get_struct_by_index(module_id, *index)?;
                 struct_.instantiate(types).equality(
                     builder,
                     module,
@@ -1145,21 +1143,26 @@ impl IntermediateType {
     }
 
     // Returns the hash of the type
-    pub fn get_hash(&self, compilation_ctx: &CompilationContext) -> u64 {
+    pub fn get_hash(
+        &self,
+        compilation_ctx: &CompilationContext,
+    ) -> Result<u64, IntermediateTypeError> {
         let mut hasher = get_hasher();
-        self.process_hash(&mut hasher, compilation_ctx);
-        hasher.finish()
+        self.process_hash(&mut hasher, compilation_ctx)?;
+        Ok(hasher.finish())
     }
 
-    pub fn process_hash(&self, mut hasher: &mut dyn Hasher, compilation_ctx: &CompilationContext) {
+    pub fn process_hash(
+        &self,
+        mut hasher: &mut dyn Hasher,
+        compilation_ctx: &CompilationContext,
+    ) -> Result<(), IntermediateTypeError> {
         match self {
             IntermediateType::IStruct {
                 module_id, index, ..
             } => {
-                let struct_ = compilation_ctx
-                    .get_struct_by_index(module_id, *index)
-                    .unwrap();
-                let module_data = compilation_ctx.get_module_data_by_id(module_id).unwrap();
+                let struct_ = compilation_ctx.get_struct_by_index(module_id, *index)?;
+                let module_data = compilation_ctx.get_module_data_by_id(module_id)?;
                 if let Some(external_struct) = module_data
                     .special_attributes
                     .external_struct
@@ -1182,10 +1185,8 @@ impl IntermediateType {
                 types,
                 ..
             } => {
-                let struct_ = compilation_ctx
-                    .get_struct_by_index(module_id, *index)
-                    .unwrap();
-                let module_data = compilation_ctx.get_module_data_by_id(module_id).unwrap();
+                let struct_ = compilation_ctx.get_struct_by_index(module_id, *index)?;
+                let module_data = compilation_ctx.get_module_data_by_id(module_id)?;
                 if let Some(external_struct) = module_data
                     .special_attributes
                     .external_struct
@@ -1201,15 +1202,17 @@ impl IntermediateType {
                     Hash::hash(&module_id, &mut hasher);
                 }
 
-                types.iter().for_each(|t| {
-                    t.process_hash(&mut hasher, compilation_ctx);
-                });
+                for t in types {
+                    t.process_hash(&mut hasher, compilation_ctx)?;
+                }
                 struct_.identifier.hash(&mut hasher);
             }
             _ => {
                 self.hash(&mut hasher);
             }
         }
+
+        Ok(())
     }
 }
 

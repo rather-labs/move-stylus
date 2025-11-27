@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
     ir::{MemArg, StoreKind},
@@ -35,9 +33,7 @@ pub fn add_revert_fn(
     };
 
     // Get the error type. Should be a struct, otherwise it panics.
-    let error_struct = compilation_ctx
-        .get_struct_by_intermediate_type(error_itype)
-        .unwrap();
+    let error_struct = compilation_ctx.get_struct_by_intermediate_type(error_itype)?;
 
     let IStructType::AbiError = error_struct.type_ else {
         return Err(NativeFunctionError::RevertFunctionNoError(
@@ -57,8 +53,7 @@ pub fn add_revert_fn(
         compilation_ctx,
         &error_struct,
         error_struct_ptr,
-    )
-    .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?;
+    )?;
 
     // Store the ptr at DATA_ABORT_MESSAGE_PTR_OFFSET
     builder

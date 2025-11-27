@@ -12,7 +12,6 @@ use crate::{
     CompilationContext,
     data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET, DATA_ZERO_OFFSET},
     hostio::host_functions::{native_keccak256, storage_cache_bytes32, storage_load_bytes32},
-    native_functions::object::add_delete_field_instructions,
     runtime::RuntimeFunction,
     storage::storage_layout::field_size,
     translation::intermediate_types::IntermediateType,
@@ -20,7 +19,10 @@ use crate::{
     wasm_builder_extensions::WasmBuilderExtension,
 };
 
-use super::error::{EncodeError, StorageError};
+use super::{
+    common::add_delete_field_instructions,
+    error::{EncodeError, StorageError},
+};
 
 /// Emits WASM instructions that encode a struct and write it into storage.
 ///
@@ -71,7 +73,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
         // Save the type hash in the slot data at offset 24 (last 8 bytes)
         builder
             .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-            .i64_const(itype.get_hash(compilation_ctx) as i64)
+            .i64_const(itype.get_hash(compilation_ctx)? as i64)
             .store(
                 compilation_ctx.memory_id,
                 StoreKind::I64 { atomic: false },
@@ -417,9 +419,7 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
     let len = module.locals.add(ValType::I32);
 
     // Stack size of the inner type
-    let stack_size = inner
-        .stack_data_size()
-        .map_err(|e| EncodeError::IntermediateType(e.into()))? as i32;
+    let stack_size = inner.stack_data_size()? as i32;
 
     // Element size in storage
     let elem_size = field_size(inner, compilation_ctx)? as i32;
@@ -702,9 +702,7 @@ pub fn add_encode_intermediate_type_instructions(
     let val_64 = module.locals.add(ValType::I64);
 
     // Stack and storage size of the type
-    let stack_size = itype
-        .stack_data_size()
-        .map_err(|e| EncodeError::IntermediateType(e.into()))? as i32;
+    let stack_size = itype.stack_data_size()? as i32;
     let storage_size = field_size(itype, compilation_ctx)? as i32;
 
     // Runtime functions

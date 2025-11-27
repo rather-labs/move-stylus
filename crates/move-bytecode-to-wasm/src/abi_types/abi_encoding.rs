@@ -13,8 +13,10 @@ use super::{error::AbiError, sol_name::SolName};
 
 pub type AbiFunctionSelector = [u8; 4];
 
-pub fn selector<T: AsRef<[u8]>>(bytes: T) -> AbiFunctionSelector {
-    keccak256(bytes)[..4].try_into().unwrap()
+pub fn selector<T: AsRef<[u8]>>(bytes: T) -> Result<AbiFunctionSelector, AbiError> {
+    keccak256(bytes)[..4]
+        .try_into()
+        .map_err(|_| AbiError::InvalidSelectorSize)
 }
 
 /// Calculate the function selector according to Solidity's [ABI encoding](https://docs.soliditylang.org/en/latest/abi-spec.html#function-selector)
@@ -40,7 +42,7 @@ where
 
     let function_name = case_callback(function_name);
 
-    Ok(selector(format!("{function_name}({parameter_strings})")))
+    selector(format!("{function_name}({parameter_strings})"))
 }
 
 fn solidity_name(

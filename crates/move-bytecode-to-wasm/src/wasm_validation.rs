@@ -1,18 +1,19 @@
 use walrus::{ExportItem, ImportKind, Module, ValType};
 
+use crate::error::{CompilationError, ICEError, ICEErrorKind};
+
+#[derive(thiserror::Error, Debug)]
 pub enum WasmValidationError {
+    #[error("invalid Wasm: {0}")]
     InvalidWasm(String),
+
+    #[error("invalid Stylus interface: {0}")]
     InvalidStylusInterface(String),
 }
 
-impl std::fmt::Debug for WasmValidationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            WasmValidationError::InvalidWasm(s) => write!(f, "Invalid Wasm: {s}"),
-            WasmValidationError::InvalidStylusInterface(s) => {
-                write!(f, "Invalid Stylus Interface: {s}")
-            }
-        }
+impl From<WasmValidationError> for CompilationError {
+    fn from(value: WasmValidationError) -> Self {
+        CompilationError::ICE(ICEError::new(ICEErrorKind::WasmValidation(value)))
     }
 }
 

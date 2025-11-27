@@ -31,7 +31,7 @@ use move_binary_format::{
 };
 
 use crate::{
-    CompilationContext,
+    CompilationContext, GlobalFunctionTable,
     abi_types::error_encoding::build_abort_error_message,
     compilation_context::{ModuleData, ModuleId},
     data::DATA_ABORT_MESSAGE_PTR_OFFSET,
@@ -679,7 +679,7 @@ fn translate_instruction(
                 builder,
                 compilation_ctx,
                 &literal.to_le_bytes(),
-            );
+            )?;
             types_stack.push(IntermediateType::IU128);
         }
         Bytecode::LdU256(literal) => {
@@ -688,7 +688,7 @@ fn translate_instruction(
                 builder,
                 compilation_ctx,
                 &literal.to_le_bytes(),
-            );
+            )?;
             types_stack.push(IntermediateType::IU256);
         }
         // Function calls
@@ -957,10 +957,7 @@ fn translate_instruction(
 
                 dependency_data
                     .functions
-                    .information
-                    .iter()
-                    .find(|f| &f.function_id == function_id)
-                    .unwrap()
+                    .get_information_by_identifier(&function_id.identifier)?
             };
 
             // There are some functions that need to be specially handled, if we find one of those
@@ -1363,9 +1360,7 @@ fn translate_instruction(
         Bytecode::ImmBorrowFieldGeneric(field_id) => {
             let (struct_field_id, instantiation_types) = module_data
                 .structs
-                .instantiated_fields_to_generic_fields
-                .get(field_id)
-                .unwrap();
+                .get_instantiated_field_generic_index(field_id)?;
 
             let instantiation_types = if instantiation_types.iter().any(type_contains_generics) {
                 match &types_stack.last() {
@@ -1474,9 +1469,7 @@ fn translate_instruction(
         Bytecode::MutBorrowFieldGeneric(field_id) => {
             let (struct_field_id, instantiation_types) = module_data
                 .structs
-                .instantiated_fields_to_generic_fields
-                .get(field_id)
-                .unwrap();
+                .get_instantiated_field_generic_index(field_id)?;
 
             let instantiation_types = if instantiation_types.iter().any(type_contains_generics) {
                 match &types_stack.last() {
@@ -3210,4 +3203,99 @@ fn get_storage_structs_with_named_ids(
     }
 
     Ok(result)
+}
+
+/// Trnaslates a function to WASM and links it to the WASM module
+///
+/// It also recursively translates and links all the functions called by this function
+pub(crate) fn translate_and_link_functions(
+    function_id: &FunctionId,
+    function_table: &mut FunctionTable,
+    function_definitions: &GlobalFunctionTable,
+    module: &mut walrus::Module,
+    compilation_ctx: &CompilationContext,
+    dynamic_fields_global_variables: &mut Vec<(GlobalId, IntermediateType)>,
+) -> Result<(), TranslationError> {
+    // Obtain the function information and module's data
+    let (function_information, module_data) = if let Some(fi) = compilation_ctx
+        .root_module_data
+        .functions
+        .information
+        .iter()
+        .find(|f| {
+            f.function_id.module_id == function_id.module_id
+                && f.function_id.identifier == function_id.identifier
+        }) {
+        (fi, compilation_ctx.root_module_data)
+    } else {
+        let module_data = compilation_ctx.get_module_data_by_id(&function_id.module_id)?;
+
+        let fi = module_data
+            .functions
+            .get_information_by_identifier(&function_id.identifier)?;
+
+        (fi, module_data)
+    };
+
+    // If the function is generic, we instantiate the concrete types so we can translate it
+    let function_information = if function_information.is_generic {
+        &function_information.instantiate(function_id.type_instantiations.as_ref().ok_or(
+            TranslationError::GenericFunctionNoTypeInstantiations(
+                function_id.module_id.clone(),
+                function_id.identifier.clone(),
+            ),
+        )?)
+    } else {
+        function_information
+    };
+
+    // Process function defined in this module
+    // First we check if there is already an entry for this function
+    if let Some(table_entry) = function_table.get_by_function_id(&function_information.function_id)
+    {
+        // If it has asigned a wasm function id means that we already translated it, so we skip
+        // it
+        if table_entry.wasm_function_id.is_some() {
+            return Ok(());
+        }
+    }
+    // If it is not present, we add an entry for it
+    else {
+        function_table.add(module, function_id.clone(), function_information)?;
+    }
+
+    let function_definition = function_definitions
+        .get(&function_id.get_generic_fn_id())
+        .ok_or_else(|| TranslationError::FunctionDefinitionNotFound(function_id.clone()))?;
+
+    // If the function contains code we translate it
+    // If it does not it means is a native function, we do nothing, it is linked and called
+    // directly in the translation function
+    if let Some(move_bytecode) = function_definition.code.as_ref() {
+        let (wasm_function_id, functions_to_link) = translate_function(
+            module,
+            compilation_ctx,
+            module_data,
+            function_table,
+            function_information,
+            move_bytecode,
+            dynamic_fields_global_variables,
+        )?;
+
+        function_table.add_to_wasm_table(module, function_id, wasm_function_id)?;
+
+        // Recursively translate and link functions called by this function
+        for function_id in &functions_to_link {
+            translate_and_link_functions(
+                function_id,
+                function_table,
+                function_definitions,
+                module,
+                compilation_ctx,
+                dynamic_fields_global_variables,
+            )?;
+        }
+    }
+
+    Ok(())
 }

@@ -479,9 +479,9 @@ impl NativeFunction {
         }
 
         let mut hasher = get_hasher();
-        generics
-            .iter()
-            .for_each(|t| t.process_hash(&mut hasher, compilation_ctx));
+        for t in generics {
+            t.process_hash(&mut hasher, compilation_ctx)?;
+        }
         let hash = format!("{:x}", hasher.finish());
 
         Ok(format!("___{name}_{hash}_{:x}", module_id.hash()))

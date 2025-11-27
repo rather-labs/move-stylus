@@ -3,7 +3,7 @@ use walrus::{
     ir::{MemArg, StoreKind},
 };
 
-use crate::CompilationContext;
+use crate::{CompilationContext, translation::TranslationError};
 
 /// Adds the instructions to load a literal heap type into memory.
 ///
@@ -13,7 +13,7 @@ pub fn load_literal_heap_type_to_memory(
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
     bytes: &[u8],
-) {
+) -> Result<(), TranslationError> {
     let pointer = module.locals.add(ValType::I32);
 
     builder.i32_const(bytes.len() as i32);
@@ -25,7 +25,9 @@ pub fn load_literal_heap_type_to_memory(
     while offset < bytes.len() {
         builder.local_get(pointer);
         builder.i64_const(i64::from_le_bytes(
-            bytes[offset..offset + 8].try_into().unwrap(),
+            bytes[offset..offset + 8]
+                .try_into()
+                .map_err(|_| TranslationError::CouldNotProcessByteArray)?,
         ));
         builder.store(
             compilation_ctx.memory_id,
@@ -40,4 +42,6 @@ pub fn load_literal_heap_type_to_memory(
     }
 
     builder.local_get(pointer);
+
+    Ok(())
 }

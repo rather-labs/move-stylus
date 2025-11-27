@@ -26,6 +26,12 @@ pub enum ConstructorError {
 
     #[error("an error ocurred while generating a runtime function's code")]
     RuntimeFunction(#[from] RuntimeFunctionError),
+
+    #[error("init function not found in table")]
+    InitFunctionNotFound,
+
+    #[error("init function WASM id not found in table")]
+    InitFunctionWasmIdNotFound,
 }
 
 impl From<ConstructorError> for CompilationError {
@@ -44,9 +50,9 @@ pub fn inject_constructor(
     if let Some(ref init_id) = compilation_ctx.root_module_data.functions.init {
         let wasm_init_fn = function_table
             .get_by_function_id(init_id)
-            .unwrap()
+            .ok_or(ConstructorError::InitFunctionNotFound)?
             .wasm_function_id
-            .unwrap();
+            .ok_or(ConstructorError::InitFunctionWasmIdNotFound)?;
 
         let constructor_fn_id = build_constructor(module, compilation_ctx, wasm_init_fn)?;
 

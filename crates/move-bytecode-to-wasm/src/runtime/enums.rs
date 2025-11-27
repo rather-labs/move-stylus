@@ -27,12 +27,10 @@ pub fn get_storage_size_by_offset(
         return Ok(function);
     }
 
-    let enum_ = compilation_ctx
-        .get_enum_by_intermediate_type(itype)
-        .unwrap();
+    let enum_ = compilation_ctx.get_enum_by_intermediate_type(itype)?;
 
     // Calculate the enum storage sizes for each offset
-    let storage_size = enum_.storage_size_by_offset(compilation_ctx).unwrap();
+    let storage_size = enum_.storage_size_by_offset(compilation_ctx)?;
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
     let mut builder = function.name(name).func_body();

@@ -8,7 +8,7 @@ use move_binary_format::{
 };
 use std::collections::HashMap;
 
-use super::{CompilationContextError, Result};
+use super::{CompilationContextError, Result, error::ModuleDataError};
 
 #[derive(Debug, Default)]
 pub struct StructData {
@@ -125,5 +125,17 @@ impl StructData {
     ) -> u16 {
         let struct_instance = &self.generic_structs_instances[struct_index.0 as usize];
         struct_instance.0.0
+    }
+
+    pub fn get_instantiated_field_generic_index(
+        &self,
+        field_id: &FieldInstantiationIndex,
+    ) -> Result<&(FieldHandleIndex, Vec<IntermediateType>)> {
+        Ok(self
+            .instantiated_fields_to_generic_fields
+            .get(field_id)
+            .ok_or(ModuleDataError::InstantiatedFieldGenericIndexNotFound(
+                *field_id,
+            ))?)
     }
 }

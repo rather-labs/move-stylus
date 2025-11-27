@@ -62,8 +62,8 @@ pub enum CompilationContextError {
     #[error("expected enum")]
     ExpectedEnum,
 
-    #[error("function with identifier {0} not found in compilation context")]
-    FunctionByIdentifierNotFound(String),
+    #[error("could not find external datatype handler index")]
+    ExternalDatatypeHandlerIndexNotFound,
 
     #[error("receive function with returns")]
     ReceiveFunctionHasReturns,

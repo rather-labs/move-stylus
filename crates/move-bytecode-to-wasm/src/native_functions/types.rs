@@ -33,9 +33,7 @@ pub fn add_is_one_time_witness_fn(
         return Ok(function);
     };
 
-    let struct_ = compilation_ctx
-        .get_struct_by_intermediate_type(itype)
-        .unwrap();
+    let struct_ = compilation_ctx.get_struct_by_intermediate_type(itype)?;
 
     // Function declaration
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);

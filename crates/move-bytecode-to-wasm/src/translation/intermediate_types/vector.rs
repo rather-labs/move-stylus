@@ -93,7 +93,9 @@ impl IVector {
         let len_local = module.locals.add(ValType::I32);
 
         // First byte is the length of the vector
-        let len = bytes.next().unwrap();
+        let len = bytes
+            .next()
+            .ok_or(IntermediateTypeError::EmptyBytesInVector)?;
         builder.i32_const(len as i32).local_set(len_local);
 
         let data_size: usize = inner.stack_data_size()? as usize;
@@ -405,7 +407,7 @@ impl IVector {
                                     offset: 0,
                                 },
                             );
-                            let enum_ = module_data.enums.get_enum_by_index(*index).unwrap();
+                            let enum_ = module_data.enums.get_enum_by_index(*index)?;
                             inner_result = enum_.copy_local_instructions(
                                 module,
                                 loop_block,

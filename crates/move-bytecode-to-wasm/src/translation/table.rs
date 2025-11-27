@@ -1,6 +1,5 @@
 use std::fmt::Display;
 
-use anyhow::Result;
 use walrus::{
     ConstExpr, ElementKind, FunctionId as WasmFunctionId, Module, TableId, TypeId, ValType,
     ir::Value,

@@ -5,6 +5,8 @@ use crate::{
     },
 };
 
+use super::error::ModuleDataError;
+
 #[derive(Debug, Default)]
 pub struct FunctionData {
     /// Module's functions arguments.
@@ -38,11 +40,12 @@ impl FunctionData {
         &self,
         identifier: &str,
     ) -> Result<&MappedFunction, CompilationContextError> {
-        self.information
+        Ok(self
+            .information
             .iter()
             .find(|f| f.function_id.identifier == identifier)
-            .ok_or(CompilationContextError::FunctionByIdentifierNotFound(
+            .ok_or(ModuleDataError::FunctionByIdentifierNotFound(
                 identifier.to_string(),
-            ))
+            ))?)
     }
 }
