@@ -374,7 +374,7 @@ pub fn add_emit_log_fn(
             IStructType::Common,
         );
 
-        let abi_encoded_data_writer_pointer = module.locals.add(ValType::I32);
+        // let abi_encoded_data_writer_pointer = module.locals.add(ValType::I32);
         let abi_encoded_data_calldata_reference_pointer = module.locals.add(ValType::I32);
 
         let data_struct_ptr = module.locals.add(ValType::I32);
@@ -385,6 +385,24 @@ pub fn add_emit_log_fn(
             .binop(BinaryOp::I32Add)
             .local_set(data_struct_ptr);
 
+        /*
+        let is_dynamic = data_struct.solidity_abi_encode_is_dynamic(compilation_ctx)?;
+        //let size = if is_dynamic {
+        //    32
+        if !is_dynamic {
+            let size = data_struct.solidity_abi_encode_size(compilation_ctx)? as i32;
+            builder
+                .i32_const(size)
+                .call(compilation_ctx.allocator)
+                .local_tee(writer_pointer)
+                .local_set(abi_encoded_data_calldata_reference_pointer);
+        } else {
+            builder
+                .local_get(writer_pointer)
+                .local_set(abi_encoded_data_calldata_reference_pointer);
+        };
+        */
+
         let is_dynamic = data_struct.solidity_abi_encode_is_dynamic(compilation_ctx)?;
         let size = if is_dynamic {
             32
@@ -392,23 +410,55 @@ pub fn add_emit_log_fn(
             data_struct.solidity_abi_encode_size(compilation_ctx)? as i32
         };
 
-        // Use the allocator to get a pointer to the end of the calldata
         builder
             .i32_const(size)
             .call(compilation_ctx.allocator)
-            .local_tee(abi_encoded_data_writer_pointer)
+            .local_tee(writer_pointer)
             .local_set(abi_encoded_data_calldata_reference_pointer);
 
-        data_struct.add_pack_instructions(
-            &mut builder,
-            module,
-            data_struct_ptr,
-            abi_encoded_data_writer_pointer,
-            abi_encoded_data_calldata_reference_pointer,
-            compilation_ctx,
-            None,
-        )?;
+        // Use the allocator to get a pointer to the end of the calldata
+
+        if data_struct.solidity_abi_encode_is_dynamic(compilation_ctx)? {
+            data_struct.add_pack_instructions(
+                &mut builder,
+                module,
+                data_struct_ptr,
+                writer_pointer,
+                abi_encoded_data_calldata_reference_pointer,
+                compilation_ctx,
+                Some(abi_encoded_data_calldata_reference_pointer),
+            )?;
+
+            // Move 32 bytes back the encoded
+
+            // Destination
+            builder.local_get(abi_encoded_data_calldata_reference_pointer);
+            // Source
+            builder
+                .local_get(abi_encoded_data_calldata_reference_pointer)
+                .i32_const(32)
+                .binop(BinaryOp::I32Add);
+            // Length
+            builder
+                .i32_const(0)
+                .call(compilation_ctx.allocator)
+                .i32_const(32)
+                .binop(BinaryOp::I32Sub);
+
+            builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+        } else {
+            data_struct.add_pack_instructions(
+                &mut builder,
+                module,
+                data_struct_ptr,
+                writer_pointer,
+                abi_encoded_data_calldata_reference_pointer,
+                compilation_ctx,
+                None,
+            )?;
+        }
     }
+
     // Beginning of the packed data
     builder.local_get(packed_data_begin);
 

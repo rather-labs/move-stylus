@@ -224,7 +224,7 @@ async fn main() -> eyre::Result<()> {
         println!(" event data = {event:?}");
     }
 
-    // Emit test event 3
+// Emit test event 3
     println!("Emitting test event 3");
     let pending_tx = example
         .emitTestEvent3(42, 43, vec![44, 45, 46], 47)
@@ -245,7 +245,7 @@ async fn main() -> eyre::Result<()> {
     for log in logs {
         let primitive_log: alloy::primitives::Log = log.clone().into();
         println!(" event data = {event:?}");
-        println!("Primitive log: {:?}", primitive_log);
+        println!("Primitive log: {primitive_log:?}");
         let decoded_event = Example::TestEvent3::decode_log(&primitive_log)?;
         println!("Decoded event data = {decoded_event:?}");
         assert_eq!(event, decoded_event.data);
@@ -267,9 +267,13 @@ async fn main() -> eyre::Result<()> {
     let logs = receipt.logs();
     for log in logs {
         let primitive_log: alloy::primitives::Log = log.clone().into();
+        println!("Primitive log: {primitive_log:?}");
         let decoded_event = Example::TestEvent4::decode_log(&primitive_log)?;
+        println!("Decoded event data = {decoded_event:?}");
         assert_eq!(event, decoded_event.data);
     }
+
+
 
     let s = example.testStack1().call().await?;
     println!("testStack1\nelements: {:?} len: {}", s._0.pos0, s._1);

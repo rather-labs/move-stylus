@@ -92,7 +92,7 @@ entry fun emit_test_event3(n: u32, a: u32, b: vector<u8>, c: u128) {
 }
 
 entry fun emit_test_event4(a: u32, b: vector<u16>, c: vector<u8>, d: vector<u32>) {
-    emit(TestEvent4 { a, b, c, d });
+    emit(TestEvent4 { a, b, c , d });
 }
 
 entry fun test_stack_1(): (Stack<u32>, u64) {
