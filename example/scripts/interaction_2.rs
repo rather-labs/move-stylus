@@ -4,7 +4,6 @@
 //! and check the value again. The deployed contract is fully written in Rust and compiled to WASM
 //! but with Stylus, it is accessible just as a normal Solidity smart contract is via an ABI.
 
-use alloy::hex;
 use alloy::primitives::keccak256;
 use alloy::providers::Provider;
 use alloy::signers::local::PrivateKeySigner;
@@ -230,7 +229,7 @@ async fn main() -> eyre::Result<()> {
         println!(" event data = {event:?}");
     }
 
-// Emit test event 3
+    // Emit test event 3
     println!("Emitting test event 3");
     let pending_tx = example
         .emitTestEvent3(42, 43, vec![44, 45, 46], 47)
@@ -278,8 +277,6 @@ async fn main() -> eyre::Result<()> {
         println!("Decoded event data = {decoded_event:?}");
         assert_eq!(event, decoded_event.data);
     }
-
-
 
     let s = example.testStack1().call().await?;
     println!("testStack1\nelements: {:?} len: {}", s._0.pos0, s._1);

@@ -375,9 +375,7 @@ pub fn add_emit_log_fn(
             IStructType::Common,
         );
 
-        // let abi_encoded_data_writer_pointer = module.locals.add(ValType::I32);
         let abi_encoded_data_calldata_reference_pointer = module.locals.add(ValType::I32);
-
         let data_struct_ptr = module.locals.add(ValType::I32);
 
         builder
@@ -426,10 +424,10 @@ pub fn add_emit_log_fn(
             builder
                 .i32_const(0)
                 .call(compilation_ctx.allocator)
-                .local_get(abi_encoded_data_calldata_reference_pointer)
+                .local_get(packed_data_begin)
+                .i32_const(32)
+                .binop(BinaryOp::I32Add)
                 .binop(BinaryOp::I32Sub)
-                // .i32_const(32)
-                // .binop(BinaryOp::I32Sub)
                 .local_tee(packed_data_length);
 
             builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
