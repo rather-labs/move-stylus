@@ -121,18 +121,16 @@ entry fun test_stack_3(): (Stack<u32>, u64){
 #[ext(event, indexes = 1)]
 public struct ReceiveEvent has copy, drop {
     sender: address,
+    data_length: u32,
+    data: vector<u8>,
 }
 
 #[ext(payable)]
 entry fun receive(ctx: &TxContext) {
-    emit(ReceiveEvent { sender: ctx.sender() });
+    emit(ReceiveEvent { sender: ctx.sender(), data_length: 0, data: vector[] });
 }
 
 #[ext(payable)]
-entry fun fallback(a: address, b: u32, ctx: &TxContext) {
-    if (b < 42) {
-        emit(ReceiveEvent { sender: a });
-    } else {
-        emit(ReceiveEvent { sender: ctx.sender() });
-    }
+entry fun fallback(data: vector<u8>, ctx: &TxContext) {
+    emit(ReceiveEvent { sender: ctx.sender(), data_length: data.length() as u32, data: data });
 }

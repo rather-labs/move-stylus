@@ -81,9 +81,11 @@ sol!(
         }
 
         #[derive(Debug, PartialEq)]
-        struct ReceiveEvent {
-            address sender;
-        }
+        event ReceiveEvent (
+            address indexed sender,
+            uint32 data_length,
+            uint8[] data,
+        );
 
         function emitTestEvent1(uint32 n) public view;
         function emitTestEvent2(uint32 a, uint8[] b, uint128 c) public view;
@@ -220,9 +222,9 @@ async fn main() -> eyre::Result<()> {
         .await?;
     let receipt = pending_tx.get_receipt().await?;
     let event = Example::TestEvent2 {
-        a: 43,
-        b: keccak256(vec![1, 2, 3].abi_encode()),
-        c: 1234,
+        a: 42,
+        b: keccak256(vec![43, 44, 45].abi_encode()),
+        c: 46,
     };
 
     // Decode event 2 from logs
@@ -297,57 +299,35 @@ async fn main() -> eyre::Result<()> {
 
     // Decode ReceiveEvent from the receipt logs
     for log in receipt.logs() {
-        let topics = log.topics();
-        let decoded_event = Example::ReceiveEvent::abi_decode(topics[1].as_slice())?;
-        let event = Example::ReceiveEvent { sender };
-        assert_eq!(decoded_event, event);
+        let primitive_log: alloy::primitives::Log = log.clone().into();
+        let decoded_event = Example::ReceiveEvent::decode_log(&primitive_log)?;
+        let event = Example::ReceiveEvent {
+            sender,
+            data_length: 0,
+            data: vec![],
+        };
+        assert_eq!(decoded_event.data, event);
     }
 
-    println!("\nCalling fallback with b < 42 by sending ETH with calldata");
-    println!("This should emit ReceiveEvent with sender = parameter 'a'");
-    let other = address!("0x0000000000000000000000000000000000000001");
-    // Encode fallback arguments (a: address, b: u32) as ABI parameters, without selector.
-    // Any non-empty calldata that doesn't match a function selector will route to fallback;
-    // here we also make the bytes ABI-compatible with the Move fallback's parameters.
-    let calldata_lt = (other, 41_u32).abi_encode();
+    println!("\nSending ETH with calldata");
+    println!("This should trigger the fallback function");
+    let calldata = vec![43, 44, 45].abi_encode();
     let tx = TransactionRequest::default()
         .from(sender)
         .to(address)
         .value(U256::from(1_000_000_000_000_000_000u128))
-        .input(calldata_lt.into());
+        .input(calldata.into());
     let pending_tx = provider.send_transaction(tx).await?;
     let receipt = pending_tx.get_receipt().await?;
     for log in receipt.logs() {
-        let topics = log.topics();
-        // ReceiveEvent has indexes = 1, so topics[1] holds the indexed sender address
-        let decoded_event = Example::ReceiveEvent::abi_decode(topics[1].as_slice())?;
-        let event = Example::ReceiveEvent { sender: other };
-        assert_eq!(decoded_event, event);
-        println!(
-            "fallback(b < 42) emitted ReceiveEvent with sender: {:?}",
-            decoded_event.sender
-        );
-    }
-
-    println!("\nCalling fallback with b >= 42 by sending ETH with calldata");
-    println!("This should emit ReceiveEvent with sender = ctx.sender()");
-    let calldata_ge = (other, 43_u32).abi_encode();
-    let tx = TransactionRequest::default()
-        .from(sender)
-        .to(address)
-        .value(U256::from(1_000_000_000_000_000_000u128))
-        .input(calldata_ge.into());
-    let pending_tx = provider.send_transaction(tx).await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let topics = log.topics();
-        let decoded_event = Example::ReceiveEvent::abi_decode(topics[1].as_slice())?;
-        let event = Example::ReceiveEvent { sender };
-        assert_eq!(decoded_event, event);
-        println!(
-            "fallback(b >= 42) emitted ReceiveEvent with sender: {:?}",
-            decoded_event.sender
-        );
+        let primitive_log: alloy::primitives::Log = log.clone().into();
+        let decoded_event = Example::ReceiveEvent::decode_log(&primitive_log)?;
+        let event = Example::ReceiveEvent {
+            sender,
+            data_length: 3,
+            data: vec![43, 44, 45],
+        };
+        assert_eq!(decoded_event.data, event);
     }
 
     Ok(())
