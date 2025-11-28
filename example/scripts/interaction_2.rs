@@ -34,6 +34,9 @@ sol!(
            ID id;
         }
 
+        #[derive(Debug)]
+        event NewUID(address indexed uid);
+
         #[derive(Debug, PartialEq)]
         event TestEvent1 (
             uint32 indexed n,
@@ -154,8 +157,9 @@ async fn main() -> eyre::Result<()> {
     let pending_tx = example.getUniqueIds().send().await?;
     let receipt = pending_tx.get_receipt().await?;
     for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("getUniqueIds - Emitted UID: 0x{}", hex::encode(raw));
+        let log: alloy::primitives::Log = log.clone().into();
+        let decoded_uid = Example::NewUID::decode_log(&log).unwrap();
+        println!("getUniqueIds - Emitted UID: 0x{}", decoded_uid.data.uid);
     }
 
     let storage_value_le = storage_value_to_le(&provider, address, counter_key).await?;
@@ -164,8 +168,9 @@ async fn main() -> eyre::Result<()> {
     let pending_tx = example.getUniqueId().send().await?;
     let receipt = pending_tx.get_receipt().await?;
     for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("getUniqueId - Emitted UID: 0x{}", hex::encode(raw));
+        let log: alloy::primitives::Log = log.clone().into();
+        let decoded_uid = Example::NewUID::decode_log(&log).unwrap();
+        println!("getUniqueIds - Emitted UID: 0x{}", decoded_uid.data.uid);
     }
     let storage_value_le = storage_value_to_le(&provider, address, counter_key).await?;
     println!("Counter value: {storage_value_le:?}");
@@ -173,8 +178,9 @@ async fn main() -> eyre::Result<()> {
     let pending_tx = example.getUniqueId().send().await?;
     let receipt = pending_tx.get_receipt().await?;
     for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("getUniqueId - Emitted UID: 0x{}", hex::encode(raw));
+        let log: alloy::primitives::Log = log.clone().into();
+        let decoded_uid = Example::NewUID::decode_log(&log).unwrap();
+        println!("getUniqueIds - Emitted UID: 0x{}", decoded_uid.data.uid);
     }
 
     let storage_value_le = storage_value_to_le(&provider, address, counter_key).await?;

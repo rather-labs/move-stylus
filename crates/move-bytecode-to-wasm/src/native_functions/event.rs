@@ -358,6 +358,7 @@ pub fn add_emit_log_fn(
     }
 
     let data_fields: &[IntermediateType] = &struct_.fields[indexes as usize..];
+    let packed_data_length = module.locals.add(ValType::I32);
 
     if !data_fields.is_empty() {
         // For the data left, we need to generate a "fake" IStruct with the fields that are not
@@ -384,24 +385,6 @@ pub fn add_emit_log_fn(
             .i32_const(4 * indexes as i32)
             .binop(BinaryOp::I32Add)
             .local_set(data_struct_ptr);
-
-        /*
-        let is_dynamic = data_struct.solidity_abi_encode_is_dynamic(compilation_ctx)?;
-        //let size = if is_dynamic {
-        //    32
-        if !is_dynamic {
-            let size = data_struct.solidity_abi_encode_size(compilation_ctx)? as i32;
-            builder
-                .i32_const(size)
-                .call(compilation_ctx.allocator)
-                .local_tee(writer_pointer)
-                .local_set(abi_encoded_data_calldata_reference_pointer);
-        } else {
-            builder
-                .local_get(writer_pointer)
-                .local_set(abi_encoded_data_calldata_reference_pointer);
-        };
-        */
 
         let is_dynamic = data_struct.solidity_abi_encode_is_dynamic(compilation_ctx)?;
         let size = if is_dynamic {
@@ -433,17 +416,21 @@ pub fn add_emit_log_fn(
 
             // Destination
             builder.local_get(abi_encoded_data_calldata_reference_pointer);
+
             // Source
             builder
                 .local_get(abi_encoded_data_calldata_reference_pointer)
                 .i32_const(32)
                 .binop(BinaryOp::I32Add);
-            // Length
+
             builder
                 .i32_const(0)
                 .call(compilation_ctx.allocator)
-                .i32_const(32)
-                .binop(BinaryOp::I32Sub);
+                .local_get(abi_encoded_data_calldata_reference_pointer)
+                .binop(BinaryOp::I32Sub)
+                // .i32_const(32)
+                // .binop(BinaryOp::I32Sub)
+                .local_tee(packed_data_length);
 
             builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
         } else {
@@ -456,21 +443,29 @@ pub fn add_emit_log_fn(
                 compilation_ctx,
                 None,
             )?;
+
+            builder
+                .i32_const(0)
+                .call(compilation_ctx.allocator)
+                .local_get(packed_data_begin)
+                .binop(BinaryOp::I32Sub)
+                .local_set(packed_data_length);
         }
+    } else {
+        builder
+            .i32_const(0)
+            .call(compilation_ctx.allocator)
+            .local_get(packed_data_begin)
+            .binop(BinaryOp::I32Sub)
+            .local_set(packed_data_length);
     }
 
     // Beginning of the packed data
-    builder.local_get(packed_data_begin);
-
-    // Use the allocator to get a pointer to the end of the calldata
     builder
-        .i32_const(0)
-        .call(compilation_ctx.allocator)
         .local_get(packed_data_begin)
-        .binop(BinaryOp::I32Sub);
-
-    let indexes = if is_anonymous { indexes } else { 1 + indexes } as i32;
-    builder.i32_const(indexes).call(emit_log_fn);
+        .local_get(packed_data_length)
+        .i32_const(if is_anonymous { indexes } else { 1 + indexes } as i32)
+        .call(emit_log_fn);
 
     Ok(function.finish(vec![struct_ptr], &mut module.funcs))
 }
