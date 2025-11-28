@@ -11,13 +11,12 @@ use dotenv::dotenv;
 use eyre::eyre;
 
 use alloy::{
-    hex,
     primitives::{Address, U256, address, keccak256},
     providers::{Provider, ProviderBuilder},
     rpc::types::TransactionRequest,
     signers::local::PrivateKeySigner,
     sol,
-    sol_types::SolValue,
+    sol_types::{SolEvent, SolValue},
     transports::http::reqwest::Url,
 };
 
@@ -35,17 +34,20 @@ sol!(
            ID id;
         }
 
-        #[derive(Debug, PartialEq)]
-        struct TestEvent1 {
-            uint32 n;
-        }
+        #[derive(Debug)]
+        event NewUID(address indexed uid);
 
         #[derive(Debug, PartialEq)]
-        struct TestEvent2 {
-            uint32 a;
-            uint8[] b;
-            uint128 c;
-        }
+        event TestEvent1 (
+            uint32 indexed n,
+        );
+
+        #[derive(Debug, PartialEq)]
+        event TestEvent2 (
+            uint32 indexed a,
+            uint8[] indexed b,
+            uint128 c,
+        );
 
         #[derive(Debug, PartialEq)]
         struct NestedStruct1 {
@@ -60,10 +62,18 @@ sol!(
         }
 
         #[derive(Debug, PartialEq)]
-        struct TestEvent3 {
-            NestedStruct1 a;
-            NestedStruct2 b;
-        }
+        event TestEvent3 (
+            NestedStruct1 indexed a,
+            NestedStruct2 b,
+        );
+
+        #[derive(Debug, PartialEq)]
+        event TestEvent4 (
+            uint32 indexed a,
+            uint16[] b,
+            uint8[] c,
+            uint32[] d,
+        );
 
         #[derive(Debug, PartialEq)]
         struct Stack {
@@ -78,6 +88,7 @@ sol!(
         function emitTestEvent1(uint32 n) public view;
         function emitTestEvent2(uint32 a, uint8[] b, uint128 c) public view;
         function emitTestEvent3(uint32 n, uint32 a, uint8[] b, uint128 c) public view;
+        function emitTestEvent4(uint32 a, uint16[] b, uint8[] c, uint32[] d) public view;
         function echoWithGenericFunctionU16(uint16 x) external view returns (uint16);
         function echoWithGenericFunctionVec32(uint32[] x) external view returns (uint32[]);
         function echoWithGenericFunctionU16Vec32(uint16 x, uint32[] y) external view returns (uint16, uint32[]);
@@ -88,7 +99,6 @@ sol!(
         function testStack1() external view returns (Stack, uint64);
         function testStack2() external view returns (Stack, uint64);
         function testStack3() external view returns (Stack, uint64);
-        function fallback(address a, uint32 b) external payable;
     }
 );
 
@@ -152,8 +162,9 @@ async fn main() -> eyre::Result<()> {
     let pending_tx = example.getUniqueIds().send().await?;
     let receipt = pending_tx.get_receipt().await?;
     for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("getUniqueIds - Emitted UID: 0x{}", hex::encode(raw));
+        let log: alloy::primitives::Log = log.clone().into();
+        let decoded_uid = Example::NewUID::decode_log(&log).unwrap();
+        println!("getUniqueIds - Emitted UID: 0x{}", decoded_uid.data.uid);
     }
 
     let storage_value_le = storage_value_to_le(&provider, address, counter_key).await?;
@@ -162,8 +173,9 @@ async fn main() -> eyre::Result<()> {
     let pending_tx = example.getUniqueId().send().await?;
     let receipt = pending_tx.get_receipt().await?;
     for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("getUniqueId - Emitted UID: 0x{}", hex::encode(raw));
+        let log: alloy::primitives::Log = log.clone().into();
+        let decoded_uid = Example::NewUID::decode_log(&log).unwrap();
+        println!("getUniqueIds - Emitted UID: 0x{}", decoded_uid.data.uid);
     }
     let storage_value_le = storage_value_to_le(&provider, address, counter_key).await?;
     println!("Counter value: {storage_value_le:?}");
@@ -171,8 +183,9 @@ async fn main() -> eyre::Result<()> {
     let pending_tx = example.getUniqueId().send().await?;
     let receipt = pending_tx.get_receipt().await?;
     for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("getUniqueId - Emitted UID: 0x{}", hex::encode(raw));
+        let log: alloy::primitives::Log = log.clone().into();
+        let decoded_uid = Example::NewUID::decode_log(&log).unwrap();
+        println!("getUniqueIds - Emitted UID: 0x{}", decoded_uid.data.uid);
     }
 
     let storage_value_le = storage_value_to_le(&provider, address, counter_key).await?;
@@ -186,89 +199,81 @@ async fn main() -> eyre::Result<()> {
 
     // Events
     // Emit test event 1
+    println!("Emitting test event 1");
     let pending_tx = example.emitTestEvent1(43).send().await?;
     let receipt = pending_tx.get_receipt().await?;
     let event = Example::TestEvent1 { n: 43 };
 
-    // Decode the event data
+    // Decode event 1 from logs
     let logs = receipt.logs();
     for log in logs {
-        let topics = log.topics();
-        let decoded_event = Example::TestEvent1::abi_decode(topics[1].as_slice())?;
-        assert_eq!(event, decoded_event);
+        let primitive_log: alloy::primitives::Log = log.clone().into();
+        let decoded_event = Example::TestEvent1::decode_log(&primitive_log)?;
+        assert_eq!(event, decoded_event.data);
     }
 
     // Emit test event 2
+    println!("Emitting test event 2");
     let pending_tx = example
         .emitTestEvent2(42, vec![43, 44, 45], 46)
         .send()
         .await?;
     let receipt = pending_tx.get_receipt().await?;
     let event = Example::TestEvent2 {
-        a: 42,
-        b: vec![43, 44, 45],
-        c: 46,
+        a: 43,
+        b: keccak256(vec![1, 2, 3].abi_encode()),
+        c: 1234,
     };
 
-    // Decode the event data
-    // TestEvent2 has indexes = 2, so fields 'a' and 'b' are indexed
-    // topics[0] = event signature, topics[1] = indexed 'a' (u32), topics[2] = indexed 'b' (vector<u8> hash)
-    // data field contains only 'c' (u128) which is not indexed
+    // Decode event 2 from logs
     let logs = receipt.logs();
     for log in logs {
-        let topics = log.topics();
-        let data = log.data().data.0.clone();
-
-        // Decode indexed 'a' (u32) from topics[1] using SolValue
-        let a = u32::abi_decode(topics[1].as_slice())?;
-
-        // let b = event.b.abi_encode();
-        // let b_hash = keccak256(b);
-        // assert_eq!(topics[2].as_slice(), b_hash.as_slice(), "Hash of 'b' vector doesn't match");
-
-        // Decode non-indexed 'c' (u128) from data using SolValue
-        let c = u128::abi_decode(&data)?;
-
-        assert_eq!(event.a, a);
-        assert_eq!(event.c, c);
+        let primitive_log: alloy::primitives::Log = log.clone().into();
+        let decoded_event = Example::TestEvent2::decode_log(&primitive_log)?;
+        assert_eq!(event, decoded_event.data);
     }
 
     // Emit test event 3
+    println!("Emitting test event 3");
     let pending_tx = example
-        .emitTestEvent3(43, 43, vec![1, 2, 3], 1234_u128)
+        .emitTestEvent3(42, 43, vec![44, 45, 46], 47)
         .send()
         .await?;
     let receipt = pending_tx.get_receipt().await?;
     let event = Example::TestEvent3 {
-        a: Example::NestedStruct1 { n: 43 },
+        a: keccak256(Example::NestedStruct1 { n: 42 }.abi_encode()),
         b: Example::NestedStruct2 {
             a: 43,
-            b: vec![1, 2, 3],
-            c: 1234_u128,
+            b: vec![44, 45, 46],
+            c: 47,
         },
     };
-    // Decode the event data
-    // TestEvent3 has indexes = 2, so fields 'a' and 'b' (both structs) are indexed
-    // topics[0] = event signature, topics[1] = indexed 'a' (NestedStruct1 hash), topics[2] = indexed 'b' (NestedStruct2 hash)
-    // data field is empty (both structs are indexed/hashed)
+    // Decode event 3 from logs
     let logs = receipt.logs();
     for log in logs {
-        let _topics = log.topics();
+        let primitive_log: alloy::primitives::Log = log.clone().into();
+        let decoded_event = Example::TestEvent3::decode_log(&primitive_log)?;
+        assert_eq!(event, decoded_event.data);
+    }
 
-        // // Verify the hash of 'a' (NestedStruct1) in topics[1]
-        // let a_encoded = event.a.abi_encode();
-        // let a_hash = keccak256(a_encoded);
-        // assert_eq!(topics[1].as_slice(), a_hash.as_slice(), "Hash of 'a' struct doesn't match");
-
-        // // Verify the hash of 'b' (NestedStruct2) in topics[2]
-        // let b_encoded = event.b.abi_encode();
-        // let b_hash = keccak256(b_encoded);
-        // assert_eq!(topics[2].as_slice(), b_hash.as_slice(), "Hash of 'b' struct doesn't match");
-
-        println!(
-            "Decoded event: a={:?} (hash verified), b={:?} (hash verified)",
-            event.a, event.b
-        );
+    // Emit test event 4
+    println!("Emitting test event 4");
+    let pending_tx = example
+        .emitTestEvent4(42, vec![43, 44, 45], vec![46, 47, 48], vec![49, 50, 51])
+        .send()
+        .await?;
+    let receipt = pending_tx.get_receipt().await?;
+    let event = Example::TestEvent4 {
+        a: 42,
+        b: vec![43, 44, 45],
+        c: vec![46, 47, 48],
+        d: vec![49, 50, 51],
+    };
+    let logs = receipt.logs();
+    for log in logs {
+        let primitive_log: alloy::primitives::Log = log.clone().into();
+        let decoded_event = Example::TestEvent4::decode_log(&primitive_log)?;
+        assert_eq!(event, decoded_event.data);
     }
 
     let s = example.testStack1().call().await?;
