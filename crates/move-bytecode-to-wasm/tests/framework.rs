@@ -157,6 +157,9 @@ mod event {
         function emitTestAnonEvent7(uint32 a, uint8[] b, uint32 c, address d, uint128 e) external;
         function emitTestAnonEvent8(uint64 a, string b) external;
         function emitTestAnonEvent9(uint64 a, string b) external;
+        function emitTestAnonEvent10(uint32 a, address b, uint8[][] c) external;
+        function emitTestAnonEvent11(uint32 a, address b, uint32 c, uint16[] d, string e) external;
+        function emitTestAnonEvent12(uint64 a, string[] b) external;
         function emitTestAnonymous(uint32 a, uint128 b, uint8[] c, uint32 d, address e, uint128 f) external;
     );
 
@@ -267,6 +270,39 @@ mod event {
         42.abi_encode().to_vec(),
         keccak256(b"test string").to_vec(),
     ].concat())]
+    #[case(emitTestEvent10Call::new((
+        42,
+        address!("0xcafe000000000000000000000000000000007357"),
+        vec![vec![1, 2], vec![3, 4], vec![5, 6]],
+    )), 4,
+    [
+        keccak256(b"TestEvent10(uint32,address,uint8[][])").to_vec(),
+        42.abi_encode().to_vec(),
+        address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec(),
+        hex::decode("0x67fd5a843da88fc165a797990d9a7825dcc0af1c9931a6aebababf15e4f2ac41").unwrap()
+    ].concat())]
+    #[case(emitTestEvent11Call::new((
+        41,
+        address!("0xcafe000000000000000000000000000000007357"),
+        43,
+        vec![1, 2, 3, 4, 5],
+        "test string".into(),
+    )), 4,
+    [
+        keccak256(b"TestEvent11(uint32,address,(uint32,uint16[],string))").to_vec(),
+        41.abi_encode().to_vec(),
+        address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec(),
+        hex::decode("0xc37ba50506dec0245492dceb29917e1743c990c285df6a31baf211c204ad8c39").unwrap(),
+    ].concat())]
+    #[case(emitTestEvent12Call::new((
+        42,
+        vec!["test string".into(), "hello world".into()],
+    )), 3,
+    [
+        keccak256(b"TestEvent12(uint64,string[])").to_vec(),
+        42.abi_encode().to_vec(),
+        hex::decode("0x4262f685f28afa73e3ac58a6f7cbef13d4d78bc1b4a8ca117c3e4bccb5e6b47e").unwrap(),
+    ].concat())]
     #[case(emitTestAnonEvent1Call::new((42,)), 1, [42.abi_encode().to_vec()].concat())]
     #[case(emitTestAnonEvent2Call::new((
         42,
@@ -362,6 +398,36 @@ mod event {
         42.abi_encode().to_vec(),
         keccak256(b"test string").to_vec(),
     ].concat())]
+    #[case(emitTestAnonEvent10Call::new((
+        42,
+        address!("0xcafe000000000000000000000000000000007357"),
+        vec![vec![1, 2], vec![3, 4], vec![5, 6]],
+    )), 3,
+    [
+        42.abi_encode().to_vec(),
+        address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec(),
+        hex::decode("0x67fd5a843da88fc165a797990d9a7825dcc0af1c9931a6aebababf15e4f2ac41").unwrap()
+    ].concat())]
+    #[case(emitTestAnonEvent11Call::new((
+        41,
+        address!("0xcafe000000000000000000000000000000007357"),
+        43,
+        vec![1, 2, 3, 4, 5],
+        "test string".into(),
+    )), 3,
+    [
+        41.abi_encode().to_vec(),
+        address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec(),
+        hex::decode("0xc37ba50506dec0245492dceb29917e1743c990c285df6a31baf211c204ad8c39").unwrap(),
+    ].concat())]
+    #[case(emitTestAnonEvent12Call::new((
+        42,
+        vec!["test string".into(), "hello world".into()],
+    )), 2,
+    [
+        42.abi_encode().to_vec(),
+        hex::decode("0x4262f685f28afa73e3ac58a6f7cbef13d4d78bc1b4a8ca117c3e4bccb5e6b47e").unwrap(),
+    ].concat())]
     #[case(emitTestAnonymousCall::new((
         42,
         u128::MAX,
@@ -373,7 +439,6 @@ mod event {
     [
         42.abi_encode().to_vec(),
         u128::MAX.abi_encode(),
-        //keccak256(vec![1, 2, 3, 4, 5].abi_encode()).to_vec(),
         hex::decode("0x5917e5a395fb9b454434de59651d36822a9e29c5ec57474df3e67937b969460c").unwrap(),
         keccak256(NestedStruct {
             a: 43,
@@ -381,41 +446,6 @@ mod event {
             c: u128::MAX,
         }.abi_encode()).to_vec()
     ].concat())]
-    #[case(emitTestEvent10Call::new((
-        42,
-        address!("0xcafe000000000000000000000000000000007357"),
-        vec![vec![1, 2], vec![3, 4], vec![5, 6]],
-    )), 4,
-    [
-        keccak256(b"TestEvent10(uint32,address,uint8[][])").to_vec(),
-        42.abi_encode().to_vec(),
-        address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec(),
-        hex::decode("0x67fd5a843da88fc165a797990d9a7825dcc0af1c9931a6aebababf15e4f2ac41").unwrap()
-        //keccak256(vec![1, 2, 3, 4, 5].abi_encode()).to_vec(),
-    ].concat())]
-    #[case(emitTestEvent11Call::new((
-        41,
-        address!("0xcafe000000000000000000000000000000007357"),
-        43,
-        vec![1, 2, 3, 4, 5],
-        "test string".into(),
-    )), 4,
-    [
-        keccak256(b"TestEvent11(uint32,address,(uint32,uint16[],string))").to_vec(),
-        41.abi_encode().to_vec(),
-        address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec(),
-        hex::decode("0xc37ba50506dec0245492dceb29917e1743c990c285df6a31baf211c204ad8c39").unwrap(),
-    ].concat())]
-    #[case(emitTestEvent12Call::new((
-        42,
-        vec!["test string".into(), "hello world".into()],
-    )), 3,
-    [
-        keccak256(b"TestEvent12(uint64,string[])").to_vec(),
-        42.abi_encode().to_vec(),
-        hex::decode("0x4262f685f28afa73e3ac58a6f7cbef13d4d78bc1b4a8ca117c3e4bccb5e6b47e").unwrap(),
-    ].concat())]
-
     fn test_emit_event<T: SolCall>(
         runtime: RuntimeSandbox,
         #[case] call_data: T,
