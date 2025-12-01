@@ -312,11 +312,12 @@ async fn main() -> eyre::Result<()> {
     println!("\nSending ETH with calldata");
     println!("This should trigger the fallback function");
     let calldata = vec![43, 44, 45].abi_encode();
+    let calldata_len = calldata.len() as u32;
     let tx = TransactionRequest::default()
         .from(sender)
         .to(address)
         .value(U256::from(1_000_000_000_000_000_000u128))
-        .input(calldata.into());
+        .input(calldata.clone().into());
     let pending_tx = provider.send_transaction(tx).await?;
     let receipt = pending_tx.get_receipt().await?;
     for log in receipt.logs() {
@@ -324,8 +325,52 @@ async fn main() -> eyre::Result<()> {
         let decoded_event = Example::ReceiveEvent::decode_log(&primitive_log)?;
         let event = Example::ReceiveEvent {
             sender,
-            data_length: 3,
-            data: vec![43, 44, 45],
+            data_length: calldata_len,
+            data: calldata.clone(),
+        };
+        assert_eq!(decoded_event.data, event);
+    }
+
+    println!("\nSending ETH with a string as calldata");
+    let calldata = String::from("hola como estas").abi_encode();
+    let calldata_len = calldata.len() as u32;
+    let tx = TransactionRequest::default()
+        .from(sender)
+        .to(address)
+        .value(U256::from(1_000_000_000_000_000_000u128))
+        .input(calldata.clone().into());
+
+    let pending_tx = provider.send_transaction(tx).await?;
+    let receipt = pending_tx.get_receipt().await?;
+    for log in receipt.logs() {
+        let primitive_log: alloy::primitives::Log = log.clone().into();
+        let decoded_event = Example::ReceiveEvent::decode_log(&primitive_log)?;
+        let event = Example::ReceiveEvent {
+            sender,
+            data_length: calldata_len,
+            data: calldata.clone(),
+        };
+        assert_eq!(decoded_event.data, event);
+    }
+
+    println!("\nSending ETH with a u256 as calldata");
+    let calldata = U256::MAX.abi_encode();
+    let calldata_len = calldata.len() as u32;
+    let tx = TransactionRequest::default()
+        .from(sender)
+        .to(address)
+        .value(U256::from(1_000_000_000_000_000_000u128))
+        .input(calldata.clone().into());
+
+    let pending_tx = provider.send_transaction(tx).await?;
+    let receipt = pending_tx.get_receipt().await?;
+    for log in receipt.logs() {
+        let primitive_log: alloy::primitives::Log = log.clone().into();
+        let decoded_event = Example::ReceiveEvent::decode_log(&primitive_log)?;
+        let event = Example::ReceiveEvent {
+            sender,
+            data_length: calldata_len,
+            data: calldata.clone(),
         };
         assert_eq!(decoded_event.data, event);
     }

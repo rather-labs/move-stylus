@@ -4,6 +4,7 @@ use stylus::tx_context::TxContext;
 use stylus::object as object;
 use stylus::object::UID;
 use stylus::event::emit;
+use stylus::fallback;
 use hello_world::stack::Stack;
 use hello_world::stack;
 
@@ -131,6 +132,10 @@ entry fun receive(ctx: &TxContext) {
 }
 
 #[ext(payable)]
-entry fun fallback(data: vector<u8>, ctx: &TxContext) {
-    emit(ReceiveEvent { sender: ctx.sender(), data_length: data.length() as u32, data: data });
+entry fun fallback(data: &fallback::Calldata, ctx: &TxContext) {
+    emit(ReceiveEvent { 
+        sender: ctx.sender(), 
+        data_length: fallback::calldata_length(data), 
+        data: fallback::calldata_as_vector(data) 
+    });
 }
