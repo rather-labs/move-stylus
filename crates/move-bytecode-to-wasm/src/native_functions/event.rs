@@ -135,18 +135,20 @@ pub fn add_emit_log_fn(
                 index: struct_index,
                 ..
             } if String_::is_vm_type(module_id, *struct_index, compilation_ctx).unwrap() => {
+                let (print_i32, _, print_m, _, _, _) = crate::declare_host_debug_functions!(module);
+
                 let value = module.locals.add(ValType::I32);
                 builder
                     .local_get(struct_ptr)
                     .load(
                         compilation_ctx.memory_id,
-                        walrus::ir::LoadKind::I32 { atomic: false },
+                        LoadKind::I32 { atomic: false },
                         MemArg {
                             offset: field_index as u32 * 4,
                             align: 0,
                         },
                     )
-                    .local_set(local);
+                    .local_set(value);
 
                 let data_begin = module.locals.add(ValType::I32);
 
@@ -160,6 +162,16 @@ pub fn add_emit_log_fn(
                 builder
                     .get_memory_curret_position(compilation_ctx)
                     .local_set(data_end);
+
+                builder.local_get(data_begin).call(print_i32);
+                builder.local_get(data_end).call(print_i32);
+
+                builder
+                    .local_get(data_begin)
+                    .local_get(data_end)
+                    .local_get(data_begin)
+                    .binop(BinaryOp::I32Sub)
+                    .call(print_m);
 
                 event_fields_encoded_data.push(Some((data_begin, data_end)))
             }
@@ -834,7 +846,11 @@ fn add_encode_indexed_string(
     compilation_ctx: &CompilationContext,
     string_ptr: LocalId,
 ) {
+    let (print_i32, _, print_m, _, _, _) = crate::declare_host_debug_functions!(module);
     let writer_pointer = module.locals.add(ValType::I32);
+
+    builder.local_get(string_ptr).call(print_i32);
+    builder.local_get(string_ptr).i32_const(64).call(print_m);
 
     // String in move have the following form:
     // public struct String has copy, drop, store {
@@ -862,6 +878,8 @@ fn add_encode_indexed_string(
             compilation_ctx.memory_id,
         )
         .unwrap();
+
+    builder.local_get(len).call(print_i32);
 
     // Allocate space for the text, padding by 32 bytes plus 32 bytes for the length
     builder

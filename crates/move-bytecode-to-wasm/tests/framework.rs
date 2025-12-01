@@ -264,7 +264,7 @@ mod event {
     [
         keccak256(b"TestEvent9(uint64,string)").to_vec(),
         42.abi_encode().to_vec(),
-        keccak256("test string".abi_encode()).to_vec(),
+        keccak256(b"test string").to_vec(),
     ].concat())]
     #[case(emitTestAnonEvent1Call::new((42,)), 1, [42.abi_encode().to_vec()].concat())]
     #[case(emitTestAnonEvent2Call::new((
@@ -359,7 +359,7 @@ mod event {
     )), 2,
     [
         42.abi_encode().to_vec(),
-        keccak256("test string".abi_encode()).to_vec(),
+        keccak256(b"test string").to_vec(),
     ].concat())]
     #[case(emitTestAnonymousCall::new((
         42,
