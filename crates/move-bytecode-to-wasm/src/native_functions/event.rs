@@ -133,8 +133,6 @@ pub fn add_emit_log_fn(
                 index: struct_index,
                 ..
             } if String_::is_vm_type(module_id, *struct_index, compilation_ctx).unwrap() => {
-                // let (print_i32, _, print_m, _, _, _) = crate::declare_host_debug_functions!(module);
-
                 let value = module.locals.add(ValType::I32);
                 builder
                     .local_get(struct_ptr)
@@ -169,7 +167,6 @@ pub fn add_emit_log_fn(
             | IntermediateType::IGenericStructInstance {
                 module_id, index, ..
             } => {
-                let (print_i32, _, print_m, _, _, _) = crate::declare_host_debug_functions!(module);
                 let struct_ = compilation_ctx.get_struct_by_index(module_id, *index)?;
 
                 let struct_ = if let IntermediateType::IGenericStructInstance { types, .. } = field
@@ -209,13 +206,6 @@ pub fn add_emit_log_fn(
                 builder
                     .get_memory_curret_position(compilation_ctx)
                     .local_set(data_end);
-
-                builder
-                    .local_get(data_begin)
-                    .local_get(data_end)
-                    .local_get(data_begin)
-                    .binop(BinaryOp::I32Sub)
-                    .call(print_m);
 
                 event_fields_encoded_data.push(Some((data_begin, data_end)));
             }
