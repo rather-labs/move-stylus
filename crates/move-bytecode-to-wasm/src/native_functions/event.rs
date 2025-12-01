@@ -120,7 +120,7 @@ pub fn add_emit_log_fn(
                     compilation_ctx,
                     inner,
                     local,
-                );
+                )?;
 
                 builder
                     .get_memory_curret_position(compilation_ctx)
@@ -132,7 +132,7 @@ pub fn add_emit_log_fn(
                 module_id,
                 index: struct_index,
                 ..
-            } if String_::is_vm_type(module_id, *struct_index, compilation_ctx).unwrap() => {
+            } if String_::is_vm_type(module_id, *struct_index, compilation_ctx)? => {
                 let value = module.locals.add(ValType::I32);
                 builder
                     .local_get(struct_ptr)
@@ -152,7 +152,7 @@ pub fn add_emit_log_fn(
                     .get_memory_curret_position(compilation_ctx)
                     .local_set(data_begin);
 
-                add_encode_indexed_string(module, &mut builder, compilation_ctx, value, false);
+                add_encode_indexed_string(module, &mut builder, compilation_ctx, value, false)?;
 
                 let data_end = module.locals.add(ValType::I32);
                 builder
@@ -200,7 +200,7 @@ pub fn add_emit_log_fn(
                     compilation_ctx,
                     struct_,
                     local,
-                );
+                )?;
 
                 let data_end = module.locals.add(ValType::I32);
                 builder
@@ -468,26 +468,29 @@ pub fn add_emit_log_fn(
     Ok(function.finish(vec![struct_ptr], &mut module.funcs))
 }
 
+///
 fn add_encode_indexed_vector_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
     inner: &IntermediateType,
     vector_ptr: LocalId,
-) {
+) -> Result<(), NativeFunctionError> {
     // Get the len
-    let len = IntermediateType::IU32
-        .add_load_memory_to_local_instructions(
-            module,
-            builder,
-            vector_ptr,
-            compilation_ctx.memory_id,
-        )
-        .unwrap();
+    let len = IntermediateType::IU32.add_load_memory_to_local_instructions(
+        module,
+        builder,
+        vector_ptr,
+        compilation_ctx.memory_id,
+    )?;
 
     // Skip vector header
     builder.skip_vec_header(vector_ptr).local_set(vector_ptr);
 
+    let i = module.locals.add(ValType::I32);
+    builder.i32_const(0).local_set(i);
+
+    let mut inner_result: Result<(), NativeFunctionError> = Ok(());
     match inner {
         // If the data is "simple" we just concatenate things contigously
         IntermediateType::IBool
@@ -498,8 +501,6 @@ fn add_encode_indexed_vector_instructions(
         | IntermediateType::IU128
         | IntermediateType::IU256
         | IntermediateType::IAddress => {
-            let i = module.locals.add(ValType::I32);
-            builder.i32_const(0).local_set(i);
             let writer_pointer = module.locals.add(ValType::I32);
             let (value, load_kind) = if inner == &IntermediateType::IU64 {
                 (
@@ -514,103 +515,108 @@ fn add_encode_indexed_vector_instructions(
             };
 
             builder.loop_(None, |loop_| {
-                loop_
-                    .local_get(vector_ptr)
-                    .load(
-                        compilation_ctx.memory_id,
-                        load_kind,
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    )
-                    .local_set(value);
+                inner_result = (|| {
+                    loop_
+                        .local_get(vector_ptr)
+                        .load(
+                            compilation_ctx.memory_id,
+                            load_kind,
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        )
+                        .local_set(value);
 
-                let loop_id = loop_.id();
+                    let loop_id = loop_.id();
 
-                // Allocate 32 bytes for the encoded data
-                loop_
-                    .i32_const(32)
-                    .call(compilation_ctx.allocator)
-                    .local_set(writer_pointer);
+                    // Allocate 32 bytes for the encoded data
+                    loop_
+                        .i32_const(32)
+                        .call(compilation_ctx.allocator)
+                        .local_set(writer_pointer);
 
-                inner
-                    .add_pack_instructions(
+                    inner.add_pack_instructions(
                         loop_,
                         module,
                         value,
                         writer_pointer,
                         writer_pointer,
                         compilation_ctx,
-                    )
-                    .unwrap();
+                    )?;
 
-                loop_
-                    .local_get(vector_ptr)
-                    .i32_const(inner.stack_data_size().unwrap() as i32)
-                    .binop(BinaryOp::I32Add)
-                    .local_set(vector_ptr);
+                    loop_
+                        .local_get(vector_ptr)
+                        .i32_const(inner.stack_data_size()? as i32)
+                        .binop(BinaryOp::I32Add)
+                        .local_set(vector_ptr);
 
-                // increment i
-                loop_
-                    .local_get(i)
-                    .i32_const(1)
-                    .binop(BinaryOp::I32Add)
-                    .local_tee(i);
+                    // increment i
+                    loop_
+                        .local_get(i)
+                        .i32_const(1)
+                        .binop(BinaryOp::I32Add)
+                        .local_tee(i);
 
-                loop_.local_get(len).binop(BinaryOp::I32LtU).br_if(loop_id);
+                    loop_.local_get(len).binop(BinaryOp::I32LtU).br_if(loop_id);
+
+                    Ok(())
+                })();
             });
         }
         IntermediateType::ISigner => todo!(),
         IntermediateType::IVector(inner) => {
-            let i = module.locals.add(ValType::I32);
             let value = module.locals.add(ValType::I32);
             builder.i32_const(0).local_set(i);
 
             builder.loop_(None, |loop_| {
                 let loop_id = loop_.id();
 
-                loop_
-                    .local_get(vector_ptr)
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    )
-                    .local_set(value);
+                inner_result = (|| {
+                    loop_
+                        .local_get(vector_ptr)
+                        .load(
+                            compilation_ctx.memory_id,
+                            LoadKind::I32 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        )
+                        .local_set(value);
 
-                add_encode_indexed_vector_instructions(
-                    module,
-                    loop_,
-                    compilation_ctx,
-                    inner,
-                    value,
-                );
+                    add_encode_indexed_vector_instructions(
+                        module,
+                        loop_,
+                        compilation_ctx,
+                        inner,
+                        value,
+                    )?;
 
-                loop_
-                    .local_get(vector_ptr)
-                    .i32_const(inner.stack_data_size().unwrap() as i32)
-                    .binop(BinaryOp::I32Add)
-                    .local_set(vector_ptr);
+                    loop_
+                        .local_get(vector_ptr)
+                        .i32_const(inner.stack_data_size()? as i32)
+                        .binop(BinaryOp::I32Add)
+                        .local_set(vector_ptr);
 
-                // increment i
-                loop_
-                    .local_get(i)
-                    .i32_const(1)
-                    .binop(BinaryOp::I32Add)
-                    .local_tee(i);
+                    // increment i
+                    loop_
+                        .local_get(i)
+                        .i32_const(1)
+                        .binop(BinaryOp::I32Add)
+                        .local_tee(i);
 
-                loop_.local_get(len).binop(BinaryOp::I32LtU).br_if(loop_id);
+                    loop_.local_get(len).binop(BinaryOp::I32LtU).br_if(loop_id);
+
+                    Ok(())
+                })();
             });
         }
         IntermediateType::IStruct {
             module_id,
             index: struct_index,
             ..
-        } if String_::is_vm_type(module_id, *struct_index, compilation_ctx).unwrap() => {
+        } if String_::is_vm_type(module_id, *struct_index, compilation_ctx)? => {
             let i = module.locals.add(ValType::I32);
             let value = module.locals.add(ValType::I32);
             builder.i32_const(0).local_set(i);
@@ -618,57 +624,54 @@ fn add_encode_indexed_vector_instructions(
             builder.loop_(None, |loop_| {
                 let loop_id = loop_.id();
 
-                loop_
-                    .local_get(vector_ptr)
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    )
-                    .local_set(value);
+                inner_result = (|| {
+                    loop_
+                        .local_get(vector_ptr)
+                        .load(
+                            compilation_ctx.memory_id,
+                            LoadKind::I32 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        )
+                        .local_set(value);
 
-                add_encode_indexed_string(module, loop_, compilation_ctx, value, true);
+                    add_encode_indexed_string(module, loop_, compilation_ctx, value, true)?;
 
-                loop_
-                    .local_get(vector_ptr)
-                    .i32_const(4)
-                    .binop(BinaryOp::I32Add)
-                    .local_set(vector_ptr);
+                    loop_
+                        .local_get(vector_ptr)
+                        .i32_const(4)
+                        .binop(BinaryOp::I32Add)
+                        .local_set(vector_ptr);
 
-                // increment i
-                loop_
-                    .local_get(i)
-                    .i32_const(1)
-                    .binop(BinaryOp::I32Add)
-                    .local_tee(i);
+                    loop_
+                        .local_get(i)
+                        .i32_const(1)
+                        .binop(BinaryOp::I32Add)
+                        .local_tee(i);
 
-                loop_.local_get(len).binop(BinaryOp::I32LtU).br_if(loop_id);
+                    loop_.local_get(len).binop(BinaryOp::I32LtU).br_if(loop_id);
+                    Ok(())
+                })();
             });
         }
-        IntermediateType::IRef(intermediate_type) => todo!(),
-        IntermediateType::IMutRef(intermediate_type) => todo!(),
-        IntermediateType::ITypeParameter(_) => todo!(),
-        IntermediateType::IStruct {
-            module_id,
-            index,
-            vm_handled_struct,
-        } => todo!(),
-        IntermediateType::IGenericStructInstance {
-            module_id,
-            index,
-            types,
-            vm_handled_struct,
-        } => todo!(),
         IntermediateType::IEnum { module_id, index } => todo!(),
         IntermediateType::IGenericEnumInstance {
             module_id,
             index,
             types,
         } => todo!(),
+        _ => {
+            return Err(NativeFunctionError::EmitFunctionInvalidEventField(
+                IntermediateType::IVector(Box::new(inner.clone())),
+            ));
+        }
     }
+
+    inner_result?;
+
+    Ok(())
 }
 
 fn add_encode_indexed_struct_instructions(
@@ -677,7 +680,7 @@ fn add_encode_indexed_struct_instructions(
     compilation_ctx: &CompilationContext,
     struct_: &IStruct,
     struct_ptr: LocalId,
-) {
+) -> Result<(), NativeFunctionError> {
     for (index, field) in struct_.fields.iter().enumerate() {
         match field {
             // If the data is "simple" we just concatenate things contigously
@@ -711,7 +714,7 @@ fn add_encode_indexed_struct_instructions(
                     },
                 );
 
-                if field.is_stack_type().unwrap() {
+                if field.is_stack_type()? {
                     builder
                         .load(
                             compilation_ctx.memory_id,
@@ -732,16 +735,14 @@ fn add_encode_indexed_struct_instructions(
                     .call(compilation_ctx.allocator)
                     .local_set(writer_pointer);
 
-                field
-                    .add_pack_instructions(
-                        builder,
-                        module,
-                        value,
-                        writer_pointer,
-                        writer_pointer,
-                        compilation_ctx,
-                    )
-                    .unwrap();
+                field.add_pack_instructions(
+                    builder,
+                    module,
+                    value,
+                    writer_pointer,
+                    writer_pointer,
+                    compilation_ctx,
+                )?;
             }
             IntermediateType::IVector(inner) => {
                 let value = module.locals.add(ValType::I32);
@@ -764,13 +765,13 @@ fn add_encode_indexed_struct_instructions(
                     compilation_ctx,
                     inner,
                     value,
-                );
+                )?;
             }
             IntermediateType::IStruct {
                 module_id,
                 index: struct_index,
                 ..
-            } if String_::is_vm_type(module_id, *struct_index, compilation_ctx).unwrap() => {
+            } if String_::is_vm_type(module_id, *struct_index, compilation_ctx)? => {
                 let value = module.locals.add(ValType::I32);
                 builder
                     .local_get(struct_ptr)
@@ -784,7 +785,7 @@ fn add_encode_indexed_struct_instructions(
                     )
                     .local_set(value);
 
-                add_encode_indexed_string(module, builder, compilation_ctx, value, true);
+                add_encode_indexed_string(module, builder, compilation_ctx, value, true)?;
             }
             IntermediateType::IStruct {
                 module_id,
@@ -797,9 +798,7 @@ fn add_encode_indexed_struct_instructions(
                 ..
             } => {
                 let value = module.locals.add(ValType::I32);
-                let child_struct = compilation_ctx
-                    .get_struct_by_index(module_id, *struct_index)
-                    .unwrap();
+                let child_struct = compilation_ctx.get_struct_by_index(module_id, *struct_index)?;
 
                 let child_struct =
                     if let IntermediateType::IGenericStructInstance { types, .. } = field {
@@ -834,20 +833,23 @@ fn add_encode_indexed_struct_instructions(
                     compilation_ctx,
                     child_struct,
                     value,
-                );
+                )?;
             }
-            IntermediateType::IRef(intermediate_type) => todo!(),
-            IntermediateType::IMutRef(intermediate_type) => todo!(),
-            IntermediateType::ITypeParameter(_) => todo!(),
             IntermediateType::IEnum { module_id, index } => todo!(),
-            IntermediateType::ISigner => todo!(),
             IntermediateType::IGenericEnumInstance {
                 module_id,
                 index,
                 types,
             } => todo!(),
+            _ => {
+                return Err(NativeFunctionError::EmitFunctionInvalidEventField(
+                    field.clone(),
+                ));
+            }
         }
     }
+
+    Ok(())
 }
 
 fn add_encode_indexed_string(
@@ -856,7 +858,7 @@ fn add_encode_indexed_string(
     compilation_ctx: &CompilationContext,
     string_ptr: LocalId,
     padded: bool,
-) {
+) -> Result<(), NativeFunctionError> {
     let writer_pointer = module.locals.add(ValType::I32);
 
     // String in move have the following form:
@@ -877,14 +879,12 @@ fn add_encode_indexed_string(
         )
         .local_set(string_ptr);
 
-    let len = IntermediateType::IU32
-        .add_load_memory_to_local_instructions(
-            module,
-            builder,
-            string_ptr,
-            compilation_ctx.memory_id,
-        )
-        .unwrap();
+    let len = IntermediateType::IU32.add_load_memory_to_local_instructions(
+        module,
+        builder,
+        string_ptr,
+        compilation_ctx.memory_id,
+    )?;
 
     if padded {
         builder
@@ -957,4 +957,6 @@ fn add_encode_indexed_string(
             .binop(BinaryOp::I32LtU)
             .br_if(loop_block_id);
     });
+
+    Ok(())
 }
