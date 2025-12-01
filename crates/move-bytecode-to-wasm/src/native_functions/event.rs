@@ -485,18 +485,18 @@ fn add_encode_indexed_vector_instructions(
 
     match inner {
         // If the data is "simple" we just concatenate things contigously
-        inner_t @ (IntermediateType::IBool
+        IntermediateType::IBool
         | IntermediateType::IU8
         | IntermediateType::IU16
         | IntermediateType::IU32
         | IntermediateType::IU64
         | IntermediateType::IU128
         | IntermediateType::IU256
-        | IntermediateType::IAddress) => {
+        | IntermediateType::IAddress => {
             let i = module.locals.add(ValType::I32);
             builder.i32_const(0).local_set(i);
             let writer_pointer = module.locals.add(ValType::I32);
-            let (value, load_kind) = if inner_t == &IntermediateType::IU64 {
+            let (value, load_kind) = if inner == &IntermediateType::IU64 {
                 (
                     module.locals.add(ValType::I64),
                     LoadKind::I64 { atomic: false },
@@ -621,5 +621,168 @@ fn add_encode_indexed_vector_instructions(
             index,
             types,
         } => todo!(),
+    }
+}
+
+fn add_encode_indexed_struct_instructions(
+    module: &mut Module,
+    builder: &mut InstrSeqBuilder,
+    compilation_ctx: &CompilationContext,
+    struct_: &IStruct,
+    struct_ptr: LocalId,
+) {
+    for (index, field) in struct_.fields.iter().enumerate() {
+        match field {
+            // If the data is "simple" we just concatenate things contigously
+            IntermediateType::IBool
+            | IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32
+            | IntermediateType::IU64
+            | IntermediateType::IU128
+            | IntermediateType::IU256
+            | IntermediateType::IAddress => {
+                let writer_pointer = module.locals.add(ValType::I32);
+                let (value, load_kind) = if *field == IntermediateType::IU64 {
+                    (
+                        module.locals.add(ValType::I64),
+                        LoadKind::I64 { atomic: false },
+                    )
+                } else {
+                    (
+                        module.locals.add(ValType::I32),
+                        LoadKind::I32 { atomic: false },
+                    )
+                };
+
+                builder
+                    .local_get(struct_ptr)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: index as u32 * 4,
+                        },
+                    )
+                    .load(
+                        compilation_ctx.memory_id,
+                        load_kind,
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(value);
+
+                // Allocate 32 bytes for the encoded data
+                builder
+                    .i32_const(32)
+                    .call(compilation_ctx.allocator)
+                    .local_set(writer_pointer);
+
+                field
+                    .add_pack_instructions(
+                        builder,
+                        module,
+                        value,
+                        writer_pointer,
+                        writer_pointer,
+                        compilation_ctx,
+                    )
+                    .unwrap();
+            }
+            IntermediateType::IVector(inner) => {
+                let value = module.locals.add(ValType::I32);
+
+                builder
+                    .local_get(struct_ptr)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: index as u32 * 4,
+                        },
+                    )
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(value);
+
+                add_encode_indexed_vector_instructions(
+                    module,
+                    builder,
+                    compilation_ctx,
+                    inner,
+                    value,
+                );
+            }
+            IntermediateType::IStruct {
+                module_id,
+                index: struct_index,
+                ..
+            }
+            | IntermediateType::IGenericStructInstance {
+                module_id,
+                index: struct_index,
+                ..
+            } => {
+                let value = module.locals.add(ValType::I32);
+                let child_struct = compilation_ctx
+                    .get_struct_by_index(module_id, *struct_index)
+                    .unwrap();
+
+                let child_struct =
+                    if let IntermediateType::IGenericStructInstance { types, .. } = field {
+                        &child_struct.instantiate(types)
+                    } else {
+                        child_struct
+                    };
+
+                builder
+                    .local_get(struct_ptr)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: index as u32 * 4,
+                        },
+                    )
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(value);
+
+                add_encode_indexed_struct_instructions(
+                    module,
+                    builder,
+                    compilation_ctx,
+                    child_struct,
+                    value,
+                );
+            }
+            IntermediateType::IRef(intermediate_type) => todo!(),
+            IntermediateType::IMutRef(intermediate_type) => todo!(),
+            IntermediateType::ITypeParameter(_) => todo!(),
+            IntermediateType::IEnum { module_id, index } => todo!(),
+            IntermediateType::ISigner => todo!(),
+            IntermediateType::IGenericEnumInstance {
+                module_id,
+                index,
+                types,
+            } => todo!(),
+        }
     }
 }
