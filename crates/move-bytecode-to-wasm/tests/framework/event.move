@@ -10,6 +10,13 @@ public struct NestedStruct has copy, drop {
 }
 
 #[allow(unused_field)]
+public struct NestedStruct2 has copy, drop {
+    a: u32,
+    b: vector<u16>,
+    c: std::ascii::String,
+}
+
+#[allow(unused_field)]
 #[ext(event, indexes = 1)]
 public struct TestEvent1 has copy, drop {
     n: u32
@@ -88,6 +95,14 @@ public struct TestEvent10 has copy, drop {
     c: vector<vector<u8>>,
 }
 
+#[allow(unused_field)]
+#[ext(event, indexes = 3)]
+public struct TestEvent11 has copy, drop {
+    a: u32,
+    b: address,
+    c: NestedStruct2,
+}
+
 entry fun emit_test_event1(n: u32) {
     emit(TestEvent1 { n });
 }
@@ -129,6 +144,11 @@ entry fun emit_test_event9(a: u64, b: std::ascii::String) {
 
 entry fun emit_test_event10(a: u32, b: address, c: vector<vector<u8>>) {
     emit(TestEvent10 { a, b, c });
+}
+
+entry fun emit_test_event11(a: u32, b: address, c: u32, d: vector<u16>, e: std::ascii::String) {
+    let c = NestedStruct2 {a: c, b: d, c: e };
+    emit(TestEvent11 { a, b, c });
 }
 
 #[allow(unused_field)]

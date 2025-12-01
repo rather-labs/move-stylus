@@ -136,7 +136,6 @@ mod event {
             uint128 c;
         }
 
-
         function emitTestEvent1(uint32 n) external;
         function emitTestEvent2(uint32 a, address b, uint128 c) external;
         function emitTestEvent3(uint32 a, address b, uint128 c, uint8[] d) external;
@@ -147,6 +146,7 @@ mod event {
         function emitTestEvent8(uint64 a, string b) external;
         function emitTestEvent9(uint64 a, string b) external;
         function emitTestEvent10(uint32 a, address b, uint8[][] c) external;
+        function emitTestEvent11(uint32 a, address b, uint32 c, uint16[] d, string e) external;
         function emitTestAnonEvent1(uint32 n) external;
         function emitTestAnonEvent2(uint32 a, address b, uint128 c) external;
         function emitTestAnonEvent3(uint32 a, address b, uint128 c, uint8[] d) external;
@@ -392,6 +392,20 @@ mod event {
         hex::decode("0x67fd5a843da88fc165a797990d9a7825dcc0af1c9931a6aebababf15e4f2ac41").unwrap()
         //keccak256(vec![1, 2, 3, 4, 5].abi_encode()).to_vec(),
     ].concat())]
+    #[case(emitTestEvent11Call::new((
+        41,
+        address!("0xcafe000000000000000000000000000000007357"),
+        43,
+        vec![1, 2, 3, 4, 5],
+        "test string".into(),
+    )), 4,
+    [
+        keccak256(b"TestEvent11(uint32,address,(uint32,uint16[],string))").to_vec(),
+        41.abi_encode().to_vec(),
+        address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec(),
+        hex::decode("0xc37ba50506dec0245492dceb29917e1743c990c285df6a31baf211c204ad8c39").unwrap(),
+    ].concat())]
+
     fn test_emit_event<T: SolCall>(
         runtime: RuntimeSandbox,
         #[case] call_data: T,

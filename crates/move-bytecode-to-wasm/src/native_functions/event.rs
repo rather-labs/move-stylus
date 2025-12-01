@@ -154,7 +154,7 @@ pub fn add_emit_log_fn(
                     .get_memory_curret_position(compilation_ctx)
                     .local_set(data_begin);
 
-                add_encode_indexed_string(module, &mut builder, compilation_ctx, value);
+                add_encode_indexed_string(module, &mut builder, compilation_ctx, value, false);
 
                 let data_end = module.locals.add(ValType::I32);
                 builder
@@ -169,6 +169,7 @@ pub fn add_emit_log_fn(
             | IntermediateType::IGenericStructInstance {
                 module_id, index, ..
             } => {
+                let (print_i32, _, print_m, _, _, _) = crate::declare_host_debug_functions!(module);
                 let struct_ = compilation_ctx.get_struct_by_index(module_id, *index)?;
 
                 let struct_ = if let IntermediateType::IGenericStructInstance { types, .. } = field
@@ -208,6 +209,13 @@ pub fn add_emit_log_fn(
                 builder
                     .get_memory_curret_position(compilation_ctx)
                     .local_set(data_end);
+
+                builder
+                    .local_get(data_begin)
+                    .local_get(data_end)
+                    .local_get(data_begin)
+                    .binop(BinaryOp::I32Sub)
+                    .call(print_m);
 
                 event_fields_encoded_data.push(Some((data_begin, data_end)));
             }
@@ -716,14 +724,6 @@ fn add_encode_indexed_struct_instructions(
                             offset: index as u32 * 4,
                         },
                     )
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    )
                     .local_set(value);
 
                 add_encode_indexed_vector_instructions(
@@ -734,7 +734,6 @@ fn add_encode_indexed_struct_instructions(
                     value,
                 );
             }
-            /*
             IntermediateType::IStruct {
                 module_id,
                 index: struct_index,
@@ -751,19 +750,10 @@ fn add_encode_indexed_struct_instructions(
                             offset: index as u32 * 4,
                         },
                     )
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    )
                     .local_set(value);
 
-                add_encode_indexed_string(module, builder, compilation_ctx, value);
+                add_encode_indexed_string(module, builder, compilation_ctx, value, true);
             }
-            */
             IntermediateType::IStruct {
                 module_id,
                 index: struct_index,
@@ -833,6 +823,7 @@ fn add_encode_indexed_string(
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
     string_ptr: LocalId,
+    padded: bool,
 ) {
     let writer_pointer = module.locals.add(ValType::I32);
 
@@ -863,11 +854,21 @@ fn add_encode_indexed_string(
         )
         .unwrap();
 
-    // Allocate space for the text, padding by 32 bytes plus 32 bytes for the length
-    builder
-        .local_get(len)
-        .call(compilation_ctx.allocator)
-        .local_set(writer_pointer);
+    if padded {
+        builder
+            .local_get(len)
+            .i32_const(31)
+            .binop(BinaryOp::I32Add)
+            .i32_const(!31)
+            .binop(BinaryOp::I32And)
+            .call(compilation_ctx.allocator)
+            .local_set(writer_pointer);
+    } else {
+        builder
+            .local_get(len)
+            .call(compilation_ctx.allocator)
+            .local_set(writer_pointer);
+    }
 
     // Set the local to point to the first element
     builder.skip_vec_header(string_ptr).local_set(string_ptr);
