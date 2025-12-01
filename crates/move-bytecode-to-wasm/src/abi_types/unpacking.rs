@@ -204,9 +204,7 @@ impl Unpackable for IntermediateType {
             IntermediateType::IStruct {
                 module_id, index, ..
             } if Calldata::is_vm_type(module_id, *index, compilation_ctx)? => {
-                // Load the calldata pointer to the stack,
-                // with layout: [calldata_length, calldata]
-                function_builder.local_get(calldata_reader_pointer);
+                Calldata::inject(function_builder, module, compilation_ctx);
             }
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
                 let struct_ = compilation_ctx.get_struct_by_intermediate_type(self)?;

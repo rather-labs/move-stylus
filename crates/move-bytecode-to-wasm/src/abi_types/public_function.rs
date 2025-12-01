@@ -151,7 +151,7 @@ impl<'a> PublicFunction<'a> {
     ///
     /// Input parameters are read from memory and unpacked as *abi encoded* values
     /// Output parameters are packed as *abi encoded* values and written to memory
-    fn wrap_public_function(
+    pub fn wrap_public_function(
         &self,
         module: &mut Module,
         block: &mut InstrSeqBuilder,

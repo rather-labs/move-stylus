@@ -4,7 +4,7 @@ use walrus::{
 };
 
 use crate::{
-    CompilationContext, compilation_context::ModuleId,
+    CompilationContext, compilation_context::ModuleId, data::DATA_CALLDATA_OFFSET,
     translation::intermediate_types::vector::IVector,
     wasm_builder_extensions::WasmBuilderExtension,
 };
@@ -31,9 +31,9 @@ pub fn add_calldata_as_vector_fn(
     // We need to convert the calldata to a vector<u8>, i.e. each byte takes 4 bytes (due to the current internal impl of vectors)
     let calldata_len = module.locals.add(ValType::I32);
 
-    // Load the calldata length from the first 4 bytes
+    // Load the calldata length, which prepends the calldata
     builder
-        .local_get(calldata_ptr)
+        .i32_const(DATA_CALLDATA_OFFSET)
         .load(
             compilation_ctx.memory_id,
             LoadKind::I32 { atomic: false },
@@ -43,13 +43,6 @@ pub fn add_calldata_as_vector_fn(
             },
         )
         .local_set(calldata_len);
-
-    // Set the calldata pointer past the length
-    builder
-        .local_get(calldata_ptr)
-        .i32_const(4)
-        .binop(BinaryOp::I32Add)
-        .local_set(calldata_ptr);
 
     let vector_ptr = module.locals.add(ValType::I32);
     IVector::allocate_vector_with_header(
@@ -122,7 +115,7 @@ pub fn add_calldata_length_fn(
     module_id: &ModuleId,
 ) -> FunctionId {
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
-    let calldata_struct_ptr = module.locals.add(ValType::I32);
+    let calldata_ptr = module.locals.add(ValType::I32);
 
     let mut builder = function
         .name(NativeFunction::get_function_name(
@@ -131,8 +124,8 @@ pub fn add_calldata_length_fn(
         ))
         .func_body();
 
-    // Load the length of the calldata from the first 4 bytes
-    builder.local_get(calldata_struct_ptr).load(
+    // Load the length of the calldata
+    builder.i32_const(DATA_CALLDATA_OFFSET).load(
         compilation_ctx.memory_id,
         LoadKind::I32 { atomic: false },
         MemArg {
@@ -141,5 +134,5 @@ pub fn add_calldata_length_fn(
         },
     );
 
-    function.finish(vec![calldata_struct_ptr], &mut module.funcs)
+    function.finish(vec![calldata_ptr], &mut module.funcs)
 }

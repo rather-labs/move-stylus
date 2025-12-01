@@ -6,6 +6,8 @@ use walrus::{
 use crate::{
     CompilationContext,
     abi_types::{error_encoding::build_abort_error_message, public_function::PublicFunction},
+    data::DATA_CALLDATA_OFFSET,
+    runtime::RuntimeFunction,
     translation::intermediate_types::IntermediateType,
 };
 
@@ -39,10 +41,36 @@ pub fn build_entrypoint_router(
     let fallback_function = functions.iter().find(|f| f.function_name == "fallback");
 
     // Load function args to memory
-    router_builder.local_get(args_len);
-    router_builder.call(compilation_ctx.allocator);
-    router_builder.local_tee(args_pointer);
-    router_builder.call(read_args_function);
+    router_builder
+        .local_get(args_len)
+        .call(compilation_ctx.allocator)
+        .local_tee(args_pointer)
+        .call(read_args_function);
+
+    // Store the calldata length and pointer to the data segment
+    router_builder
+        .i32_const(DATA_CALLDATA_OFFSET)
+        .local_get(args_len)
+        .store(
+            compilation_ctx.memory_id,
+            StoreKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
+
+    router_builder
+        .i32_const(DATA_CALLDATA_OFFSET)
+        .local_get(args_pointer)
+        .store(
+            compilation_ctx.memory_id,
+            StoreKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 4,
+            },
+        );
 
     // If args_len == 0, try receive, injecting the selector in the args data
     // If args_len != 0: load selector from args (normal case)
@@ -59,23 +87,35 @@ pub fn build_entrypoint_router(
                         .local_set(selector_variable);
                 }
 
-                // Allocate buffer with selector prefix and update args_pointer/args_len
-                then.i32_const(4)
-                    .call(compilation_ctx.allocator)
-                    .local_tee(args_pointer);
-
-                // Write the function selector to the first 4 bytes of the new buffer
-                then.local_get(selector_variable).store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-
                 // Update args_len to 4
                 then.i32_const(4).local_set(args_len);
+
+                // Store the new args_len to memory
+                then.i32_const(4)
+                    .call(compilation_ctx.allocator)
+                    .local_get(args_len)
+                    .store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+
+                // Allocate buffer with selector prefix
+                then.local_get(args_len)
+                    .call(compilation_ctx.allocator)
+                    .local_tee(args_pointer)
+                    .local_get(selector_variable)
+                    .store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
             },
             |else_| {
                 // Load selector from memory
@@ -107,83 +147,35 @@ pub fn build_entrypoint_router(
             dynamic_fields_global_variables,
         )?;
     }
+
     // If no function matched we might be in the fallback case:
     if let Some(fallback_fn) = fallback_function {
-        // selector_variable = fallback selector
-        router_builder
-            .i32_const(i32::from_le_bytes(fallback_fn.function_selector))
-            .local_set(selector_variable);
-
-        // Allocate buffer with selector prefix and update args_pointer/args_len
-        let args_pointer_ = module.locals.add(ValType::I32);
-
-        // Allocate memory for the encoded data, adding 4 bytes for the selector prefix and 4 bytes for the calldata length
-        router_builder
-            .local_get(args_len)
-            .i32_const(8)
-            .binop(BinaryOp::I32Add)
-            .call(compilation_ctx.allocator)
-            .local_tee(args_pointer_);
-
-        // Write the function selector to the first 4 bytes of the new buffer
-        router_builder
-            .local_get(args_pointer_)
-            .local_get(selector_variable)
-            .store(
-                compilation_ctx.memory_id,
-                StoreKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
-
-        // Write the calldata length to the next 4 bytes of the new buffer
-        router_builder
-            .local_get(args_pointer_)
-            .local_get(args_len)
-            .store(
-                compilation_ctx.memory_id,
-                StoreKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 4,
-                },
-            );
-
-        // memcopy(dst = args_pointer_ + 8, src = args_pointer, len = args_len)
-        router_builder
-            .local_get(args_pointer_)
-            .i32_const(8)
-            .binop(BinaryOp::I32Add)
-            .local_get(args_pointer)
-            .local_get(args_len)
-            .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-
-        // args_pointer = new_args_pointer
-        router_builder
-            .local_get(args_pointer_)
-            .local_set(args_pointer);
-
-        // args_len = args_len + 8
-        router_builder
-            .local_get(args_len)
-            .i32_const(8)
-            .binop(BinaryOp::I32Add)
-            .local_set(args_len);
-
-        // Let the fallback router block try to handle this call. If it matches, it will
-        // execute and return; otherwise execution will continue to the error path below.
-        fallback_fn.build_router_block(
-            &mut router_builder,
+        let commit_changes_to_storage_function = RuntimeFunction::get_commit_changes_to_storage_fn(
             module,
-            selector_variable,
-            args_pointer,
-            args_len,
-            write_return_data_function,
             compilation_ctx,
             dynamic_fields_global_variables,
         )?;
+
+        // Wrap function to pack/unpack parameters
+        fallback_fn.wrap_public_function(
+            module,
+            &mut router_builder,
+            args_pointer,
+            compilation_ctx,
+        )?;
+
+        // Stack: [return_data_pointer] [return_data_length] [status]
+        let status = module.locals.add(ValType::I32);
+        router_builder.local_set(status);
+
+        // Write return data to memory
+        router_builder.call(write_return_data_function);
+
+        router_builder.call(commit_changes_to_storage_function);
+
+        // Return status
+        router_builder.local_get(status);
+        router_builder.return_();
     }
 
     // Build no function match error message

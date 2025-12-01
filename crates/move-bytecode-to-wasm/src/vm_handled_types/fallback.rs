@@ -5,8 +5,12 @@ use crate::{
         ModuleId,
         reserved_modules::{SF_MODULE_NAME_FALLBACK, STYLUS_FRAMEWORK_ADDRESS},
     },
+    data::DATA_CALLDATA_OFFSET,
 };
-use walrus::{InstrSeqBuilder, Module};
+use walrus::{
+    InstrSeqBuilder, Module,
+    ir::{LoadKind, MemArg},
+};
 
 pub struct Calldata;
 
@@ -14,11 +18,18 @@ impl VmHandledType for Calldata {
     const IDENTIFIER: &str = "Calldata";
 
     fn inject(
-        _block: &mut InstrSeqBuilder,
+        block: &mut InstrSeqBuilder,
         _module: &mut Module,
-        _compilation_ctx: &CompilationContext,
+        compilation_ctx: &CompilationContext,
     ) {
-        // no-op
+        block.i32_const(DATA_CALLDATA_OFFSET).load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 4,
+            },
+        );
     }
 
     fn is_vm_type(
