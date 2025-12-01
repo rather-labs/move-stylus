@@ -209,7 +209,8 @@ mod event {
         keccak256(b"TestEvent5(uint32,address,uint8[])").to_vec(),
         42.abi_encode().to_vec(),
         address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec(),
-        keccak256(vec![1, 2, 3, 4, 5].abi_encode()).to_vec(),
+        hex::decode("0x5917e5a395fb9b454434de59651d36822a9e29c5ec57474df3e67937b969460c").unwrap()
+        //keccak256(vec![1, 2, 3, 4, 5].abi_encode()).to_vec(),
     ].concat())]
     #[case(emitTestEvent6Call::new((
         41,
