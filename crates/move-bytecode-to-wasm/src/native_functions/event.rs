@@ -156,53 +156,26 @@ pub fn add_emit_log_fn(
                     )
                     .local_set(local);
 
-                let abi_encoded_data_writer_pointer = module.locals.add(ValType::I32);
-                let abi_encoded_data_calldata_reference_pointer = module.locals.add(ValType::I32);
+                let data_begin = module.locals.add(ValType::I32);
 
-                let is_dynamic = struct_.solidity_abi_encode_is_dynamic(compilation_ctx)?;
-                let size = if is_dynamic {
-                    32
-                } else {
-                    struct_.solidity_abi_encode_size(compilation_ctx)? as i32
-                };
-
-                // Use the allocator to get a pointer to the end of the calldata
                 builder
-                    .i32_const(size)
-                    .call(compilation_ctx.allocator)
-                    .local_tee(abi_encoded_data_writer_pointer)
-                    .local_set(abi_encoded_data_calldata_reference_pointer);
+                    .get_memory_curret_position(compilation_ctx)
+                    .local_set(data_begin);
 
-                if is_dynamic {
-                    field.add_pack_instructions_dynamic(
-                        &mut builder,
-                        module,
-                        local,
-                        abi_encoded_data_writer_pointer,
-                        abi_encoded_data_calldata_reference_pointer,
-                        compilation_ctx,
-                    )?;
-                } else {
-                    field.add_pack_instructions(
-                        &mut builder,
-                        module,
-                        local,
-                        abi_encoded_data_writer_pointer,
-                        abi_encoded_data_calldata_reference_pointer,
-                        compilation_ctx,
-                    )?;
-                }
+                add_encode_indexed_struct_instructions(
+                    module,
+                    &mut builder,
+                    compilation_ctx,
+                    struct_,
+                    local,
+                );
 
-                // Use the allocator to get a pointer to the end of the data
+                let data_end = module.locals.add(ValType::I32);
                 builder
-                    .i32_const(0)
-                    .call(compilation_ctx.allocator)
-                    .local_set(abi_encoded_data_writer_pointer);
+                    .get_memory_curret_position(compilation_ctx)
+                    .local_set(data_end);
 
-                event_fields_encoded_data.push(Some((
-                    abi_encoded_data_calldata_reference_pointer,
-                    abi_encoded_data_writer_pointer,
-                )));
+                event_fields_encoded_data.push(Some((data_begin, data_end)));
             }
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
                 todo!()
@@ -655,25 +628,29 @@ fn add_encode_indexed_struct_instructions(
                     )
                 };
 
-                builder
-                    .local_get(struct_ptr)
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: index as u32 * 4,
-                        },
-                    )
-                    .load(
-                        compilation_ctx.memory_id,
-                        load_kind,
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    )
-                    .local_set(value);
+                builder.local_get(struct_ptr).load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: index as u32 * 4,
+                    },
+                );
+
+                if field.is_stack_type().unwrap() {
+                    builder
+                        .load(
+                            compilation_ctx.memory_id,
+                            load_kind,
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        )
+                        .local_set(value);
+                } else {
+                    builder.local_set(value);
+                }
 
                 // Allocate 32 bytes for the encoded data
                 builder
