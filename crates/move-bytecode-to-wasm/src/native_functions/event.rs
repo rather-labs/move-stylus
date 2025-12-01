@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use move_binary_format::file_format::FieldHandleIndex;
 use walrus::{
-    FunctionBuilder, FunctionId, InstrSeqBuilder, Local, LocalId, Module, ValType,
+    FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
@@ -10,12 +10,10 @@ use crate::{
     CompilationContext,
     abi_types::{event_encoding::move_signature_to_event_signature_hash, packing::Packable},
     compilation_context::ModuleId,
-    data,
     hostio::host_functions::{emit_log, native_keccak256},
     translation::intermediate_types::{
         IntermediateType,
         structs::{IStruct, IStructType},
-        vector,
     },
     vm_handled_types::{VmHandledType, string::String_},
     wasm_builder_extensions::WasmBuilderExtension,
@@ -135,7 +133,7 @@ pub fn add_emit_log_fn(
                 index: struct_index,
                 ..
             } if String_::is_vm_type(module_id, *struct_index, compilation_ctx).unwrap() => {
-                let (print_i32, _, print_m, _, _, _) = crate::declare_host_debug_functions!(module);
+                // let (print_i32, _, print_m, _, _, _) = crate::declare_host_debug_functions!(module);
 
                 let value = module.locals.add(ValType::I32);
                 builder
@@ -162,16 +160,6 @@ pub fn add_emit_log_fn(
                 builder
                     .get_memory_curret_position(compilation_ctx)
                     .local_set(data_end);
-
-                builder.local_get(data_begin).call(print_i32);
-                builder.local_get(data_end).call(print_i32);
-
-                builder
-                    .local_get(data_begin)
-                    .local_get(data_end)
-                    .local_get(data_begin)
-                    .binop(BinaryOp::I32Sub)
-                    .call(print_m);
 
                 event_fields_encoded_data.push(Some((data_begin, data_end)))
             }
@@ -846,11 +834,7 @@ fn add_encode_indexed_string(
     compilation_ctx: &CompilationContext,
     string_ptr: LocalId,
 ) {
-    let (print_i32, _, print_m, _, _, _) = crate::declare_host_debug_functions!(module);
     let writer_pointer = module.locals.add(ValType::I32);
-
-    builder.local_get(string_ptr).call(print_i32);
-    builder.local_get(string_ptr).i32_const(64).call(print_m);
 
     // String in move have the following form:
     // public struct String has copy, drop, store {
@@ -878,8 +862,6 @@ fn add_encode_indexed_string(
             compilation_ctx.memory_id,
         )
         .unwrap();
-
-    builder.local_get(len).call(print_i32);
 
     // Allocate space for the text, padding by 32 bytes plus 32 bytes for the length
     builder
