@@ -103,6 +103,13 @@ public struct TestEvent11 has copy, drop {
     c: NestedStruct2,
 }
 
+#[allow(unused_field)]
+#[ext(event, indexes = 2)]
+public struct TestEvent12 has copy, drop {
+    a: u64,
+    b: vector<std::ascii::String>,
+}
+
 entry fun emit_test_event1(n: u32) {
     emit(TestEvent1 { n });
 }
@@ -149,6 +156,10 @@ entry fun emit_test_event10(a: u32, b: address, c: vector<vector<u8>>) {
 entry fun emit_test_event11(a: u32, b: address, c: u32, d: vector<u16>, e: std::ascii::String) {
     let c = NestedStruct2 {a: c, b: d, c: e };
     emit(TestEvent11 { a, b, c });
+}
+
+entry fun emit_test_event12(a: u64, b: vector<std::ascii::String>) {
+    emit(TestEvent12 { a, b });
 }
 
 #[allow(unused_field)]

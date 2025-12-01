@@ -147,6 +147,7 @@ mod event {
         function emitTestEvent9(uint64 a, string b) external;
         function emitTestEvent10(uint32 a, address b, uint8[][] c) external;
         function emitTestEvent11(uint32 a, address b, uint32 c, uint16[] d, string e) external;
+        function emitTestEvent12(uint64 a, string[] b) external;
         function emitTestAnonEvent1(uint32 n) external;
         function emitTestAnonEvent2(uint32 a, address b, uint128 c) external;
         function emitTestAnonEvent3(uint32 a, address b, uint128 c, uint8[] d) external;
@@ -404,6 +405,15 @@ mod event {
         41.abi_encode().to_vec(),
         address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec(),
         hex::decode("0xc37ba50506dec0245492dceb29917e1743c990c285df6a31baf211c204ad8c39").unwrap(),
+    ].concat())]
+    #[case(emitTestEvent12Call::new((
+        42,
+        vec!["test string".into(), "hello world".into()],
+    )), 3,
+    [
+        keccak256(b"TestEvent12(uint64,string[])").to_vec(),
+        42.abi_encode().to_vec(),
+        hex::decode("0x4262f685f28afa73e3ac58a6f7cbef13d4d78bc1b4a8ca117c3e4bccb5e6b47e").unwrap(),
     ].concat())]
 
     fn test_emit_event<T: SolCall>(

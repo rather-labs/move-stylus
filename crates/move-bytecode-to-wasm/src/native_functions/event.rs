@@ -578,6 +578,8 @@ fn add_encode_indexed_vector_instructions(
             builder.i32_const(0).local_set(i);
 
             builder.loop_(None, |loop_| {
+                let loop_id = loop_.id();
+
                 loop_
                     .local_get(vector_ptr)
                     .load(
@@ -590,8 +592,6 @@ fn add_encode_indexed_vector_instructions(
                     )
                     .local_set(value);
 
-                let loop_id = loop_.id();
-
                 add_encode_indexed_vector_instructions(
                     module,
                     loop_,
@@ -603,6 +603,48 @@ fn add_encode_indexed_vector_instructions(
                 loop_
                     .local_get(vector_ptr)
                     .i32_const(inner.stack_data_size().unwrap() as i32)
+                    .binop(BinaryOp::I32Add)
+                    .local_set(vector_ptr);
+
+                // increment i
+                loop_
+                    .local_get(i)
+                    .i32_const(1)
+                    .binop(BinaryOp::I32Add)
+                    .local_tee(i);
+
+                loop_.local_get(len).binop(BinaryOp::I32LtU).br_if(loop_id);
+            });
+        }
+        IntermediateType::IStruct {
+            module_id,
+            index: struct_index,
+            ..
+        } if String_::is_vm_type(module_id, *struct_index, compilation_ctx).unwrap() => {
+            let i = module.locals.add(ValType::I32);
+            let value = module.locals.add(ValType::I32);
+            builder.i32_const(0).local_set(i);
+
+            builder.loop_(None, |loop_| {
+                let loop_id = loop_.id();
+
+                loop_
+                    .local_get(vector_ptr)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(value);
+
+                add_encode_indexed_string(module, loop_, compilation_ctx, value, true);
+
+                loop_
+                    .local_get(vector_ptr)
+                    .i32_const(4)
                     .binop(BinaryOp::I32Add)
                     .local_set(vector_ptr);
 
