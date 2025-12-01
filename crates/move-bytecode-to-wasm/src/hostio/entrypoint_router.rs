@@ -117,10 +117,10 @@ pub fn build_entrypoint_router(
         // Allocate buffer with selector prefix and update args_pointer/args_len
         let args_pointer_ = module.locals.add(ValType::I32);
 
-        // Allocate memory for the encoded data, adding 4 bytes for the selector prefix
+        // Allocate memory for the encoded data, adding 4 bytes for the selector prefix and 4 bytes for the calldata length
         router_builder
             .local_get(args_len)
-            .i32_const(4)
+            .i32_const(8)
             .binop(BinaryOp::I32Add)
             .call(compilation_ctx.allocator)
             .local_tee(args_pointer_);
@@ -138,10 +138,23 @@ pub fn build_entrypoint_router(
                 },
             );
 
-        // memcopy(dst = new_args_pointer + 4, src = args_pointer, len = args_len)
+        // Write the calldata length to the next 4 bytes of the new buffer
         router_builder
             .local_get(args_pointer_)
-            .i32_const(4)
+            .local_get(args_len)
+            .store(
+                compilation_ctx.memory_id,
+                StoreKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 4,
+                },
+            );
+
+        // memcopy(dst = args_pointer_ + 8, src = args_pointer, len = args_len)
+        router_builder
+            .local_get(args_pointer_)
+            .i32_const(8)
             .binop(BinaryOp::I32Add)
             .local_get(args_pointer)
             .local_get(args_len)
@@ -152,10 +165,10 @@ pub fn build_entrypoint_router(
             .local_get(args_pointer_)
             .local_set(args_pointer);
 
-        // args_len = args_len + 4
+        // args_len = args_len + 8
         router_builder
             .local_get(args_len)
-            .i32_const(4)
+            .i32_const(8)
             .binop(BinaryOp::I32Add)
             .local_set(args_len);
 

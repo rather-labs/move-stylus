@@ -7,6 +7,7 @@ mod contract_calls;
 mod dynamic_field;
 pub mod error;
 mod event;
+mod fallback;
 pub mod object;
 mod tests;
 mod transaction;
@@ -24,8 +25,8 @@ use crate::{
         ModuleId,
         reserved_modules::{
             SF_MODULE_NAME_DYNAMIC_FIELD, SF_MODULE_NAME_ERROR, SF_MODULE_NAME_EVENT,
-            SF_MODULE_NAME_OBJECT, SF_MODULE_NAME_TRANSFER, SF_MODULE_NAME_TX_CONTEXT,
-            SF_MODULE_NAME_TYPES, STYLUS_FRAMEWORK_ADDRESS,
+            SF_MODULE_NAME_FALLBACK, SF_MODULE_NAME_OBJECT, SF_MODULE_NAME_TRANSFER,
+            SF_MODULE_NAME_TX_CONTEXT, SF_MODULE_NAME_TYPES, STYLUS_FRAMEWORK_ADDRESS,
         },
     },
     hasher::get_hasher,
@@ -91,6 +92,10 @@ impl NativeFunction {
     const HOST_BLOCK_GAS_LIMIT: &str = "block_gas_limit";
     const HOST_BLOCK_TIMESTAMP: &str = "block_timestamp";
     const HOST_CHAIN_ID: &str = "chainid";
+
+    // Fallback functions
+    const NATIVE_CALLDATA_AS_VECTOR: &str = "calldata_as_vector";
+    const NATIVE_CALLDATA_LENGTH: &str = "calldata_length";
 
     /// Links the function into the module and returns its id. If the function is already present
     /// it just returns the id.
@@ -186,6 +191,16 @@ impl NativeFunction {
                 (Self::NATIVE_GET_LAST_MEMORY_POSITION, _, _) => {
                     tests::add_get_last_memory_position_fn(module, compilation_ctx)
                 }
+                (
+                    Self::NATIVE_CALLDATA_AS_VECTOR,
+                    STYLUS_FRAMEWORK_ADDRESS,
+                    SF_MODULE_NAME_FALLBACK,
+                ) => fallback::add_calldata_as_vector_fn(module, compilation_ctx, module_id),
+                (
+                    Self::NATIVE_CALLDATA_LENGTH,
+                    STYLUS_FRAMEWORK_ADDRESS,
+                    SF_MODULE_NAME_FALLBACK,
+                ) => fallback::add_calldata_length_fn(module, compilation_ctx, module_id),
                 _ => {
                     return Err(NativeFunctionError::NativeFunctionNotSupported(
                         module_id.clone(),

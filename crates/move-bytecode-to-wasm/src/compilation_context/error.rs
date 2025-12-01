@@ -93,11 +93,11 @@ pub enum CompilationContextError {
     FallbackFunctionTooManyArguments,
 
     #[error(
-        "fallback function with invalid argument type at position {0} (must be vector<u8> or TxContext)"
+        "fallback function with invalid argument type at position {0} (must be Calldata or TxContext)"
     )]
     FallbackFunctionInvalidArgumentType(usize),
 
-    #[error("fallback function with invalid return type (must be empty or a single vector<u8>)")]
+    #[error("fallback function with invalid return type (must be empty or Calldata)")]
     FallbackFunctionInvalidReturnType,
 
     #[error(r#"datatype handle index "{0}" not found"#)]

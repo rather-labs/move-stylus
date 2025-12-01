@@ -1105,11 +1105,6 @@ impl ModuleData {
             return Err(CompilationContextError::FallbackFunctionBadVisibility);
         }
 
-        // Helper function to check if a type is vector<u8>
-        let is_vector_u8 = |arg: &IntermediateType| -> bool {
-            matches!(arg, IntermediateType::IVector(inner) if **inner == IntermediateType::IU8)
-        };
-
         // Validate arguments based on count
         match move_function_arguments.len() {
             0 => {
@@ -1125,8 +1120,8 @@ impl ModuleData {
                     })
                     .ok_or(CompilationContextError::FallbackFunctionInvalidArgumentType(1))?;
 
-                // Check if it's vector<u8> or TxContext
-                if !(is_vector_u8(&first_arg)
+                // Check if it's fallback calldata or TxContext
+                if !(is_fallback_calldata(&first_arg, move_module_dependencies)
                     || is_tx_context_ref(&first_arg, move_module_dependencies))
                 {
                     return Err(CompilationContextError::FallbackFunctionInvalidArgumentType(1));
@@ -1150,8 +1145,8 @@ impl ModuleData {
                     })
                     .ok_or(CompilationContextError::FallbackFunctionInvalidArgumentType(2))?;
 
-                // First argument must be vector<u8>
-                if !is_vector_u8(&first_arg) {
+                // First argument must be fallback calldata
+                if !is_fallback_calldata(&first_arg, move_module_dependencies) {
                     return Err(CompilationContextError::FallbackFunctionInvalidArgumentType(1));
                 }
 
@@ -1172,7 +1167,7 @@ impl ModuleData {
                 // No return values: valid
             }
             1 => {
-                // 1 return value: must be vector<u8>
+                // 1 return value: must be fallback calldata
                 let return_type = move_function_return
                     .0
                     .first()
@@ -1181,7 +1176,7 @@ impl ModuleData {
                     })
                     .ok_or(CompilationContextError::FallbackFunctionInvalidReturnType)?;
 
-                if !is_vector_u8(&return_type) {
+                if !is_fallback_calldata(&return_type, move_module_dependencies) {
                     return Err(CompilationContextError::FallbackFunctionInvalidReturnType);
                 }
             }
@@ -1192,6 +1187,46 @@ impl ModuleData {
         }
 
         Ok(true)
+    }
+}
+
+fn is_fallback_calldata(
+    argument: &IntermediateType,
+    move_module_dependencies: &[(PackageName, CompiledUnitWithSource)],
+) -> bool {
+    match argument {
+        IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
+            match inner.as_ref() {
+                IntermediateType::IStruct {
+                    module_id, index, ..
+                } if module_id.module_name == "fallback"
+                    && module_id.address == STYLUS_FRAMEWORK_ADDRESS =>
+                {
+                    // TODO: Look for this external module one time and pass it down to this
+                    // function
+                    let external_module_source = &move_module_dependencies
+                        .iter()
+                        .find(|(_, m)| {
+                            m.unit.name().as_str() == "fallback"
+                                && Address::from(m.unit.address.into_bytes())
+                                    == STYLUS_FRAMEWORK_ADDRESS
+                        })
+                        .expect("could not find stylus framework as dependency")
+                        .1
+                        .unit
+                        .module;
+
+                    let struct_ =
+                        external_module_source.struct_def_at(StructDefinitionIndex::new(*index));
+                    let handle = external_module_source.datatype_handle_at(struct_.struct_handle);
+                    let identifier = external_module_source.identifier_at(handle.name);
+                    identifier.as_str() == "Calldata"
+                }
+
+                _ => false,
+            }
+        }
+        _ => false,
     }
 }
 
