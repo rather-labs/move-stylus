@@ -80,6 +80,14 @@ public struct TestEvent9 has copy, drop {
     b: std::ascii::String,
 }
 
+#[allow(unused_field)]
+#[ext(event, indexes = 3)]
+public struct TestEvent10 has copy, drop {
+    a: u32,
+    b: address,
+    c: vector<vector<u8>>,
+}
+
 entry fun emit_test_event1(n: u32) {
     emit(TestEvent1 { n });
 }
@@ -117,6 +125,10 @@ entry fun emit_test_event8(a: u64, b: std::ascii::String) {
 
 entry fun emit_test_event9(a: u64, b: std::ascii::String) {
     emit(TestEvent9 { a, b });
+}
+
+entry fun emit_test_event10(a: u32, b: address, c: vector<vector<u8>>) {
+    emit(TestEvent10 { a, b, c });
 }
 
 #[allow(unused_field)]

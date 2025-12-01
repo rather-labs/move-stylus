@@ -94,9 +94,7 @@ pub fn add_emit_log_fn(
                 event_fields_encoded_data.push(None);
                 continue;
             }
-            IntermediateType::IVector(_) => {
-                let (print_i32, _, print_m, _, _, _) = crate::declare_host_debug_functions!(module);
-
+            IntermediateType::IVector(inner) => {
                 builder
                     .local_get(struct_ptr)
                     .load(
@@ -117,22 +115,17 @@ pub fn add_emit_log_fn(
 
                 let data_end = module.locals.add(ValType::I32);
 
-                add_encode_indexed_parameter_instructions(
+                add_encode_indexed_vector_instructions(
                     module,
                     &mut builder,
                     compilation_ctx,
-                    field,
+                    inner,
                     local,
                 );
 
                 builder
                     .get_memory_curret_position(compilation_ctx)
                     .local_set(data_end);
-
-                builder.local_get(data_begin).call(print_i32);
-                builder.local_get(data_end).call(print_i32);
-
-                builder.local_get(data_begin).i32_const(160).call(print_m);
 
                 event_fields_encoded_data.push(Some((data_begin, data_end)));
             }
@@ -470,284 +463,163 @@ pub fn add_emit_log_fn(
     Ok(function.finish(vec![struct_ptr], &mut module.funcs))
 }
 
-fn add_encode_indexed_parameter_instructions(
+fn add_encode_indexed_vector_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
-    field: &IntermediateType,
+    inner: &IntermediateType,
     vector_ptr: LocalId,
 ) {
-    match field {
-        IntermediateType::IVector(inner) => {
-            // Get the len
-            let len = IntermediateType::IU32
-                .add_load_memory_to_local_instructions(
-                    module,
-                    builder,
-                    vector_ptr,
-                    compilation_ctx.memory_id,
-                )
-                .unwrap();
+    // Get the len
+    let len = IntermediateType::IU32
+        .add_load_memory_to_local_instructions(
+            module,
+            builder,
+            vector_ptr,
+            compilation_ctx.memory_id,
+        )
+        .unwrap();
 
-            // Skip vector header
-            builder.skip_vec_header(vector_ptr).local_set(vector_ptr);
+    // Skip vector header
+    builder.skip_vec_header(vector_ptr).local_set(vector_ptr);
 
-            match &**inner {
-                // If the data is "simple" we just concatenate things contigously
-                inner_t @ (IntermediateType::IBool
-                | IntermediateType::IU8
-                | IntermediateType::IU16
-                | IntermediateType::IU32
-                | IntermediateType::IU64
-                | IntermediateType::IU128
-                | IntermediateType::IU256
-                | IntermediateType::IAddress) => {
-                    let i = module.locals.add(ValType::I32);
-                    builder.i32_const(0).local_set(i);
-                    let writer_pointer = module.locals.add(ValType::I32);
-                    let (value, load_kind) = if inner_t == &IntermediateType::IU64 {
-                        (
-                            module.locals.add(ValType::I64),
-                            LoadKind::I64 { atomic: false },
-                        )
-                    } else {
-                        (
-                            module.locals.add(ValType::I32),
-                            LoadKind::I32 { atomic: false },
-                        )
-                    };
-
-                    builder.loop_(None, |loop_| {
-                        loop_
-                            .local_get(vector_ptr)
-                            .load(
-                                compilation_ctx.memory_id,
-                                load_kind,
-                                MemArg {
-                                    align: 0,
-                                    offset: 0,
-                                },
-                            )
-                            .local_set(value);
-
-                        let loop_id = loop_.id();
-
-                        // Allocate 32 bytes for the encoded data
-                        loop_
-                            .i32_const(32)
-                            .call(compilation_ctx.allocator)
-                            .local_set(writer_pointer);
-
-                        inner
-                            .add_pack_instructions(
-                                loop_,
-                                module,
-                                value,
-                                writer_pointer,
-                                writer_pointer,
-                                compilation_ctx,
-                            )
-                            .unwrap();
-
-                        loop_
-                            .local_get(vector_ptr)
-                            .i32_const(inner.stack_data_size().unwrap() as i32)
-                            .binop(BinaryOp::I32Add)
-                            .local_set(vector_ptr);
-
-                        // increment i
-                        loop_
-                            .local_get(i)
-                            .i32_const(1)
-                            .binop(BinaryOp::I32Add)
-                            .local_tee(i);
-
-                        loop_.local_get(len).binop(BinaryOp::I32LtU).br_if(loop_id);
-                    });
-                }
-                IntermediateType::ISigner => todo!(),
-                IntermediateType::IVector(intermediate_type) => todo!(),
-                IntermediateType::IRef(intermediate_type) => todo!(),
-                IntermediateType::IMutRef(intermediate_type) => todo!(),
-                IntermediateType::ITypeParameter(_) => todo!(),
-                IntermediateType::IStruct {
-                    module_id,
-                    index,
-                    vm_handled_struct,
-                } => todo!(),
-                IntermediateType::IGenericStructInstance {
-                    module_id,
-                    index,
-                    types,
-                    vm_handled_struct,
-                } => todo!(),
-                IntermediateType::IEnum { module_id, index } => todo!(),
-                IntermediateType::IGenericEnumInstance {
-                    module_id,
-                    index,
-                    types,
-                } => todo!(),
-            }
-        }
-        _ => {
-            panic!("trying to encode a non vector");
-        }
-    }
-}
-
-/*
-
-fn add_encode_indexed_parameter_instructions(
-    module: &mut Module,
-    builder: &mut InstrSeqBuilder,
-    compilation_ctx: &CompilationContext,
-    field: &IntermediateType,
-    field_index: u32,
-    struct_ptr: LocalId,
-    local: LocalId,
-    module_id: &ModuleId,
-) -> Result<Option<(LocalId, LocalId)>, NativeFunctionError> {
-    match field {
-        IntermediateType::IBool
+    match inner {
+        // If the data is "simple" we just concatenate things contigously
+        inner_t @ (IntermediateType::IBool
         | IntermediateType::IU8
         | IntermediateType::IU16
         | IntermediateType::IU32
         | IntermediateType::IU64
         | IntermediateType::IU128
         | IntermediateType::IU256
-        | IntermediateType::IAddress => Ok(None),
-        IntermediateType::IVector(_) => {
-            // Get the pointer to the field
-            builder
-                .local_get(struct_ptr)
-                .load(
-                    compilation_ctx.memory_id,
-                    walrus::ir::LoadKind::I32 { atomic: false },
-                    MemArg {
-                        offset: field_index as u32 * 4,
-                        align: 0,
-                    },
+        | IntermediateType::IAddress) => {
+            let i = module.locals.add(ValType::I32);
+            builder.i32_const(0).local_set(i);
+            let writer_pointer = module.locals.add(ValType::I32);
+            let (value, load_kind) = if inner_t == &IntermediateType::IU64 {
+                (
+                    module.locals.add(ValType::I64),
+                    LoadKind::I64 { atomic: false },
                 )
-                .local_set(local);
+            } else {
+                (
+                    module.locals.add(ValType::I32),
+                    LoadKind::I32 { atomic: false },
+                )
+            };
 
-            let abi_encoded_data_writer_pointer = module.locals.add(ValType::I32);
-            let abi_encoded_data_calldata_reference_pointer = module.locals.add(ValType::I32);
+            builder.loop_(None, |loop_| {
+                loop_
+                    .local_get(vector_ptr)
+                    .load(
+                        compilation_ctx.memory_id,
+                        load_kind,
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(value);
 
-            builder
-                .i32_const(32)
-                .call(compilation_ctx.allocator)
-                .local_tee(abi_encoded_data_writer_pointer)
-                .local_set(abi_encoded_data_calldata_reference_pointer);
+                let loop_id = loop_.id();
 
-            field.add_pack_instructions(
-                &mut builder,
-                module,
-                local,
-                abi_encoded_data_writer_pointer,
-                abi_encoded_data_calldata_reference_pointer,
-                compilation_ctx,
-            )?;
+                // Allocate 32 bytes for the encoded data
+                loop_
+                    .i32_const(32)
+                    .call(compilation_ctx.allocator)
+                    .local_set(writer_pointer);
 
-            // Use the allocator to get a pointer to the end of the data
-            builder
-                .i32_const(0)
-                .call(compilation_ctx.allocator)
-                .local_set(abi_encoded_data_writer_pointer);
+                inner
+                    .add_pack_instructions(
+                        loop_,
+                        module,
+                        value,
+                        writer_pointer,
+                        writer_pointer,
+                        compilation_ctx,
+                    )
+                    .unwrap();
 
-            // Omit array length in encoding
-            builder
-                .local_get(abi_encoded_data_calldata_reference_pointer)
-                .i32_const(32)
-                .binop(BinaryOp::I32Add)
-                .local_set(abi_encoded_data_calldata_reference_pointer);
+                loop_
+                    .local_get(vector_ptr)
+                    .i32_const(inner.stack_data_size().unwrap() as i32)
+                    .binop(BinaryOp::I32Add)
+                    .local_set(vector_ptr);
 
-            Ok(Some((
-                abi_encoded_data_calldata_reference_pointer,
-                abi_encoded_data_writer_pointer,
-            )))
+                // increment i
+                loop_
+                    .local_get(i)
+                    .i32_const(1)
+                    .binop(BinaryOp::I32Add)
+                    .local_tee(i);
+
+                loop_.local_get(len).binop(BinaryOp::I32LtU).br_if(loop_id);
+            });
         }
+        IntermediateType::ISigner => todo!(),
+        IntermediateType::IVector(inner) => {
+            let i = module.locals.add(ValType::I32);
+            let value = module.locals.add(ValType::I32);
+            builder.i32_const(0).local_set(i);
+
+            builder.loop_(None, |loop_| {
+                loop_
+                    .local_get(vector_ptr)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(value);
+
+                let loop_id = loop_.id();
+
+                add_encode_indexed_vector_instructions(
+                    module,
+                    loop_,
+                    compilation_ctx,
+                    inner,
+                    value,
+                );
+
+                loop_
+                    .local_get(vector_ptr)
+                    .i32_const(inner.stack_data_size().unwrap() as i32)
+                    .binop(BinaryOp::I32Add)
+                    .local_set(vector_ptr);
+
+                // increment i
+                loop_
+                    .local_get(i)
+                    .i32_const(1)
+                    .binop(BinaryOp::I32Add)
+                    .local_tee(i);
+
+                loop_.local_get(len).binop(BinaryOp::I32LtU).br_if(loop_id);
+            });
+        }
+        IntermediateType::IRef(intermediate_type) => todo!(),
+        IntermediateType::IMutRef(intermediate_type) => todo!(),
+        IntermediateType::ITypeParameter(_) => todo!(),
         IntermediateType::IStruct {
-            module_id, index, ..
-        }
-        | IntermediateType::IGenericStructInstance {
-            module_id, index, ..
-        } => {
-            let struct_ = compilation_ctx.get_struct_by_index(module_id, *index)?;
-
-            let struct_ = if let IntermediateType::IGenericStructInstance { types, .. } = field {
-                &struct_.instantiate(types)
-            } else {
-                struct_
-            };
-
-            builder
-                .local_get(struct_ptr)
-                .load(
-                    compilation_ctx.memory_id,
-                    walrus::ir::LoadKind::I32 { atomic: false },
-                    MemArg {
-                        offset: field_index as u32 * 4,
-                        align: 0,
-                    },
-                )
-                .local_set(local);
-
-            let abi_encoded_data_writer_pointer = module.locals.add(ValType::I32);
-            let abi_encoded_data_calldata_reference_pointer = module.locals.add(ValType::I32);
-
-            let is_dynamic = struct_.solidity_abi_encode_is_dynamic(compilation_ctx)?;
-            let size = if is_dynamic {
-                32
-            } else {
-                struct_.solidity_abi_encode_size(compilation_ctx)? as i32
-            };
-
-            // Use the allocator to get a pointer to the end of the calldata
-            builder
-                .i32_const(size)
-                .call(compilation_ctx.allocator)
-                .local_tee(abi_encoded_data_writer_pointer)
-                .local_set(abi_encoded_data_calldata_reference_pointer);
-
-            if is_dynamic {
-                field.add_pack_instructions_dynamic(
-                    &mut builder,
-                    module,
-                    local,
-                    abi_encoded_data_writer_pointer,
-                    abi_encoded_data_calldata_reference_pointer,
-                    compilation_ctx,
-                )?;
-            } else {
-                field.add_pack_instructions(
-                    &mut builder,
-                    module,
-                    local,
-                    abi_encoded_data_writer_pointer,
-                    abi_encoded_data_calldata_reference_pointer,
-                    compilation_ctx,
-                )?;
-            }
-
-            // Use the allocator to get a pointer to the end of the data
-            builder
-                .i32_const(0)
-                .call(compilation_ctx.allocator)
-                .local_set(abi_encoded_data_writer_pointer);
-
-            event_fields_encoded_data.push(Some((
-                abi_encoded_data_calldata_reference_pointer,
-                abi_encoded_data_writer_pointer,
-            )));
-        }
-        IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
-            todo!()
-        }
-        _ => {
-            return Err(NativeFunctionError::EmitFunctionInvalidEventField(
-                field.clone(),
-            ));
-        }
+            module_id,
+            index,
+            vm_handled_struct,
+        } => todo!(),
+        IntermediateType::IGenericStructInstance {
+            module_id,
+            index,
+            types,
+            vm_handled_struct,
+        } => todo!(),
+        IntermediateType::IEnum { module_id, index } => todo!(),
+        IntermediateType::IGenericEnumInstance {
+            module_id,
+            index,
+            types,
+        } => todo!(),
     }
 }
-*/
