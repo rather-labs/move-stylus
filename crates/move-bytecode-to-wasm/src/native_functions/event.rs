@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use move_binary_format::file_format::FieldHandleIndex;
 use walrus::{
     FunctionBuilder, FunctionId, InstrSeqBuilder, Local, LocalId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg},
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
 use crate::{
@@ -17,6 +17,7 @@ use crate::{
         structs::{IStruct, IStructType},
         vector,
     },
+    vm_handled_types::{VmHandledType, string::String_},
     wasm_builder_extensions::WasmBuilderExtension,
 };
 
@@ -128,6 +129,39 @@ pub fn add_emit_log_fn(
                     .local_set(data_end);
 
                 event_fields_encoded_data.push(Some((data_begin, data_end)));
+            }
+            IntermediateType::IStruct {
+                module_id,
+                index: struct_index,
+                ..
+            } if String_::is_vm_type(module_id, *struct_index, compilation_ctx).unwrap() => {
+                let value = module.locals.add(ValType::I32);
+                builder
+                    .local_get(struct_ptr)
+                    .load(
+                        compilation_ctx.memory_id,
+                        walrus::ir::LoadKind::I32 { atomic: false },
+                        MemArg {
+                            offset: field_index as u32 * 4,
+                            align: 0,
+                        },
+                    )
+                    .local_set(local);
+
+                let data_begin = module.locals.add(ValType::I32);
+
+                builder
+                    .get_memory_curret_position(compilation_ctx)
+                    .local_set(data_begin);
+
+                add_encode_indexed_string(module, &mut builder, compilation_ctx, value);
+
+                let data_end = module.locals.add(ValType::I32);
+                builder
+                    .get_memory_curret_position(compilation_ctx)
+                    .local_set(data_end);
+
+                event_fields_encoded_data.push(Some((data_begin, data_end)))
             }
             IntermediateType::IStruct {
                 module_id, index, ..
@@ -700,6 +734,36 @@ fn add_encode_indexed_struct_instructions(
                     value,
                 );
             }
+            /*
+            IntermediateType::IStruct {
+                module_id,
+                index: struct_index,
+                ..
+            } if String_::is_vm_type(module_id, *struct_index, compilation_ctx).unwrap() => {
+                let value = module.locals.add(ValType::I32);
+                builder
+                    .local_get(struct_ptr)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: index as u32 * 4,
+                        },
+                    )
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(value);
+
+                add_encode_indexed_string(module, builder, compilation_ctx, value);
+            }
+            */
             IntermediateType::IStruct {
                 module_id,
                 index: struct_index,
@@ -762,4 +826,102 @@ fn add_encode_indexed_struct_instructions(
             } => todo!(),
         }
     }
+}
+
+fn add_encode_indexed_string(
+    module: &mut Module,
+    builder: &mut InstrSeqBuilder,
+    compilation_ctx: &CompilationContext,
+    string_ptr: LocalId,
+) {
+    let writer_pointer = module.locals.add(ValType::I32);
+
+    // String in move have the following form:
+    // public struct String has copy, drop, store {
+    //   bytes: vector<u8>,
+    // }
+    //
+    // So we need to perform a load first to get to the inner vector
+    builder
+        .local_get(string_ptr)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .local_set(string_ptr);
+
+    let len = IntermediateType::IU32
+        .add_load_memory_to_local_instructions(
+            module,
+            builder,
+            string_ptr,
+            compilation_ctx.memory_id,
+        )
+        .unwrap();
+
+    // Allocate space for the text, padding by 32 bytes plus 32 bytes for the length
+    builder
+        .local_get(len)
+        .call(compilation_ctx.allocator)
+        .local_set(writer_pointer);
+
+    // Set the local to point to the first element
+    builder.skip_vec_header(string_ptr).local_set(string_ptr);
+
+    // Loop through the vector values
+    let i = module.locals.add(ValType::I32);
+    builder.i32_const(0).local_set(i);
+    builder.loop_(None, |loop_block| {
+        let loop_block_id = loop_block.id();
+
+        loop_block
+            .local_get(writer_pointer)
+            .local_get(string_ptr)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .store(
+                compilation_ctx.memory_id,
+                StoreKind::I32_8 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+
+        // increment the local to point to next first value
+        loop_block
+            .local_get(string_ptr)
+            .i32_const(4)
+            .binop(BinaryOp::I32Add)
+            .local_set(string_ptr);
+
+        // increment data pointer
+        loop_block
+            .local_get(writer_pointer)
+            .i32_const(1)
+            .binop(BinaryOp::I32Add)
+            .local_set(writer_pointer);
+
+        // increment i
+        loop_block
+            .local_get(i)
+            .i32_const(1)
+            .binop(BinaryOp::I32Add)
+            .local_tee(i);
+
+        loop_block
+            .local_get(len)
+            .binop(BinaryOp::I32LtU)
+            .br_if(loop_block_id);
+    });
 }
