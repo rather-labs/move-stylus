@@ -215,7 +215,7 @@ async fn main() -> eyre::Result<()> {
     let receipt = pending_tx.get_receipt().await?;
     let event = Example::TestEvent2 {
         a: 43,
-        b: keccak256(vec![1, 2, 3].abi_encode()),
+        b: keccak256(&(vec![1, 2, 3].abi_encode())[64..]),
         c: 1234,
     };
 
@@ -249,8 +249,8 @@ async fn main() -> eyre::Result<()> {
     let logs = receipt.logs();
     for log in logs {
         let primitive_log: alloy::primitives::Log = log.clone().into();
-        println!(" event data = {event:?}");
-        println!("Primitive log: {primitive_log:?}");
+        // println!(" event data = {event:?}");
+        // println!("Primitive log: {primitive_log:?}");
         let decoded_event = Example::TestEvent3::decode_log(&primitive_log)?;
         println!("Decoded event data = {decoded_event:?}");
         assert_eq!(event, decoded_event.data);
@@ -272,7 +272,7 @@ async fn main() -> eyre::Result<()> {
     let logs = receipt.logs();
     for log in logs {
         let primitive_log: alloy::primitives::Log = log.clone().into();
-        println!("Primitive log: {primitive_log:?}");
+        // println!("Primitive log: {primitive_log:?}");
         let decoded_event = Example::TestEvent4::decode_log(&primitive_log)?;
         println!("Decoded event data = {decoded_event:?}");
         assert_eq!(event, decoded_event.data);
