@@ -326,7 +326,6 @@ pub fn add_emit_log_fn(
                 let Some((encode_start, encode_end)) = abi_encoded_data else {
                     return Err(NativeFunctionError::EmitFunctionInvalidVectorData);
                 };
-
                 builder
                     .local_get(encode_end)
                     .local_get(encode_start)
@@ -901,12 +900,55 @@ fn add_encode_indexed_struct_instructions(
                     value,
                 )?;
             }
-            IntermediateType::IEnum { module_id, index } => todo!(),
-            IntermediateType::IGenericEnumInstance {
+            IntermediateType::IEnum {
                 module_id,
-                index,
-                types,
-            } => todo!(),
+                index: enum_index,
+            } => {
+                let value = module.locals.add(ValType::I32);
+                let writer_pointer = module.locals.add(ValType::I32);
+                let child_enum = compilation_ctx.get_enum_by_index(module_id, *enum_index)?;
+
+                if !child_enum.is_simple {
+                    return Err(NativeFunctionError::EmitFunctionInvalidEventField(
+                        field.clone(),
+                    ));
+                }
+
+                builder
+                    .local_get(struct_ptr)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: index as u32 * 4,
+                        },
+                    )
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(value);
+
+                // Allocate 32 bytes for the encoded data
+                builder
+                    .i32_const(32)
+                    .call(compilation_ctx.allocator)
+                    .local_set(writer_pointer);
+
+                IntermediateType::IU8.add_pack_instructions(
+                    builder,
+                    module,
+                    value,
+                    writer_pointer,
+                    writer_pointer,
+                    compilation_ctx,
+                )?;
+            }
             _ => {
                 return Err(NativeFunctionError::EmitFunctionInvalidEventField(
                     field.clone(),
