@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use move_binary_format::file_format::FieldHandleIndex;
 use walrus::{
-    FunctionBuilder, FunctionId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg},
+    FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
 use crate::{
@@ -15,6 +15,8 @@ use crate::{
         IntermediateType,
         structs::{IStruct, IStructType},
     },
+    vm_handled_types::{VmHandledType, string::String_},
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 
 use super::{NativeFunction, error::NativeFunctionError};
@@ -87,12 +89,12 @@ pub fn add_emit_log_fn(
             | IntermediateType::IU64
             | IntermediateType::IU128
             | IntermediateType::IU256
-            | IntermediateType::IAddress => {
+            | IntermediateType::IAddress
+            | IntermediateType::IEnum { .. } => {
                 event_fields_encoded_data.push(None);
                 continue;
             }
-            IntermediateType::IVector(_) => {
-                // Get the pointer to the field
+            IntermediateType::IVector(inner) => {
                 builder
                     .local_get(struct_ptr)
                     .load(
@@ -105,34 +107,60 @@ pub fn add_emit_log_fn(
                     )
                     .local_set(local);
 
-                let abi_encoded_data_writer_pointer = module.locals.add(ValType::I32);
-                let abi_encoded_data_calldata_reference_pointer = module.locals.add(ValType::I32);
+                let data_begin = module.locals.add(ValType::I32);
 
                 builder
-                    .i32_const(32)
-                    .call(compilation_ctx.allocator)
-                    .local_tee(abi_encoded_data_writer_pointer)
-                    .local_set(abi_encoded_data_calldata_reference_pointer);
+                    .get_memory_curret_position(compilation_ctx)
+                    .local_set(data_begin);
 
-                field.add_pack_instructions(
-                    &mut builder,
+                let data_end = module.locals.add(ValType::I32);
+
+                add_encode_indexed_vector_instructions(
                     module,
-                    local,
-                    abi_encoded_data_writer_pointer,
-                    abi_encoded_data_calldata_reference_pointer,
+                    &mut builder,
                     compilation_ctx,
+                    inner,
+                    local,
                 )?;
 
-                // Use the allocator to get a pointer to the end of the data
                 builder
-                    .i32_const(0)
-                    .call(compilation_ctx.allocator)
-                    .local_set(abi_encoded_data_writer_pointer);
+                    .get_memory_curret_position(compilation_ctx)
+                    .local_set(data_end);
 
-                event_fields_encoded_data.push(Some((
-                    abi_encoded_data_calldata_reference_pointer,
-                    abi_encoded_data_writer_pointer,
-                )));
+                event_fields_encoded_data.push(Some((data_begin, data_end)));
+            }
+            IntermediateType::IStruct {
+                module_id,
+                index: struct_index,
+                ..
+            } if String_::is_vm_type(module_id, *struct_index, compilation_ctx)? => {
+                let value = module.locals.add(ValType::I32);
+                builder
+                    .local_get(struct_ptr)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            offset: field_index as u32 * 4,
+                            align: 0,
+                        },
+                    )
+                    .local_set(value);
+
+                let data_begin = module.locals.add(ValType::I32);
+
+                builder
+                    .get_memory_curret_position(compilation_ctx)
+                    .local_set(data_begin);
+
+                add_encode_indexed_string(module, &mut builder, compilation_ctx, value, false)?;
+
+                let data_end = module.locals.add(ValType::I32);
+                builder
+                    .get_memory_curret_position(compilation_ctx)
+                    .local_set(data_end);
+
+                event_fields_encoded_data.push(Some((data_begin, data_end)))
             }
             IntermediateType::IStruct {
                 module_id, index, ..
@@ -161,56 +189,26 @@ pub fn add_emit_log_fn(
                     )
                     .local_set(local);
 
-                let abi_encoded_data_writer_pointer = module.locals.add(ValType::I32);
-                let abi_encoded_data_calldata_reference_pointer = module.locals.add(ValType::I32);
+                let data_begin = module.locals.add(ValType::I32);
 
-                let is_dynamic = struct_.solidity_abi_encode_is_dynamic(compilation_ctx)?;
-                let size = if is_dynamic {
-                    32
-                } else {
-                    struct_.solidity_abi_encode_size(compilation_ctx)? as i32
-                };
-
-                // Use the allocator to get a pointer to the end of the calldata
                 builder
-                    .i32_const(size)
-                    .call(compilation_ctx.allocator)
-                    .local_tee(abi_encoded_data_writer_pointer)
-                    .local_set(abi_encoded_data_calldata_reference_pointer);
+                    .get_memory_curret_position(compilation_ctx)
+                    .local_set(data_begin);
 
-                if is_dynamic {
-                    field.add_pack_instructions_dynamic(
-                        &mut builder,
-                        module,
-                        local,
-                        abi_encoded_data_writer_pointer,
-                        abi_encoded_data_calldata_reference_pointer,
-                        compilation_ctx,
-                    )?;
-                } else {
-                    field.add_pack_instructions(
-                        &mut builder,
-                        module,
-                        local,
-                        abi_encoded_data_writer_pointer,
-                        abi_encoded_data_calldata_reference_pointer,
-                        compilation_ctx,
-                    )?;
-                }
+                add_encode_indexed_struct_instructions(
+                    module,
+                    &mut builder,
+                    compilation_ctx,
+                    struct_,
+                    local,
+                )?;
 
-                // Use the allocator to get a pointer to the end of the data
+                let data_end = module.locals.add(ValType::I32);
                 builder
-                    .i32_const(0)
-                    .call(compilation_ctx.allocator)
-                    .local_set(abi_encoded_data_writer_pointer);
+                    .get_memory_curret_position(compilation_ctx)
+                    .local_set(data_end);
 
-                event_fields_encoded_data.push(Some((
-                    abi_encoded_data_calldata_reference_pointer,
-                    abi_encoded_data_writer_pointer,
-                )));
-            }
-            IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
-                todo!()
+                event_fields_encoded_data.push(Some((data_begin, data_end)));
             }
             _ => {
                 return Err(NativeFunctionError::EmitFunctionInvalidEventField(
@@ -304,6 +302,7 @@ pub fn add_emit_log_fn(
             | IntermediateType::IU64
             | IntermediateType::IU128
             | IntermediateType::IU256
+            | IntermediateType::IEnum { .. }
             | IntermediateType::IAddress => {
                 builder
                     .i32_const(32)
@@ -326,7 +325,6 @@ pub fn add_emit_log_fn(
                 let Some((encode_start, encode_end)) = abi_encoded_data else {
                     return Err(NativeFunctionError::EmitFunctionInvalidVectorData);
                 };
-
                 builder
                     .local_get(encode_end)
                     .local_get(encode_start)
@@ -345,9 +343,6 @@ pub fn add_emit_log_fn(
                     .local_get(abi_encoded_data_length)
                     .local_get(writer_pointer)
                     .call(native_keccak);
-            }
-            IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
-                todo!()
             }
             _ => {
                 return Err(NativeFunctionError::EmitFunctionInvalidEventField(
@@ -466,4 +461,614 @@ pub fn add_emit_log_fn(
         .call(emit_log_fn);
 
     Ok(function.finish(vec![struct_ptr], &mut module.funcs))
+}
+
+/// Encodes a vector following the ABI spec for events
+///
+/// https://docs.soliditylang.org/en/latest/abi-spec.html#indexed-event-encoding
+fn add_encode_indexed_vector_instructions(
+    module: &mut Module,
+    builder: &mut InstrSeqBuilder,
+    compilation_ctx: &CompilationContext,
+    inner: &IntermediateType,
+    vector_ptr: LocalId,
+) -> Result<(), NativeFunctionError> {
+    // Get the len
+    let len = IntermediateType::IU32.add_load_memory_to_local_instructions(
+        module,
+        builder,
+        vector_ptr,
+        compilation_ctx.memory_id,
+    )?;
+
+    // Skip vector header
+    builder.skip_vec_header(vector_ptr).local_set(vector_ptr);
+
+    let i = module.locals.add(ValType::I32);
+    builder.i32_const(0).local_set(i);
+
+    let mut inner_result: Result<(), NativeFunctionError> = Ok(());
+    match inner {
+        // If the data is "simple" we just concatenate things contigously
+        IntermediateType::IBool
+        | IntermediateType::IU8
+        | IntermediateType::IU16
+        | IntermediateType::IU32
+        | IntermediateType::IU64
+        | IntermediateType::IU128
+        | IntermediateType::IU256
+        | IntermediateType::IAddress => {
+            let writer_pointer = module.locals.add(ValType::I32);
+            let (value, load_kind) = if inner == &IntermediateType::IU64 {
+                (
+                    module.locals.add(ValType::I64),
+                    LoadKind::I64 { atomic: false },
+                )
+            } else {
+                (
+                    module.locals.add(ValType::I32),
+                    LoadKind::I32 { atomic: false },
+                )
+            };
+
+            builder.loop_(None, |loop_| {
+                inner_result = (|| {
+                    loop_
+                        .local_get(vector_ptr)
+                        .load(
+                            compilation_ctx.memory_id,
+                            load_kind,
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        )
+                        .local_set(value);
+
+                    let loop_id = loop_.id();
+
+                    // Allocate 32 bytes for the encoded data
+                    loop_
+                        .i32_const(32)
+                        .call(compilation_ctx.allocator)
+                        .local_set(writer_pointer);
+
+                    inner.add_pack_instructions(
+                        loop_,
+                        module,
+                        value,
+                        writer_pointer,
+                        writer_pointer,
+                        compilation_ctx,
+                    )?;
+
+                    loop_
+                        .local_get(vector_ptr)
+                        .i32_const(inner.stack_data_size()? as i32)
+                        .binop(BinaryOp::I32Add)
+                        .local_set(vector_ptr);
+
+                    // increment i
+                    loop_
+                        .local_get(i)
+                        .i32_const(1)
+                        .binop(BinaryOp::I32Add)
+                        .local_tee(i);
+
+                    loop_.local_get(len).binop(BinaryOp::I32LtU).br_if(loop_id);
+
+                    Ok(())
+                })();
+            });
+        }
+        IntermediateType::IVector(inner) => {
+            let value = module.locals.add(ValType::I32);
+            builder.i32_const(0).local_set(i);
+
+            builder.loop_(None, |loop_| {
+                let loop_id = loop_.id();
+
+                inner_result = (|| {
+                    loop_
+                        .local_get(vector_ptr)
+                        .load(
+                            compilation_ctx.memory_id,
+                            LoadKind::I32 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        )
+                        .local_set(value);
+
+                    add_encode_indexed_vector_instructions(
+                        module,
+                        loop_,
+                        compilation_ctx,
+                        inner,
+                        value,
+                    )?;
+
+                    loop_
+                        .local_get(vector_ptr)
+                        .i32_const(inner.stack_data_size()? as i32)
+                        .binop(BinaryOp::I32Add)
+                        .local_set(vector_ptr);
+
+                    // increment i
+                    loop_
+                        .local_get(i)
+                        .i32_const(1)
+                        .binop(BinaryOp::I32Add)
+                        .local_tee(i);
+
+                    loop_.local_get(len).binop(BinaryOp::I32LtU).br_if(loop_id);
+
+                    Ok(())
+                })();
+            });
+        }
+        IntermediateType::IStruct {
+            module_id,
+            index: struct_index,
+            ..
+        } if String_::is_vm_type(module_id, *struct_index, compilation_ctx)? => {
+            let i = module.locals.add(ValType::I32);
+            let value = module.locals.add(ValType::I32);
+            builder.i32_const(0).local_set(i);
+
+            builder.loop_(None, |loop_| {
+                let loop_id = loop_.id();
+
+                inner_result = (|| {
+                    loop_
+                        .local_get(vector_ptr)
+                        .load(
+                            compilation_ctx.memory_id,
+                            LoadKind::I32 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        )
+                        .local_set(value);
+
+                    add_encode_indexed_string(module, loop_, compilation_ctx, value, true)?;
+
+                    loop_
+                        .local_get(vector_ptr)
+                        .i32_const(4)
+                        .binop(BinaryOp::I32Add)
+                        .local_set(vector_ptr);
+
+                    loop_
+                        .local_get(i)
+                        .i32_const(1)
+                        .binop(BinaryOp::I32Add)
+                        .local_tee(i);
+
+                    loop_.local_get(len).binop(BinaryOp::I32LtU).br_if(loop_id);
+                    Ok(())
+                })();
+            });
+        }
+
+        // Enums are treated as vectors of u8
+        IntermediateType::IEnum { module_id, index } => {
+            let enum_ = compilation_ctx.get_enum_by_index(module_id, *index)?;
+
+            if !enum_.is_simple {
+                return Err(NativeFunctionError::EmitFunctionInvalidEventField(
+                    IntermediateType::IVector(Box::new(inner.clone())),
+                ));
+            }
+
+            let value = module.locals.add(ValType::I32);
+            let writer_pointer = module.locals.add(ValType::I32);
+            builder.i32_const(0).local_set(i);
+
+            builder.loop_(None, |loop_| {
+                let loop_id = loop_.id();
+
+                inner_result = (|| {
+                    loop_
+                        .local_get(vector_ptr)
+                        .load(
+                            compilation_ctx.memory_id,
+                            LoadKind::I32 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        )
+                        .load(
+                            compilation_ctx.memory_id,
+                            LoadKind::I32 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        )
+                        .local_set(value);
+
+                    // Allocate 32 bytes for the encoded data
+                    loop_
+                        .i32_const(32)
+                        .call(compilation_ctx.allocator)
+                        .local_set(writer_pointer);
+
+                    IntermediateType::IU8.add_pack_instructions(
+                        loop_,
+                        module,
+                        value,
+                        writer_pointer,
+                        writer_pointer,
+                        compilation_ctx,
+                    )?;
+
+                    loop_
+                        .local_get(vector_ptr)
+                        .i32_const(4)
+                        .binop(BinaryOp::I32Add)
+                        .local_set(vector_ptr);
+
+                    // increment i
+                    loop_
+                        .local_get(i)
+                        .i32_const(1)
+                        .binop(BinaryOp::I32Add)
+                        .local_tee(i);
+
+                    loop_.local_get(len).binop(BinaryOp::I32LtU).br_if(loop_id);
+
+                    Ok(())
+                })();
+            });
+        }
+        _ => {
+            return Err(NativeFunctionError::EmitFunctionInvalidEventField(
+                IntermediateType::IVector(Box::new(inner.clone())),
+            ));
+        }
+    }
+
+    inner_result?;
+
+    Ok(())
+}
+
+/// Encodes a struct following the ABI spec for events
+///
+/// https://docs.soliditylang.org/en/latest/abi-spec.html#indexed-event-encoding
+fn add_encode_indexed_struct_instructions(
+    module: &mut Module,
+    builder: &mut InstrSeqBuilder,
+    compilation_ctx: &CompilationContext,
+    struct_: &IStruct,
+    struct_ptr: LocalId,
+) -> Result<(), NativeFunctionError> {
+    for (index, field) in struct_.fields.iter().enumerate() {
+        match field {
+            // If the data is "simple" we just concatenate things contigously
+            IntermediateType::IBool
+            | IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32
+            | IntermediateType::IU64
+            | IntermediateType::IU128
+            | IntermediateType::IU256
+            | IntermediateType::IAddress => {
+                let writer_pointer = module.locals.add(ValType::I32);
+                let (value, load_kind) = if *field == IntermediateType::IU64 {
+                    (
+                        module.locals.add(ValType::I64),
+                        LoadKind::I64 { atomic: false },
+                    )
+                } else {
+                    (
+                        module.locals.add(ValType::I32),
+                        LoadKind::I32 { atomic: false },
+                    )
+                };
+
+                builder.local_get(struct_ptr).load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: index as u32 * 4,
+                    },
+                );
+
+                if field.is_stack_type()? {
+                    builder
+                        .load(
+                            compilation_ctx.memory_id,
+                            load_kind,
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        )
+                        .local_set(value);
+                } else {
+                    builder.local_set(value);
+                }
+
+                // Allocate 32 bytes for the encoded data
+                builder
+                    .i32_const(32)
+                    .call(compilation_ctx.allocator)
+                    .local_set(writer_pointer);
+
+                field.add_pack_instructions(
+                    builder,
+                    module,
+                    value,
+                    writer_pointer,
+                    writer_pointer,
+                    compilation_ctx,
+                )?;
+            }
+            IntermediateType::IVector(inner) => {
+                let value = module.locals.add(ValType::I32);
+
+                builder
+                    .local_get(struct_ptr)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: index as u32 * 4,
+                        },
+                    )
+                    .local_set(value);
+
+                add_encode_indexed_vector_instructions(
+                    module,
+                    builder,
+                    compilation_ctx,
+                    inner,
+                    value,
+                )?;
+            }
+            IntermediateType::IStruct {
+                module_id,
+                index: struct_index,
+                ..
+            } if String_::is_vm_type(module_id, *struct_index, compilation_ctx)? => {
+                let value = module.locals.add(ValType::I32);
+                builder
+                    .local_get(struct_ptr)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: index as u32 * 4,
+                        },
+                    )
+                    .local_set(value);
+
+                add_encode_indexed_string(module, builder, compilation_ctx, value, true)?;
+            }
+            IntermediateType::IStruct {
+                module_id,
+                index: struct_index,
+                ..
+            }
+            | IntermediateType::IGenericStructInstance {
+                module_id,
+                index: struct_index,
+                ..
+            } => {
+                let value = module.locals.add(ValType::I32);
+                let child_struct = compilation_ctx.get_struct_by_index(module_id, *struct_index)?;
+
+                let child_struct =
+                    if let IntermediateType::IGenericStructInstance { types, .. } = field {
+                        &child_struct.instantiate(types)
+                    } else {
+                        child_struct
+                    };
+
+                builder
+                    .local_get(struct_ptr)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: index as u32 * 4,
+                        },
+                    )
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(value);
+
+                add_encode_indexed_struct_instructions(
+                    module,
+                    builder,
+                    compilation_ctx,
+                    child_struct,
+                    value,
+                )?;
+            }
+            IntermediateType::IEnum {
+                module_id,
+                index: enum_index,
+            } => {
+                let value = module.locals.add(ValType::I32);
+                let writer_pointer = module.locals.add(ValType::I32);
+                let child_enum = compilation_ctx.get_enum_by_index(module_id, *enum_index)?;
+
+                if !child_enum.is_simple {
+                    return Err(NativeFunctionError::EmitFunctionInvalidEventField(
+                        field.clone(),
+                    ));
+                }
+
+                builder
+                    .local_get(struct_ptr)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: index as u32 * 4,
+                        },
+                    )
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(value);
+
+                // Allocate 32 bytes for the encoded data
+                builder
+                    .i32_const(32)
+                    .call(compilation_ctx.allocator)
+                    .local_set(writer_pointer);
+
+                IntermediateType::IU8.add_pack_instructions(
+                    builder,
+                    module,
+                    value,
+                    writer_pointer,
+                    writer_pointer,
+                    compilation_ctx,
+                )?;
+            }
+            _ => {
+                return Err(NativeFunctionError::EmitFunctionInvalidEventField(
+                    field.clone(),
+                ));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Encodes a struct following the ABI spec for events
+///
+/// https://docs.soliditylang.org/en/latest/abi-spec.html#indexed-event-encoding
+fn add_encode_indexed_string(
+    module: &mut Module,
+    builder: &mut InstrSeqBuilder,
+    compilation_ctx: &CompilationContext,
+    string_ptr: LocalId,
+    padded: bool,
+) -> Result<(), NativeFunctionError> {
+    let writer_pointer = module.locals.add(ValType::I32);
+
+    // String in move have the following form:
+    // public struct String has copy, drop, store {
+    //   bytes: vector<u8>,
+    // }
+    //
+    // So we need to perform a load first to get to the inner vector
+    builder
+        .local_get(string_ptr)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .local_set(string_ptr);
+
+    let len = IntermediateType::IU32.add_load_memory_to_local_instructions(
+        module,
+        builder,
+        string_ptr,
+        compilation_ctx.memory_id,
+    )?;
+
+    if padded {
+        builder
+            .local_get(len)
+            .i32_const(31)
+            .binop(BinaryOp::I32Add)
+            .i32_const(!31)
+            .binop(BinaryOp::I32And)
+            .call(compilation_ctx.allocator)
+            .local_set(writer_pointer);
+    } else {
+        builder
+            .local_get(len)
+            .call(compilation_ctx.allocator)
+            .local_set(writer_pointer);
+    }
+
+    // Set the local to point to the first element
+    builder.skip_vec_header(string_ptr).local_set(string_ptr);
+
+    // Loop through the vector values
+    let i = module.locals.add(ValType::I32);
+    builder.i32_const(0).local_set(i);
+    builder.loop_(None, |loop_block| {
+        let loop_block_id = loop_block.id();
+
+        loop_block
+            .local_get(writer_pointer)
+            .local_get(string_ptr)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .store(
+                compilation_ctx.memory_id,
+                StoreKind::I32_8 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+
+        // increment the local to point to next first value
+        loop_block
+            .local_get(string_ptr)
+            .i32_const(4)
+            .binop(BinaryOp::I32Add)
+            .local_set(string_ptr);
+
+        // increment data pointer
+        loop_block
+            .local_get(writer_pointer)
+            .i32_const(1)
+            .binop(BinaryOp::I32Add)
+            .local_set(writer_pointer);
+
+        // increment i
+        loop_block
+            .local_get(i)
+            .i32_const(1)
+            .binop(BinaryOp::I32Add)
+            .local_tee(i);
+
+        loop_block
+            .local_get(len)
+            .binop(BinaryOp::I32LtU)
+            .br_if(loop_block_id);
+    });
+
+    Ok(())
 }
