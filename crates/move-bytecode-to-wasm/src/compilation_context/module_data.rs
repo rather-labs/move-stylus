@@ -1029,8 +1029,6 @@ impl ModuleData {
         // Receive function definition (see https://docs.soliditylang.org/en/latest/contracts.html#receive-ether-function):
         // - A contract can have at most one receive function, declared using receive() external payable { ... } (without the function keyword).
         // - This function cannot have arguments other than a TxContext parameter, cannot return anything and must have external visibility and payable state mutability.
-        // - It can be virtual, can override and can have modifiers. (TODO: can we check this?)
-
         const RECEIVE_FUNCTION_NAME: &str = "receive";
 
         // Must be named `receive`. Otherwise, it is not a receive function.
