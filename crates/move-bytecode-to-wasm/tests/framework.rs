@@ -136,6 +136,12 @@ mod event {
             uint128 c;
         }
 
+        enum TestEnum {
+            One,
+            Two,
+            Three,
+        }
+
         function emitTestEvent1(uint32 n) external;
         function emitTestEvent2(uint32 a, address b, uint128 c) external;
         function emitTestEvent3(uint32 a, address b, uint128 c, uint8[] d) external;
@@ -148,6 +154,7 @@ mod event {
         function emitTestEvent10(uint32 a, address b, uint8[][] c) external;
         function emitTestEvent11(uint32 a, address b, uint32 c, uint16[] d, string e) external;
         function emitTestEvent12(uint64 a, string[] b) external;
+        function emitTestEvent13(uint64 a, TestEnum[] b) external;
         function emitTestAnonEvent1(uint32 n) external;
         function emitTestAnonEvent2(uint32 a, address b, uint128 c) external;
         function emitTestAnonEvent3(uint32 a, address b, uint128 c, uint8[] d) external;
@@ -160,6 +167,7 @@ mod event {
         function emitTestAnonEvent10(uint32 a, address b, uint8[][] c) external;
         function emitTestAnonEvent11(uint32 a, address b, uint32 c, uint16[] d, string e) external;
         function emitTestAnonEvent12(uint64 a, string[] b) external;
+        function emitTestAnonEvent13(uint64 a, TestEnum[] b) external;
         function emitTestAnonymous(uint32 a, uint128 b, uint8[] c, uint32 d, address e, uint128 f) external;
     );
 
@@ -303,6 +311,15 @@ mod event {
         42.abi_encode().to_vec(),
         hex::decode("0x4262f685f28afa73e3ac58a6f7cbef13d4d78bc1b4a8ca117c3e4bccb5e6b47e").unwrap(),
     ].concat())]
+    #[case(emitTestEvent13Call::new((
+        42,
+        vec![TestEnum::One, TestEnum::Two, TestEnum::Three],
+    )), 3,
+    [
+        keccak256(b"TestEvent13(uint64,uint8[])").to_vec(),
+        42.abi_encode().to_vec(),
+        hex::decode("0xe682b7c401097344fed1af3e3492f018caf2a2491b45159ba612453495164301").unwrap(),
+    ].concat())]
     #[case(emitTestAnonEvent1Call::new((42,)), 1, [42.abi_encode().to_vec()].concat())]
     #[case(emitTestAnonEvent2Call::new((
         42,
@@ -427,6 +444,14 @@ mod event {
     [
         42.abi_encode().to_vec(),
         hex::decode("0x4262f685f28afa73e3ac58a6f7cbef13d4d78bc1b4a8ca117c3e4bccb5e6b47e").unwrap(),
+    ].concat())]
+    #[case(emitTestAnonEvent13Call::new((
+        42,
+        vec![TestEnum::One, TestEnum::Two, TestEnum::Three],
+    )), 2,
+    [
+        42.abi_encode().to_vec(),
+        hex::decode("0xe682b7c401097344fed1af3e3492f018caf2a2491b45159ba612453495164301").unwrap(),
     ].concat())]
     #[case(emitTestAnonymousCall::new((
         42,

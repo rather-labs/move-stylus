@@ -564,7 +564,6 @@ fn add_encode_indexed_vector_instructions(
                 })();
             });
         }
-        IntermediateType::ISigner => todo!(),
         IntermediateType::IVector(inner) => {
             let value = module.locals.add(ValType::I32);
             builder.i32_const(0).local_set(i);
@@ -656,12 +655,79 @@ fn add_encode_indexed_vector_instructions(
                 })();
             });
         }
-        IntermediateType::IEnum { module_id, index } => todo!(),
-        IntermediateType::IGenericEnumInstance {
-            module_id,
-            index,
-            types,
-        } => todo!(),
+
+        // Enums are treated as vectors of u8
+        IntermediateType::IEnum { module_id, index } => {
+            let enum_ = compilation_ctx.get_enum_by_index(module_id, *index)?;
+
+            if !enum_.is_simple {
+                return Err(NativeFunctionError::EmitFunctionInvalidEventField(
+                    IntermediateType::IVector(Box::new(inner.clone())),
+                ));
+            }
+
+            let value = module.locals.add(ValType::I32);
+            let writer_pointer = module.locals.add(ValType::I32);
+            builder.i32_const(0).local_set(i);
+
+            builder.loop_(None, |loop_| {
+                let loop_id = loop_.id();
+
+                inner_result = (|| {
+                    loop_
+                        .local_get(vector_ptr)
+                        .load(
+                            compilation_ctx.memory_id,
+                            LoadKind::I32 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        )
+                        .load(
+                            compilation_ctx.memory_id,
+                            LoadKind::I32 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        )
+                        .local_set(value);
+
+                    // Allocate 32 bytes for the encoded data
+                    loop_
+                        .i32_const(32)
+                        .call(compilation_ctx.allocator)
+                        .local_set(writer_pointer);
+
+                    IntermediateType::IU8.add_pack_instructions(
+                        loop_,
+                        module,
+                        value,
+                        writer_pointer,
+                        writer_pointer,
+                        compilation_ctx,
+                    )?;
+
+                    loop_
+                        .local_get(vector_ptr)
+                        .i32_const(4)
+                        .binop(BinaryOp::I32Add)
+                        .local_set(vector_ptr);
+
+                    // increment i
+                    loop_
+                        .local_get(i)
+                        .i32_const(1)
+                        .binop(BinaryOp::I32Add)
+                        .local_tee(i);
+
+                    loop_.local_get(len).binop(BinaryOp::I32LtU).br_if(loop_id);
+
+                    Ok(())
+                })();
+            });
+        }
         _ => {
             return Err(NativeFunctionError::EmitFunctionInvalidEventField(
                 IntermediateType::IVector(Box::new(inner.clone())),

@@ -2,6 +2,12 @@ module test::event;
 
 use stylus::event::emit;
 
+public enum TestEnum has copy, drop {
+    One,
+    Two,
+    Three,
+}
+
 #[allow(unused_field)]
 public struct NestedStruct has copy, drop {
     a: u32,
@@ -110,6 +116,13 @@ public struct TestEvent12 has copy, drop {
     b: vector<std::ascii::String>,
 }
 
+#[allow(unused_field)]
+#[ext(event, indexes = 2)]
+public struct TestEvent13 has copy, drop {
+    a: u64,
+    b: vector<TestEnum>,
+}
+
 entry fun emit_test_event1(n: u32) {
     emit(TestEvent1 { n });
 }
@@ -160,6 +173,10 @@ entry fun emit_test_event11(a: u32, b: address, c: u32, d: vector<u16>, e: std::
 
 entry fun emit_test_event12(a: u64, b: vector<std::ascii::String>) {
     emit(TestEvent12 { a, b });
+}
+
+entry fun emit_test_event13(a: u64, b: vector<TestEnum>) {
+    emit(TestEvent13 { a, b });
 }
 
 #[allow(unused_field)]
@@ -257,6 +274,13 @@ public struct TestEvent12Anon has copy, drop {
 }
 
 #[allow(unused_field)]
+#[ext(event, anonymous, indexes = 2)]
+public struct TestEvent13Anon has copy, drop {
+    a: u64,
+    b: vector<TestEnum>,
+}
+
+#[allow(unused_field)]
 #[ext(event, anonymous, indexes = 4)]
 public struct Anonymous has copy, drop {
     a: u32,
@@ -331,6 +355,10 @@ entry fun emit_test_anon_event11(a: u32, b: address, c: u32, d: vector<u16>, e: 
 
 entry fun emit_test_anon_event12(a: u64, b: vector<std::ascii::String>) {
     emit(TestEvent12Anon { a, b });
+}
+
+entry fun emit_test_anon_event13(a: u64, b: vector<TestEnum>) {
+    emit(TestEvent13Anon { a, b });
 }
 
 entry fun emit_test_anonymous(a: u32, b: u128, c: vector<u8>, d: u32, e: address, f: u128) {
