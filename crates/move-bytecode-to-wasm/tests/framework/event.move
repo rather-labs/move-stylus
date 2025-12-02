@@ -62,6 +62,8 @@ public struct TestEvent4 has copy, drop {
     e: NestedStruct,
 }
 
+
+
 #[allow(unused_field)]
 #[ext(event, indexes = 3)]
 public struct TestEvent5 has copy, drop {
@@ -138,6 +140,14 @@ public struct TestEvent14 has copy, drop {
     c: NestedStruct3,
 }
 
+#[allow(unused_field)]
+#[ext(event, indexes = 3)]
+public struct TestEvent15 has copy, drop {
+    a: TestEnum,
+    b: address,
+    c: u128,
+}
+
 entry fun emit_test_event1(n: u32) {
     emit(TestEvent1 { n });
 }
@@ -197,6 +207,10 @@ entry fun emit_test_event13(a: u64, b: vector<TestEnum>) {
 entry fun emit_test_event14(a: u32, b: address, c: u32, d: vector<u16>, e: TestEnum) {
     let c = NestedStruct3 {a: c, b: d, c: e };
     emit(TestEvent14 { a, b, c });
+}
+
+entry fun emit_test_event15(a: TestEnum, b: address, c: u128) {
+    emit(TestEvent15 { a, b, c });
 }
 
 #[allow(unused_field)]
@@ -309,6 +323,14 @@ public struct TestEvent14Anon has copy, drop {
 }
 
 #[allow(unused_field)]
+#[ext(event, anonymous, indexes = 3)]
+public struct TestEvent15Anon has copy, drop {
+    a: TestEnum,
+    b: address,
+    c: u128,
+}
+
+#[allow(unused_field)]
 #[ext(event, anonymous, indexes = 4)]
 public struct Anonymous has copy, drop {
     a: u32,
@@ -390,6 +412,10 @@ entry fun emit_test_anon_event13(a: u64, b: vector<TestEnum>) {
 entry fun emit_test_anon_event14(a: u32, b: address, c: u32, d: vector<u16>, e: TestEnum) {
     let c = NestedStruct3 {a: c, b: d, c: e };
     emit(TestEvent14Anon { a, b, c });
+}
+
+entry fun emit_test_anon_event15(a: TestEnum, b: address, c: u128) {
+    emit(TestEvent15Anon { a, b, c });
 }
 
 entry fun emit_test_anonymous(a: u32, b: u128, c: vector<u8>, d: u32, e: address, f: u128) {

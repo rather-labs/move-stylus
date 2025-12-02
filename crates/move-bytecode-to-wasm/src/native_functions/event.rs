@@ -89,7 +89,8 @@ pub fn add_emit_log_fn(
             | IntermediateType::IU64
             | IntermediateType::IU128
             | IntermediateType::IU256
-            | IntermediateType::IAddress => {
+            | IntermediateType::IAddress
+            | IntermediateType::IEnum { .. } => {
                 event_fields_encoded_data.push(None);
                 continue;
             }
@@ -209,9 +210,6 @@ pub fn add_emit_log_fn(
 
                 event_fields_encoded_data.push(Some((data_begin, data_end)));
             }
-            IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
-                todo!()
-            }
             _ => {
                 return Err(NativeFunctionError::EmitFunctionInvalidEventField(
                     field.clone(),
@@ -304,6 +302,7 @@ pub fn add_emit_log_fn(
             | IntermediateType::IU64
             | IntermediateType::IU128
             | IntermediateType::IU256
+            | IntermediateType::IEnum { .. }
             | IntermediateType::IAddress => {
                 builder
                     .i32_const(32)
@@ -344,9 +343,6 @@ pub fn add_emit_log_fn(
                     .local_get(abi_encoded_data_length)
                     .local_get(writer_pointer)
                     .call(native_keccak);
-            }
-            IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
-                todo!()
             }
             _ => {
                 return Err(NativeFunctionError::EmitFunctionInvalidEventField(
@@ -467,7 +463,6 @@ pub fn add_emit_log_fn(
     Ok(function.finish(vec![struct_ptr], &mut module.funcs))
 }
 
-///
 fn add_encode_indexed_vector_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,

@@ -156,6 +156,7 @@ mod event {
         function emitTestEvent12(uint64 a, string[] b) external;
         function emitTestEvent13(uint64 a, TestEnum[] b) external;
         function emitTestEvent14(uint32 a, address b, uint32 c, uint16[] d, TestEnum e) external;
+        function emitTestEvent15(TestEnum a, address b, uint128 c) external;
         function emitTestAnonEvent1(uint32 n) external;
         function emitTestAnonEvent2(uint32 a, address b, uint128 c) external;
         function emitTestAnonEvent3(uint32 a, address b, uint128 c, uint8[] d) external;
@@ -170,6 +171,7 @@ mod event {
         function emitTestAnonEvent12(uint64 a, string[] b) external;
         function emitTestAnonEvent13(uint64 a, TestEnum[] b) external;
         function emitTestAnonEvent14(uint32 a, address b, uint32 c, uint16[] d, TestEnum e) external;
+        function emitTestAnonEvent15(TestEnum a, address b, uint128 c) external;
         function emitTestAnonymous(uint32 a, uint128 b, uint8[] c, uint32 d, address e, uint128 f) external;
     );
 
@@ -335,6 +337,17 @@ mod event {
         address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec(),
         hex::decode("0xb938c742591e76b1d9405e45bbaf979fb5fa6e2fdc73269e4c19be276687ccb3").unwrap(),
     ].concat())]
+    #[case(emitTestEvent15Call::new((
+        TestEnum::Two,
+        address!("0xcafe000000000000000000000000000000007357"),
+        u128::MAX,
+    )), 4,
+    [
+        keccak256(b"TestEvent15(uint8,address,uint128)").to_vec(),
+        1.abi_encode().to_vec(),
+        address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec(),
+        u128::MAX.abi_encode().to_vec(),
+    ].concat())]
     #[case(emitTestAnonEvent1Call::new((42,)), 1, [42.abi_encode().to_vec()].concat())]
     #[case(emitTestAnonEvent2Call::new((
         42,
@@ -479,6 +492,16 @@ mod event {
         41.abi_encode().to_vec(),
         address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec(),
         hex::decode("0xb938c742591e76b1d9405e45bbaf979fb5fa6e2fdc73269e4c19be276687ccb3").unwrap(),
+    ].concat())]
+    #[case(emitTestAnonEvent15Call::new((
+        TestEnum::Two,
+        address!("0xcafe000000000000000000000000000000007357"),
+        u128::MAX,
+    )), 3,
+    [
+        1.abi_encode().to_vec(),
+        address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec(),
+        u128::MAX.abi_encode().to_vec(),
     ].concat())]
     #[case(emitTestAnonymousCall::new((
         42,
