@@ -463,6 +463,9 @@ pub fn add_emit_log_fn(
     Ok(function.finish(vec![struct_ptr], &mut module.funcs))
 }
 
+/// Encodes a vector following the ABI spec for events
+///
+/// https://docs.soliditylang.org/en/latest/abi-spec.html#indexed-event-encoding
 fn add_encode_indexed_vector_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
@@ -734,6 +737,9 @@ fn add_encode_indexed_vector_instructions(
     Ok(())
 }
 
+/// Encodes a struct following the ABI spec for events
+///
+/// https://docs.soliditylang.org/en/latest/abi-spec.html#indexed-event-encoding
 fn add_encode_indexed_struct_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
@@ -955,6 +961,9 @@ fn add_encode_indexed_struct_instructions(
     Ok(())
 }
 
+/// Encodes a struct following the ABI spec for events
+///
+/// https://docs.soliditylang.org/en/latest/abi-spec.html#indexed-event-encoding
 fn add_encode_indexed_string(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
