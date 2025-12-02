@@ -22,7 +22,8 @@ use crate::{
         vector::IVector,
     },
     vm_handled_types::{
-        VmHandledType, named_id::NamedId, string::String_, tx_context::TxContext, uid::Uid,
+        VmHandledType, fallback::Calldata, named_id::NamedId, string::String_,
+        tx_context::TxContext, uid::Uid,
     },
 };
 
@@ -199,6 +200,11 @@ impl Unpackable for IntermediateType {
                     calldata_reader_pointer,
                     compilation_ctx,
                 )?;
+            }
+            IntermediateType::IStruct {
+                module_id, index, ..
+            } if Calldata::is_vm_type(module_id, *index, compilation_ctx)? => {
+                Calldata::inject(function_builder, module, compilation_ctx);
             }
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
                 let struct_ = compilation_ctx.get_struct_by_intermediate_type(self)?;
