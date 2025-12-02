@@ -4,20 +4,21 @@
 //! and check the value again. The deployed contract is fully written in Rust and compiled to WASM
 //! but with Stylus, it is accessible just as a normal Solidity smart contract is via an ABI.
 
-use alloy::primitives::keccak256;
-use alloy::providers::Provider;
-use alloy::signers::local::PrivateKeySigner;
+use std::str::FromStr;
+use std::sync::Arc;
+
+use dotenv::dotenv;
+use eyre::eyre;
+
 use alloy::{
-    primitives::{Address, address},
-    providers::ProviderBuilder,
+    primitives::{Address, U256, address, keccak256},
+    providers::{Provider, ProviderBuilder},
+    rpc::types::TransactionRequest,
+    signers::local::PrivateKeySigner,
     sol,
     sol_types::{SolEvent, SolValue},
     transports::http::reqwest::Url,
 };
-use dotenv::dotenv;
-use eyre::eyre;
-use std::str::FromStr;
-use std::sync::Arc;
 
 sol!(
     #[sol(rpc)]
@@ -74,11 +75,17 @@ sol!(
             uint32[] d,
         );
 
-
         #[derive(Debug, PartialEq)]
         struct Stack {
             uint32[] pos0;
         }
+
+        #[derive(Debug, PartialEq)]
+        event ReceiveEvent (
+            address indexed sender,
+            uint32 data_length,
+            uint8[] data,
+        );
 
         function emitTestEvent1(uint32 n) public view;
         function emitTestEvent2(uint32 a, uint8[] b, uint128 c) public view;
@@ -107,6 +114,7 @@ async fn main() -> eyre::Result<()> {
         .map_err(|_| eyre!("No {} env var set", "CONTRACT_ADDRESS_2"))?;
 
     let signer = PrivateKeySigner::from_str(&priv_key)?;
+    let sender = signer.address();
 
     let provider = Arc::new(
         ProviderBuilder::new()
@@ -209,24 +217,22 @@ async fn main() -> eyre::Result<()> {
     // Emit test event 2
     println!("Emitting test event 2");
     let pending_tx = example
-        .emitTestEvent2(43, vec![1, 2, 3], 1234)
+        .emitTestEvent2(42, vec![43, 44, 45], 46)
         .send()
         .await?;
     let receipt = pending_tx.get_receipt().await?;
     let event = Example::TestEvent2 {
-        a: 43,
-        b: keccak256(vec![1, 2, 3].abi_encode()),
-        c: 1234,
+        a: 42,
+        b: keccak256(vec![43, 44, 45].abi_encode()),
+        c: 46,
     };
 
-    // Decode the event data
+    // Decode event 2 from logs
     let logs = receipt.logs();
     for log in logs {
         let primitive_log: alloy::primitives::Log = log.clone().into();
         let decoded_event = Example::TestEvent2::decode_log(&primitive_log)?;
-        println!("Decoded event data = {decoded_event:?}");
         assert_eq!(event, decoded_event.data);
-        println!(" event data = {event:?}");
     }
 
     // Emit test event 3
@@ -244,15 +250,11 @@ async fn main() -> eyre::Result<()> {
             c: 47,
         },
     };
-
-    // Decode the event data
+    // Decode event 3 from logs
     let logs = receipt.logs();
     for log in logs {
         let primitive_log: alloy::primitives::Log = log.clone().into();
-        println!(" event data = {event:?}");
-        println!("Primitive log: {primitive_log:?}");
         let decoded_event = Example::TestEvent3::decode_log(&primitive_log)?;
-        println!("Decoded event data = {decoded_event:?}");
         assert_eq!(event, decoded_event.data);
     }
 
@@ -272,9 +274,7 @@ async fn main() -> eyre::Result<()> {
     let logs = receipt.logs();
     for log in logs {
         let primitive_log: alloy::primitives::Log = log.clone().into();
-        println!("Primitive log: {primitive_log:?}");
         let decoded_event = Example::TestEvent4::decode_log(&primitive_log)?;
-        println!("Decoded event data = {decoded_event:?}");
         assert_eq!(event, decoded_event.data);
     }
 
@@ -286,6 +286,94 @@ async fn main() -> eyre::Result<()> {
 
     let s = example.testStack3().call().await?;
     println!("testStack3\nelements: {:?} len: {}", s._0.pos0, s._1);
+
+    println!("\nSending plain ETH transfer to the contract (empty calldata)");
+    println!("This should trigger the receive() function if it exists");
+    let tx = TransactionRequest::default()
+        .from(sender)
+        .to(address)
+        .value(U256::from(1_000_000_000_000_000_000u128));
+    let pending_tx = provider.send_transaction(tx).await?;
+    let receipt = pending_tx.get_receipt().await?;
+    println!("Successfully sent 1 ETH to the contract (plain transfer)");
+
+    // Decode ReceiveEvent from the receipt logs
+    for log in receipt.logs() {
+        let primitive_log: alloy::primitives::Log = log.clone().into();
+        let decoded_event = Example::ReceiveEvent::decode_log(&primitive_log)?;
+        let event = Example::ReceiveEvent {
+            sender,
+            data_length: 0,
+            data: vec![],
+        };
+        assert_eq!(decoded_event.data, event);
+    }
+
+    println!("\nSending ETH with calldata");
+    println!("This should trigger the fallback function");
+    let calldata = vec![43, 44, 45].abi_encode();
+    let calldata_len = calldata.len() as u32;
+    let tx = TransactionRequest::default()
+        .from(sender)
+        .to(address)
+        .value(U256::from(1_000_000_000_000_000_000u128))
+        .input(calldata.clone().into());
+    let pending_tx = provider.send_transaction(tx).await?;
+    let receipt = pending_tx.get_receipt().await?;
+    for log in receipt.logs() {
+        let primitive_log: alloy::primitives::Log = log.clone().into();
+        let decoded_event = Example::ReceiveEvent::decode_log(&primitive_log)?;
+        let event = Example::ReceiveEvent {
+            sender,
+            data_length: calldata_len,
+            data: calldata.clone(),
+        };
+        assert_eq!(decoded_event.data, event);
+    }
+
+    println!("\nSending ETH with a string as calldata");
+    let calldata = String::from("hola como estas").abi_encode();
+    let calldata_len = calldata.len() as u32;
+    let tx = TransactionRequest::default()
+        .from(sender)
+        .to(address)
+        .value(U256::from(1_000_000_000_000_000_000u128))
+        .input(calldata.clone().into());
+
+    let pending_tx = provider.send_transaction(tx).await?;
+    let receipt = pending_tx.get_receipt().await?;
+    for log in receipt.logs() {
+        let primitive_log: alloy::primitives::Log = log.clone().into();
+        let decoded_event = Example::ReceiveEvent::decode_log(&primitive_log)?;
+        let event = Example::ReceiveEvent {
+            sender,
+            data_length: calldata_len,
+            data: calldata.clone(),
+        };
+        assert_eq!(decoded_event.data, event);
+    }
+
+    println!("\nSending ETH with a u256 as calldata");
+    let calldata = U256::MAX.abi_encode();
+    let calldata_len = calldata.len() as u32;
+    let tx = TransactionRequest::default()
+        .from(sender)
+        .to(address)
+        .value(U256::from(1_000_000_000_000_000_000u128))
+        .input(calldata.clone().into());
+
+    let pending_tx = provider.send_transaction(tx).await?;
+    let receipt = pending_tx.get_receipt().await?;
+    for log in receipt.logs() {
+        let primitive_log: alloy::primitives::Log = log.clone().into();
+        let decoded_event = Example::ReceiveEvent::decode_log(&primitive_log)?;
+        let event = Example::ReceiveEvent {
+            sender,
+            data_length: calldata_len,
+            data: calldata.clone(),
+        };
+        assert_eq!(decoded_event.data, event);
+    }
 
     Ok(())
 }

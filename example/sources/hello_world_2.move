@@ -4,6 +4,7 @@ use stylus::tx_context::TxContext;
 use stylus::object as object;
 use stylus::object::UID;
 use stylus::event::emit;
+use stylus::fallback;
 use hello_world::stack::Stack;
 use hello_world::stack;
 
@@ -116,4 +117,25 @@ entry fun test_stack_3(): (Stack<u32>, u64){
     s.pop_back();
     s.pop_back();
     (s, s.size())
+}
+
+#[ext(event, indexes = 1)]
+public struct ReceiveEvent has copy, drop {
+    sender: address,
+    data_length: u32,
+    data: vector<u8>,
+}
+
+#[ext(payable)]
+entry fun receive(ctx: &TxContext) {
+    emit(ReceiveEvent { sender: ctx.sender(), data_length: 0, data: vector[] });
+}
+
+#[ext(payable)]
+entry fun fallback(data: &fallback::Calldata, ctx: &TxContext) {
+    emit(ReceiveEvent { 
+        sender: ctx.sender(), 
+        data_length: fallback::calldata_length(data), 
+        data: fallback::calldata_as_vector(data) 
+    });
 }

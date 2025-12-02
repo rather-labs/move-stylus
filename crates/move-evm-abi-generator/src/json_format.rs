@@ -1,4 +1,4 @@
-use crate::abi::Abi;
+use crate::abi::{Abi, FunctionType};
 use crate::common::snake_to_upper_camel;
 use crate::types::Type;
 use move_parse_special_attributes::function_modifiers::FunctionModifier;
@@ -8,26 +8,6 @@ const EMPTY_STR: &str = "";
 #[derive(Serialize)]
 struct JsonAbi {
     abi: Vec<JsonAbiItem>,
-}
-
-#[derive(Clone, Copy, Debug, Serialize)]
-#[serde(rename_all = "lowercase")]
-enum FunctionType {
-    Constructor,
-    Fallback,
-    Receive,
-    Function,
-}
-
-impl FunctionType {
-    fn from_identifier(identifier: &str) -> Self {
-        match identifier {
-            "constructor" => Self::Constructor,
-            "fallback" => Self::Fallback,
-            "receive" => Self::Receive,
-            _ => Self::Function,
-        }
-    }
 }
 
 // Todo: is it possible to get the FunctionType from within the Function variant to serialize the type as a string?
@@ -203,9 +183,7 @@ fn process_functions(abi: &Abi) -> Vec<JsonAbiItem> {
         .functions
         .iter()
         .map(|f| {
-            let fn_type = FunctionType::from_identifier(&f.identifier);
-
-            let (name, inputs, outputs) = match fn_type {
+            let (name, inputs, outputs) = match f.function_type {
                 // Fallback and Receive have no name, inputs, or outputs
                 FunctionType::Fallback | FunctionType::Receive => (None, None, None),
                 // Constructor has no name, but has inputs
@@ -255,7 +233,7 @@ fn process_functions(abi: &Abi) -> Vec<JsonAbiItem> {
             let state_mutability = map_state_mutability(&f.modifiers).to_string();
 
             JsonAbiItem::Function {
-                type_: fn_type,
+                type_: f.function_type,
                 name,
                 inputs,
                 outputs,
@@ -264,10 +242,22 @@ fn process_functions(abi: &Abi) -> Vec<JsonAbiItem> {
         })
         .collect();
 
-    // Sort functions by name for deterministic output
-    functions.sort_by_key(|item| match item {
-        JsonAbiItem::Function { name, .. } => name.as_ref().unwrap().clone(),
-        _ => panic!(),
+    // Sort functions: special functions first (Constructor, Receive, Fallback), then regular functions by name
+    functions.sort_by_key(|item| {
+        match item {
+            JsonAbiItem::Function { type_, name, .. } => {
+                let priority = match type_ {
+                    FunctionType::Constructor => 0,
+                    FunctionType::Receive => 1,
+                    FunctionType::Fallback => 2,
+                    FunctionType::Function => 3,
+                };
+                // For regular functions, use the name; for special functions, use empty string
+                let name_key = name.clone().unwrap_or_default();
+                (priority, name_key)
+            }
+            _ => panic!("Expected Function variant"),
+        }
     });
 
     functions

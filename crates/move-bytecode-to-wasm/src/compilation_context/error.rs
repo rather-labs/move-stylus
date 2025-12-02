@@ -65,11 +65,46 @@ pub enum CompilationContextError {
     #[error("could not find external datatype handler index")]
     ExternalDatatypeHandlerIndexNotFound,
 
+    #[error("receive function with returns")]
+    ReceiveFunctionHasReturns,
+
+    #[error("receive function with too many arguments")]
+    ReceiveFunctionTooManyArguments,
+
+    #[error("receive function with non-TxContext argument")]
+    ReceiveFunctionNonTxContextArgument,
+
+    #[error("receive function with non-payable state mutability")]
+    ReceiveFunctionIsNotPayable,
+
+    #[error("receive function with bad visibility")]
+    ReceiveFunctionBadVisibility,
+
+    #[error("there can be only a single receive function per module")]
+    DuplicateReceiveFunction,
+
+    #[error("there can be only a single fallback function per module")]
+    DuplicateFallbackFunction,
+
+    #[error("fallback function with bad visibility")]
+    FallbackFunctionBadVisibility,
+
+    #[error("fallback function with too many arguments (must have 0, 1, or 2 arguments)")]
+    FallbackFunctionTooManyArguments,
+
+    #[error(
+        "fallback function with invalid argument type at position {0} (expected reference to Calldata or TxContext)"
+    )]
+    FallbackFunctionInvalidArgumentType(usize),
+
+    #[error("fallback function with invalid return type (expected reference to Calldata)")]
+    FallbackFunctionInvalidReturnType,
+
     #[error(r#"datatype handle index "{0}" not found"#)]
     DatatypeHanldeIndexNotFound(usize),
 
     #[error("there can be only a single init function per module")]
-    TwoOrMoreInits,
+    DuplicateInitFunction,
 
     #[error("found init funciton with no arguments")]
     InitFunctionNoAguments,
