@@ -741,6 +741,12 @@ impl ModuleData {
                 type_instantiations: None,
             };
 
+            // If we find this function, means the module is compiled in test mode. We should not
+            // process this function because it is injected by move and not used in WASM context
+            if function_name == "unit_test_poison" {
+                continue;
+            }
+
             // If the functions is defined in this module, we can obtain its definition and process
             // it.
             // If the function is not defined here, it will be processed when processing the
