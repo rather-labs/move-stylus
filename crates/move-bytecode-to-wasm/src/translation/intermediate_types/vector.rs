@@ -4,7 +4,6 @@ use walrus::{
 };
 
 use super::{IntermediateType, error::IntermediateTypeError, heap_integers::IU128};
-use crate::data::DATA_DEADBEEF_OFFSET;
 use crate::runtime::RuntimeFunction;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 use crate::{CompilationContext, compilation_context::ModuleData};
@@ -903,15 +902,7 @@ impl IVector {
                 // After a call_indirect, we check for this flag and update any mutable references
                 // that still point to the old location, following the chain to the new vector.
                 then.local_get(vec_ptr)
-                    .i32_const(DATA_DEADBEEF_OFFSET)
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    )
+                    .i32_const(0xDEADBEEF_u32 as i32)
                     .store(
                         compilation_ctx.memory_id,
                         StoreKind::I32 { atomic: false },

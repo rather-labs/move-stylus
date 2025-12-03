@@ -42,15 +42,12 @@ pub const DATA_ENUM_STORAGE_SIZE_OFFSET: i32 = 260;
 /// Stores the pointer and length of the calldata (8 bytes)
 pub const DATA_CALLDATA_OFFSET: i32 = 396;
 
-/// deadbeef magic number
-pub const DATA_DEADBEEF_OFFSET: i32 = 404;
-
 /// Amount of memory reserved starting from offset 0.
 ///
 /// # WARNING
 /// This value must be kept in sync to correctly initialize the memory allocator
 /// at the proper offset.
-pub const TOTAL_RESERVED_MEMORY: i32 = 408;
+pub const TOTAL_RESERVED_MEMORY: i32 = 404;
 
 /// Initializes the module's data segment.
 pub fn setup_data_segment(module: &mut Module, memory_id: MemoryId) {
@@ -78,15 +75,6 @@ pub fn setup_data_segment(module: &mut Module, memory_id: MemoryId) {
         DataKind::Active {
             memory: memory_id,
             offset: ConstExpr::Value(Value::I32(DATA_FROZEN_OBJECTS_KEY_OFFSET)),
-        },
-        data,
-    );
-
-    let data = [0xde, 0xad, 0xbe, 0xef].to_vec();
-    module.data.add(
-        DataKind::Active {
-            memory: memory_id,
-            offset: ConstExpr::Value(Value::I32(DATA_DEADBEEF_OFFSET)),
         },
         data,
     );

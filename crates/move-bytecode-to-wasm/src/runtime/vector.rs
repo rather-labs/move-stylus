@@ -5,7 +5,6 @@ use walrus::{
 
 use super::{RuntimeFunction, error::RuntimeFunctionError};
 use crate::CompilationContext;
-use crate::data::DATA_DEADBEEF_OFFSET;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 
 // Increments vector length by 1
@@ -665,15 +664,7 @@ pub fn vec_update_mut_ref_function(
                     offset: 0,
                 },
             )
-            .i32_const(DATA_DEADBEEF_OFFSET)
-            .load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            )
+            .i32_const(0xDEADBEEF_u32 as i32)
             .binop(BinaryOp::I32Eq)
             .if_else(
                 None,
