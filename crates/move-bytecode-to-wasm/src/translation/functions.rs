@@ -261,20 +261,25 @@ pub fn prepare_function_return(
 /// It processes each argument type, checking if it is an immutable (`IRef`) or mutable (`IMutRef`) reference.
 /// If a reference is detected, the function ensures that the pointer to the referenced data is loaded.
 ///
-/// Returns the types extracted from the stack
+/// Returns the types extracted from the stack and a vector of mutable reference to vector locals (if any)
 pub fn prepare_function_arguments(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     arguments: &[IntermediateType],
     compilation_ctx: &CompilationContext,
     types_stack: &mut TypesStack,
-) -> Result<Vec<IntermediateType>, TranslationError> {
+) -> Result<(Vec<IntermediateType>, Vec<LocalId>), TranslationError> {
     let mut result = Vec::new();
-    // Verify that the types currently on the types stack correspond to the expected argument types.
-    // Additionally, determine if any of these arguments are references.
+
+    // Vector of mutable reference to vector locals
+    let mut mut_ref_vec_locals: Vec<LocalId> = Vec::new();
+
     let mut has_ref = false;
+
+    // Verify that the types currently on the types stack correspond to the expected argument types and check if any of these arguments are references.
     for arg in arguments.iter().rev() {
         let typestack_arg = types_stack.pop_expecting(arg)?;
+
         result.insert(0, typestack_arg);
 
         has_ref = has_ref
@@ -294,6 +299,16 @@ pub fn prepare_function_arguments(
                 arg_ty,
                 IntermediateType::IRef(_) | IntermediateType::IMutRef(_)
             ) {
+                // If this argument is a mutable reference to a vector, record the original address it points to.
+                if let IntermediateType::IMutRef(inner) = arg_ty {
+                    if let IntermediateType::IVector(_) = **inner {
+                        let mut_ref_vec_local =
+                            inner.add_stack_to_local_instructions(module, builder)?;
+                        mut_ref_vec_locals.push(mut_ref_vec_local);
+                        builder.local_get(mut_ref_vec_local);
+                    }
+                }
+
                 // If the argument is a Ref, load the pointer
                 builder.load(
                     compilation_ctx.memory_id,
@@ -313,5 +328,5 @@ pub fn prepare_function_arguments(
         }
     };
 
-    Ok(result)
+    Ok((result, mut_ref_vec_locals))
 }

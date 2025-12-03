@@ -845,7 +845,7 @@ fn translate_instruction(
                 let function_id = &function_information.function_id;
                 let arguments = &function_information.signature.arguments;
 
-                prepare_function_arguments(
+                let (_argument_types, mut_ref_vec_locals) = prepare_function_arguments(
                     module,
                     builder,
                     arguments,
@@ -853,12 +853,41 @@ fn translate_instruction(
                     types_stack,
                 )?;
 
-                // If the function is in the table we call it directly
-                if let Some(f) = function_table.get_by_function_id(function_id) {
+                // If the function IS native, we link it and call it directly
+                if function_information.is_native {
+                    let type_instantiations = function_information
+                        .function_id
+                        .type_instantiations
+                        .as_ref()
+                        .ok_or(TranslationError::CallGenericWihtoutTypeInstantiations)?;
+
+                    let native_function_id = NativeFunction::get_generic(
+                        &function_id.identifier,
+                        module,
+                        compilation_ctx,
+                        &function_id.module_id,
+                        type_instantiations,
+                    )?;
+
+                    builder.call(native_function_id);
+                } else {
+                    let table_id = function_table.get_table_id();
+
+                    // If the function is in the table we call it directly
+                    let f_entry = if let Some(f) = function_table.get_by_function_id(function_id) {
+                        f
+                    }
+                    // Otherwise, we add it to the table and declare it for translating and linking
+                    // before calling it
+                    else {
+                        functions_calls_to_link.push(function_id.clone());
+                        function_table.add(module, function_id.clone(), &function_information)?
+                    };
+
                     call_indirect(
-                        f,
+                        f_entry,
                         &function_information.signature.returns,
-                        function_table.get_table_id(),
+                        table_id,
                         builder,
                         module,
                         compilation_ctx,
@@ -883,56 +912,15 @@ fn translate_instruction(
                             function_id,
                         )?;
                     }
-                }
-                // Otherwise
-                // If the function is not native, we add it to the table and declare it for translating
-                // and linking
-                // If the function IS native, we link it and call it directly
-                else if function_information.is_native {
-                    let type_instantiations = function_information
-                        .function_id
-                        .type_instantiations
-                        .as_ref()
-                        .ok_or(TranslationError::CallGenericWihtoutTypeInstantiations)?;
 
-                    let native_function_id = NativeFunction::get_generic(
-                        &function_id.identifier,
-                        module,
-                        compilation_ctx,
-                        &function_id.module_id,
-                        type_instantiations,
-                    )?;
-
-                    builder.call(native_function_id);
-                } else {
-                    let table_id = function_table.get_table_id();
-                    let f_entry =
-                        function_table.add(module, function_id.clone(), &function_information)?;
-                    functions_calls_to_link.push(function_id.clone());
-
-                    call_indirect(
-                        f_entry,
-                        &function_information.signature.returns,
-                        table_id,
-                        builder,
-                        module,
-                        compilation_ctx,
-                    )?;
-
-                    if vm_handled_types::dynamic_fields::Field::is_borrow_mut_fn(
-                        &function_id.module_id,
-                        &function_id.identifier,
-                    ) || vm_handled_types::table::Table::is_borrow_mut_fn(
-                        &function_id.module_id,
-                        &function_id.identifier,
-                    ) {
-                        add_field_borrow_mut_global_var_instructions(
-                            module,
-                            compilation_ctx,
-                            builder,
-                            dynamic_fields_global_variables,
-                            function_id,
-                        )?;
+                    // After the call, check if any argument is a mutable reference to a vector
+                    // and update it if needed.
+                    if !mut_ref_vec_locals.is_empty() {
+                        let update_mut_ref_fn =
+                            RuntimeFunction::VecUpdateMutRef.get(module, Some(compilation_ctx))?;
+                        for &local in mut_ref_vec_locals.iter() {
+                            builder.local_get(local).call(update_mut_ref_fn);
+                        }
                     }
                 };
 
@@ -1015,7 +1003,7 @@ fn translate_instruction(
 
                 builder.call(delete_fn);
             } else {
-                let argument_types = prepare_function_arguments(
+                let (argument_types, mut_ref_vec_locals) = prepare_function_arguments(
                     module,
                     builder,
                     arguments,
@@ -1023,22 +1011,8 @@ fn translate_instruction(
                     types_stack,
                 )?;
 
-                // If the function is in the table we call it directly
-                if let Some(f) = function_table.get_by_function_id(function_id) {
-                    call_indirect(
-                        f,
-                        &module_data.functions.returns[function_handle_index.into_index()],
-                        function_table.get_table_id(),
-                        builder,
-                        module,
-                        compilation_ctx,
-                    )?;
-                }
-                // Otherwise
-                // If the function is not native, we add it to the table and declare it for translating
-                // and linking
                 // If the function IS native, we link it and call it directly
-                else if function_information.is_native {
+                if function_information.is_native {
                     let native_function_module = compilation_ctx
                         .get_module_data_by_id(&function_information.function_id.module_id)?;
 
@@ -1123,9 +1097,17 @@ fn translate_instruction(
                     builder.call(native_function_id);
                 } else {
                     let table_id = function_table.get_table_id();
-                    let f_entry =
-                        function_table.add(module, function_id.clone(), function_information)?;
-                    functions_calls_to_link.push(function_id.clone());
+
+                    // If the function is in the table we call it directly
+                    let f_entry = if let Some(f) = function_table.get_by_function_id(function_id) {
+                        f
+                    }
+                    // Otherwise, we add it to the table and declare it for translating and linking
+                    // before calling it
+                    else {
+                        functions_calls_to_link.push(function_id.clone());
+                        function_table.add(module, function_id.clone(), function_information)?
+                    };
 
                     call_indirect(
                         f_entry,
@@ -1136,6 +1118,16 @@ fn translate_instruction(
                         compilation_ctx,
                     )?;
                 };
+
+                // After the call, check if any argument is a mutable reference to a vector
+                // and update it if needed.
+                if !mut_ref_vec_locals.is_empty() {
+                    let update_mut_ref_fn =
+                        RuntimeFunction::VecUpdateMutRef.get(module, Some(compilation_ctx))?;
+                    for &local in mut_ref_vec_locals.iter() {
+                        builder.local_get(local).call(update_mut_ref_fn);
+                    }
+                }
             }
 
             // Insert in the stack types the types returned by the function (if any)

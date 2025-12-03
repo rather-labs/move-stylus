@@ -1405,6 +1405,10 @@ mod vec_32 {
         function vecPushAndPopBack(uint32[] x, uint32 y) external returns (uint32[]);
         function vecUnpack(uint32[] x) external returns (uint32[]);
         function cumulativeSum(uint32[] x) external returns (uint32);
+        function vecAppend(uint32[] x, uint32[] y) external returns (uint32[]);
+        function vecAppend2(uint32[] x, uint32[] y) external returns (uint32[]);
+        function testMutateMutRefVector(uint32[] x) external returns (uint32[]);
+        function testMutateMutRefVector2(uint32[] x) external returns (uint32[]);
     );
 
     #[rstest]
@@ -1428,6 +1432,10 @@ mod vec_32 {
     #[case(vecPushAndPopBackCall::new((vec![1u32, 2u32, 3u32], 4u32)), vec![1, 2, 3])]
     #[case(vecUnpackCall::new((vec![1u32, 5u32, 9u32],)), vec![3, 1, 4, 1, 5, 9])]
     #[case(cumulativeSumCall::new((vec![1u32, 2u32, 3u32],)), (6u32,))]
+    #[case(vecAppendCall::new((vec![1u32, 2u32, 3u32], vec![4u32, 5u32, 6u32])), vec![1, 2, 3, 4, 5, 6])]
+    #[case(vecAppend2Call::new((vec![1u32, 2u32, 3u32], vec![4u32, 5u32, 6u32, 7u32])), vec![1, 2, 3, 4, 5, 6, 7])]
+    #[case(testMutateMutRefVectorCall::new((vec![1u32],)), vec![1, 42, 43, 44])]
+    #[case(testMutateMutRefVector2Call::new((vec![1u32],)), vec![1, 42, 43, 44])]
     fn test_vec_32<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
