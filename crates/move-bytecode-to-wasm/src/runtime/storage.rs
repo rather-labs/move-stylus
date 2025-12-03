@@ -1158,7 +1158,7 @@ pub fn accumulate_or_advance_slot_delete(
     compilation_ctx: &CompilationContext,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let (storage_cache_fn, _) = storage_cache_bytes32(module);
-    let next_slot_fn = storage_next_slot_function(module, compilation_ctx)?;
+    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx))?;
 
     Ok(build_accumulate_or_advance_slot(
         module,
@@ -1196,7 +1196,7 @@ pub fn accumulate_or_advance_slot_read(
     compilation_ctx: &CompilationContext,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let (storage_load, _) = storage_load_bytes32(module);
-    let next_slot_fn = storage_next_slot_function(module, compilation_ctx)?;
+    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx))?;
 
     Ok(build_accumulate_or_advance_slot(
         module,
@@ -1232,7 +1232,7 @@ pub fn accumulate_or_advance_slot_write(
     compilation_ctx: &CompilationContext,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let (storage_cache_fn, _) = storage_cache_bytes32(module);
-    let next_slot_fn = storage_next_slot_function(module, compilation_ctx)?;
+    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx))?;
 
     Ok(build_accumulate_or_advance_slot(
         module,
