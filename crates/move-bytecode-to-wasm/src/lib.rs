@@ -1,3 +1,26 @@
+pub(crate) mod abi_types;
+pub mod compilation_context;
+mod constructor;
+mod data;
+pub mod error;
+mod generics;
+mod hasher;
+mod hostio;
+mod memory;
+mod native_functions;
+mod runtime;
+mod storage;
+mod translation;
+mod utils;
+mod vm_handled_types;
+mod wasm_builder_extensions;
+mod wasm_validation;
+
+#[cfg(test)]
+mod test_tools;
+
+#[cfg(feature = "inject-host-debug-fns")]
+mod test_tools;
 use abi_types::public_function::PublicFunction;
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
 use compilation_context::{ModuleData, ModuleId};
@@ -22,31 +45,10 @@ use translation::{
 use walrus::{GlobalId, Module, RefType};
 use wasm_validation::validate_stylus_wasm;
 
-pub(crate) mod abi_types;
-pub mod compilation_context;
-mod constructor;
-mod data;
-pub mod error;
-mod generics;
-mod hasher;
-mod hostio;
-mod memory;
-mod native_functions;
-mod runtime;
-mod storage;
-mod translation;
-mod utils;
-mod vm_handled_types;
-mod wasm_builder_extensions;
-mod wasm_validation;
-
 pub use translation::functions::MappedFunction;
 
 #[cfg(feature = "inject-host-debug-fns")]
 use walrus::ValType;
-
-#[cfg(test)]
-mod test_tools;
 
 pub type GlobalFunctionTable<'move_package> =
     HashMap<FunctionId, &'move_package FunctionDefinition>;

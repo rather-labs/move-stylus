@@ -39,7 +39,7 @@ impl Build {
         if let Err(compilation_error) =
             translate_package_cli(compiled, &rerooted_path, config.install_dir, emit_wat)
         {
-            print_error_diagnostic(compilation_error)
+            print_error_diagnostic(*compilation_error)
         }
 
         Ok(())

@@ -7,9 +7,12 @@ pub(crate) mod build_config;
 pub(crate) mod error;
 
 use base::{
-    abi_generate::AbiGenerate, build::Build, coverage::Coverage, deploy::Deploy,
-    disassemble::Disassemble, info::Info, new::New, test::Test,
+    abi_generate::AbiGenerate, build::Build, coverage::Coverage, deploy::Deploy, info::Info,
+    new::New, test::Test,
 };
+
+#[cfg(debug_assertions)]
+use base::disassemble::Disassemble;
 
 /// Default directory where saved Move resources live
 pub const DEFAULT_STORAGE_DIR: &str = "storage";

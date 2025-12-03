@@ -35,7 +35,7 @@ pub fn translate_package_cli(
     rerooted_path: &Path,
     install_dir: Option<PathBuf>,
     emit_wat: bool,
-) -> Result<(), CompilationError> {
+) -> Result<(), Box<CompilationError>> {
     let build_directory = if let Some(install_dir) = install_dir {
         install_dir.join(format!(
             "build/{}/wasm",
