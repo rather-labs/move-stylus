@@ -1,4 +1,4 @@
-module hello_world::simple_counter;
+module hello_world::hello_world;
 
 public struct Counter has drop {
     value: u64
@@ -24,14 +24,5 @@ entry fun set_value(counter: &mut Counter, value: u64) {
 fun test_increment_once() {
     let mut c = Counter { value: 0 };
     increment(&mut c);
-    assert!(c.value == 1, debug::print(&c.value));
-}
-
-#[test]
-fun test_increment_multiple_times() {
-    let mut c = Counter { value: 10 };
-    increment(&mut c);
-    increment(&mut c);
-    increment(&mut c);
-    assert!(c.value == 13);
+    assert!(c.value == 1); //, debug::print(&c.value));
 }

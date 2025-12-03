@@ -266,8 +266,15 @@ pub fn process_special_attributes(
 
                             let first_modifier = modifiers.pop_front();
                             match first_modifier {
+                                // TODO: Process this only if test mode is enabled
                                 Some(FunctionModifier::Test) => {
                                     result.test_functions.push(f.name.to_owned().to_string());
+                                    result.functions.push(Function {
+                                        name: f.name.to_owned().to_string(),
+                                        modifiers: vec![],
+                                        signature,
+                                        visibility,
+                                    });
                                 }
                                 Some(FunctionModifier::ExternalCall) => {
                                     let modifiers =

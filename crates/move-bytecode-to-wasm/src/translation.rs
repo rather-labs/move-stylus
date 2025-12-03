@@ -198,6 +198,8 @@ pub fn translate_function(
     #[cfg(debug_assertions)]
     function.name(function_information.function_id.identifier.clone());
 
+    println!("{}", function_information.function_id.identifier);
+
     let mut builder = function.func_body();
 
     let (arguments, locals) = process_fn_local_variables(function_information, module)?;
@@ -930,6 +932,7 @@ fn translate_instruction(
         }
         // Function calls
         Bytecode::Call(function_handle_index) => {
+            println!("===> {} {:?}", module_data.id, function_handle_index);
             let function_id = &module_data.functions.calls[function_handle_index.into_index()];
             let arguments = &module_data.functions.arguments[function_handle_index.into_index()];
 

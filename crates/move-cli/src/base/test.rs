@@ -22,16 +22,16 @@ impl Test {
         verbose: bool,
     ) -> anyhow::Result<()> {
         let rerooted_path = reroot_path(path)?;
+        let install_dir = config.install_dir.clone();
 
         config.test_mode = true;
         config.dev_mode = true;
 
-        let package = config.clone().cli_compile_package(
-            &rerooted_path,
-            &mut std::io::stdout(),
-            &mut std::io::stdin().lock(),
-        )?;
+        let package = config.compile_package(&rerooted_path, &mut Vec::new())?;
 
+        translate_package_cli(package, &rerooted_path, install_dir, false, verbose).unwrap();
+
+        /*
         let package_modules =
             package_module_data(&package, None, verbose).map_err(print_error_diagnostic)?;
 
@@ -40,6 +40,15 @@ impl Test {
         {
             print_error_diagnostic(*compilation_error)
         }
+
+        for (path, module_id) in &package_modules.modules_paths {
+            let data = package_modules.modules_data.get(module_id).unwrap();
+
+            if !data.special_attributes.test_functions.is_empty() {
+                println!("Running tests for {module_id}...");
+            }
+        }
+        */
 
         Ok(())
     }

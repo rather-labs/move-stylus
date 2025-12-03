@@ -741,6 +741,9 @@ impl ModuleData {
                 type_instantiations: None,
             };
 
+            println!(
+                "{module_id} {function_name} {function_module_name} {function_module_address}"
+            );
             // If we find this function, means the module is compiled in test mode. We should not
             // process this function because it is injected by move and not used in WASM context
             if function_name == "unit_test_poison" {
