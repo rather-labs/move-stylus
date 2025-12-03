@@ -1,6 +1,8 @@
 use anyhow::anyhow;
 use clap::Parser;
-use std::process::Command;
+use std::{path::Path, process::Command};
+
+use crate::base::reroot_path;
 
 /// Deploys a contract
 #[derive(Parser)]
@@ -55,7 +57,7 @@ pub struct PrivateKeyArgs {
 }
 
 impl Deploy {
-    pub fn execute(self) -> anyhow::Result<()> {
+    pub fn execute(self, path: Option<&Path>) -> anyhow::Result<()> {
         let Self {
             contract_name,
             endpoint,
@@ -66,6 +68,12 @@ impl Deploy {
             max_fee_per_gas_gwei,
             data_fee_bump_percent,
         } = self;
+
+        let rerooted_path = reroot_path(path)?;
+        let manifest =
+            move_package::source_package::manifest_parser::parse_move_manifest_from_file(
+                &rerooted_path.join("Move.toml"),
+            )?;
 
         if !cargo_stylus_installed() {
             return Err(anyhow!(
@@ -82,7 +90,10 @@ impl Deploy {
             .arg("--")
             .arg("deploy")
             .arg("--wasm-file")
-            .arg(get_wasm_file_with_path(&contract_name)?)
+            .arg(get_wasm_file_with_path(
+                &contract_name,
+                manifest.package.name.as_str(),
+            )?)
             .arg("--endpoint")
             .arg(&endpoint)
             .arg("--data-fee-bump-percent")
@@ -138,14 +149,17 @@ impl Deploy {
     }
 }
 
-fn get_wasm_file_with_path(contract_name: &str) -> Result<String, anyhow::Error> {
+fn get_wasm_file_with_path(
+    contract_name: &str,
+    package_name: &str,
+) -> Result<String, anyhow::Error> {
     let name = if contract_name.ends_with(".move") {
         contract_name.replace(".move", ".wasm")
     } else {
         format!("{contract_name}.wasm")
     };
 
-    let file_path = format!("./build/wasm/{name}");
+    let file_path = format!("./build/{package_name}/wasm/{name}");
 
     //Check if the file exists
     if !std::path::Path::new(&file_path).exists() {

@@ -26,6 +26,7 @@ impl Build {
     ) -> anyhow::Result<()> {
         let Build { emit_wat } = self;
         let rerooted_path = reroot_path(path)?;
+
         if config.fetch_deps_only {
             let mut config = config;
             if config.test_mode {

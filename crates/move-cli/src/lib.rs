@@ -84,7 +84,7 @@ pub fn run_cli(move_args: Move, cmd: Command) -> Result<()> {
         ),
         Command::Info(c) => c.execute(move_args.package_path.as_deref(), build_config),
         Command::New(c) => c.execute_with_defaults(move_args.package_path.as_deref()),
-        Command::Deploy(c) => c.execute(),
+        Command::Deploy(c) => c.execute(move_args.package_path.as_deref()),
     }
 }
 
