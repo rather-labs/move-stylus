@@ -3,9 +3,8 @@
 
 use crate::error::print_error_diagnostic;
 
-use super::reroot_path;
+use super::{reroot_path, translate_package_cli};
 use clap::*;
-use move_bytecode_to_wasm::translate_package_cli;
 use move_package::BuildConfig;
 use std::path::Path;
 

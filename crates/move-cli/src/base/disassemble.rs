@@ -3,10 +3,9 @@
 
 use crate::error::print_error_diagnostic;
 
-use super::reroot_path;
+use super::{reroot_path, translate_package_cli};
 use clap::*;
 use move_bytecode_source_map::utils::serialize_to_json_string;
-use move_bytecode_to_wasm::translate_package_cli;
 use move_compiler::compiled_unit::NamedCompiledModule;
 use move_disassembler::disassembler::Disassembler;
 use move_package::{BuildConfig, compilation::compiled_package::CompiledUnitWithSource};

@@ -11,6 +11,7 @@ exclude = ["example-rust"]
 # Dependencies that should be kept in sync through the whole workspace
 [workspace.dependencies]
 anyhow = "1.0.52"
+wasmprinter = "0.228"
 clap = { version = "4", features = ["derive"] }
 move-binary-format = { git = "https://github.com/MystenLabs/sui" }
 move-bytecode-source-map = { git = "https://github.com/MystenLabs/sui" }
