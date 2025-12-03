@@ -95,4 +95,35 @@ entry fun cumulative_sum(x: vector<u32>): u32 {
     sum
 }
 
- 
+//////////
+entry fun vec_append(x: &mut vector<u32>, y: vector<u32>): vector<u32> {
+    vector::append(x, y);
+    *x
+}   
+
+fun vec_append_(lhs: &mut vector<u32>, mut other: vector<u32>) {
+    vector::reverse(&mut other);
+    while (!vector::is_empty(&other)) vector::push_back(lhs, vector::pop_back(&mut other));
+    vector::destroy_empty(other);
+}
+
+entry fun vec_append_2(x: &mut vector<u32>, y: vector<u32>): vector<u32> {
+    vec_append_(x, y);
+    *x
+}
+
+fun mutate_mut_ref_vector(x: &mut vector<u32>) {
+    x.push_back(42u32);
+    x.push_back(43u32);
+    x.push_back(44u32);
+}
+
+entry fun test_mutate_mut_ref_vector(x: &mut vector<u32>): vector<u32> {
+    mutate_mut_ref_vector(x);
+    *x
+}
+
+entry fun test_mutate_mut_ref_vector_2(mut x: vector<u32>): vector<u32> {
+    mutate_mut_ref_vector(&mut x);
+    x
+}
