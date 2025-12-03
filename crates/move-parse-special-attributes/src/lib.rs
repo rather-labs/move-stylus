@@ -55,6 +55,7 @@ pub struct SpecialAttributes {
     pub external_struct: HashMap<String, ExternalStruct>,
     pub external_call_structs: HashSet<String>,
     pub abi_errors: HashMap<String, AbiError>,
+    pub test_functions: Vec<String>,
 }
 
 pub fn process_special_attributes(
@@ -265,6 +266,9 @@ pub fn process_special_attributes(
 
                             let first_modifier = modifiers.pop_front();
                             match first_modifier {
+                                Some(FunctionModifier::Test) => {
+                                    result.test_functions.push(f.name.to_owned().to_string());
+                                }
                                 Some(FunctionModifier::ExternalCall) => {
                                     let modifiers =
                                         modifiers.into_iter().collect::<Vec<FunctionModifier>>();
