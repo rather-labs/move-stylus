@@ -853,42 +853,8 @@ fn translate_instruction(
                     types_stack,
                 )?;
 
-                // If the function is in the table we call it directly
-                if let Some(f) = function_table.get_by_function_id(function_id) {
-                    call_indirect(
-                        f,
-                        &function_information.signature.returns,
-                        function_table.get_table_id(),
-                        builder,
-                        module,
-                        compilation_ctx,
-                    )?;
-
-                    // Every time `dynamic_fields::borrow_mut` or
-                    // `dynamic_fields_named_id::borrow_mut` are called, we must register a unique
-                    // global variable that will hold a `Field` pointer, used at the end of the
-                    // router to commit the changes made to the field to storage
-                    if vm_handled_types::dynamic_fields::Field::is_borrow_mut_fn(
-                        &function_id.module_id,
-                        &function_id.identifier,
-                    ) || vm_handled_types::table::Table::is_borrow_mut_fn(
-                        &function_id.module_id,
-                        &function_id.identifier,
-                    ) {
-                        add_field_borrow_mut_global_var_instructions(
-                            module,
-                            compilation_ctx,
-                            builder,
-                            dynamic_fields_global_variables,
-                            function_id,
-                        )?;
-                    }
-                }
-                // Otherwise
-                // If the function is not native, we add it to the table and declare it for translating
-                // and linking
                 // If the function IS native, we link it and call it directly
-                else if function_information.is_native {
+                if function_information.is_native {
                     let type_instantiations = function_information
                         .function_id
                         .type_instantiations
@@ -906,9 +872,17 @@ fn translate_instruction(
                     builder.call(native_function_id);
                 } else {
                     let table_id = function_table.get_table_id();
-                    let f_entry =
-                        function_table.add(module, function_id.clone(), &function_information)?;
-                    functions_calls_to_link.push(function_id.clone());
+
+                    // If the function is in the table we call it directly
+                    let f_entry = if let Some(f) = function_table.get_by_function_id(function_id) {
+                        f
+                    }
+                    // Otherwise, we add it to the table and declare it for translating and linking
+                    // before calling it
+                    else {
+                        functions_calls_to_link.push(function_id.clone());
+                        function_table.add(module, function_id.clone(), &function_information)?
+                    };
 
                     call_indirect(
                         f_entry,
@@ -919,6 +893,10 @@ fn translate_instruction(
                         compilation_ctx,
                     )?;
 
+                    // Every time `dynamic_fields::borrow_mut` or
+                    // `dynamic_fields_named_id::borrow_mut` are called, we must register a unique
+                    // global variable that will hold a `Field` pointer, used at the end of the
+                    // router to commit the changes made to the field to storage
                     if vm_handled_types::dynamic_fields::Field::is_borrow_mut_fn(
                         &function_id.module_id,
                         &function_id.identifier,
@@ -1023,22 +1001,8 @@ fn translate_instruction(
                     types_stack,
                 )?;
 
-                // If the function is in the table we call it directly
-                if let Some(f) = function_table.get_by_function_id(function_id) {
-                    call_indirect(
-                        f,
-                        &module_data.functions.returns[function_handle_index.into_index()],
-                        function_table.get_table_id(),
-                        builder,
-                        module,
-                        compilation_ctx,
-                    )?;
-                }
-                // Otherwise
-                // If the function is not native, we add it to the table and declare it for translating
-                // and linking
                 // If the function IS native, we link it and call it directly
-                else if function_information.is_native {
+                if function_information.is_native {
                     let native_function_module = compilation_ctx
                         .get_module_data_by_id(&function_information.function_id.module_id)?;
 
@@ -1123,9 +1087,17 @@ fn translate_instruction(
                     builder.call(native_function_id);
                 } else {
                     let table_id = function_table.get_table_id();
-                    let f_entry =
-                        function_table.add(module, function_id.clone(), function_information)?;
-                    functions_calls_to_link.push(function_id.clone());
+
+                    // If the function is in the table we call it directly
+                    let f_entry = if let Some(f) = function_table.get_by_function_id(function_id) {
+                        f
+                    }
+                    // Otherwise, we add it to the table and declare it for translating and linking
+                    // before calling it
+                    else {
+                        functions_calls_to_link.push(function_id.clone());
+                        function_table.add(module, function_id.clone(), function_information)?
+                    };
 
                     call_indirect(
                         f_entry,
