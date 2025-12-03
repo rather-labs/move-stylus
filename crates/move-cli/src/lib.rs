@@ -20,11 +20,7 @@ pub const DEFAULT_BUILD_DIR: &str = ".";
 use anyhow::Result;
 use build_config::BuildConfig;
 use clap::Parser;
-use move_core_types::{account_address::AccountAddress, identifier::Identifier};
-use move_vm_runtime::native_functions::NativeFunction;
 use std::path::PathBuf;
-
-type NativeFunctionRecord = (AccountAddress, Identifier, Identifier, NativeFunction);
 
 #[derive(Parser)]
 #[clap(author, version, about)]

@@ -7,7 +7,6 @@ pub mod deploy;
 pub mod disassemble;
 pub mod info;
 pub mod new;
-pub mod test;
 
 use move_bytecode_to_wasm::{
     error::{CompilationError, ICEError, ICEErrorKind},
