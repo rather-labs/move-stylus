@@ -223,7 +223,7 @@ async fn main() -> eyre::Result<()> {
     let receipt = pending_tx.get_receipt().await?;
     let event = Example::TestEvent2 {
         a: 42,
-        b: keccak256(vec![43, 44, 45].abi_encode()),
+        b: keccak256(&vec![43, 44, 45].abi_encode()[64..]),
         c: 46,
     };
 
