@@ -845,7 +845,7 @@ fn translate_instruction(
                 let function_id = &function_information.function_id;
                 let arguments = &function_information.signature.arguments;
 
-                prepare_function_arguments(
+                let (_argument_types, mut_ref_vec_locals) = prepare_function_arguments(
                     module,
                     builder,
                     arguments,
@@ -934,6 +934,16 @@ fn translate_instruction(
                             function_id,
                         )?;
                     }
+
+                    // After the call, check if any argument is a mutable reference to a vector
+                    // and update it if needed.
+                    if !mut_ref_vec_locals.is_empty() {
+                        let update_mut_ref_fn =
+                            RuntimeFunction::VecUpdateMutRef.get(module, Some(compilation_ctx))?;
+                        for &local in mut_ref_vec_locals.iter() {
+                            builder.local_get(local).call(update_mut_ref_fn);
+                        }
+                    }
                 };
 
                 // Insert in the stack types the types returned by the function (if any)
@@ -1015,7 +1025,7 @@ fn translate_instruction(
 
                 builder.call(delete_fn);
             } else {
-                let argument_types = prepare_function_arguments(
+                let (argument_types, mut_ref_vec_locals) = prepare_function_arguments(
                     module,
                     builder,
                     arguments,
@@ -1136,6 +1146,16 @@ fn translate_instruction(
                         compilation_ctx,
                     )?;
                 };
+
+                // After the call, check if any argument is a mutable reference to a vector
+                // and update it if needed.
+                if !mut_ref_vec_locals.is_empty() {
+                    let update_mut_ref_fn =
+                        RuntimeFunction::VecUpdateMutRef.get(module, Some(compilation_ctx))?;
+                    for &local in mut_ref_vec_locals.iter() {
+                        builder.local_get(local).call(update_mut_ref_fn);
+                    }
+                }
             }
 
             // Insert in the stack types the types returned by the function (if any)

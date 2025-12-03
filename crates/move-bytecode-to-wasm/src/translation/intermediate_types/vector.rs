@@ -3,11 +3,11 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
+use super::{IntermediateType, error::IntermediateTypeError, heap_integers::IU128};
+use crate::data::DATA_DEADBEEF_OFFSET;
 use crate::runtime::RuntimeFunction;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 use crate::{CompilationContext, compilation_context::ModuleData};
-
-use super::{IntermediateType, error::IntermediateTypeError, heap_integers::IU128};
 
 #[derive(Clone)]
 pub struct IVector;
@@ -883,9 +883,10 @@ impl IVector {
 
                 // Set vec_ptr to the new vector pointer and store it at *vec_ref
                 // This modifies the original vector reference to point to the new vector
-                then.local_set(vec_ptr)
+                let new_vec_ptr = module.locals.add(ValType::I32);
+                then.local_set(new_vec_ptr)
                     .local_get(vec_ref)
-                    .local_get(vec_ptr)
+                    .local_get(new_vec_ptr)
                     .store(
                         compilation_ctx.memory_id,
                         StoreKind::I32 { atomic: false },
@@ -894,6 +895,42 @@ impl IVector {
                             offset: 0,
                         },
                     );
+
+                // Mark the original vector location with the DEADBEEF flag to indicate relocation.
+                // When a vector is resized, any existing mutable references pointing to the old
+                // location become invalid. By writing DEADBEEF into the length field (first 4 bytes)
+                // of the original vector, we create a marker that can be detected after function calls.
+                // After a call_indirect, we check for this flag and update any mutable references
+                // that still point to the old location, following the chain to the new vector.
+                then.local_get(vec_ptr)
+                    .i32_const(DATA_DEADBEEF_OFFSET)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+                // Set the original vector pointer to the new vector pointer.
+                // This way we can update the reference to it, as explained above
+                then.local_get(vec_ptr).local_get(new_vec_ptr).store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 4,
+                    },
+                );
+                then.local_get(new_vec_ptr).local_set(vec_ptr);
             },
             |_| {},
         );
@@ -920,11 +957,7 @@ impl IVector {
         // length++
         let vec_increment_len_fn =
             RuntimeFunction::VecIncrementLen.get(module, Some(compilation_ctx))?;
-        builder
-            .local_get(vec_ptr)
-            .local_get(len)
-            .call(vec_increment_len_fn);
-
+        builder.local_get(vec_ptr).call(vec_increment_len_fn);
         Ok(())
     }
 }

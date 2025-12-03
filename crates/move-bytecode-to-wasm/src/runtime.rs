@@ -61,6 +61,7 @@ pub enum RuntimeFunction {
     VecBorrow,
     VecIncrementLen,
     VecDecrementLen,
+    VecUpdateMutRef,
     // Storage
     StorageNextSlot,
     DeriveMappingSlot,
@@ -129,6 +130,7 @@ impl RuntimeFunction {
             Self::VecBorrow => "vec_borrow",
             Self::VecIncrementLen => "vec_increment_len",
             Self::VecDecrementLen => "vec_decrement_len",
+            Self::VecUpdateMutRef => "vec_update_mut_ref",
             // Storage
             Self::StorageNextSlot => "storage_next_slot",
             Self::DeriveMappingSlot => "derive_mapping_slot",
@@ -245,6 +247,9 @@ impl RuntimeFunction {
                 }
                 (Self::VecDecrementLen, Some(ctx)) => {
                     vector::decrement_vec_len_function(module, ctx)
+                }
+                (Self::VecUpdateMutRef, Some(ctx)) => {
+                    vector::vec_update_mut_ref_function(module, ctx)
                 }
                 // Storage
                 (Self::StorageNextSlot, Some(ctx)) => {
