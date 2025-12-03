@@ -4,6 +4,7 @@ use stylus::tx_context::TxContext;
 use stylus::object as object;
 use stylus::object::UID;
 use stylus::event::emit;
+use stylus::fallback;
 use hello_world::stack::Stack;
 use hello_world::stack;
 
@@ -65,12 +66,19 @@ public struct NestedStruct2 has copy, drop {
     c: u128,
 }
 
-#[ext(event, indexes = 2)]
+#[ext(event, indexes = 1)]
 public struct TestEvent3 has copy, drop {
     a: NestedStruct1,
     b: NestedStruct2,
 }
 
+#[ext(event, indexes = 1)]
+public struct TestEvent4 has copy, drop {
+    a: u32,
+    b: vector<u16>,
+    c: vector<u8>,
+    d: vector<u32>,
+}
 
 entry fun emit_test_event1(n: u32) {
     emit(TestEvent1 { n });
@@ -82,6 +90,10 @@ entry fun emit_test_event2(a: u32, b: vector<u8>, c: u128) {
 
 entry fun emit_test_event3(n: u32, a: u32, b: vector<u8>, c: u128) {
     emit(TestEvent3 { a: NestedStruct1 { n }, b: NestedStruct2 { a, b, c } });
+}
+
+entry fun emit_test_event4(a: u32, b: vector<u16>, c: vector<u8>, d: vector<u32>) {
+    emit(TestEvent4 { a, b, c , d });
 }
 
 entry fun test_stack_1(): (Stack<u32>, u64) {
@@ -105,4 +117,25 @@ entry fun test_stack_3(): (Stack<u32>, u64){
     s.pop_back();
     s.pop_back();
     (s, s.size())
+}
+
+#[ext(event, indexes = 1)]
+public struct ReceiveEvent has copy, drop {
+    sender: address,
+    data_length: u32,
+    data: vector<u8>,
+}
+
+#[ext(payable)]
+entry fun receive(ctx: &TxContext) {
+    emit(ReceiveEvent { sender: ctx.sender(), data_length: 0, data: vector[] });
+}
+
+#[ext(payable)]
+entry fun fallback(data: &fallback::Calldata, ctx: &TxContext) {
+    emit(ReceiveEvent { 
+        sender: ctx.sender(), 
+        data_length: fallback::calldata_length(data), 
+        data: fallback::calldata_as_vector(data) 
+    });
 }

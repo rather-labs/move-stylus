@@ -19,6 +19,7 @@ pub const SF_MODULE_NAME_EVENT: &str = "event";
 pub const SF_MODULE_NAME_TYPES: &str = "types";
 pub const SF_MODULE_NAME_TABLE: &str = "table";
 pub const SF_MODULE_NAME_ERROR: &str = "error";
+pub const SF_MODULE_NAME_FALLBACK: &str = "fallback";
 
 // Module names for standard lib
 pub const STDLIB_MODULE_NAME_ASCII: &str = "ascii";

@@ -3,7 +3,7 @@ use walrus::{
     ir::{BinaryOp, UnaryOp},
 };
 
-use crate::data::DATA_SLOT_DATA_PTR_OFFSET;
+use crate::{CompilationContext, data::DATA_SLOT_DATA_PTR_OFFSET};
 
 #[derive(Debug, thiserror::Error)]
 pub enum WasmBuilderExtensionError {
@@ -79,6 +79,9 @@ pub trait WasmBuilderExtension {
     /// [..., ] --> load_i32_from_bytes() -> [..., i64_constant]
     fn load_i64_from_bytes(&mut self, bytes: &[u8])
     -> Result<&mut Self, WasmBuilderExtensionError>;
+
+    /// Leaves in the stack the current position of the linear memory.
+    fn get_memory_curret_position(&mut self, compilation_ctx: &CompilationContext) -> &mut Self;
 }
 
 impl WasmBuilderExtension for InstrSeqBuilder<'_> {
@@ -178,5 +181,9 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
         self.i64_const(i64::from_le_bytes(num_bytes));
 
         Ok(self)
+    }
+
+    fn get_memory_curret_position(&mut self, compilation_ctx: &CompilationContext) -> &mut Self {
+        self.i32_const(0).call(compilation_ctx.allocator)
     }
 }

@@ -514,6 +514,16 @@ impl RuntimeSandbox {
                         let mut result = vec![0; len as usize];
                         memory.read(&caller, ptr as usize, &mut result).unwrap();
                         println!("Data {result:?}");
+
+                        println!("In chunks of 32 bytes:");
+                        for chunk in result.chunks(32) {
+                            // print each byte in hex, for example
+                            for b in chunk {
+                                print!("{b:?} ");
+                            }
+                            println!(); // newline after each 32‑byte chunk
+                        }
+
                         println!("--- --- ---\n");
                     },
                 )

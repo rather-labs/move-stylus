@@ -36,7 +36,10 @@ use move_package::{
     compilation::compiled_package::CompiledUnitWithSource,
     source_package::parsed_manifest::PackageName,
 };
-use move_parse_special_attributes::SpecialAttributes;
+use move_parse_special_attributes::{
+    SpecialAttributes,
+    function_modifiers::{Function, FunctionModifier},
+};
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
@@ -213,6 +216,7 @@ impl ModuleData {
             &datatype_handles_map,
             function_definitions,
             move_module_dependencies,
+            &special_attributes,
         )?;
 
         let signatures = move_module_unit
@@ -682,13 +686,18 @@ impl ModuleData {
         datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
         function_definitions: &mut GlobalFunctionTable<'move_package>,
         move_module_dependencies: &'move_package [(PackageName, CompiledUnitWithSource)],
+        special_attributes: &SpecialAttributes,
     ) -> Result<FunctionData> {
         // Return types of functions in intermediate types. Used to fill the stack type
         let mut functions_returns = Vec::new();
         let mut functions_arguments = Vec::new();
         let mut function_calls = Vec::new();
         let mut function_information = Vec::new();
-        let mut init = None;
+
+        // Special reserved functions
+        let mut init: Option<FunctionId> = None;
+        let mut receive: Option<FunctionId> = None;
+        let mut fallback: Option<FunctionId> = None;
 
         for (index, function) in move_module.function_handles().iter().enumerate() {
             let move_function_arguments = &move_module.signature_at(function.parameters);
@@ -763,11 +772,44 @@ impl ModuleData {
                     move_module_dependencies,
                 )?;
 
-                if is_init {
-                    if init.is_some() {
-                        return Err(CompilationContextError::TwoOrMoreInits);
-                    }
-                    init = Some(function_id.clone());
+                if is_init && init.replace(function_id.clone()).is_some() {
+                    return Err(CompilationContextError::DuplicateInitFunction);
+                }
+
+                let function_sa = special_attributes
+                    .functions
+                    .iter()
+                    .find(|f| f.name == function_name)
+                    .or_else(|| special_attributes.external_calls.get(function_name))
+                    .ok_or(ModuleDataError::FunctionByIdentifierNotFound(
+                        function_name.to_string(),
+                    ))?;
+
+                let is_receive = Self::is_receive(
+                    &function_id,
+                    move_function_arguments,
+                    move_function_return,
+                    function_def,
+                    function_sa,
+                    datatype_handles_map,
+                    move_module_dependencies,
+                )?;
+
+                if is_receive && receive.replace(function_id.clone()).is_some() {
+                    return Err(CompilationContextError::DuplicateReceiveFunction);
+                }
+
+                let is_fallback = Self::is_fallback(
+                    &function_id,
+                    move_function_arguments,
+                    move_function_return,
+                    function_def,
+                    datatype_handles_map,
+                    move_module_dependencies,
+                )?;
+
+                if is_fallback && fallback.replace(function_id.clone()).is_some() {
+                    return Err(CompilationContextError::DuplicateFallbackFunction);
                 }
 
                 function_information.push(MappedFunction::new(
@@ -822,6 +864,8 @@ impl ModuleData {
             generic_calls: generic_function_calls,
             information: function_information,
             init,
+            receive,
+            fallback,
         })
     }
 
@@ -883,49 +927,15 @@ impl ModuleData {
         }
 
         // Check TxContext in the last argument
-        let last_arg = move_function_arguments
-            .0
-            .last()
-            .map(|last| IntermediateType::try_from_signature_token(last, datatype_handles_map))
-            .transpose()?;
-
         // The compilation context is not available yet, so we can't use it to check if the
         // `TxContext` is the one from the stylus framework. It is done manually
-        let is_tx_context_ref = match last_arg {
-            Some(IntermediateType::IRef(inner)) | Some(IntermediateType::IMutRef(inner)) => {
-                match inner.as_ref() {
-                    IntermediateType::IStruct {
-                        module_id, index, ..
-                    } if module_id.module_name == "tx_context"
-                        && module_id.address == STYLUS_FRAMEWORK_ADDRESS =>
-                    {
-                        // TODO: Look for this external module one time and pass it down to this
-                        // function
-                        let external_module_source = &move_module_dependencies
-                            .iter()
-                            .find(|(_, m)| {
-                                m.unit.name().as_str() == "tx_context"
-                                    && Address::from(m.unit.address.into_bytes())
-                                        == STYLUS_FRAMEWORK_ADDRESS
-                            })
-                            .ok_or(ModuleDataError::StylusFrameworkDependencyNotFound)?
-                            .1
-                            .unit
-                            .module;
-
-                        let struct_ = external_module_source
-                            .struct_def_at(StructDefinitionIndex::new(*index));
-                        let handle =
-                            external_module_source.datatype_handle_at(struct_.struct_handle);
-                        let identifier = external_module_source.identifier_at(handle.name);
-                        identifier.as_str() == "TxContext"
-                    }
-
-                    _ => false,
-                }
-            }
-            _ => false,
-        };
+        let is_tx_context_ref = move_function_arguments
+            .0
+            .last()
+            .and_then(|last| {
+                IntermediateType::try_from_signature_token(last, datatype_handles_map).ok()
+            })
+            .is_some_and(|arg| is_tx_context_ref(&arg, move_module_dependencies));
 
         if !is_tx_context_ref {
             return Err(CompilationContextError::InitFunctionNoTxContext);
@@ -1002,5 +1012,259 @@ impl ModuleData {
         } else {
             true
         }
+    }
+
+    // Determines whether a function is a valid receive function.
+    // Returns true if the function is a valid receive function, otherwise returns false.
+    // If the function name is "Receive" but does not fulfill the requirements, returns an error.
+    fn is_receive(
+        function_id: &FunctionId,
+        move_function_arguments: &Signature,
+        move_function_return: &Signature,
+        function_def: &FunctionDefinition,
+        function_sa: &Function,
+        datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
+        move_module_dependencies: &[(PackageName, CompiledUnitWithSource)],
+    ) -> Result<bool> {
+        // Receive function definition (see https://docs.soliditylang.org/en/latest/contracts.html#receive-ether-function):
+        // - A contract can have at most one receive function, declared using receive() external payable { ... } (without the function keyword).
+        // - This function cannot have arguments other than a TxContext parameter, cannot return anything and must have external visibility and payable state mutability.
+        const RECEIVE_FUNCTION_NAME: &str = "receive";
+
+        // Must be named `receive`. Otherwise, it is not a receive function.
+        if function_id.identifier != RECEIVE_FUNCTION_NAME {
+            return Ok(false);
+        }
+
+        // Since the function is named `receive`, we must verify that it satisfies all specified constraints.
+        // If any requirement is not fulfilled, an error will be returned; otherwise return true.
+
+        // Must have external visibility, i.e. it must be entry
+        if !function_def.is_entry {
+            return Err(CompilationContextError::ReceiveFunctionBadVisibility);
+        }
+
+        // The function can only take a reference to the TxContext as its only argument.
+        if move_function_arguments.len() > 1 {
+            return Err(CompilationContextError::ReceiveFunctionTooManyArguments);
+        }
+        if let Some(first_arg) = move_function_arguments.0.first() {
+            if let Ok(arg) =
+                IntermediateType::try_from_signature_token(first_arg, datatype_handles_map)
+            {
+                if !is_tx_context_ref(&arg, move_module_dependencies) {
+                    return Err(CompilationContextError::ReceiveFunctionNonTxContextArgument);
+                }
+            }
+        }
+
+        // Must have no return values
+        if !move_function_return.is_empty() {
+            return Err(CompilationContextError::ReceiveFunctionHasReturns);
+        }
+
+        // Must be payable
+        if !function_sa.modifiers.contains(&FunctionModifier::Payable) {
+            return Err(CompilationContextError::ReceiveFunctionIsNotPayable);
+        }
+
+        Ok(true)
+    }
+
+    // Determines whether a function is a valid fallback function.
+    // Returns true if the function is a valid fallback function, otherwise returns false.
+    // If the function name is "Fallback" but does not fulfill the requirements, returns an error.
+    fn is_fallback(
+        function_id: &FunctionId,
+        move_function_arguments: &Signature,
+        move_function_return: &Signature,
+        function_def: &FunctionDefinition,
+        datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
+        move_module_dependencies: &[(PackageName, CompiledUnitWithSource)],
+    ) -> Result<bool> {
+        // Fallback function definition (see https://docs.soliditylang.org/en/latest/contracts.html#fallback-function):
+        // A contract can have at most one fallback function, declared using either fallback () external [payable]
+        // or fallback (bytes calldata input) external [payable] returns (bytes memory output) (both without the function keyword).
+        // This function must have external visibility, but it is not required to be payable.
+        // A fallback function can be virtual, can override and can have modifiers.
+
+        const FALLBACK_FUNCTION_NAME: &str = "fallback";
+
+        // Must be named `fallback`. Otherwise, it is not a fallback function.
+        if function_id.identifier != FALLBACK_FUNCTION_NAME {
+            return Ok(false);
+        }
+
+        // Since the function is named `fallback`, we must verify that it satisfies all specified constraints.
+        // If any requirement is not fulfilled, an error will be returned; otherwise return true.
+
+        // Must have external visibility, i.e. it must be entry
+        if !function_def.is_entry {
+            return Err(CompilationContextError::FallbackFunctionBadVisibility);
+        }
+
+        // Validate arguments based on count
+        match move_function_arguments.len() {
+            0 => {
+                // No arguments: valid
+            }
+            1 => {
+                // 1 argument: must be either vector<u8> or TxContext
+                let first_arg = move_function_arguments
+                    .0
+                    .first()
+                    .and_then(|arg| {
+                        IntermediateType::try_from_signature_token(arg, datatype_handles_map).ok()
+                    })
+                    .ok_or(CompilationContextError::FallbackFunctionInvalidArgumentType(1))?;
+
+                // Check if it's fallback calldata or TxContext
+                if !(is_fallback_calldata(&first_arg, move_module_dependencies)
+                    || is_tx_context_ref(&first_arg, move_module_dependencies))
+                {
+                    return Err(CompilationContextError::FallbackFunctionInvalidArgumentType(1));
+                }
+            }
+            2 => {
+                // 2 arguments: first must be vector<u8>, second must be TxContext
+                let first_arg = move_function_arguments
+                    .0
+                    .first()
+                    .and_then(|arg| {
+                        IntermediateType::try_from_signature_token(arg, datatype_handles_map).ok()
+                    })
+                    .ok_or(CompilationContextError::FallbackFunctionInvalidArgumentType(1))?;
+
+                let second_arg = move_function_arguments
+                    .0
+                    .last()
+                    .and_then(|arg| {
+                        IntermediateType::try_from_signature_token(arg, datatype_handles_map).ok()
+                    })
+                    .ok_or(CompilationContextError::FallbackFunctionInvalidArgumentType(2))?;
+
+                // First argument must be fallback calldata
+                if !is_fallback_calldata(&first_arg, move_module_dependencies) {
+                    return Err(CompilationContextError::FallbackFunctionInvalidArgumentType(1));
+                }
+
+                // Second argument must be TxContext
+                if !is_tx_context_ref(&second_arg, move_module_dependencies) {
+                    return Err(CompilationContextError::FallbackFunctionInvalidArgumentType(2));
+                }
+            }
+            _ => {
+                // Already checked above, but this is unreachable
+                return Err(CompilationContextError::FallbackFunctionTooManyArguments);
+            }
+        }
+
+        // Validate return type: must be either empty or a single vector<u8>
+        match move_function_return.len() {
+            0 => {
+                // No return values: valid
+            }
+            1 => {
+                // 1 return value: must be fallback calldata
+                let return_type = move_function_return
+                    .0
+                    .first()
+                    .and_then(|arg| {
+                        IntermediateType::try_from_signature_token(arg, datatype_handles_map).ok()
+                    })
+                    .ok_or(CompilationContextError::FallbackFunctionInvalidReturnType)?;
+
+                if !is_fallback_calldata(&return_type, move_module_dependencies) {
+                    return Err(CompilationContextError::FallbackFunctionInvalidReturnType);
+                }
+            }
+            _ => {
+                // More than 1 return value: invalid
+                return Err(CompilationContextError::FallbackFunctionInvalidReturnType);
+            }
+        }
+
+        Ok(true)
+    }
+}
+
+fn is_fallback_calldata(
+    argument: &IntermediateType,
+    move_module_dependencies: &[(PackageName, CompiledUnitWithSource)],
+) -> bool {
+    match argument {
+        IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
+            match inner.as_ref() {
+                IntermediateType::IStruct {
+                    module_id, index, ..
+                } if module_id.module_name == "fallback"
+                    && module_id.address == STYLUS_FRAMEWORK_ADDRESS =>
+                {
+                    // TODO: Look for this external module one time and pass it down to this
+                    // function
+                    let external_module_source = &move_module_dependencies
+                        .iter()
+                        .find(|(_, m)| {
+                            m.unit.name().as_str() == "fallback"
+                                && Address::from(m.unit.address.into_bytes())
+                                    == STYLUS_FRAMEWORK_ADDRESS
+                        })
+                        .expect("could not find stylus framework as dependency")
+                        .1
+                        .unit
+                        .module;
+
+                    let struct_ =
+                        external_module_source.struct_def_at(StructDefinitionIndex::new(*index));
+                    let handle = external_module_source.datatype_handle_at(struct_.struct_handle);
+                    let identifier = external_module_source.identifier_at(handle.name);
+                    identifier.as_str() == "Calldata"
+                }
+
+                _ => false,
+            }
+        }
+        _ => false,
+    }
+}
+
+/// Helper function to check if the argument is a reference to the TxContext.
+fn is_tx_context_ref(
+    argument: &IntermediateType,
+    move_module_dependencies: &[(PackageName, CompiledUnitWithSource)],
+) -> bool {
+    match argument {
+        IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
+            match inner.as_ref() {
+                IntermediateType::IStruct {
+                    module_id, index, ..
+                } if module_id.module_name == "tx_context"
+                    && module_id.address == STYLUS_FRAMEWORK_ADDRESS =>
+                {
+                    // TODO: Look for this external module one time and pass it down to this
+                    // function
+                    let external_module_source = &move_module_dependencies
+                        .iter()
+                        .find(|(_, m)| {
+                            m.unit.name().as_str() == "tx_context"
+                                && Address::from(m.unit.address.into_bytes())
+                                    == STYLUS_FRAMEWORK_ADDRESS
+                        })
+                        .expect("could not find stylus framework as dependency")
+                        .1
+                        .unit
+                        .module;
+
+                    let struct_ =
+                        external_module_source.struct_def_at(StructDefinitionIndex::new(*index));
+                    let handle = external_module_source.datatype_handle_at(struct_.struct_handle);
+                    let identifier = external_module_source.identifier_at(handle.name);
+                    identifier.as_str() == "TxContext"
+                }
+
+                _ => false,
+            }
+        }
+        _ => false,
     }
 }
