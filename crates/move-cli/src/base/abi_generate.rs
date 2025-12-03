@@ -9,7 +9,7 @@ use crate::error::print_error_diagnostic;
 
 use super::reroot_path;
 
-/// Build the package at `path`. If no path is provided defaults to current directory.
+/// Generate the package ABI at `path`. If no path is provided defaults to current directory.
 #[derive(Parser)]
 #[clap(name = "abi-generate")]
 pub struct AbiGenerate {
@@ -17,7 +17,7 @@ pub struct AbiGenerate {
     #[clap(long = "json", short = 'j')]
     pub json: bool,
 
-    /// Generate human-readable ABI files (.abi)
+    /// Generate human-readable ABI files (.sol)
     #[clap(long = "human-readable", short = 'r')]
     pub human_readable: bool,
 }
@@ -30,6 +30,7 @@ impl AbiGenerate {
         config: BuildConfig,
     ) -> anyhow::Result<()> {
         let rerooted_path = reroot_path(path)?;
+        let install_dir = config.install_dir.clone();
 
         let package = config.compile_package(&rerooted_path, &mut Vec::new())?;
 
@@ -59,7 +60,18 @@ impl AbiGenerate {
             generate_human_readable,
         ) {
             Ok(mut processed_abis) => {
-                let build_directory = rerooted_path.join("build/abi");
+                let build_directory = if let Some(install_dir) = install_dir {
+                    install_dir.join(format!(
+                        "build/{}/abi",
+                        package.compiled_package_info.package_name
+                    ))
+                } else {
+                    rerooted_path.join(format!(
+                        "build/{}/abi",
+                        package.compiled_package_info.package_name
+                    ))
+                };
+
                 // Create the build directory if it doesn't exist
                 std::fs::create_dir_all(&build_directory).unwrap();
 
@@ -67,7 +79,7 @@ impl AbiGenerate {
                     if generate_human_readable {
                         if let Some(content) = &abi.content_human_readable {
                             // Change the extension
-                            abi.file.set_extension("abi");
+                            abi.file.set_extension("sol");
                             let file = abi.file.file_name().expect("Source file name not found.");
                             std::fs::write(build_directory.join(file), content.as_bytes())?;
                         }
