@@ -1,6 +1,5 @@
 module hello_world::cross_contract_call;
 
-use erc20call::erc20call::{ERC20, new};
 use erc20call::erc20call as erc20call;
 use stylus::contract_calls as ccc;
 

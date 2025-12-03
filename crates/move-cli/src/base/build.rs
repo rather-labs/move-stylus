@@ -18,7 +18,12 @@ pub struct Build {
 }
 
 impl Build {
-    pub fn execute(self, path: Option<&Path>, config: BuildConfig) -> anyhow::Result<()> {
+    pub fn execute(
+        self,
+        path: Option<&Path>,
+        config: BuildConfig,
+        verbose: bool,
+    ) -> anyhow::Result<()> {
         let Build { emit_wat } = self;
         let rerooted_path = reroot_path(path)?;
         if config.fetch_deps_only {
@@ -36,9 +41,13 @@ impl Build {
             &mut std::io::stdin().lock(),
         )?;
 
-        if let Err(compilation_error) =
-            translate_package_cli(compiled, &rerooted_path, config.install_dir, emit_wat)
-        {
+        if let Err(compilation_error) = translate_package_cli(
+            compiled,
+            &rerooted_path,
+            config.install_dir,
+            emit_wat,
+            verbose,
+        ) {
             print_error_diagnostic(*compilation_error)
         }
 

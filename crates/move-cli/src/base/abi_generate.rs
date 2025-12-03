@@ -28,6 +28,7 @@ impl AbiGenerate {
         path: Option<&Path>,
         module_name: Option<String>,
         config: BuildConfig,
+        verbose: bool,
     ) -> anyhow::Result<()> {
         let rerooted_path = reroot_path(path)?;
         let install_dir = config.install_dir.clone();
@@ -35,7 +36,7 @@ impl AbiGenerate {
         let package = config.compile_package(&rerooted_path, &mut Vec::new())?;
 
         let package_modules =
-            package_module_data(&package, None).map_err(print_error_diagnostic)?;
+            package_module_data(&package, None, verbose).map_err(print_error_diagnostic)?;
 
         let root_compiled_units: Vec<&CompiledUnitWithSource> =
             if let Some(module_name) = module_name {

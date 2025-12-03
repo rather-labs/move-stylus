@@ -3,7 +3,6 @@
 
 pub mod abi_generate;
 pub mod build;
-pub mod coverage;
 pub mod deploy;
 pub mod disassemble;
 pub mod info;
@@ -35,6 +34,7 @@ pub fn translate_package_cli(
     rerooted_path: &Path,
     install_dir: Option<PathBuf>,
     emit_wat: bool,
+    verbose: bool,
 ) -> Result<(), Box<CompilationError>> {
     let build_directory = if let Some(install_dir) = install_dir {
         install_dir.join(format!(
@@ -52,7 +52,7 @@ pub fn translate_package_cli(
     std::fs::create_dir_all(&build_directory)
         .map_err(|e| ICEError::new(ICEErrorKind::Unexpected(e.into())))?;
 
-    let mut modules = translate_package(package, None)?;
+    let mut modules = translate_package(package, None, verbose)?;
 
     for (module_name, module) in modules.iter_mut() {
         module

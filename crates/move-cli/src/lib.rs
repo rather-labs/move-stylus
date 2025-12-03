@@ -6,10 +6,7 @@ pub mod base;
 pub(crate) mod build_config;
 pub(crate) mod error;
 
-use base::{
-    abi_generate::AbiGenerate, build::Build, coverage::Coverage, deploy::Deploy, info::Info,
-    new::New, test::Test,
-};
+use base::{abi_generate::AbiGenerate, build::Build, deploy::Deploy, info::Info, new::New};
 
 #[cfg(debug_assertions)]
 use base::disassemble::Disassemble;
@@ -25,7 +22,6 @@ use build_config::BuildConfig;
 use clap::Parser;
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use move_vm_runtime::native_functions::NativeFunction;
-use move_vm_test_utils::gas_schedule::CostTable;
 use std::path::PathBuf;
 
 type NativeFunctionRecord = (AccountAddress, Identifier, Identifier, NativeFunction);
@@ -62,45 +58,41 @@ pub struct MoveCLI {
 pub enum Command {
     AbiGenerate(AbiGenerate),
     Build(Build),
-    Coverage(Coverage),
     #[cfg(debug_assertions)]
     Disassemble(Disassemble),
     Deploy(Deploy),
     Info(Info),
     New(New),
-    Test(Test),
 }
 
-pub fn run_cli(
-    natives: Vec<NativeFunctionRecord>,
-    cost_table: &CostTable,
-    move_args: Move,
-    cmd: Command,
-) -> Result<()> {
+pub fn run_cli(move_args: Move, cmd: Command) -> Result<()> {
     let build_config = move_package::BuildConfig::from(move_args.build_config);
 
-    // TODO: right now, the gas metering story for move-cli (as a library) is a bit of a mess.
-    //         1. It's still using the old CostTable.
-    //         2. The CostTable only affects sandbox runs, but not unit tests, which use a unit cost table.
     match cmd {
-        Command::AbiGenerate(c) => c.execute(move_args.package_path.as_deref(), None, build_config),
-        Command::Build(c) => c.execute(move_args.package_path.as_deref(), build_config),
-        Command::Coverage(c) => c.execute(move_args.package_path.as_deref(), build_config),
-        #[cfg(debug_assertions)]
-        Command::Disassemble(c) => c.execute(move_args.package_path.as_deref(), build_config),
-        Command::Info(c) => c.execute(move_args.package_path.as_deref(), build_config),
-        Command::New(c) => c.execute_with_defaults(move_args.package_path.as_deref()),
-        Command::Test(c) => c.execute(
+        Command::AbiGenerate(c) => c.execute(
+            move_args.package_path.as_deref(),
+            None,
+            build_config,
+            move_args.verbose,
+        ),
+        Command::Build(c) => c.execute(
             move_args.package_path.as_deref(),
             build_config,
-            natives,
-            Some(cost_table.clone()),
+            move_args.verbose,
         ),
+        #[cfg(debug_assertions)]
+        Command::Disassemble(c) => c.execute(
+            move_args.package_path.as_deref(),
+            build_config,
+            move_args.verbose,
+        ),
+        Command::Info(c) => c.execute(move_args.package_path.as_deref(), build_config),
+        Command::New(c) => c.execute_with_defaults(move_args.package_path.as_deref()),
         Command::Deploy(c) => c.execute(),
     }
 }
 
-pub fn move_cli(natives: Vec<NativeFunctionRecord>, cost_table: &CostTable) -> Result<()> {
+pub fn move_cli() -> Result<()> {
     let args = MoveCLI::parse();
-    run_cli(natives, cost_table, args.move_args, args.cmd)
+    run_cli(args.move_args, args.cmd)
 }

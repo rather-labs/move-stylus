@@ -33,7 +33,12 @@ pub struct Disassemble {
 }
 
 impl Disassemble {
-    pub fn execute(self, path: Option<&Path>, config: BuildConfig) -> anyhow::Result<()> {
+    pub fn execute(
+        self,
+        path: Option<&Path>,
+        config: BuildConfig,
+        verbose: bool,
+    ) -> anyhow::Result<()> {
         let rerooted_path = reroot_path(path)?;
         let Self {
             interactive,
@@ -90,7 +95,7 @@ impl Disassemble {
         }
 
         if let Err(compilation_error) =
-            translate_package_cli(package, &rerooted_path, install_dir, true)
+            translate_package_cli(package, &rerooted_path, install_dir, true, verbose)
         {
             print_error_diagnostic(*compilation_error)
         }

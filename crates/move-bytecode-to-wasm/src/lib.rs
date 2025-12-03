@@ -57,7 +57,7 @@ pub fn translate_single_module(
     package: CompiledPackage,
     module_name: &str,
 ) -> Result<Module, CompilationError> {
-    let mut modules = translate_package(package, Some(module_name.to_string()))?;
+    let mut modules = translate_package(package, Some(module_name.to_string()), false)?;
 
     Ok(modules
         .remove(module_name)
@@ -67,6 +67,7 @@ pub fn translate_single_module(
 pub fn translate_package(
     package: CompiledPackage,
     module_name: Option<String>,
+    verbose: bool,
 ) -> Result<HashMap<String, Module>, CompilationError> {
     let root_compiled_units: Vec<&CompiledUnitWithSource> = if let Some(module_name) = module_name {
         package
@@ -129,6 +130,7 @@ pub fn translate_package(
             &root_compiled_units,
             &root_compiled_module_unit.immediate_dependencies(),
             &mut function_definitions,
+            verbose,
         ) {
             match dependencies_errors {
                 DependencyProcessingError::ICE(ice_error) => {
@@ -232,6 +234,7 @@ pub struct PackageModuleData {
 pub fn package_module_data(
     package: &CompiledPackage,
     module_name: Option<String>,
+    verbose: bool,
 ) -> Result<PackageModuleData, CompilationError> {
     let mut modules_data = HashMap::new();
     let mut modules_paths = HashMap::new();
@@ -266,6 +269,7 @@ pub fn package_module_data(
             &root_compiled_units,
             &root_compiled_module_unit.immediate_dependencies(),
             &mut function_definitions,
+            verbose,
         ) {
             match dependencies_errors {
                 DependencyProcessingError::ICE(ice_error) => {
@@ -322,6 +326,7 @@ pub fn process_dependency_tree<'move_package>(
     root_compiled_units: &'move_package [&CompiledUnitWithSource],
     dependencies: &[move_core_types::language_storage::ModuleId],
     function_definitions: &mut GlobalFunctionTable<'move_package>,
+    verbose: bool,
 ) -> Result<(), DependencyProcessingError> {
     let mut errors = Vec::new();
     for dependency in dependencies {
@@ -331,9 +336,13 @@ pub fn process_dependency_tree<'move_package>(
         };
         // If the HashMap contains the key, we already processed that dependency
         if !dependencies_data.contains_key(&module_id) {
-            // println!("  \x1B[1m\x1B[32mPROCESSING DEPENDENCY\x1B[0m {module_id}");
+            if verbose {
+                println!("  \x1B[1m\x1B[34mPROCESSING DEPENDENCY\x1B[0m {module_id}");
+            }
         } else {
-            // println!("  \x1B[1m\x1B[32mPROCESSING DEPENDENCY\x1B[0m {module_id} [cached]");
+            if verbose {
+                println!("  \x1B[1m\x1B[34mPROCESSING DEPENDENCY\x1B[0m {module_id} [cached]");
+            }
             continue;
         }
 
@@ -356,6 +365,7 @@ pub fn process_dependency_tree<'move_package>(
                 root_compiled_units,
                 immediate_dependencies,
                 function_definitions,
+                verbose,
             )
         } else {
             Ok(())
