@@ -39,7 +39,7 @@ pub const DATA_ABORT_MESSAGE_PTR_OFFSET: i32 = 256;
 /// It takes 128 bytes (32 * 4 bytes) to store the size of the enum for each offset.
 pub const DATA_ENUM_STORAGE_SIZE_OFFSET: i32 = 260;
 
-/// Stores the pointer and length of the calldata
+/// Stores the pointer and length of the calldata (8 bytes)
 pub const DATA_CALLDATA_OFFSET: i32 = 396;
 
 /// Amount of memory reserved starting from offset 0.

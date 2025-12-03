@@ -1,6 +1,6 @@
 use walrus::{
     FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
 };
 
 use super::{RuntimeFunction, error::RuntimeFunctionError};
@@ -9,23 +9,29 @@ use crate::wasm_builder_extensions::WasmBuilderExtension;
 
 // Increments vector length by 1
 // # Arguments:
-//    - len: (i32) length of the vector
 //    - vec ptr: (i32) reference to the vector
 pub fn increment_vec_len_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
 ) -> FunctionId {
-    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
     let mut builder = function
         .name(RuntimeFunction::VecIncrementLen.name().to_owned())
         .func_body();
 
     let ptr = module.locals.add(ValType::I32);
-    let len = module.locals.add(ValType::I32);
 
     builder
         .local_get(ptr)
-        .local_get(len)
+        .local_get(ptr)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
         .i32_const(1)
         .binop(BinaryOp::I32Add)
         .store(
@@ -37,53 +43,66 @@ pub fn increment_vec_len_function(
             },
         );
 
-    function.finish(vec![ptr, len], &mut module.funcs)
+    function.finish(vec![ptr], &mut module.funcs)
 }
 
 // Decrements vector length by 1
 // # Arguments:
-//    - len: (i32) length of the vector
 //    - vec ptr: (i32) reference to the vector
 pub fn decrement_vec_len_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
 ) -> FunctionId {
-    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
     let mut builder = function
         .name(RuntimeFunction::VecDecrementLen.name().to_owned())
         .func_body();
 
     let ptr = module.locals.add(ValType::I32);
-    let len = module.locals.add(ValType::I32);
 
     // Trap if vector length == 0
     builder
-        .local_get(len)
-        .i32_const(0)
-        .binop(BinaryOp::I32Eq)
+        .local_get(ptr)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .unop(UnaryOp::I32Eqz)
         .if_else(
             None,
             |then| {
                 then.unreachable(); // cannot pop from empty vector
             },
-            |_| {},
-        );
-
-    builder
-        .local_get(ptr)
-        .local_get(len)
-        .i32_const(1)
-        .binop(BinaryOp::I32Sub)
-        .store(
-            compilation_ctx.memory_id,
-            StoreKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
+            |else_| {
+                else_
+                    .local_get(ptr)
+                    .local_get(ptr)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .i32_const(1)
+                    .binop(BinaryOp::I32Sub)
+                    .store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
             },
         );
 
-    function.finish(vec![ptr, len], &mut module.funcs)
+    function.finish(vec![ptr], &mut module.funcs)
 }
 
 /// Swaps the elements at two indices in the vector. Abort the execution if any of the indice
@@ -405,10 +424,7 @@ pub fn vec_pop_back_32_function(
         .local_set(len);
 
     // Decrement vector length
-    builder
-        .local_get(ptr)
-        .local_get(len)
-        .call(decrement_vec_len_function);
+    builder.local_get(ptr).call(decrement_vec_len_function);
 
     // Update vector length
     builder
@@ -480,10 +496,7 @@ pub fn vec_pop_back_64_function(
         .local_set(len);
 
     // Decrement vector length
-    builder
-        .local_get(ptr)
-        .local_get(len)
-        .call(decrement_vec_len_function);
+    builder.local_get(ptr).call(decrement_vec_len_function);
 
     // Update vector length
     builder
@@ -599,4 +612,99 @@ pub fn vec_borrow_function(
     );
 
     function.finish(vec![vec_ref, index, is_heap, size], &mut module.funcs)
+}
+
+// Follows a chain of relocated vectors by checking for the DEADBEEF flag.
+//
+// When a vector's capacity is increased (e.g., during push_back), the original vector data
+// is copied to a new memory location with increased capacity. This invalidates any references
+// pointing to the original vector location.
+//
+// To handle this, when relocating a vector, we write a special marker (DEADBEEF) into the
+// first 4 bytes of the original vector's memory (where the length field was), and store the
+// new vector pointer at offset 4 (where the capacity field was). This is safe because a
+// vector's metadata requires at least 8 bytes: 4 bytes for length and 4 bytes for capacity.
+//
+// This function checks if the vector pointer points to a location containing the DEADBEEF
+// flag. If so, it follows the chain by reading the new pointer from offset 4 and updating
+// the reference. This process repeats until a valid vector (without the DEADBEEF flag) is found.
+//
+// # Arguments:
+//    - vec_ref_ptr: (i32) pointer to the reference structure that contains the vector pointer
+pub fn vec_update_mut_ref_function(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) -> FunctionId {
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
+    let mut builder = function
+        .name(RuntimeFunction::VecUpdateMutRef.name().to_owned())
+        .func_body();
+
+    let vec_ref_ptr = module.locals.add(ValType::I32);
+
+    builder.loop_(None, |loop_block| {
+        let loop_id = loop_block.id();
+
+        // Check if DEADBEEF flag is set at *vec_ref
+        loop_block
+            .local_get(vec_ref_ptr)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .i32_const(0xDEADBEEF_u32 as i32)
+            .binop(BinaryOp::I32Eq)
+            .if_else(
+                None,
+                |then_| {
+                    // If true, update the reference to point to the new vector,
+                    // which is stored at *vec_ref + 4, and continue looping.
+                    then_
+                        .local_get(vec_ref_ptr)
+                        .local_get(vec_ref_ptr)
+                        .load(
+                            compilation_ctx.memory_id,
+                            LoadKind::I32 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        )
+                        .load(
+                            compilation_ctx.memory_id,
+                            LoadKind::I32 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 4,
+                            },
+                        )
+                        .store(
+                            compilation_ctx.memory_id,
+                            StoreKind::I32 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        )
+                        .br(loop_id);
+                },
+                |_| {
+                    // If false, fall through and exit the loop.
+                },
+            );
+    });
+
+    function.finish(vec![vec_ref_ptr], &mut module.funcs)
 }
