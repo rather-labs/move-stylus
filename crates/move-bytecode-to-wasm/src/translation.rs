@@ -3141,7 +3141,44 @@ fn get_storage_structs_with_named_ids(
     let mut result = Vec::new();
     for (arg_index, fn_arg) in mapped_function.signature.arguments.iter().enumerate() {
         let (itype, struct_) = match fn_arg {
-            IntermediateType::IMutRef(inner) => (
+            // We look for both mutable and immutable references of NamedIds, because the collected
+            // ones are used to generate the code for the delegate call function used (when using
+            // `NativeFunction::get_external_call`.
+            //
+            // If we have two functions that use the same delegate call, for example:
+            //
+            // ```
+            //   public struct Counter has key {
+            //      id: NamedId<COUNTER_>,
+            //      value: u64,
+            //   }
+            //
+            //   entry fun increment(counter: &Counter) {
+            //       let delegated_counter = dci::new(
+            //           contract_calls::new(counter.contract_address)
+            //               .delegate()
+            //       );
+            //       let res = delegated_counter.increment();
+            //       assert!(res.succeded(), 33);
+            //   }
+            //
+            //   entry fun increment2(counter: &mut Counter) {
+            //       let delegated_counter = dci::new(
+            //           contract_calls::new(counter.contract_address)
+            //               .delegate()
+            //       );
+            //       let res = delegated_counter.increment();
+            //       assert!(res.succeded(), 33);
+            //   }
+            // ```
+            //
+            // and if we only collect mutable ones, the external `increment` function will be
+            // generated with the wrong number of arguments.
+            //
+            // Another reason to include immutable references is that we don't know if the
+            // delegated call will change the storage or not. That is independent of the mut
+            // declaration of the NamedId
+            IntermediateType::IMutRef(inner) | IntermediateType::IRef(inner) => (
                 &**inner,
                 compilation_ctx.get_struct_by_intermediate_type(inner),
             ),
