@@ -27,8 +27,8 @@ use crate::{
         reserved_modules::{
             SF_MODULE_NAME_DYNAMIC_FIELD, SF_MODULE_NAME_ERROR, SF_MODULE_NAME_EVENT,
             SF_MODULE_NAME_FALLBACK, SF_MODULE_NAME_OBJECT, SF_MODULE_NAME_TRANSFER,
-            SF_MODULE_NAME_TX_CONTEXT, SF_MODULE_NAME_TYPES, STANDARD_LIB_ADDRESS,
-            STDLIB_MODULE_UNIT_TEST, STYLUS_FRAMEWORK_ADDRESS,
+            SF_MODULE_NAME_TX_CONTEXT, SF_MODULE_NAME_TYPES, SF_MODULE_TEST_SCENARIO,
+            STANDARD_LIB_ADDRESS, STDLIB_MODULE_UNIT_TEST, STYLUS_FRAMEWORK_ADDRESS,
         },
     },
     hasher::get_hasher,
@@ -99,7 +99,10 @@ impl NativeFunction {
     const NATIVE_CALLDATA_AS_VECTOR: &str = "calldata_as_vector";
     const NATIVE_CALLDATA_LENGTH: &str = "calldata_length";
 
+    // Tests
     const NATIVE_POISON: &str = "poison";
+    const NATIVE_NEW_TX_CONTEXT: &str = "new_tx_context";
+    const NATIVE_DROP_STORAGE_OBJECT: &str = "drop_storage_object";
 
     /// Links the function into the module and returns its id. If the function is already present
     /// it just returns the id.
@@ -172,9 +175,16 @@ impl NativeFunction {
                 (Self::NATIVE_POISON, STANDARD_LIB_ADDRESS, STDLIB_MODULE_UNIT_TEST) => {
                     unit_test::add_poison_fn(module, module_id)
                 }
+                (
+                    Self::NATIVE_NEW_TX_CONTEXT,
+                    STYLUS_FRAMEWORK_ADDRESS,
+                    SF_MODULE_TEST_SCENARIO,
+                ) => unit_test::add_new_tx_context_fn(module, module_id, compilation_ctx),
+
                 (Self::NATIVE_SENDER, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TX_CONTEXT) => {
                     transaction::add_native_sender_fn(module, compilation_ctx, module_id)
                 }
+
                 (Self::NATIVE_MSG_VALUE, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TX_CONTEXT) => {
                     transaction::add_native_msg_value_fn(module, compilation_ctx, module_id)
                 }
@@ -278,6 +288,14 @@ impl NativeFunction {
         } = module_id;
 
         let function_id = match (name, *address, module_name.as_str()) {
+            //
+            // Tests
+            //
+            (
+                Self::NATIVE_DROP_STORAGE_OBJECT,
+                STYLUS_FRAMEWORK_ADDRESS,
+                SF_MODULE_TEST_SCENARIO,
+            ) => unit_test::add_drop_storage_object_fn(module, module_id),
             //
             // Transfer
             //

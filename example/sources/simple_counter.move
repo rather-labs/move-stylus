@@ -1,4 +1,5 @@
-module hello_world::hello_world;
+//module hello_world::hello_world;
+module hello_world::simple_counter;
 
 public struct Counter has drop {
     value: u64

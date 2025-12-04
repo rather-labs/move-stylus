@@ -314,6 +314,7 @@ fn translate_flow(
                                 instruction.clone(),
                                 Rc::new(e),
                             ));
+                            break;
                         }
                     }
                 }
