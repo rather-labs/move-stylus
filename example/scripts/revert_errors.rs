@@ -28,7 +28,7 @@ sol!(
         error BasicError(string);
 
         #[derive(Debug, PartialEq)]
-        error CustomError(
+        error CustomError_(
             string error_message,
             uint64 error_code,
         );
@@ -70,30 +70,12 @@ sol!(
             NestedStruct2 b,
         );
 
-        #[derive(Debug, PartialEq)]
-        event ErrorEvent(
-            string s,
-        );
-
-
-        #[derive(Debug, PartialEq)]
-        event OkEvent(
-            uint32 indexed c,
-        );
-
-        #[derive(Debug, PartialEq)]
-        event ReceiveEvent (
-            address indexed sender,
-            uint32 data_length,
-        );
-
         // Functions from the Move contract
         function revertStandardError(string s) external;
         function revertCustomError(string s, uint64 code) external;
         function revertCustomError2(bool a, uint8 b, uint16 c, uint32 d, uint64 e, uint128 f, uint256 g, address h, uint8 i) external;
         function revertCustomError3(uint32[] a, uint128[] b, uint64[][] c) external;
         function revertCustomError4(string a, uint64 b) external;
-        function exampleWithRevert(uint32 a, uint32 b, string s) external;
     }
 );
 
@@ -119,6 +101,8 @@ async fn check_and_decode_revert_error<E: SolError + PartialEq + std::fmt::Debug
                 }
                 None => {
                     println!("Could not decode revert data as {}", E::SIGNATURE);
+                    let revert_data = e.as_revert_data().unwrap();
+                    println!("Revert data: {revert_data:?}");
                 }
             };
         }
@@ -160,7 +144,7 @@ async fn main() -> eyre::Result<()> {
     // Test 2
     println!("Test 2: Testing revert CustomError");
     let custom_error =
-        RevertErrors::CustomError::new((String::from("Not enough Ether provided."), 42));
+        RevertErrors::CustomError_::new((String::from("Not enough Ether provided."), 42));
     let pending_tx = contract
         .revertCustomError(String::from("Not enough Ether provided."), 42)
         .send()

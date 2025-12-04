@@ -21,13 +21,13 @@ entry fun revert_standard_error(s: String) {
 
 #[ext(abi_error)]
 #[allow(unused_field)]
-public struct CustomError has copy, drop {
+public struct CustomError_ has copy, drop {
     error_message: String,
     error_code: u64,
 }
     
 entry fun revert_custom_error(s: String, code: u64) {
-    revert( CustomError { error_message: s, error_code: code });
+    revert( CustomError_ { error_message: s, error_code: code });
 }
 
 #[allow(unused_field)]
