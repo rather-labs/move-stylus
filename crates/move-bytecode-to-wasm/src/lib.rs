@@ -208,15 +208,6 @@ pub fn translate_package(
             &dynamic_fields_global_variables,
         )?;
 
-        /*
-        // If the module contains test functions, we should export them so we can call them from
-        // the runner
-        for test_function in &root_module_data.special_attributes.test_functions {
-            let function_id = module.funcs.by_name(test_function).unwrap();
-            module.exports.add(test_function, function_id);
-        }
-        */
-
         function_table.ensure_all_functions_added()?;
         validate_stylus_wasm(&mut module)?;
 
