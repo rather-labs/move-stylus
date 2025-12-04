@@ -3349,6 +3349,7 @@ dependencies = [
  "move-unit-test",
  "move-vm-runtime",
  "move-vm-test-utils",
+ "wasmprinter 0.228.0",
 ]
 
 [[package]]

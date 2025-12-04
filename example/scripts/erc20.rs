@@ -3,6 +3,7 @@ use alloy::primitives::address;
 use alloy::providers::Provider;
 use alloy::rpc::types::TransactionRequest;
 use alloy::signers::local::PrivateKeySigner;
+use alloy::sol_types::SolEvent;
 use alloy::{primitives::Address, providers::ProviderBuilder, sol, transports::http::reqwest::Url};
 use dotenv::dotenv;
 use eyre::eyre;
@@ -13,6 +14,15 @@ sol!(
     #[sol(rpc)]
     #[allow(missing_docs)]
     contract Example {
+        #[derive(Debug)]
+        event Approval(address indexed owner, address indexed spender, uint256 value);
+
+        #[derive(Debug)]
+        event NewUID(address indexed uid);
+
+        #[derive(Debug)]
+        event Transfer(address indexed from, address indexed to, uint256 value);
+
         function constructor() public view;
         function mint(address to, uint256 amount) external view;
         function burn(address from, uint256 amount) external view;
@@ -108,7 +118,9 @@ async fn main() -> eyre::Result<()> {
 
     println!("Mint events");
     for (index, log) in receipt.logs().iter().enumerate() {
-        println!("Mint event log {} {:#?}", index + 1, log);
+        let primitive_log: alloy::primitives::Log = log.clone().into();
+        let decoded_event = Example::Transfer::decode_log(&primitive_log)?;
+        println!("Mint event log {} {:#?}", index + 1, decoded_event);
     }
     let res = example.totalSupply().call().await?;
     println!("Total Supply after mint = {res}");
@@ -130,7 +142,9 @@ async fn main() -> eyre::Result<()> {
     let pending_tx = example.transfer(address_1, U256::from(1000)).send().await?;
     let receipt = pending_tx.get_receipt().await?;
     for (index, log) in receipt.logs().iter().enumerate() {
-        println!("Transfer event log {} {:#?}", index + 1, log);
+        let primitive_log: alloy::primitives::Log = log.clone().into();
+        let decoded_event = Example::Transfer::decode_log(&primitive_log)?;
+        println!("Transfer event log {} {:#?}", index + 1, decoded_event);
     }
 
     let res = example.balanceOf(sender).call().await?;
@@ -149,7 +163,9 @@ async fn main() -> eyre::Result<()> {
 
     println!("Burn events");
     for (index, log) in receipt.logs().iter().enumerate() {
-        println!("Burn event log {} {:#?}", index + 1, log);
+        let primitive_log: alloy::primitives::Log = log.clone().into();
+        let decoded_event = Example::Transfer::decode_log(&primitive_log)?;
+        println!("Burn event log {} {:#?}", index + 1, decoded_event);
     }
 
     let res = example.totalSupply().call().await?;
@@ -172,9 +188,14 @@ async fn main() -> eyre::Result<()> {
     let pending_tx = example_2.approve(sender, U256::from(100)).send().await?;
     let receipt = pending_tx.get_receipt().await?;
     println!("Approval events");
-    for (index, log) in receipt.logs().iter().enumerate() {
-        println!("Approval event log {} {:#?}", index + 1, log);
-    }
+
+    let primitive_log: alloy::primitives::Log = receipt.logs()[0].clone().into();
+    let decoded_event = Example::NewUID::decode_log(&primitive_log)?;
+    println!("Approval event log {decoded_event:#?}");
+
+    let primitive_log: alloy::primitives::Log = receipt.logs()[1].clone().into();
+    let decoded_event = Example::Approval::decode_log(&primitive_log)?;
+    println!("Approval event log {decoded_event:#?}");
 
     println!();
 
@@ -201,7 +222,9 @@ async fn main() -> eyre::Result<()> {
     let receipt = pending_tx.get_receipt().await?;
     println!("Transfer events");
     for (index, log) in receipt.logs().iter().enumerate() {
-        println!("Transfer event log {} {:#?}", index + 1, log);
+        let primitive_log: alloy::primitives::Log = log.clone().into();
+        let decoded_event = Example::Transfer::decode_log(&primitive_log)?;
+        println!("Transfer event log {} {:#?}", index + 1, decoded_event);
     }
 
     println!();

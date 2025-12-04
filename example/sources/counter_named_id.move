@@ -13,7 +13,7 @@ public struct Counter has key {
     value: u64
 }
 
-entry fun create(ctx: &mut TxContext) {
+entry fun create(ctx: &TxContext) {
   transfer::share_object(Counter {
     id: object::new_named_id<COUNTER_>(),
     owner: ctx.sender(),

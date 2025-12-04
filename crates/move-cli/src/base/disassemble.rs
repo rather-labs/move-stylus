@@ -3,10 +3,9 @@
 
 use crate::error::print_error_diagnostic;
 
-use super::reroot_path;
+use super::{reroot_path, translate_package_cli};
 use clap::*;
 use move_bytecode_source_map::utils::serialize_to_json_string;
-use move_bytecode_to_wasm::translate_package_cli;
 use move_compiler::compiled_unit::NamedCompiledModule;
 use move_disassembler::disassembler::Disassembler;
 use move_package::{BuildConfig, compilation::compiled_package::CompiledUnitWithSource};
@@ -34,7 +33,12 @@ pub struct Disassemble {
 }
 
 impl Disassemble {
-    pub fn execute(self, path: Option<&Path>, config: BuildConfig) -> anyhow::Result<()> {
+    pub fn execute(
+        self,
+        path: Option<&Path>,
+        config: BuildConfig,
+        verbose: bool,
+    ) -> anyhow::Result<()> {
         let rerooted_path = reroot_path(path)?;
         let Self {
             interactive,
@@ -43,6 +47,8 @@ impl Disassemble {
             debug,
             bytecode_map,
         } = self;
+        let install_dir = config.install_dir.clone();
+
         // Make sure the package is built
         let package = config.compile_package(&rerooted_path, &mut Vec::new())?;
 
@@ -88,8 +94,10 @@ impl Disassemble {
             }
         }
 
-        if let Err(compilation_error) = translate_package_cli(package, &rerooted_path) {
-            print_error_diagnostic(compilation_error)
+        if let Err(compilation_error) =
+            translate_package_cli(package, &rerooted_path, install_dir, true, verbose)
+        {
+            print_error_diagnostic(*compilation_error)
         }
 
         Ok(())
