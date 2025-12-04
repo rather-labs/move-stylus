@@ -43,19 +43,6 @@ pub fn u64_to_ascii_base_10(
         .name(RuntimeFunction::U64ToAsciiBase10.name().to_owned())
         .func_body();
 
-    // trap if negative, or n > 10ˆ18
-    builder
-        .local_get(n)
-        .i64_const(0)
-        .binop(BinaryOp::I64LtS)
-        .if_else(
-            None,
-            |t| {
-                t.unreachable();
-            },
-            |_| {},
-        );
-
     // Handle n = 0 case
     builder
         .local_get(n)
@@ -91,11 +78,13 @@ pub fn u64_to_ascii_base_10(
                     );
             },
             |nz| {
-                // scale = 10^18;
-                nz.i64_const(1_000_000_000_000_000_000i64).local_set(scale);
+                const SCALE_10_POW_19_I64: i64 = 10_000_000_000_000_000_000u64 as i64;
 
-                // len = 19
-                nz.i32_const(19).local_set(len);
+                // scale = 10^19;
+                nz.i64_const(SCALE_10_POW_19_I64).local_set(scale);
+
+                // len = 20
+                nz.i32_const(20).local_set(len);
 
                 // allocate memory for the length
                 nz.i32_const(1)
@@ -217,8 +206,9 @@ mod tests {
     #[case(1000000u64, "1000000")]
     #[case(123456789u64, "123456789")]
     #[case(9876543210u64, "9876543210")]
-    #[should_panic]
     #[case(u64::MAX, "18446744073709551615")]
+    #[case(i64::MAX as u64, "9223372036854775807")]
+    #[case(i64::MAX as u64 + 1, "9223372036854775808")]
     fn test_u64_to_ascii_base_10(#[case] error_code: u64, #[case] expected: &str) {
         let (mut raw_module, allocator_func, memory_id) = build_module(None);
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func);

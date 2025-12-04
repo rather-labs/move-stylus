@@ -313,7 +313,6 @@ mod tests {
     #[case(1000000u64, "1000000")]
     #[case(123456789u64, "123456789")]
     #[case(9876543210u64, "9876543210")]
-    #[should_panic]
     #[case(u64::MAX, "18446744073709551615")]
     fn test_build_abort_error_message(#[case] error_code: u64, #[case] expected: &str) {
         let (mut raw_module, allocator_func, memory_id) = build_module(None);
