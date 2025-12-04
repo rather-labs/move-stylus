@@ -3,7 +3,7 @@
 
 use crate::error::print_error_diagnostic;
 
-use super::{reroot_path, translate_package_cli};
+use super::{get_build_directory, reroot_path, translate_package_cli};
 use clap::*;
 use move_bytecode_to_wasm::package_module_data;
 use move_package::BuildConfig;
@@ -30,6 +30,8 @@ impl Test {
 
         let package = config.compile_package(&rerooted_path, &mut Vec::new())?;
 
+        let build_directory = get_build_directory(&rerooted_path, &package, &install_dir);
+
         let package_modules =
             package_module_data(&package, None, verbose).map_err(print_error_diagnostic)?;
 
@@ -43,7 +45,7 @@ impl Test {
             let data = package_modules.modules_data.get(module_id).unwrap();
 
             if !data.special_attributes.test_functions.is_empty() {
-                run_tests(module_id, data, path);
+                run_tests(module_id, data, path, &build_directory);
             }
         }
 

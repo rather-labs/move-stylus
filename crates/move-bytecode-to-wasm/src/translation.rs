@@ -245,6 +245,18 @@ pub fn translate_function(
 
     let function_id = function.finish(arguments, &mut module.funcs);
 
+    // If the module contains test functions, we should export them so we can call them from
+    // the runner
+    if module_data
+        .special_attributes
+        .test_functions
+        .contains(&function_information.function_id.identifier)
+    {
+        module
+            .exports
+            .add(&function_information.function_id.identifier, function_id);
+    }
+
     Ok((function_id, functions_to_link))
 }
 

@@ -26,3 +26,10 @@ fun test_increment_once() {
     increment(&mut c);
     assert!(c.value == 1); //, debug::print(&c.value));
 }
+
+#[test]
+fun test_increment_once_fails() {
+    let mut c = Counter { value: 0 };
+    increment(&mut c);
+    assert!(c.value == 2); //, debug::print(&c.value));
+}
