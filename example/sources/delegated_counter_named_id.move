@@ -16,7 +16,7 @@ public struct Counter has key {
     contract_address: address,
 }
 
-entry fun create(contract_logic: address, ctx: &mut TxContext) {
+entry fun create(contract_logic: address, ctx: &TxContext) {
   transfer::share_object(Counter {
     id: object::new_named_id<COUNTER_>(),
     owner: ctx.sender(),
@@ -82,7 +82,7 @@ entry fun change_logic(counter: &mut Counter, logic_address: address) {
 }
 
 /// Set value (only runnable by the Counter owner)
-entry fun set_value(counter: &mut Counter, value: u64, ctx: &TxContext) {
+entry fun set_value(counter: &Counter, value: u64, ctx: &TxContext) {
     assert!(counter.owner == ctx.sender(), 0);
     let delegated_counter = dci::new(
         contract_calls::new(counter.contract_address)

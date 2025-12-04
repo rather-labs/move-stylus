@@ -241,7 +241,7 @@ entry fun transfer_from(
     amount: u256,
     allowance: &mut Allowance,
     balance: &mut Balance,
-    ctx: &mut TxContext,
+    ctx: &TxContext,
 ): bool {
     if (field::exists_(&allowance.id, sender)) {
         let spender_allowance = field::borrow_mut<ALLOWANCE_, address, Table<address, u256>>(

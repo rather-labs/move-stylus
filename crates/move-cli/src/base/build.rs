@@ -3,20 +3,30 @@
 
 use crate::error::print_error_diagnostic;
 
-use super::reroot_path;
+use super::{reroot_path, translate_package_cli};
 use clap::*;
-use move_bytecode_to_wasm::translate_package_cli;
 use move_package::BuildConfig;
 use std::path::Path;
 
 /// Build the package at `path`. If no path is provided defaults to current directory.
 #[derive(Parser)]
 #[clap(name = "build")]
-pub struct Build;
+pub struct Build {
+    /// Emits the WebAssembly Text Format along with the compiled files
+    #[clap(long = "emit-wat", default_value = "false")]
+    emit_wat: bool,
+}
 
 impl Build {
-    pub fn execute(self, path: Option<&Path>, config: BuildConfig) -> anyhow::Result<()> {
+    pub fn execute(
+        self,
+        path: Option<&Path>,
+        config: BuildConfig,
+        verbose: bool,
+    ) -> anyhow::Result<()> {
+        let Build { emit_wat } = self;
         let rerooted_path = reroot_path(path)?;
+
         if config.fetch_deps_only {
             let mut config = config;
             if config.test_mode {
@@ -32,8 +42,14 @@ impl Build {
             &mut std::io::stdin().lock(),
         )?;
 
-        if let Err(compilation_error) = translate_package_cli(compiled, &rerooted_path) {
-            print_error_diagnostic(compilation_error)
+        if let Err(compilation_error) = translate_package_cli(
+            compiled,
+            &rerooted_path,
+            config.install_dir,
+            emit_wat,
+            verbose,
+        ) {
+            print_error_diagnostic(*compilation_error)
         }
 
         Ok(())

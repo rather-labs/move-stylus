@@ -180,7 +180,7 @@ pub fn translate_test_complete_package(path: &str) -> HashMap<String, Module> {
         .compile_package(&rerooted_path, &mut Vec::new())
         .unwrap();
 
-    translate_package(package, None).unwrap()
+    translate_package(package, None, false).unwrap()
 }
 
 #[allow(dead_code)]
@@ -195,7 +195,7 @@ pub fn translate_test_complete_package_with_framework(path: &str) -> HashMap<Str
         .compile_package(&rerooted_path, &mut Vec::new())
         .unwrap();
 
-    translate_package(package, None).unwrap()
+    translate_package(package, None, false).unwrap()
 }
 
 #[allow(dead_code)]

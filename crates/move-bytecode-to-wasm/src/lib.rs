@@ -1,30 +1,3 @@
-use abi_types::public_function::PublicFunction;
-pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
-use compilation_context::{ModuleData, ModuleId};
-use constructor::inject_constructor;
-use error::{
-    CodeError, CompilationError, DependencyError, DependencyProcessingError, ICEError, ICEErrorKind,
-};
-use move_binary_format::file_format::FunctionDefinition;
-use move_package::{
-    compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource},
-    source_package::parsed_manifest::PackageName,
-};
-use move_parse_special_attributes::process_special_attributes;
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-};
-use translation::{
-    TranslationError,
-    intermediate_types::IntermediateType,
-    table::{FunctionId, FunctionTable},
-    translate_and_link_functions,
-};
-
-use walrus::{GlobalId, Module, RefType};
-use wasm_validation::validate_stylus_wasm;
-
 pub(crate) mod abi_types;
 pub mod compilation_context;
 mod constructor;
@@ -43,13 +16,39 @@ mod vm_handled_types;
 mod wasm_builder_extensions;
 mod wasm_validation;
 
+#[cfg(test)]
+mod test_tools;
+
+#[cfg(feature = "inject-host-debug-fns")]
+mod test_tools;
+use abi_types::public_function::PublicFunction;
+pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
+use compilation_context::{ModuleData, ModuleId};
+use constructor::inject_constructor;
+use error::{
+    CodeError, CompilationError, DependencyError, DependencyProcessingError, ICEError, ICEErrorKind,
+};
+use move_binary_format::file_format::FunctionDefinition;
+use move_package::{
+    compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource},
+    source_package::parsed_manifest::PackageName,
+};
+use move_parse_special_attributes::process_special_attributes;
+use std::{collections::HashMap, path::PathBuf};
+use translation::{
+    TranslationError,
+    intermediate_types::IntermediateType,
+    table::{FunctionId, FunctionTable},
+    translate_and_link_functions,
+};
+
+use walrus::{GlobalId, Module, RefType};
+use wasm_validation::validate_stylus_wasm;
+
 pub use translation::functions::MappedFunction;
 
 #[cfg(feature = "inject-host-debug-fns")]
 use walrus::ValType;
-
-#[cfg(test)]
-mod test_tools;
 
 pub type GlobalFunctionTable<'move_package> =
     HashMap<FunctionId, &'move_package FunctionDefinition>;
@@ -58,7 +57,7 @@ pub fn translate_single_module(
     package: CompiledPackage,
     module_name: &str,
 ) -> Result<Module, CompilationError> {
-    let mut modules = translate_package(package, Some(module_name.to_string()))?;
+    let mut modules = translate_package(package, Some(module_name.to_string()), false)?;
 
     Ok(modules
         .remove(module_name)
@@ -68,6 +67,7 @@ pub fn translate_single_module(
 pub fn translate_package(
     package: CompiledPackage,
     module_name: Option<String>,
+    verbose: bool,
 ) -> Result<HashMap<String, Module>, CompilationError> {
     let root_compiled_units: Vec<&CompiledUnitWithSource> = if let Some(module_name) = module_name {
         package
@@ -130,6 +130,7 @@ pub fn translate_package(
             &root_compiled_units,
             &root_compiled_module_unit.immediate_dependencies(),
             &mut function_definitions,
+            verbose,
         ) {
             match dependencies_errors {
                 DependencyProcessingError::ICE(ice_error) => {
@@ -233,6 +234,7 @@ pub struct PackageModuleData {
 pub fn package_module_data(
     package: &CompiledPackage,
     module_name: Option<String>,
+    verbose: bool,
 ) -> Result<PackageModuleData, CompilationError> {
     let mut modules_data = HashMap::new();
     let mut modules_paths = HashMap::new();
@@ -267,6 +269,7 @@ pub fn package_module_data(
             &root_compiled_units,
             &root_compiled_module_unit.immediate_dependencies(),
             &mut function_definitions,
+            verbose,
         ) {
             match dependencies_errors {
                 DependencyProcessingError::ICE(ice_error) => {
@@ -314,35 +317,6 @@ pub fn package_module_data(
     }
 }
 
-pub fn translate_package_cli(
-    package: CompiledPackage,
-    rerooted_path: &Path,
-) -> Result<(), CompilationError> {
-    let build_directory = rerooted_path.join("build/wasm");
-    // Create the build directory if it doesn't exist
-    std::fs::create_dir_all(&build_directory)
-        .map_err(|e| ICEError::new(ICEErrorKind::Unexpected(e.into())))?;
-
-    let mut modules = translate_package(package, None)?;
-
-    for (module_name, module) in modules.iter_mut() {
-        module
-            .emit_wasm_file(build_directory.join(format!("{module_name}.wasm")))
-            .map_err(|e| ICEError::new(ICEErrorKind::Unexpected(e.into())))?;
-
-        // Convert to WAT format
-        let wat = wasmprinter::print_bytes(module.emit_wasm())
-            .map_err(|e| ICEError::new(ICEErrorKind::Unexpected(e.into())))?;
-        std::fs::write(
-            build_directory.join(format!("{module_name}.wat")),
-            wat.as_bytes(),
-        )
-        .map_err(|e| ICEError::new(ICEErrorKind::Io(e)))?;
-    }
-
-    Ok(())
-}
-
 /// This functions process the dependency tree for the root module.
 ///
 /// It builds `ModuleData` for every module in the dependency tree and saves it in a HashMap.
@@ -352,6 +326,7 @@ pub fn process_dependency_tree<'move_package>(
     root_compiled_units: &'move_package [&CompiledUnitWithSource],
     dependencies: &[move_core_types::language_storage::ModuleId],
     function_definitions: &mut GlobalFunctionTable<'move_package>,
+    verbose: bool,
 ) -> Result<(), DependencyProcessingError> {
     let mut errors = Vec::new();
     for dependency in dependencies {
@@ -361,9 +336,13 @@ pub fn process_dependency_tree<'move_package>(
         };
         // If the HashMap contains the key, we already processed that dependency
         if !dependencies_data.contains_key(&module_id) {
-            // println!("  \x1B[1m\x1B[32mPROCESSING DEPENDENCY\x1B[0m {module_id}");
+            if verbose {
+                println!("  \x1B[1m\x1B[34mPROCESSING DEPENDENCY\x1B[0m {module_id}");
+            }
         } else {
-            // println!("  \x1B[1m\x1B[32mPROCESSING DEPENDENCY\x1B[0m {module_id} [cached]");
+            if verbose {
+                println!("  \x1B[1m\x1B[34mPROCESSING DEPENDENCY\x1B[0m {module_id} [cached]");
+            }
             continue;
         }
 
@@ -386,6 +365,7 @@ pub fn process_dependency_tree<'move_package>(
                 root_compiled_units,
                 immediate_dependencies,
                 function_definitions,
+                verbose,
             )
         } else {
             Ok(())
@@ -436,44 +416,4 @@ pub fn process_dependency_tree<'move_package>(
     } else {
         Err(DependencyProcessingError::CodeError(errors))
     }
-}
-
-// TODO: Move to translation.rs
-
-#[cfg(feature = "inject-host-debug-fns")]
-fn inject_debug_fns(module: &mut walrus::Module) {
-    if cfg!(feature = "inject-host-debug-fns") {
-        let func_ty = module.types.add(&[ValType::I32], &[]);
-        module.add_import_func("", "print_i32", func_ty);
-
-        let func_ty = module.types.add(&[ValType::I32, ValType::I32], &[]);
-        module.add_import_func("", "print_memory_from", func_ty);
-
-        let func_ty = module.types.add(&[ValType::I64], &[]);
-        module.add_import_func("", "print_i64", func_ty);
-
-        let func_ty = module.types.add(&[ValType::I32], &[]);
-        module.add_import_func("", "print_u128", func_ty);
-
-        let func_ty = module.types.add(&[], &[]);
-        module.add_import_func("", "print_separator", func_ty);
-
-        let func_ty = module.types.add(&[ValType::I32], &[]);
-        module.add_import_func("", "print_address", func_ty);
-    }
-}
-
-#[cfg(feature = "inject-host-debug-fns")]
-#[macro_export]
-macro_rules! declare_host_debug_functions {
-    ($module: ident) => {
-        (
-            $module.imports.get_func("", "print_i32").unwrap(),
-            $module.imports.get_func("", "print_i64").unwrap(),
-            $module.imports.get_func("", "print_memory_from").unwrap(),
-            $module.imports.get_func("", "print_address").unwrap(),
-            $module.imports.get_func("", "print_separator").unwrap(),
-            $module.imports.get_func("", "print_u128").unwrap(),
-        )
-    };
 }

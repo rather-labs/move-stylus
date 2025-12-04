@@ -38,6 +38,6 @@ entry fun read(counter: &Counter): u64 {
 }
 
 /// Set value
-entry fun set_value(counter: &mut Counter, value: u64, ctx: &TxContext) {
+entry fun set_value(counter: &mut Counter, value: u64) {
     counter.value = value;
 }

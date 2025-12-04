@@ -153,3 +153,41 @@ macro_rules! test_compilation_context {
         }
     };
 }
+
+#[cfg(feature = "inject-host-debug-fns")]
+fn inject_debug_fns(module: &mut walrus::Module) {
+    if cfg!(feature = "inject-host-debug-fns") {
+        let func_ty = module.types.add(&[ValType::I32], &[]);
+        module.add_import_func("", "print_i32", func_ty);
+
+        let func_ty = module.types.add(&[ValType::I32, ValType::I32], &[]);
+        module.add_import_func("", "print_memory_from", func_ty);
+
+        let func_ty = module.types.add(&[ValType::I64], &[]);
+        module.add_import_func("", "print_i64", func_ty);
+
+        let func_ty = module.types.add(&[ValType::I32], &[]);
+        module.add_import_func("", "print_u128", func_ty);
+
+        let func_ty = module.types.add(&[], &[]);
+        module.add_import_func("", "print_separator", func_ty);
+
+        let func_ty = module.types.add(&[ValType::I32], &[]);
+        module.add_import_func("", "print_address", func_ty);
+    }
+}
+
+#[cfg(feature = "inject-host-debug-fns")]
+#[macro_export]
+macro_rules! declare_host_debug_functions {
+    ($module: ident) => {
+        (
+            $module.imports.get_func("", "print_i32").unwrap(),
+            $module.imports.get_func("", "print_i64").unwrap(),
+            $module.imports.get_func("", "print_memory_from").unwrap(),
+            $module.imports.get_func("", "print_address").unwrap(),
+            $module.imports.get_func("", "print_separator").unwrap(),
+            $module.imports.get_func("", "print_u128").unwrap(),
+        )
+    };
+}

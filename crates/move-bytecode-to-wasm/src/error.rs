@@ -37,6 +37,12 @@ pub enum CompilationError {
     NoFilesFound,
 }
 
+impl From<ICEError> for Box<CompilationError> {
+    fn from(value: ICEError) -> Self {
+        CompilationError::from(value).into()
+    }
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum CodeError {
     #[error("an special attributes error ocured")]
