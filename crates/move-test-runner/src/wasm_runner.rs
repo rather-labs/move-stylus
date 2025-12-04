@@ -8,7 +8,7 @@ use crate::constants::{
     BLOCK_BASEFEE, BLOCK_GAS_LIMIT, BLOCK_NUMBER, BLOCK_TIMESTAMP, CHAIN_ID, GAS_PRICE,
     MSG_SENDER_ADDRESS, MSG_VALUE, SIGNER_ADDRESS,
 };
-use alloy_primitives::{FixedBytes, U256, keccak256};
+use alloy_primitives::{U256, keccak256};
 use anyhow::Result;
 // use walrus::Module;
 use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store};
@@ -18,8 +18,8 @@ pub struct ModuleData {
     pub return_data: Vec<u8>,
 }
 
+#[allow(dead_code)]
 pub struct ExecutionData {
-    //pub result: i32,
     pub return_data: Vec<u8>,
     pub instance: wasmtime::Instance,
     pub store: Store<ModuleData>,
@@ -28,6 +28,7 @@ pub struct ExecutionData {
 type LogEventReceiver = Arc<Mutex<mpsc::Receiver<(u32, Vec<u8>)>>>;
 type CrossCrontractExecutionReceiver = Arc<Mutex<mpsc::Receiver<CrossContractExecutionData>>>;
 
+#[allow(dead_code)]
 pub struct RuntimeSandbox {
     engine: Engine,
     linker: Linker<ModuleData>,
@@ -81,6 +82,7 @@ pub enum CrossContractCallType {
     DelegateCall,
 }
 
+#[allow(dead_code)]
 pub struct CrossContractExecutionData {
     pub calldata: Vec<u8>,
     pub address: [u8; 20],
@@ -120,11 +122,10 @@ impl RuntimeSandbox {
             .func_wrap(
                 "vm_hooks",
                 "read_return_data",
-                move |mut caller: Caller<'_, ModuleData>, dest_ptr: u32, offset: u32, size: u32| {
-                    println!(
-                        "read_return_data called with dest_ptr: {dest_ptr}, offset: {offset}, size: {size}"
-                    );
-
+                move |mut caller: Caller<'_, ModuleData>,
+                      dest_ptr: u32,
+                      offset: u32,
+                      _size: u32| {
                     let mem = get_memory(&mut caller);
 
                     let data = cccrd.lock().unwrap();
@@ -153,35 +154,40 @@ impl RuntimeSandbox {
                       calldata_len_ptr: u32,
                       gas: u64,
                       return_data_len_ptr: u32| {
-                          println!(
-                              "delegate_call_contract called with address_ptr: {address_ptr}, calldata_ptr: {calldata_ptr}, calldata_len: {calldata_len_ptr}, gas: {gas}, return_data_len_ptr: {return_data_len_ptr}"
-                          );
+                    if cccs.load(std::sync::atomic::Ordering::Relaxed) {
+                        let mem = get_memory(&mut caller);
 
-                        if cccs.load(std::sync::atomic::Ordering::Relaxed) {
-                            let mem = get_memory(&mut caller);
+                        let mut address = [0; 20];
+                        mem.read(&caller, address_ptr as usize, &mut address)
+                            .unwrap();
 
-                            let mut address = [0; 20];
-                            mem.read(&caller, address_ptr as usize, &mut address).unwrap();
+                        let mut calldata = vec![0; calldata_len_ptr as usize];
+                        mem.read(&caller, calldata_ptr as usize, &mut calldata)
+                            .unwrap();
 
-                            let mut calldata = vec![0; calldata_len_ptr as usize];
-                            mem.read(&caller, calldata_ptr as usize, &mut calldata).unwrap();
+                        let cross_contract_call_return_data_len =
+                            &cccrd.lock().unwrap().len().to_le_bytes()[..4];
+                        mem.write(
+                            &mut caller,
+                            return_data_len_ptr as usize,
+                            cross_contract_call_return_data_len,
+                        )
+                        .unwrap();
 
-                            let cross_contract_call_return_data_len  = &cccrd.lock().unwrap().len().to_le_bytes()[..4];
-                            mem.write(&mut caller, return_data_len_ptr as usize, cross_contract_call_return_data_len).unwrap();
+                        cces.send(CrossContractExecutionData {
+                            calldata,
+                            address,
+                            gas,
+                            value: U256::from(0),
+                            return_datan_len: return_data_len_ptr,
+                            call_type: CrossContractCallType::DelegateCall,
+                        })
+                        .unwrap();
 
-                              cces.send(CrossContractExecutionData {
-                                  calldata,
-                                  address,
-                                  gas,
-                                  value: U256::from(0),
-                                  return_datan_len: return_data_len_ptr,
-                                  call_type: CrossContractCallType::DelegateCall,
-                              }).unwrap();
-
-                            Ok(0)
-                        } else {
-                            Ok(1)
-                        }
+                        Ok(0)
+                    } else {
+                        Ok(1)
+                    }
                 },
             )
             .unwrap();
@@ -199,35 +205,40 @@ impl RuntimeSandbox {
                       calldata_len_ptr: u32,
                       gas: u64,
                       return_data_len_ptr: u32| {
-                          println!(
-                              "static_call_contract called with address_ptr: {address_ptr}, calldata_ptr: {calldata_ptr}, calldata_len: {calldata_len_ptr}, gas: {gas}, return_data_len_ptr: {return_data_len_ptr}"
-                          );
-                        if cccs.load(std::sync::atomic::Ordering::Relaxed) {
-                            let mem = get_memory(&mut caller);
+                    if cccs.load(std::sync::atomic::Ordering::Relaxed) {
+                        let mem = get_memory(&mut caller);
 
-                            let mut address = [0; 20];
-                            mem.read(&caller, address_ptr as usize, &mut address).unwrap();
+                        let mut address = [0; 20];
+                        mem.read(&caller, address_ptr as usize, &mut address)
+                            .unwrap();
 
-                            let mut calldata = vec![0; calldata_len_ptr as usize];
-                            mem.read(&caller, calldata_ptr as usize, &mut calldata).unwrap();
+                        let mut calldata = vec![0; calldata_len_ptr as usize];
+                        mem.read(&caller, calldata_ptr as usize, &mut calldata)
+                            .unwrap();
 
-                            let cross_contract_call_return_data_len  = &cccrd.lock().unwrap().len().to_le_bytes()[..4];
-                            mem.write(&mut caller, return_data_len_ptr as usize, cross_contract_call_return_data_len).unwrap();
+                        let cross_contract_call_return_data_len =
+                            &cccrd.lock().unwrap().len().to_le_bytes()[..4];
+                        mem.write(
+                            &mut caller,
+                            return_data_len_ptr as usize,
+                            cross_contract_call_return_data_len,
+                        )
+                        .unwrap();
 
-                              cces.send(CrossContractExecutionData {
-                                  calldata,
-                                  address,
-                                  gas,
-                                  value: U256::from(0),
-                                  return_datan_len: return_data_len_ptr,
-                                  call_type: CrossContractCallType::StaticCall,
-                              }).unwrap();
+                        cces.send(CrossContractExecutionData {
+                            calldata,
+                            address,
+                            gas,
+                            value: U256::from(0),
+                            return_datan_len: return_data_len_ptr,
+                            call_type: CrossContractCallType::StaticCall,
+                        })
+                        .unwrap();
 
-                            Ok(0)
-                        } else {
-                            Ok(1)
-                        }
-
+                        Ok(0)
+                    } else {
+                        Ok(1)
+                    }
                 },
             )
             .unwrap();
@@ -246,39 +257,44 @@ impl RuntimeSandbox {
                       value_ptr: u32,
                       gas: u64,
                       return_data_len_ptr: u32| {
-                            println!(
-                                "call_contract called with address_ptr: {address_ptr}, calldata_ptr: {calldata_ptr}, calldata_len_ptr: {calldata_len_ptr}, value_ptr: {value_ptr}, gas: {gas}, return_data_len_ptr: {return_data_len_ptr}"
-                            );
-                            if cccs.load(std::sync::atomic::Ordering::Relaxed) {
-                            let mem = get_memory(&mut caller);
+                    if cccs.load(std::sync::atomic::Ordering::Relaxed) {
+                        let mem = get_memory(&mut caller);
 
-                            let mut address = [0; 20];
-                            mem.read(&caller, address_ptr as usize, &mut address).unwrap();
+                        let mut address = [0; 20];
+                        mem.read(&caller, address_ptr as usize, &mut address)
+                            .unwrap();
 
-                            let mut calldata = vec![0; calldata_len_ptr as usize];
-                            mem.read(&caller, calldata_ptr as usize, &mut calldata).unwrap();
+                        let mut calldata = vec![0; calldata_len_ptr as usize];
+                        mem.read(&caller, calldata_ptr as usize, &mut calldata)
+                            .unwrap();
 
-                            let mut value = [0; 32];
-                            mem.read(&caller, value_ptr as usize, &mut value).unwrap();
-                            let value = U256::from_be_bytes(value);
+                        let mut value = [0; 32];
+                        mem.read(&caller, value_ptr as usize, &mut value).unwrap();
+                        let value = U256::from_be_bytes(value);
 
-                            let cross_contract_call_return_data_len  = &cccrd.lock().unwrap().len().to_le_bytes()[..4];
-                            mem.write(&mut caller, return_data_len_ptr as usize, cross_contract_call_return_data_len).unwrap();
+                        let cross_contract_call_return_data_len =
+                            &cccrd.lock().unwrap().len().to_le_bytes()[..4];
+                        mem.write(
+                            &mut caller,
+                            return_data_len_ptr as usize,
+                            cross_contract_call_return_data_len,
+                        )
+                        .unwrap();
 
-                              cces.send(CrossContractExecutionData {
-                                  calldata,
-                                  address,
-                                  gas,
-                                  value,
-                                  return_datan_len: return_data_len_ptr,
-                                  call_type: CrossContractCallType::Call,
-                              }).unwrap();
+                        cces.send(CrossContractExecutionData {
+                            calldata,
+                            address,
+                            gas,
+                            value,
+                            return_datan_len: return_data_len_ptr,
+                            call_type: CrossContractCallType::Call,
+                        })
+                        .unwrap();
 
-                            Ok(0)
-                        } else {
-                            Ok(1)
-                        }
-
+                        Ok(0)
+                    } else {
+                        Ok(1)
+                    }
                 },
             )
             .unwrap();
@@ -475,32 +491,8 @@ impl RuntimeSandbox {
     /// Crates a temporary runtime sandbox instance and calls the entrypoint with the given data.
     ///
     /// Returns the result of the entrypoint call and the return data.
-    pub fn call_entrypoint(&self, data: Vec<u8>) -> Result<(i32, Vec<u8>)> {
-        let data_len = data.len() as i32;
-        let mut store = Store::new(
-            &self.engine,
-            ModuleData {
-                data,
-                return_data: vec![],
-            },
-        );
-        let instance = self.linker.instantiate(&mut store, &self.module)?;
-
-        let entrypoint = instance.get_typed_func::<i32, i32>(&mut store, "user_entrypoint")?;
-
-        let result = entrypoint
-            .call(&mut store, data_len)
-            .map_err(|e| anyhow::anyhow!("error calling entrypoint: {e:?}"))?;
-
-        Ok((result, store.data().return_data.clone()))
-    }
-
-    /// Crates a temporary runtime sandbox instance and calls the entrypoint with the given data.
-    ///
-    /// Returns the result of the entrypoint call and the return data.
     pub fn call_test_function(&self, function_name: &str) -> Result<ExecutionData> {
         let data = vec![];
-        let data_len = data.len() as i32;
         let mut store = Store::new(
             &self.engine,
             ModuleData {
@@ -522,67 +514,5 @@ impl RuntimeSandbox {
             instance,
             store,
         })
-    }
-
-    pub fn read_memory_from(
-        instance: &wasmtime::Instance,
-        store: &mut Store<ModuleData>,
-        from: usize,
-        len: usize,
-    ) -> Result<Vec<u8>> {
-        // Get exported memory
-        let memory = instance
-            .get_export(&mut *store, "memory")
-            .and_then(|e| e.into_memory())
-            .expect("Wasm module must export memory");
-
-        Ok(memory.data(&store)[from..from + len].to_vec())
-    }
-
-    pub fn obtain_uid(&self) -> FixedBytes<32> {
-        let (topic, data) = self.log_events.lock().unwrap().recv().unwrap();
-        assert_eq!(2, topic);
-        assert_eq!(*keccak256(b"NewUID(address)").as_slice(), data[..32]);
-        FixedBytes::<32>::from_slice(&data[32..])
-    }
-
-    pub fn set_tx_origin(&self, new_address: [u8; 20]) {
-        *self.current_tx_origin.lock().unwrap() = new_address;
-    }
-
-    pub fn get_tx_origin(&self) -> [u8; 20] {
-        *self.current_tx_origin.lock().unwrap()
-    }
-
-    pub fn set_msg_sender(&self, new_address: [u8; 20]) {
-        *self.current_msg_sender.lock().unwrap() = new_address;
-    }
-
-    pub fn get_storage_at_slot(&self, slot: [u8; 32]) -> [u8; 32] {
-        let storage = self.storage.lock().unwrap();
-        *storage.get(&slot).unwrap()
-    }
-
-    pub fn get_storage(&self) -> HashMap<[u8; 32], [u8; 32]> {
-        self.storage.lock().unwrap().clone()
-    }
-
-    pub fn set_cross_contract_call_success(&self, success: bool) {
-        self.cross_contract_call_succeed
-            .store(success, std::sync::atomic::Ordering::Relaxed);
-    }
-
-    pub fn set_cross_contract_return_data(&self, data: Vec<u8>) {
-        *self.cross_contract_call_return_data.lock().unwrap() = data;
-    }
-
-    pub fn print_storage(&self) {
-        let storage = self.storage.lock().unwrap();
-        let mut entries: Vec<_> = storage.iter().collect();
-        entries.sort_by_key(|(key, _)| *key);
-
-        for (key, value) in entries {
-            println!("key: {key:?} \n\t value: {value:?}");
-        }
     }
 }
