@@ -216,7 +216,7 @@ mod uint_8 {
         function sub(uint8 x, uint8 y) external returns (uint8);
         function div(uint8 x, uint8 y) external returns (uint8);
         function mul(uint8 x, uint8 y) external returns (uint8);
-        function mod(uint8 x, uint8 y) external returns (uint8);
+        function mod_(uint8 x, uint8 y) external returns (uint8);
     );
 
     #[rstest]
@@ -293,7 +293,7 @@ mod uint_8 {
     ) {
         run_test(
             runtime,
-            modCall::new((dividend, divisor)).abi_encode(),
+            mod_Call::new((dividend, divisor)).abi_encode(),
             <(&i32,)>::abi_encode(&(&expected_result,)),
         )
         .unwrap();
@@ -351,7 +351,7 @@ mod uint_16 {
         function sub(uint16 x, uint16 y) external returns (uint16);
         function div(uint16 x, uint16 y) external returns (uint16);
         function mul(uint16 x, uint16 y) external returns (uint16);
-        function mod(uint16 x, uint16 y) external returns (uint16);
+        function mod_(uint16 x, uint16 y) external returns (uint16);
     );
 
     #[rstest]
@@ -427,7 +427,7 @@ mod uint_16 {
     ) {
         run_test(
             runtime,
-            modCall::new((dividend, divisor)).abi_encode(),
+            mod_Call::new((dividend, divisor)).abi_encode(),
             <(&u16,)>::abi_encode(&(&expected_result,)),
         )
         .unwrap();
@@ -485,7 +485,7 @@ mod uint_32 {
         function sub(uint32 x, uint32 y) external returns (uint32);
         function div(uint32 x, uint32 y) external returns (uint32);
         function mul(uint32 x, uint32 y) external returns (uint32);
-        function mod(uint32 x, uint32 y) external returns (uint32);
+        function mod_(uint32 x, uint32 y) external returns (uint32);
     );
 
     #[rstest]
@@ -562,7 +562,7 @@ mod uint_32 {
     ) {
         run_test(
             runtime,
-            modCall::new((dividend, divisor)).abi_encode(),
+            mod_Call::new((dividend, divisor)).abi_encode(),
             <(&u32,)>::abi_encode(&(&expected_result,)),
         )
         .unwrap();
@@ -618,7 +618,7 @@ mod uint_64 {
         function sub(uint64 x, uint64 y) external returns (uint64);
         function div(uint64 x, uint64 y) external returns (uint64);
         function mul(uint64 x, uint64 y) external returns (uint64);
-        function mod(uint64 x, uint64 y) external returns (uint64);
+        function mod_(uint64 x, uint64 y) external returns (uint64);
     );
 
     #[rstest]
@@ -694,7 +694,7 @@ mod uint_64 {
     ) {
         run_test(
             runtime,
-            modCall::new((dividend, divisor)).abi_encode(),
+            mod_Call::new((dividend, divisor)).abi_encode(),
             <(&u64,)>::abi_encode(&(&expected_result,)),
         )
         .unwrap();
@@ -750,7 +750,7 @@ mod uint_128 {
         function sub(uint128 x, uint128 y) external returns (uint128);
         function mul(uint128 x, uint128 y) external returns (uint128);
         function div(uint128 x, uint128 y) external returns (uint128);
-        function mod(uint128 x, uint128 y) external returns (uint128);
+        function mod_(uint128 x, uint128 y) external returns (uint128);
     );
 
     #[rstest]
@@ -930,7 +930,7 @@ mod uint_128 {
     ) {
         run_test(
             runtime,
-            modCall::new((dividend, divisor)).abi_encode(),
+            mod_Call::new((dividend, divisor)).abi_encode(),
             <(&u128,)>::abi_encode(&(&expected_result,)),
         )
         .unwrap();
@@ -961,7 +961,7 @@ mod uint_256 {
         function sub(uint256 x, uint256 y) external returns (uint256);
         function mul(uint256 x, uint256 y) external returns (uint256);
         function div(uint256 x, uint256 y) external returns (uint256);
-        function mod(uint256 x, uint256 y) external returns (uint256);
+        function mod_(uint256 x, uint256 y) external returns (uint256);
     );
 
     #[rstest]
@@ -1286,7 +1286,7 @@ mod uint_256 {
     ) {
         run_test(
             runtime,
-            modCall::new((dividend, divisor)).abi_encode(),
+            mod_Call::new((dividend, divisor)).abi_encode(),
             <(&U256,)>::abi_encode(&(&expected_result,)),
         )
         .unwrap();
