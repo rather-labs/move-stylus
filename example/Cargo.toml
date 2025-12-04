@@ -47,6 +47,10 @@ path = "scripts/delegated_counter.rs"
 name = "delegated_counter_named_id"
 path = "scripts/delegated_counter_named_id.rs"
 
+[[bin]]
+name = "revert_errors"
+path = "scripts/revert_errors.rs"
+
 [dependencies]
 dotenv = "0.15.0"
 eyre = "0.6.8"

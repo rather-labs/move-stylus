@@ -43,18 +43,11 @@ pub fn move_signature_to_abi_selector(
 /// - `builder`: WASM instruction sequence builder
 /// - `module`: WASM module being built
 /// - `compilation_ctx`: Compilation context with memory and allocator info
-/// - `error_selector`: 4-byte error selector
-/// - `error_ptr`: Pointer to already ABI-encoded error parameters
-/// - `error_len`: Length of the already ABI-encoded error parameters
+/// - `error_struct`: Error struct to be encoded
+/// - `error_struct_ptr`: Pointer to the error struct in memory
 ///
 /// # Returns
-/// - `LocalId`: Pointer to the allocated error message blob
-///
-/// # Memory Layout
-/// The returned blob has the following structure:
-/// - Byte 0-3: Total message length (little-endian u32)
-/// - Bytes 4-7: Error selector (4 bytes)
-/// - Bytes 8+: ABI-encoded error parameters (already encoded by `build_pack_instructions`)
+/// - Result<LocalId, AbiError>
 pub fn build_custom_error_message(
     builder: &mut InstrSeqBuilder,
     module: &mut Module,
