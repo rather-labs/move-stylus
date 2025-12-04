@@ -23,7 +23,7 @@ pub fn run_tests(
     compiled_modules_path: &Path,
 ) -> Summary {
     println!(
-        "[ RUNNING {CYAN}{module_id}{RESET} TESTS ({})]",
+        "\n[ RUNNING {CYAN}{module_id}{RESET} TESTS ({})]",
         module_path.display()
     );
 

@@ -42,8 +42,8 @@ entry fun set_value(counter: &mut Counter, value: u64, ctx: &TxContext) {
 //
 #[test]
 fun test_increment() {
-    let ctx = test_scenario::new_tx_context();
-    let uid = object::new(ctx);
+    let mut ctx = test_scenario::new_tx_context();
+    let uid = object::new(&mut ctx);
     let mut c = Counter { id: uid, owner: @0x1, value: 0 };
 
     increment(&mut c);
@@ -53,7 +53,6 @@ fun test_increment() {
 }
 
 
-/*
 
 #[test]
 fun test_read() {
@@ -80,6 +79,7 @@ fun test_set_value_by_owner() {
     test_scenario::drop_storage_object(c);
 }
 
+/*
 #[test]
 fun test_set_value_wrong_owner_should_fail() {
     let ctx_owner = test_scenario::new_tx_context(@0x4);
