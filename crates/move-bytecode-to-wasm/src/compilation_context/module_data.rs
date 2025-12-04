@@ -168,6 +168,7 @@ impl ModuleData {
     ) -> Result<Self> {
         let move_module_unit = &move_module.unit.module;
 
+        println!("2 1 {move_module_unit:#?}");
         let datatype_handles_map = Self::process_datatype_handles(
             &module_id,
             move_module_unit,
@@ -744,9 +745,25 @@ impl ModuleData {
             println!(
                 "{module_id} {function_name} {function_module_name} {function_module_address}"
             );
+
             // If we find this function, means the module is compiled in test mode. We should not
             // process this function because it is injected by move and not used in WASM context
             if function_name == "unit_test_poison" {
+                let function_def =
+                    move_module.function_def_at(FunctionDefinitionIndex::new(index as u16));
+
+                function_information.push(MappedFunction::new(
+                    function_id.clone(),
+                    move_function_arguments,
+                    move_function_return,
+                    &[],
+                    function_def,
+                    datatype_handles_map,
+                )?);
+
+                function_definitions.insert(function_id.clone(), function_def);
+
+                function_calls.push(function_id);
                 continue;
             }
 

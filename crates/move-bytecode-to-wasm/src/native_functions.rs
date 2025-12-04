@@ -13,6 +13,7 @@ mod tests;
 mod transaction;
 pub mod transfer;
 mod types;
+mod unit_test;
 
 use std::hash::Hasher;
 
@@ -26,7 +27,8 @@ use crate::{
         reserved_modules::{
             SF_MODULE_NAME_DYNAMIC_FIELD, SF_MODULE_NAME_ERROR, SF_MODULE_NAME_EVENT,
             SF_MODULE_NAME_FALLBACK, SF_MODULE_NAME_OBJECT, SF_MODULE_NAME_TRANSFER,
-            SF_MODULE_NAME_TX_CONTEXT, SF_MODULE_NAME_TYPES, STYLUS_FRAMEWORK_ADDRESS,
+            SF_MODULE_NAME_TX_CONTEXT, SF_MODULE_NAME_TYPES, STANDARD_LIB_ADDRESS,
+            STDLIB_MODULE_UNIT_TEST, STYLUS_FRAMEWORK_ADDRESS,
         },
     },
     hasher::get_hasher,
@@ -97,6 +99,8 @@ impl NativeFunction {
     const NATIVE_CALLDATA_AS_VECTOR: &str = "calldata_as_vector";
     const NATIVE_CALLDATA_LENGTH: &str = "calldata_length";
 
+    const NATIVE_POISON: &str = "poison";
+
     /// Links the function into the module and returns its id. If the function is already present
     /// it just returns the id.
     ///
@@ -165,6 +169,9 @@ impl NativeFunction {
             Ok(function)
         } else {
             Ok(match (name, *address, module_name.as_str()) {
+                (Self::NATIVE_POISON, STANDARD_LIB_ADDRESS, STDLIB_MODULE_UNIT_TEST) => {
+                    unit_test::add_poison_fn(module, module_id)
+                }
                 (Self::NATIVE_SENDER, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TX_CONTEXT) => {
                     transaction::add_native_sender_fn(module, compilation_ctx, module_id)
                 }

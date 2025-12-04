@@ -24,3 +24,4 @@ pub const SF_MODULE_NAME_FALLBACK: &str = "fallback";
 // Module names for standard lib
 pub const STDLIB_MODULE_NAME_ASCII: &str = "ascii";
 pub const STDLIB_MODULE_NAME_STRING: &str = "string";
+pub const STDLIB_MODULE_UNIT_TEST: &str = "unit_test";

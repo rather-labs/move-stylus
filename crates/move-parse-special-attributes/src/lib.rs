@@ -61,6 +61,7 @@ pub struct SpecialAttributes {
 pub fn process_special_attributes(
     path: &Path,
 ) -> Result<SpecialAttributes, (MappedFiles, Vec<SpecialAttributeError>)> {
+    println!("PROCESSING FILE {path:?}");
     let (mapped_files, program_res) = Compiler::from_files(
         None,
         vec![path.to_str().unwrap()],
@@ -244,6 +245,7 @@ pub fn process_special_attributes(
             for module_member in module.members {
                 match module_member {
                     ModuleMember::Function(ref f) => {
+                        println!("PROCESSING {}", f.name.to_owned());
                         let visibility: Visibility = (&f.visibility).into();
                         let signature = Function::parse_signature(&f.signature);
 
@@ -348,6 +350,7 @@ pub fn process_special_attributes(
         };
     }
 
+    println!("FINISHED SPECIAL");
     if found_error {
         Err((mapped_files, module_errors))
     } else {

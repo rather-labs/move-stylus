@@ -198,7 +198,10 @@ pub fn translate_function(
     #[cfg(debug_assertions)]
     function.name(function_information.function_id.identifier.clone());
 
-    println!("{}", function_information.function_id.identifier);
+    println!(
+        "TRANSLATING {}",
+        function_information.function_id.identifier
+    );
 
     let mut builder = function.func_body();
 
@@ -614,6 +617,7 @@ fn translate_instruction(
     module: &mut Module,
     branches: &HashMap<u16, BranchMode>,
 ) -> Result<Vec<FunctionId>, TranslationError> {
+    println!("Translating instruction {instruction:?}");
     let mut functions_calls_to_link = Vec::new();
 
     let compilation_ctx = &translate_flow_ctx.compilation_ctx;
