@@ -51,6 +51,9 @@ example-delegated-counter:
 example-delegated-counter-named-id:
 	cargo run -p move-hello-world-example --bin delegated_counter_named_id
 
+example-revert-errors:
+	cargo run -p move-hello-world-example --bin revert_errors
+
 deploy-example:
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
@@ -149,6 +152,12 @@ deploy-delegated-counter-named-id:
 		--wasm-file=./example/build/wasm/delegated_counter_named_id.wasm \
 		| ./update_contract_env.sh CONTRACT_ADDRESS_DELEGATED_COUNTER_NAMED_ID
 
+deploy-revert-errors:
+	cargo stylus deploy \
+		--endpoint='http://localhost:8547' \
+		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
+		--wasm-file=./example/build/wasm/revert_errors.wasm \
+		| ./update_contract_env.sh CONTRACT_ADDRESS_REVERT_ERRORS
 
 setup-stylus:
 	RUSTFLAGS="-C link-args=-rdynamic" cargo install --force cargo-stylus
