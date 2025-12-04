@@ -7,6 +7,9 @@ test:
 disassemble:
 	cargo run -p move-cli -- disassemble --name hello_world -p ./example --Xdebug
 
+unit-test:
+	cargo run -p move-cli -- test -p ./example
+
 disassemble-module:
 	cargo run -p move-cli -- disassemble --name $(filter-out $@,$(MAKECMDGOALS)) -p ./example --Xdebug
 %:

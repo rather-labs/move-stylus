@@ -1,0 +1,7 @@
+[package]
+name = "move-test-runner"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+move-bytecode-to-wasm.workspace = true

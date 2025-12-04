@@ -168,7 +168,6 @@ impl ModuleData {
     ) -> Result<Self> {
         let move_module_unit = &move_module.unit.module;
 
-        println!("2 1 {move_module_unit:#?}");
         let datatype_handles_map = Self::process_datatype_handles(
             &module_id,
             move_module_unit,
@@ -742,12 +741,9 @@ impl ModuleData {
                 type_instantiations: None,
             };
 
-            println!(
-                "{module_id} {function_name} {function_module_name} {function_module_address}"
-            );
-
-            // If we find this function, means the module is compiled in test mode. We should not
-            // process this function because it is injected by move and not used in WASM context
+            // If we find this function, means the module is compiled in test mode. This function
+            // is never called, it is just there to pollute the module so it can't be linked in
+            // production mode
             if function_name == "unit_test_poison" {
                 let function_def =
                     move_module.function_def_at(FunctionDefinitionIndex::new(index as u16));

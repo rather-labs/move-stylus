@@ -109,8 +109,6 @@ pub fn translate_package(
         println!("\x1B[1m\x1B[32mCOMPILING\x1B[0m {module_name}");
         let root_compiled_module_unit = &root_compiled_module.unit.module;
 
-        println!("1");
-
         let root_module_id = ModuleId {
             address: root_compiled_module_unit.address().into_bytes().into(),
             module_name: module_name.clone(),
@@ -118,16 +116,12 @@ pub fn translate_package(
 
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
 
-        println!("2");
-
         #[cfg(feature = "inject-host-debug-fns")]
         inject_debug_fns(&mut module);
 
         // Function table
         let function_table_id = module.tables.add_local(false, 0, None, RefType::Funcref);
         let mut function_table = FunctionTable::new(function_table_id);
-
-        println!("3");
 
         // Process the dependency tree
         if let Err(dependencies_errors) = process_dependency_tree(
@@ -149,7 +143,6 @@ pub fn translate_package(
             }
         }
 
-        println!("4");
         let special_attributes = match process_special_attributes(&root_compiled_module.source_path)
         {
             Ok(sa) => sa,
@@ -168,7 +161,6 @@ pub fn translate_package(
             special_attributes,
         )?;
 
-        println!("5");
         let compilation_ctx =
             CompilationContext::new(&root_module_data, &modules_data, memory_id, allocator_func);
 
@@ -338,22 +330,20 @@ pub fn process_dependency_tree<'move_package>(
 ) -> Result<(), DependencyProcessingError> {
     let mut errors = Vec::new();
     for dependency in dependencies {
-        println!("1 1");
         let module_id = ModuleId {
             module_name: dependency.name().to_string(),
             address: dependency.address().into_bytes().into(),
         };
 
-        println!("1 2 {module_id}");
         // If the HashMap contains the key, we already processed that dependency
         if !dependencies_data.contains_key(&module_id) {
-            // if verbose {
-            println!("  \x1B[1m\x1B[34mPROCESSING DEPENDENCY\x1B[0m {module_id}");
-            // }
+            if verbose {
+                println!("  \x1B[1m\x1B[34mPROCESSING DEPENDENCY\x1B[0m {module_id}");
+            }
         } else {
-            // if verbose {
-            println!("  \x1B[1m\x1B[34mPROCESSING DEPENDENCY\x1B[0m {module_id} [cached]");
-            //  }
+            if verbose {
+                println!("  \x1B[1m\x1B[34mPROCESSING DEPENDENCY\x1B[0m {module_id} [cached]");
+            }
             continue;
         }
 
@@ -367,7 +357,6 @@ pub fn process_dependency_tree<'move_package>(
             .map(|(_, module)| module)
             .ok_or_else(|| DependencyError::DependencyNotFound(dependency.name().to_string()))?;
 
-        println!("1 3");
         let immediate_dependencies = &dependency_module.unit.module.immediate_dependencies();
         // If the the dependency has dependency, we process them first
         let dependencies_process_result = if !immediate_dependencies.is_empty() {
@@ -383,7 +372,6 @@ pub fn process_dependency_tree<'move_package>(
             Ok(())
         };
 
-        println!("1 4 ");
         if let Err(dependencies_errors) = dependencies_process_result {
             match dependencies_errors {
                 DependencyProcessingError::ICE(ice_error) => {
@@ -396,7 +384,6 @@ pub fn process_dependency_tree<'move_package>(
             }
         }
 
-        println!("1 5 ");
         let special_attributes = match process_special_attributes(&dependency_module.source_path) {
             Ok(sa) => sa,
             Err((_mf, e)) => {
@@ -405,7 +392,6 @@ pub fn process_dependency_tree<'move_package>(
             }
         };
 
-        println!("1 6 ");
         let dependency_module_data = ModuleData::build_module_data(
             module_id.clone(),
             dependency_module,
@@ -418,7 +404,6 @@ pub fn process_dependency_tree<'move_package>(
             DependencyProcessingError::ICE(ICEError::new(ICEErrorKind::CompilationContext(e)))
         })?;
 
-        println!("1 7 ");
         let processed_dependency =
             dependencies_data.insert(module_id.clone(), dependency_module_data);
 
