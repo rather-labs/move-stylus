@@ -3,11 +3,14 @@
 
 use alloy_primitives::U256;
 
-pub const SIGNER_ADDRESS: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 3, 5, 7];
+pub const SIGNER_ADDRESS: [u8; 20] = [
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xbe, 0xef,
+];
 pub const CONTRACT_ADDRESS: &str = "0xcafe000000000000000000000000000000007357";
 
-pub const MSG_SENDER_ADDRESS: [u8; 20] =
-    [7, 3, 5, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 3, 5, 7];
+pub const MSG_SENDER_ADDRESS: [u8; 20] = [
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xca, 0xfe,
+];
 
 pub const MSG_VALUE: U256 = U256::MAX;
 
