@@ -62,7 +62,7 @@ fun test_increment_once() {
     assert!(c.value == 1);
 }
 
-#[test]
+#[test, expected_failure]
 fun test_increment_once_fails() {
     let mut c = Counter { value: 0 };
     increment(&mut c);

@@ -82,9 +82,9 @@ fun test_set_value_by_owner() {
     test_scenario::drop_storage_object(c);
 }
 
-#[test]
+#[test, expected_failure]
 fun test_set_value_wrong_owner_should_fail() {
-    test_scenario::set_sender_address(@0x4);
+    test_scenario::set_sender_address(@0x5);
     let mut ctx = test_scenario::new_tx_context();
     let uid = object::new(&mut ctx);
     let mut c = Counter { id: uid, owner: @0x4, value: 5 };
