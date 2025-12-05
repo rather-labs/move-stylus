@@ -47,6 +47,11 @@ pub enum SpecialAttributeErrorKind {
 
     #[error("Errors cannot be nested. Found {0} in struct.")]
     NestedError(String),
+
+    #[error(
+        "Struct '{0}' is reserved by the Stylus Framework and cannot be defined in module '{1}'."
+    )]
+    FrameworkReservedStruct(String, String),
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -87,6 +92,13 @@ impl From<&SpecialAttributeError> for Diagnostic {
             ),
             SpecialAttributeErrorKind::NestedError(_) => custom(
                 "Struct field validation error",
+                Severity::BlockingError,
+                3,
+                3,
+                Box::leak(value.to_string().into_boxed_str()),
+            ),
+            SpecialAttributeErrorKind::FrameworkReservedStruct(_, _) => custom(
+                "Struct validation error",
                 Severity::BlockingError,
                 3,
                 3,

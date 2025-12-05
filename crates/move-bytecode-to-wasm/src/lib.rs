@@ -109,8 +109,11 @@ pub fn translate_package(
         println!("\x1B[1m\x1B[32mCOMPILING\x1B[0m {module_name}");
         let root_compiled_module_unit = &root_compiled_module.unit.module;
 
+        // Extract package address from CompiledPackage
+        let package_address = root_compiled_module_unit.address().into_bytes();
+
         let root_module_id = ModuleId {
-            address: root_compiled_module_unit.address().into_bytes().into(),
+            address: package_address.into(),
             module_name: module_name.clone(),
         };
 
@@ -143,14 +146,14 @@ pub fn translate_package(
             }
         }
 
-        let special_attributes = match process_special_attributes(&root_compiled_module.source_path)
-        {
-            Ok(sa) => sa,
-            Err((_mf, e)) => {
-                errors.extend(e.into_iter().map(CodeError::SpecialAttributesError));
-                continue;
-            }
-        };
+        let special_attributes =
+            match process_special_attributes(&root_compiled_module.source_path, package_address) {
+                Ok(sa) => sa,
+                Err((_mf, e)) => {
+                    errors.extend(e.into_iter().map(CodeError::SpecialAttributesError));
+                    continue;
+                }
+            };
 
         let root_module_data = ModuleData::build_module_data(
             root_module_id.clone(),
@@ -257,8 +260,9 @@ pub fn package_module_data(
         let module_name = root_compiled_module.unit.name.to_string();
         let root_compiled_module_unit = &root_compiled_module.unit.module;
 
+        let package_address = root_compiled_module_unit.address().into_bytes();
         let root_module_id = ModuleId {
-            address: root_compiled_module_unit.address().into_bytes().into(),
+            address: package_address.into(),
             module_name: module_name.clone(),
         };
 
@@ -282,14 +286,14 @@ pub fn package_module_data(
             }
         }
 
-        let special_attributes = match process_special_attributes(&root_compiled_module.source_path)
-        {
-            Ok(sa) => sa,
-            Err((_mf, e)) => {
-                errors.extend(e.into_iter().map(CodeError::SpecialAttributesError));
-                continue;
-            }
-        };
+        let special_attributes =
+            match process_special_attributes(&root_compiled_module.source_path, package_address) {
+                Ok(sa) => sa,
+                Err((_mf, e)) => {
+                    errors.extend(e.into_iter().map(CodeError::SpecialAttributesError));
+                    continue;
+                }
+            };
 
         let root_module_data = ModuleData::build_module_data(
             root_module_id.clone(),
@@ -330,9 +334,10 @@ pub fn process_dependency_tree<'move_package>(
 ) -> Result<(), DependencyProcessingError> {
     let mut errors = Vec::new();
     for dependency in dependencies {
+        let dependency_address = dependency.address().into_bytes();
         let module_id = ModuleId {
             module_name: dependency.name().to_string(),
-            address: dependency.address().into_bytes().into(),
+            address: dependency_address.into(),
         };
         // If the HashMap contains the key, we already processed that dependency
         if !dependencies_data.contains_key(&module_id) {
@@ -383,13 +388,14 @@ pub fn process_dependency_tree<'move_package>(
             }
         }
 
-        let special_attributes = match process_special_attributes(&dependency_module.source_path) {
-            Ok(sa) => sa,
-            Err((_mf, e)) => {
-                errors.extend(e.into_iter().map(CodeError::SpecialAttributesError));
-                continue;
-            }
-        };
+        let special_attributes =
+            match process_special_attributes(&dependency_module.source_path, dependency_address) {
+                Ok(sa) => sa,
+                Err((_mf, e)) => {
+                    errors.extend(e.into_iter().map(CodeError::SpecialAttributesError));
+                    continue;
+                }
+            };
 
         let dependency_module_data = ModuleData::build_module_data(
             module_id.clone(),

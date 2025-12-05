@@ -7,10 +7,16 @@ use move_parse_special_attributes::{
 
 #[test]
 pub fn test_errors_and_events() {
+    let package_address = [
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0,
+    ];
     let file = std::path::Path::new("tests/errors_and_events/sources/misc.move");
     let absolute: PathBuf = fs::canonicalize(file).unwrap();
 
-    let Err((_, special_attributes_errors)) = process_special_attributes(&absolute) else {
+    let Err((_, special_attributes_errors)) =
+        process_special_attributes(&absolute, package_address)
+    else {
         panic!("Expected error due to invalid errors and events usage");
     };
 

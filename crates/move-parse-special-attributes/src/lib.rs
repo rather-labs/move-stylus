@@ -4,6 +4,7 @@ pub mod event;
 mod external_call;
 pub mod function_modifiers;
 mod function_validation;
+pub mod reserved_modules;
 mod shared;
 pub mod struct_modifiers;
 pub mod types;
@@ -16,6 +17,7 @@ pub use event::Event;
 use event::EventParseError;
 pub use external_call::error::{ExternalCallFunctionError, ExternalCallStructError};
 pub use function_validation::FunctionValidationError;
+pub use reserved_modules::StylusFrameworkPackage;
 // TODO: Create error struct with LOC and error info
 
 use external_call::{
@@ -26,7 +28,7 @@ use function_modifiers::{Function, FunctionModifier, Visibility};
 use function_validation::validate_function;
 use move_compiler::{
     Compiler, PASS_PARSER,
-    parser::ast::{Definition, ModuleMember},
+    parser::ast::{Ability_, Definition, ModuleMember},
     shared::{Identifier, NumericalAddress, files::MappedFiles},
 };
 use move_ir_types::location::Loc;
@@ -43,6 +45,7 @@ pub struct Struct_ {
     pub fields: Vec<(String, Type)>,
     pub positional_fields: bool,
     pub loc: Loc,
+    pub has_key: bool,
 }
 
 #[derive(Default, Debug)]
@@ -59,6 +62,7 @@ pub struct SpecialAttributes {
 
 pub fn process_special_attributes(
     path: &Path,
+    package_address: [u8; 32],
 ) -> Result<SpecialAttributes, (MappedFiles, Vec<SpecialAttributeError>)> {
     let (mapped_files, program_res) = Compiler::from_files(
         None,
@@ -68,6 +72,8 @@ pub fn process_special_attributes(
     )
     .run::<PASS_PARSER>()
     .unwrap();
+
+    let stylus_framework = &crate::reserved_modules::STYLUS_FRAMEWORK;
 
     let mut result = SpecialAttributes::default();
     let mut module_errors = Vec::new();
@@ -84,6 +90,21 @@ pub fn process_special_attributes(
                 match module_member {
                     ModuleMember::Struct(s) => {
                         let struct_name = s.name.value().as_str().to_string();
+
+                        // Check if the struct is reserved by the Stylus Framework
+                        if package_address != stylus_framework.address
+                            && stylus_framework
+                                .is_reserved_struct(&result.module_name, &struct_name)
+                        {
+                            found_error = true;
+                            module_errors.push(SpecialAttributeError {
+                                kind: SpecialAttributeErrorKind::FrameworkReservedStruct(
+                                    struct_name.clone(),
+                                    result.module_name.clone(),
+                                ),
+                                line_of_code: s.loc,
+                            });
+                        }
 
                         // No matter if it is a struct marked with special attributes, we collect
                         // its information.
@@ -113,6 +134,7 @@ pub fn process_special_attributes(
                                 move_compiler::parser::ast::StructFields::Positional(_)
                             ),
                             loc: s.loc,
+                            has_key: s.abilities.iter().any(|a| a.value == Ability_::Key),
                         });
 
                         let mut found_modifier: bool = false;
@@ -246,12 +268,19 @@ pub fn process_special_attributes(
                         let visibility: Visibility = (&f.visibility).into();
                         let signature = Function::parse_signature(&f.signature);
 
-                        // Validate function:
-                        // - If the function is generic, it cannot be an entrypoint.
-                        // - If it has an Event parameter, it must be a native emit function.
-                        // - If it has an Error parameter, it must be a native revert function.
-                        if let Err(error) = validate_function(f, &result.events, &result.abi_errors)
-                        {
+                        // Function validation checks:
+                        // - Entry functions must not be generic.
+                        // - Functions with an Event parameter are only allowed if they are native emit functions.
+                        // - Functions with an Error parameter are only allowed if they are native revert functions.
+                        // - Entry functions must not return structs that have the key ability.
+                        // - Functions must not accept UID or references to UID as parameters, unless they are Stylus Framework functions.
+                        if let Err(error) = validate_function(
+                            f,
+                            &result.events,
+                            &result.abi_errors,
+                            &result.structs,
+                            package_address,
+                        ) {
                             found_error = true;
                             module_errors.push(error);
                         }

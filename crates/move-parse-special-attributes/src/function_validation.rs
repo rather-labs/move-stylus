@@ -4,7 +4,7 @@ use move_compiler::{
 };
 
 use crate::{
-    AbiError, Event,
+    AbiError, Event, Struct_,
     error::{SpecialAttributeError, SpecialAttributeErrorKind},
     types::Type,
 };
@@ -19,6 +19,17 @@ pub enum FunctionValidationError {
 
     #[error("Generic functions cannot be entrypoints")]
     GenericFunctionsIsEntry,
+
+    #[error("Entry functions cannot return structs with the key ability")]
+    EntryFunctionReturnsKeyStruct,
+
+    #[error("Invalid UID argument. UID is a reserved type and cannot be used as an argument.")]
+    InvalidUidArgument,
+
+    #[error(
+        "Invalid NamedId argument. NamedId is a reserved type and cannot be used as an argument."
+    )]
+    InvalidNamedIdArgument,
 }
 
 impl From<&FunctionValidationError> for DiagnosticInfo {
@@ -150,26 +161,86 @@ fn validate_revert_function(
     Ok(())
 }
 
+/// Extracts all struct names from a type (recursively handles vectors, tuples, etc.)
+fn extract_struct_names(type_: &Type) -> Vec<String> {
+    match type_ {
+        Type::UserDataType(name, _) => vec![name.clone()],
+        Type::Vector(inner) => extract_struct_names(inner),
+        Type::Tuple(types) => types.iter().flat_map(extract_struct_names).collect(),
+        _ => Vec::new(),
+    }
+}
+
 /// Validates that a function is correct:
 ///
 /// - If the function is generic, it cannot be an entrypoint.
 /// - If the function has an Event parameter, it must be an emit function; otherwise, it is invalid.
 /// - If the function has an AbiError parameter, it must be a revert function; otherwise, it is invalid.
-/// - If neither type is present, the function is always considered valid.
+/// - Entry functions cannot return structs with the key ability.
+/// - Functions cannot take a UID as arguments, unless it is a function from the Stylus Framework package.
 pub fn validate_function(
     function: &Function,
     events: &std::collections::HashMap<String, Event>,
     abi_errors: &std::collections::HashMap<String, AbiError>,
+    structs: &[Struct_],
+    package_address: [u8; 32],
 ) -> Result<(), SpecialAttributeError> {
-    if !function.signature.type_parameters.is_empty() && function.entry.is_some() {
-        return Err(SpecialAttributeError {
-            kind: SpecialAttributeErrorKind::FunctionValidation(
-                FunctionValidationError::GenericFunctionsIsEntry,
-            ),
-            line_of_code: function.loc,
-        });
-    }
     let signature = crate::function_modifiers::Function::parse_signature(&function.signature);
+
+    // If any of the function's parameters is a UID type and the package address does not match the Stylus Framework address, this function should be rejected as invalid.
+    // TODO: handle vectors
+    if package_address != crate::reserved_modules::SF_ADDRESS {
+        for param in &signature.parameters {
+            if let Type::UserDataType(name, _) = &param.type_ {
+                if name == "UID" {
+                    return Err(SpecialAttributeError {
+                        kind: SpecialAttributeErrorKind::FunctionValidation(
+                            FunctionValidationError::InvalidUidArgument,
+                        ),
+                        line_of_code: function.loc,
+                    });
+                } else if name == "NamedId" {
+                    return Err(SpecialAttributeError {
+                        kind: SpecialAttributeErrorKind::FunctionValidation(
+                            FunctionValidationError::InvalidNamedIdArgument,
+                        ),
+                        line_of_code: function.loc,
+                    });
+                }
+            }
+        }
+    }
+
+    if function.entry.is_some() {
+        // If the function is generic and is entry, it should be rejected as invalid.
+        if !function.signature.type_parameters.is_empty() {
+            return Err(SpecialAttributeError {
+                kind: SpecialAttributeErrorKind::FunctionValidation(
+                    FunctionValidationError::GenericFunctionsIsEntry,
+                ),
+                line_of_code: function.loc,
+            });
+        }
+
+        // Check if return type contains any structs with the key ability
+        // TODO: how do we validate external structs?
+        if extract_struct_names(&signature.return_type)
+            .iter()
+            .any(|struct_name| {
+                structs
+                    .iter()
+                    .find(|s| s.name == *struct_name)
+                    .is_some_and(|s| s.has_key)
+            })
+        {
+            return Err(SpecialAttributeError {
+                kind: SpecialAttributeErrorKind::FunctionValidation(
+                    FunctionValidationError::EntryFunctionReturnsKeyStruct,
+                ),
+                line_of_code: function.loc,
+            });
+        }
+    }
 
     for param in &signature.parameters {
         if is_event_type(&param.type_, events) {
