@@ -99,6 +99,12 @@ impl NativeFunction {
     const NATIVE_DROP_STORAGE_OBJECT: &str = "drop_storage_object";
     const NATIVE_SET_SENDER_ADDRESS: &str = "set_sender_address";
     const NATIVE_SET_SIGNER_ADDRESS: &str = "set_signer_address";
+    const NATIVE_SET_BLOCK_BASEFEE: &str = "set_block_basefee";
+    const NATIVE_SET_GAS_PRICE: &str = "set_gas_price";
+    const NATIVE_SET_BLOCK_NUMBER: &str = "set_block_number";
+    const NATIVE_SET_GAS_LIMIT: &str = "set_gas_limit";
+    const NATIVE_SET_BLOCK_TIMESTAMP: &str = "set_block_timestamp";
+    const NATIVE_SET_CHAIN_ID: &str = "set_chain_id";
 
     // Host functions
     const HOST_BLOCK_NUMBER: &str = "block_number";
@@ -109,6 +115,12 @@ impl NativeFunction {
     // Host test functions
     const HOST_SET_SENDER_ADDRESS: &str = "set_sender_address";
     const HOST_SET_SIGNER_ADDRESS: &str = "set_signer_address";
+    const HOST_SET_BLOCK_BASEFEE: &str = "set_block_basefee";
+    const HOST_SET_GAS_PRICE: &str = "set_gas_price";
+    const HOST_SET_BLOCK_NUMBER: &str = "set_block_number";
+    const HOST_SET_GAS_LIMIT: &str = "set_gas_limit";
+    const HOST_SET_BLOCK_TIMESTAMP: &str = "set_block_timestamp";
+    const HOST_SET_CHAIN_ID: &str = "set_chain_id";
 
     /// Links the function into the module and returns its id. If the function is already present
     /// it just returns the id.
@@ -200,6 +212,58 @@ impl NativeFunction {
                     ) => {
                         let (function_id, _) =
                             hostio::host_test_functions::set_signer_address(module);
+                        function_id
+                    }
+                    (
+                        Self::HOST_SET_BLOCK_BASEFEE,
+                        STYLUS_FRAMEWORK_ADDRESS,
+                        SF_MODULE_TEST_SCENARIO,
+                    ) => {
+                        let (function_id, _) =
+                            hostio::host_test_functions::set_block_basefee(module);
+                        function_id
+                    }
+                    (
+                        Self::HOST_SET_GAS_PRICE,
+                        STYLUS_FRAMEWORK_ADDRESS,
+                        SF_MODULE_TEST_SCENARIO,
+                    ) => {
+                        let (function_id, _) = hostio::host_test_functions::set_gas_price(module);
+                        function_id
+                    }
+                    (
+                        Self::HOST_SET_BLOCK_NUMBER,
+                        STYLUS_FRAMEWORK_ADDRESS,
+                        SF_MODULE_TEST_SCENARIO,
+                    ) => {
+                        let (function_id, _) =
+                            hostio::host_test_functions::set_block_number(module);
+                        function_id
+                    }
+
+                    (
+                        Self::HOST_SET_GAS_LIMIT,
+                        STYLUS_FRAMEWORK_ADDRESS,
+                        SF_MODULE_TEST_SCENARIO,
+                    ) => {
+                        let (function_id, _) = hostio::host_test_functions::set_gas_limit(module);
+                        function_id
+                    }
+                    (
+                        Self::HOST_SET_BLOCK_TIMESTAMP,
+                        STYLUS_FRAMEWORK_ADDRESS,
+                        SF_MODULE_TEST_SCENARIO,
+                    ) => {
+                        let (function_id, _) =
+                            hostio::host_test_functions::set_block_timestamp(module);
+                        function_id
+                    }
+                    (
+                        Self::HOST_SET_CHAIN_ID,
+                        STYLUS_FRAMEWORK_ADDRESS,
+                        SF_MODULE_TEST_SCENARIO,
+                    ) => {
+                        let (function_id, _) = hostio::host_test_functions::set_chain_id(module);
                         function_id
                     }
                     _ => {
@@ -533,6 +597,12 @@ impl NativeFunction {
         match name {
             Self::NATIVE_SET_SENDER_ADDRESS => Some(Self::HOST_SET_SENDER_ADDRESS),
             Self::NATIVE_SET_SIGNER_ADDRESS => Some(Self::HOST_SET_SIGNER_ADDRESS),
+            Self::NATIVE_SET_BLOCK_BASEFEE => Some(Self::HOST_SET_BLOCK_BASEFEE),
+            Self::NATIVE_SET_GAS_PRICE => Some(Self::HOST_SET_GAS_PRICE),
+            Self::NATIVE_SET_BLOCK_NUMBER => Some(Self::HOST_SET_BLOCK_NUMBER),
+            Self::NATIVE_SET_GAS_LIMIT => Some(Self::HOST_SET_GAS_LIMIT),
+            Self::NATIVE_SET_BLOCK_TIMESTAMP => Some(Self::HOST_SET_BLOCK_TIMESTAMP),
+            Self::NATIVE_SET_CHAIN_ID => Some(Self::HOST_SET_CHAIN_ID),
             _ => None,
         }
     }

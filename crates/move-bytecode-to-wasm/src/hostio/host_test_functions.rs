@@ -10,6 +10,30 @@ pub fn set_signer_address(module: &mut Module) -> (FunctionId, ImportId) {
     get_or_insert_import(module, "set_signer_address", &[ValType::I32], &[])
 }
 
+pub fn set_block_basefee(module: &mut Module) -> (FunctionId, ImportId) {
+    get_or_insert_import(module, "set_block_basefee", &[ValType::I32], &[])
+}
+
+pub fn set_gas_price(module: &mut Module) -> (FunctionId, ImportId) {
+    get_or_insert_import(module, "set_gas_price", &[ValType::I32], &[])
+}
+
+pub fn set_block_number(module: &mut Module) -> (FunctionId, ImportId) {
+    get_or_insert_import(module, "set_block_number", &[ValType::I64], &[])
+}
+
+pub fn set_gas_limit(module: &mut Module) -> (FunctionId, ImportId) {
+    get_or_insert_import(module, "set_gas_limit", &[ValType::I64], &[])
+}
+
+pub fn set_block_timestamp(module: &mut Module) -> (FunctionId, ImportId) {
+    get_or_insert_import(module, "set_block_timestamp", &[ValType::I64], &[])
+}
+
+pub fn set_chain_id(module: &mut Module) -> (FunctionId, ImportId) {
+    get_or_insert_import(module, "set_chain_id", &[ValType::I64], &[])
+}
+
 #[inline]
 fn get_or_insert_import(
     module: &mut walrus::Module,

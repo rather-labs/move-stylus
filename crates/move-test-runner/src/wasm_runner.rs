@@ -1,7 +1,11 @@
 use std::{
     collections::HashMap,
     path::Path,
-    sync::{Arc, Mutex, atomic::AtomicBool, mpsc},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, AtomicU64},
+        mpsc,
+    },
 };
 
 use crate::constants::{
@@ -76,6 +80,73 @@ macro_rules! link_fn_write_constant {
     () => {};
 }
 
+macro_rules! link_test_fn_write_address_constant {
+    ($linker:expr, $name:literal, $test_var:ident) => {
+        let var = $test_var.clone();
+        $linker
+            .func_wrap(
+                "vm_test_hooks",
+                $name,
+                move |mut caller: Caller<'_, ModuleData>, ptr: u32| {
+                    let mem = match caller.get_export("memory") {
+                        Some(Extern::Memory(mem)) => mem,
+                        _ => panic!("failed to find host memory"),
+                    };
+
+                    let mut address_buffer = [0; 20];
+                    mem.read(&mut caller, ptr as usize + 12, &mut address_buffer)
+                        .unwrap();
+
+                    let mut var = var.lock().unwrap();
+                    *var = address_buffer;
+                },
+            )
+            .unwrap();
+    };
+    () => {};
+}
+
+macro_rules! link_test_fn_write_u256_constant {
+    ($linker:expr, $name:literal, $test_var:ident) => {
+        let var = $test_var.clone();
+        $linker
+            .func_wrap(
+                "vm_test_hooks",
+                $name,
+                move |mut caller: Caller<'_, ModuleData>, ptr: u32| {
+                    let mem = match caller.get_export("memory") {
+                        Some(Extern::Memory(mem)) => mem,
+                        _ => panic!("failed to find host memory"),
+                    };
+
+                    let mut buffer = [0; 32];
+                    mem.read(&mut caller, ptr as usize, &mut buffer).unwrap();
+
+                    let mut var = var.lock().unwrap();
+                    *var = U256::from_le_bytes(buffer);
+                },
+            )
+            .unwrap();
+    };
+    () => {};
+}
+
+macro_rules! link_test_fn_write_u64_constant {
+    ($linker:expr, $name:literal, $test_var:ident) => {
+        let var = $test_var.clone();
+        $linker
+            .func_wrap(
+                "vm_test_hooks",
+                $name,
+                move |mut _caller: Caller<'_, ModuleData>, value: u64| {
+                    var.store(value, std::sync::atomic::Ordering::Release);
+                },
+            )
+            .unwrap();
+    };
+    () => {};
+}
+
 pub enum CrossContractCallType {
     Call,
     StaticCall,
@@ -99,8 +170,16 @@ impl RuntimeSandbox {
         let module = WasmModule::from_file(&engine, compiled_module_path).unwrap();
 
         let storage: Arc<Mutex<HashMap<[u8; 32], [u8; 32]>>> = Arc::new(Mutex::new(HashMap::new()));
+
         let current_tx_origin = Arc::new(Mutex::new(SIGNER_ADDRESS));
         let current_msg_sender = Arc::new(Mutex::new(MSG_SENDER_ADDRESS));
+        let current_base_fee = Arc::new(Mutex::new(BLOCK_BASEFEE));
+        let current_gas_price = Arc::new(Mutex::new(GAS_PRICE));
+        let current_block_number = Arc::new(AtomicU64::new(BLOCK_NUMBER));
+        let current_gas_limit = Arc::new(AtomicU64::new(BLOCK_GAS_LIMIT));
+        let current_timestamp = Arc::new(AtomicU64::new(BLOCK_TIMESTAMP));
+        let current_chain_id = Arc::new(AtomicU64::new(CHAIN_ID));
+
         let cross_contract_call_return_data = Arc::new(Mutex::new(vec![]));
         let cross_contract_call_succeed = Arc::new(AtomicBool::new(true));
 
@@ -475,42 +554,17 @@ impl RuntimeSandbox {
         link_fn_ret_constant!(linker, "block_gas_limit", BLOCK_GAS_LIMIT, i64);
         link_fn_ret_constant!(linker, "block_timestamp", BLOCK_TIMESTAMP, i64);
 
+        //
         // Test functions
-        let msg_sender = current_msg_sender.clone();
-        linker
-            .func_wrap(
-                "vm_test_hooks",
-                "set_sender_address",
-                move |mut caller: Caller<'_, ModuleData>, address_ptr: u32| {
-                    let mem = get_memory(&mut caller);
-
-                    let mut address_buffer = [0; 20];
-                    mem.read(&mut caller, address_ptr as usize + 12, &mut address_buffer)
-                        .unwrap();
-
-                    let mut msg_sender = msg_sender.lock().unwrap();
-                    *msg_sender = address_buffer;
-                },
-            )
-            .unwrap();
-
-        let signer = current_tx_origin.clone();
-        linker
-            .func_wrap(
-                "vm_test_hooks",
-                "set_signer_address",
-                move |mut caller: Caller<'_, ModuleData>, address_ptr: u32| {
-                    let mem = get_memory(&mut caller);
-
-                    let mut address_buffer = [0; 20];
-                    mem.read(&mut caller, address_ptr as usize + 12, &mut address_buffer)
-                        .unwrap();
-
-                    let mut msg_sender = signer.lock().unwrap();
-                    *msg_sender = address_buffer;
-                },
-            )
-            .unwrap();
+        //
+        link_test_fn_write_address_constant!(linker, "set_sender_address", current_msg_sender);
+        link_test_fn_write_address_constant!(linker, "set_signer_address", current_tx_origin);
+        link_test_fn_write_u256_constant!(linker, "set_block_basefee", current_base_fee);
+        link_test_fn_write_u256_constant!(linker, "set_gas_price", current_gas_price);
+        link_test_fn_write_u64_constant!(linker, "set_block_number", current_block_number);
+        link_test_fn_write_u64_constant!(linker, "set_gas_limit", current_gas_limit);
+        link_test_fn_write_u64_constant!(linker, "set_block_timestamp", current_timestamp);
+        link_test_fn_write_u64_constant!(linker, "set_chain_id", current_chain_id);
 
         Self {
             engine,
