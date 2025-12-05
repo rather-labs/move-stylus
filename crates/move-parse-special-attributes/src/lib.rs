@@ -7,6 +7,7 @@ mod function_validation;
 pub mod reserved_modules;
 mod shared;
 pub mod struct_modifiers;
+mod struct_validation;
 pub mod types;
 
 pub use abi_error::AbiError;
@@ -18,6 +19,7 @@ use event::EventParseError;
 pub use external_call::error::{ExternalCallFunctionError, ExternalCallStructError};
 pub use function_validation::FunctionValidationError;
 pub use reserved_modules::StylusFrameworkPackage;
+pub use struct_validation::StructValidationError;
 // TODO: Create error struct with LOC and error info
 
 use external_call::{
@@ -37,6 +39,7 @@ use std::{
     path::Path,
 };
 use struct_modifiers::StructModifier;
+use struct_validation::validate_struct;
 use types::Type;
 
 #[derive(Debug)]
@@ -90,21 +93,6 @@ pub fn process_special_attributes(
                 match module_member {
                     ModuleMember::Struct(s) => {
                         let struct_name = s.name.value().as_str().to_string();
-
-                        // Check if the struct is reserved by the Stylus Framework
-                        if package_address != stylus_framework.address
-                            && stylus_framework
-                                .is_reserved_struct(&result.module_name, &struct_name)
-                        {
-                            found_error = true;
-                            module_errors.push(SpecialAttributeError {
-                                kind: SpecialAttributeErrorKind::FrameworkReservedStruct(
-                                    struct_name.clone(),
-                                    result.module_name.clone(),
-                                ),
-                                line_of_code: s.loc,
-                            });
-                        }
 
                         // No matter if it is a struct marked with special attributes, we collect
                         // its information.
@@ -248,15 +236,22 @@ pub fn process_special_attributes(
         };
     }
 
-    // Validate that no struct fields contain events or errors
+    // Validate all structs:
+    // - check if the struct is reserved by the Stylus Framework
+    // - validate UID/NamedId placement
+    // - check for nested events/errors
     for s in &result.structs {
-        for (_, field_type) in &s.fields {
-            if let Some(error) =
-                validate_struct_field(field_type, &result.events, &result.abi_errors, s.loc)
-            {
-                module_errors.push(error);
-                found_error = true;
-            }
+        let validation_errors = validate_struct(
+            s,
+            &result.module_name,
+            package_address,
+            stylus_framework,
+            &result.events,
+            &result.abi_errors,
+        );
+        if !validation_errors.is_empty() {
+            found_error = true;
+            module_errors.extend(validation_errors);
         }
     }
 
@@ -370,43 +365,5 @@ pub fn process_special_attributes(
         Err((mapped_files, module_errors))
     } else {
         Ok(result)
-    }
-}
-
-/// Checks if a field of a struct is an event or an error (or an array/tuple of them)
-/// If so, returns a SpecialAttributeError.
-fn validate_struct_field(
-    ty: &Type,
-    events: &HashMap<String, Event>,
-    abi_errors: &HashMap<String, AbiError>,
-    loc: Loc,
-) -> Option<SpecialAttributeError> {
-    match ty {
-        Type::UserDataType(name, _) => {
-            // Check if the type itself is an event or error
-            if events.contains_key(name) {
-                return Some(SpecialAttributeError {
-                    kind: SpecialAttributeErrorKind::NestedEvent(name.to_string()),
-                    line_of_code: loc,
-                });
-            }
-            if abi_errors.contains_key(name) {
-                return Some(SpecialAttributeError {
-                    kind: SpecialAttributeErrorKind::NestedError(name.to_string()),
-                    line_of_code: loc,
-                });
-            }
-            None
-        }
-        Type::Vector(inner) => validate_struct_field(inner, events, abi_errors, loc),
-        Type::Tuple(types) => {
-            for t in types {
-                if let Some(error) = validate_struct_field(t, events, abi_errors, loc) {
-                    return Some(error);
-                }
-            }
-            None
-        }
-        _ => None,
     }
 }
