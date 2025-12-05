@@ -2687,7 +2687,8 @@ mod storage_encoding {
             UID id;
             uint64 a;
         }
-        function saveFoo () public view;
+
+        function saveFoo() public view;
         function readFoo(uint256 id) public view returns (Foo);
 
         struct MegaFoo {
@@ -2705,6 +2706,7 @@ mod storage_encoding {
             Foo b;
             Bar[] c;
         }
+
         function saveVar() public view;
         function readVar(uint256 id) public view returns (Var);
 
@@ -2714,6 +2716,7 @@ mod storage_encoding {
             GenericStruct32 b;
             uint32 c;
         }
+
         function saveGenericWrapper32() public view;
         function readGenericWrapper32(uint256 id) public view returns (GenericWrapper32);
 
