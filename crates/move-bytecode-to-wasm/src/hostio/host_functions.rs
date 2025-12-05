@@ -1,5 +1,7 @@
 use walrus::{FunctionId, ImportId, Module, ValType};
 
+pub const HOST_MODULE_NAME: &str = "vm_hooks";
+
 pub fn add_pay_for_memory_grow(module: &mut Module) -> (FunctionId, ImportId) {
     get_or_insert_import(module, "pay_for_memory_grow", &[ValType::I32], &[])
 }
@@ -325,7 +327,7 @@ fn get_or_insert_import(
     params: &[walrus::ValType],
     results: &[walrus::ValType],
 ) -> (walrus::FunctionId, walrus::ImportId) {
-    if let Ok(function_id) = module.imports.get_func("vm_hooks", name) {
+    if let Ok(function_id) = module.imports.get_func(HOST_MODULE_NAME, name) {
         for import in module.imports.iter() {
             if let walrus::ImportKind::Function(func_id) = import.kind {
                 if func_id == function_id {
@@ -336,5 +338,5 @@ fn get_or_insert_import(
     }
 
     let ty = module.types.add(params, results);
-    module.add_import_func("vm_hooks", name, ty)
+    module.add_import_func(HOST_MODULE_NAME, name, ty)
 }

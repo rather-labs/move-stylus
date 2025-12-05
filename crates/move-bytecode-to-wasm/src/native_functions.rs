@@ -32,7 +32,7 @@ use crate::{
         },
     },
     hasher::get_hasher,
-    hostio,
+    hostio::{self, host_functions::HOST_MODULE_NAME, host_test_functions::TEST_HOST_MODULE_NAME},
     runtime::RuntimeFunction,
     translation::intermediate_types::IntermediateType,
 };
@@ -129,7 +129,8 @@ impl NativeFunction {
         // Some functions are implemented by host functions directly. For those, we just import and
         // use them without wrapping them.
         if let Some(host_fn_name) = Self::host_fn_name(name) {
-            let host_fn = if let Ok(function_id) = module.imports.get_func("vm_hooks", host_fn_name)
+            let host_fn = if let Ok(function_id) =
+                module.imports.get_func(HOST_MODULE_NAME, host_fn_name)
             {
                 function_id
             } else {
@@ -175,8 +176,9 @@ impl NativeFunction {
         }
 
         if let Some(host_test_fn_name) = Self::host_test_fn_name(name) {
-            let host_fn = if let Ok(function_id) =
-                module.imports.get_func("vm_test_hooks", host_test_fn_name)
+            let host_fn = if let Ok(function_id) = module
+                .imports
+                .get_func(TEST_HOST_MODULE_NAME, host_test_fn_name)
             {
                 function_id
             } else {

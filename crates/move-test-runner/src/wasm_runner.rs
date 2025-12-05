@@ -461,7 +461,6 @@ impl RuntimeSandbox {
 
                     let data = msg_sender.lock().unwrap();
 
-                    println!("====> 3 {:?}", &*data);
                     mem.write(&mut caller, ptr as usize, &*data).unwrap();
                 },
             )

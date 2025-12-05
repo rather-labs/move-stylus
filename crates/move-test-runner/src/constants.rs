@@ -15,14 +15,16 @@ pub const MSG_SENDER_ADDRESS: [u8; 20] = [
 pub const MSG_VALUE: U256 = U256::MAX;
 
 pub const BLOCK_BASEFEE: U256 = U256::from_le_bytes([
-    1, 2, 3, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0x12, 0x34, 0x56, 0x78, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0,
 ]);
 
 pub const GAS_PRICE: U256 = U256::from_le_bytes([
-    5, 5, 5, 5, 5, 5, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0,
 ]);
 
 pub const BLOCK_NUMBER: u64 = 3141592;
 pub const BLOCK_GAS_LIMIT: u64 = 30_000_000;
-pub const BLOCK_TIMESTAMP: u64 = 1_234_567_890;
+pub const BLOCK_TIMESTAMP: u64 = 1438338373;
 pub const CHAIN_ID: u64 = 42331;

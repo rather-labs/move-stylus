@@ -71,7 +71,7 @@ fun test_set_value_by_owner() {
 
     let mut c = Counter {
         id: uid,
-        owner: test_scenario::default_sender_address(),
+        owner: test_scenario::default_sender(),
         value: 5
     };
 
