@@ -52,8 +52,6 @@ fun test_increment() {
     test_scenario::drop_storage_object(c);
 }
 
-
-
 #[test]
 fun test_read() {
     let mut ctx = test_scenario::new_tx_context();
@@ -86,9 +84,11 @@ fun test_set_value_by_owner() {
 
 #[test]
 fun test_set_value_wrong_owner_should_fail() {
+    test_scenario::set_sender_address(@0x4);
     let mut ctx = test_scenario::new_tx_context();
     let uid = object::new(&mut ctx);
     let mut c = Counter { id: uid, owner: @0x4, value: 5 };
+
 
     set_value(&mut c, 99, &ctx);
 

@@ -187,7 +187,8 @@ impl NativeFunction {
                         SF_MODULE_TEST_SCENARIO,
                     ) => {
                         let (function_id, _) =
-                            hostio::host_test_functions::set_signer_address(module);
+                            hostio::host_test_functions::set_sender_address(module);
+
                         function_id
                     }
                     (
@@ -196,7 +197,7 @@ impl NativeFunction {
                         SF_MODULE_TEST_SCENARIO,
                     ) => {
                         let (function_id, _) =
-                            hostio::host_test_functions::set_sender_address(module);
+                            hostio::host_test_functions::set_signer_address(module);
                         function_id
                     }
                     _ => {
