@@ -70,7 +70,138 @@ public fun default_block_timestamp(): u64 {
     1438338373
 }
 
-/// Provides the default transaction chain id used in the test environment.
+/// Provides the default transaction block timestmap used in the test environment.
 public fun default_chain_id(): u64 {
     42331
+}
+
+
+//
+// Unit tests
+//
+// These tests, besides testin this module, tests the test runner
+//
+#[test]
+fun test_default_signer() {
+    let addr = default_signer();
+    assert!(addr == @0xbeef);
+}
+
+#[test]
+fun test_default_sender() {
+    let addr = default_sender();
+    assert!(addr == @0xcafe);
+}
+
+#[test]
+fun test_default_base_fee() {
+    let fee = default_base_fee();
+    assert!(fee == 12345678);
+}
+
+#[test]
+fun test_default_gas_price() {
+    let price = default_gas_price();
+    assert!(price == 55555555555555);
+}
+
+#[test]
+fun test_default_block_number() {
+    let num = default_block_number();
+    assert!(num == 3141592);
+}
+
+#[test]
+fun test_default_gas_limit() {
+    let limit = default_gas_limit();
+    assert!(limit == 30_000_000);
+}
+
+#[test]
+fun test_default_block_timestamp() {
+    let ts = default_block_timestamp();
+    assert!(ts == 1438338373);
+}
+
+#[test]
+fun test_default_chain_id() {
+    let id = default_chain_id();
+    assert!(id == 42331);
+}
+
+#[test]
+fun test_basefee_changed() {
+    let ctx = new_tx_context();
+    let new_fee: u256 = 999999;
+
+    set_block_basefee(new_fee);
+
+    assert!(default_base_fee() != ctx.block_basefee());
+    assert!(new_fee == ctx.block_basefee());
+}
+
+#[test]
+fun test_sender_changed() {
+    let ctx = new_tx_context();
+    let new_addr = @0x1111;
+
+    set_sender_address(new_addr);
+
+    assert!(default_signer() != ctx.sender());
+    assert!(new_addr == ctx.sender());
+}
+
+#[test]
+fun test_gas_price_changed() {
+    let ctx = new_tx_context();
+    let new_price: u256 = 123456789;
+
+    set_gas_price(new_price);
+
+    assert!(default_gas_price() != ctx.gas_price());
+    assert!(new_price == ctx.gas_price());
+}
+
+#[test]
+fun test_block_number_changed() {
+    let ctx = new_tx_context();
+    let new_number: u64 = 42;
+
+    set_block_number(new_number);
+
+    assert!(default_block_number() != ctx.block_number());
+    assert!(new_number == ctx.block_number());
+}
+
+#[test]
+fun test_gas_limit_changed() {
+    let ctx = new_tx_context();
+    let new_limit: u64 = 1000000;
+
+    set_gas_limit(new_limit);
+
+    assert!(default_gas_limit() != ctx.block_gas_limit());
+    assert!(new_limit == ctx.block_gas_limit());
+}
+
+#[test]
+fun test_block_timestamp_changed() {
+    let ctx = new_tx_context();
+    let new_ts: u64 = 987654321;
+
+    set_block_timestamp(new_ts);
+
+    assert!(default_block_timestamp() != ctx.block_timestamp());
+    assert!(new_ts == ctx.block_timestamp());
+}
+
+#[test]
+fun test_chain_id_changed() {
+    let ctx = new_tx_context();
+    let new_id: u64 = 99;
+
+    set_chain_id(new_id);
+
+    assert!(default_chain_id() != ctx.chain_id());
+    assert!(new_id == ctx.chain_id());
 }

@@ -39,21 +39,20 @@ pub struct RuntimeSandbox {
     module: WasmModule,
     pub log_events: LogEventReceiver,
     pub cross_contract_calls: CrossCrontractExecutionReceiver,
-    current_tx_origin: Arc<Mutex<[u8; 20]>>,
-    current_msg_sender: Arc<Mutex<[u8; 20]>>,
     storage: Arc<Mutex<HashMap<[u8; 32], [u8; 32]>>>,
     cross_contract_call_return_data: Arc<Mutex<Vec<u8>>>,
     cross_contract_call_succeed: Arc<AtomicBool>,
 }
 
 macro_rules! link_fn_ret_constant {
-    ($linker:expr, $name:literal, $constant:expr, $constant_type: ty) => {
+    ($linker:expr, $name:literal, $var:ident) => {
+        let var = $var.clone();
         $linker
             .func_wrap(
                 "vm_hooks",
                 $name,
-                move |_caller: Caller<'_, ModuleData>| -> $constant_type {
-                    $constant as $constant_type
+                move |_caller: Caller<'_, ModuleData>| -> i64 {
+                    var.load(std::sync::atomic::Ordering::Acquire) as i64
                 },
             )
             .unwrap();
@@ -61,7 +60,8 @@ macro_rules! link_fn_ret_constant {
 }
 
 macro_rules! link_fn_write_constant {
-    ($linker:expr, $name:literal, $constant:expr) => {
+    ($linker:expr, $name:literal, $var:ident) => {
+        let var = $var.clone();
         $linker
             .func_wrap(
                 "vm_hooks",
@@ -72,7 +72,10 @@ macro_rules! link_fn_write_constant {
                         _ => panic!("failed to find host memory"),
                     };
 
-                    mem.write(&mut caller, ptr as usize, &$constant).unwrap();
+                    let value = var.lock().unwrap();
+
+                    mem.write(&mut caller, ptr as usize, &(*value).to_le_bytes::<32>())
+                        .unwrap();
                 },
             )
             .unwrap();
@@ -179,6 +182,7 @@ impl RuntimeSandbox {
         let current_gas_limit = Arc::new(AtomicU64::new(BLOCK_GAS_LIMIT));
         let current_timestamp = Arc::new(AtomicU64::new(BLOCK_TIMESTAMP));
         let current_chain_id = Arc::new(AtomicU64::new(CHAIN_ID));
+        let current_msg_value = Arc::new(Mutex::new(MSG_VALUE));
 
         let cross_contract_call_return_data = Arc::new(Mutex::new(vec![]));
         let cross_contract_call_succeed = Arc::new(AtomicBool::new(true));
@@ -545,14 +549,14 @@ impl RuntimeSandbox {
             )
             .unwrap();
 
-        link_fn_write_constant!(linker, "msg_value", MSG_VALUE.to_le_bytes::<32>());
-        link_fn_write_constant!(linker, "block_basefee", BLOCK_BASEFEE.to_le_bytes::<32>());
-        link_fn_write_constant!(linker, "tx_gas_price", GAS_PRICE.to_le_bytes::<32>());
+        link_fn_write_constant!(linker, "msg_value", current_msg_value);
+        link_fn_write_constant!(linker, "block_basefee", current_base_fee);
+        link_fn_write_constant!(linker, "tx_gas_price", current_gas_price);
 
-        link_fn_ret_constant!(linker, "chainid", CHAIN_ID, i64);
-        link_fn_ret_constant!(linker, "block_number", BLOCK_NUMBER, i64);
-        link_fn_ret_constant!(linker, "block_gas_limit", BLOCK_GAS_LIMIT, i64);
-        link_fn_ret_constant!(linker, "block_timestamp", BLOCK_TIMESTAMP, i64);
+        link_fn_ret_constant!(linker, "chainid", current_chain_id);
+        link_fn_ret_constant!(linker, "block_number", current_block_number);
+        link_fn_ret_constant!(linker, "block_gas_limit", current_gas_limit);
+        link_fn_ret_constant!(linker, "block_timestamp", current_timestamp);
 
         //
         // Test functions
@@ -572,8 +576,6 @@ impl RuntimeSandbox {
             module,
             log_events: Arc::new(Mutex::new(log_receiver)),
             cross_contract_calls: Arc::new(Mutex::new(cce_receiver)),
-            current_tx_origin,
-            current_msg_sender,
             storage,
             cross_contract_call_return_data,
             cross_contract_call_succeed,
