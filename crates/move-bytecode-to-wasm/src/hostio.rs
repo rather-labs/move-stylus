@@ -11,6 +11,7 @@ use crate::{
 pub mod entrypoint_router;
 pub mod error;
 pub mod host_functions;
+pub mod host_test_functions;
 
 /// Create a new module with stylus memory management functions and adds the `pay_for_memory_grow` function
 /// as required by stylus

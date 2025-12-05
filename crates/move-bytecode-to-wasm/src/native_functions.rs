@@ -89,12 +89,6 @@ impl NativeFunction {
     const NATIVE_REMOVE_CHILD_OBJECT: &str = "remove_child_object";
     const NATIVE_HAS_CHILD_OBJECT: &str = "has_child_object";
 
-    // Host functions
-    const HOST_BLOCK_NUMBER: &str = "block_number";
-    const HOST_BLOCK_GAS_LIMIT: &str = "block_gas_limit";
-    const HOST_BLOCK_TIMESTAMP: &str = "block_timestamp";
-    const HOST_CHAIN_ID: &str = "chainid";
-
     // Fallback functions
     const NATIVE_CALLDATA_AS_VECTOR: &str = "calldata_as_vector";
     const NATIVE_CALLDATA_LENGTH: &str = "calldata_length";
@@ -103,6 +97,18 @@ impl NativeFunction {
     const NATIVE_POISON: &str = "poison";
     const NATIVE_NEW_TX_CONTEXT: &str = "new_tx_context";
     const NATIVE_DROP_STORAGE_OBJECT: &str = "drop_storage_object";
+    const NATIVE_SET_SENDER_ADDRESS: &str = "set_sender_address";
+    const NATIVE_SET_SIGNER_ADDRESS: &str = "set_signer_address";
+
+    // Host functions
+    const HOST_BLOCK_NUMBER: &str = "block_number";
+    const HOST_BLOCK_GAS_LIMIT: &str = "block_gas_limit";
+    const HOST_BLOCK_TIMESTAMP: &str = "block_timestamp";
+    const HOST_CHAIN_ID: &str = "chainid";
+
+    // Host test functions
+    const HOST_SET_SENDER_ADDRESS: &str = "set_sender_address";
+    const HOST_SET_SIGNER_ADDRESS: &str = "set_signer_address";
 
     /// Links the function into the module and returns its id. If the function is already present
     /// it just returns the id.
@@ -160,6 +166,42 @@ impl NativeFunction {
                     _ => {
                         return Err(NativeFunctionError::HostFunctionNotSupported(
                             host_fn_name.to_string(),
+                        ));
+                    }
+                }
+            };
+
+            return Ok(host_fn);
+        }
+
+        if let Some(host_test_fn_name) = Self::host_test_fn_name(name) {
+            let host_fn = if let Ok(function_id) =
+                module.imports.get_func("vm_test_hooks", host_test_fn_name)
+            {
+                function_id
+            } else {
+                match (host_test_fn_name, *address, module_name.as_str()) {
+                    (
+                        Self::HOST_SET_SENDER_ADDRESS,
+                        STYLUS_FRAMEWORK_ADDRESS,
+                        SF_MODULE_TEST_SCENARIO,
+                    ) => {
+                        let (function_id, _) =
+                            hostio::host_test_functions::set_signer_address(module);
+                        function_id
+                    }
+                    (
+                        Self::HOST_SET_SIGNER_ADDRESS,
+                        STYLUS_FRAMEWORK_ADDRESS,
+                        SF_MODULE_TEST_SCENARIO,
+                    ) => {
+                        let (function_id, _) =
+                            hostio::host_test_functions::set_sender_address(module);
+                        function_id
+                    }
+                    _ => {
+                        return Err(NativeFunctionError::HostFunctionNotSupported(
+                            host_test_fn_name.to_string(),
                         ));
                     }
                 }
@@ -479,6 +521,15 @@ impl NativeFunction {
             Self::NATIVE_BLOCK_GAS_LIMIT => Some(Self::HOST_BLOCK_GAS_LIMIT),
             Self::NATIVE_BLOCK_TIMESTAMP => Some(Self::HOST_BLOCK_TIMESTAMP),
             Self::NATIVE_CHAIN_ID => Some(Self::HOST_CHAIN_ID),
+            _ => None,
+        }
+    }
+
+    /// Maps the native function name to the host function name.
+    fn host_test_fn_name(name: &str) -> Option<&'static str> {
+        match name {
+            Self::NATIVE_SET_SENDER_ADDRESS => Some(Self::HOST_SET_SENDER_ADDRESS),
+            Self::NATIVE_SET_SIGNER_ADDRESS => Some(Self::HOST_SET_SIGNER_ADDRESS),
             _ => None,
         }
     }

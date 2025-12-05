@@ -474,6 +474,43 @@ impl RuntimeSandbox {
         link_fn_ret_constant!(linker, "block_gas_limit", BLOCK_GAS_LIMIT, i64);
         link_fn_ret_constant!(linker, "block_timestamp", BLOCK_TIMESTAMP, i64);
 
+        // Test functions
+        let msg_sender = current_msg_sender.clone();
+        linker
+            .func_wrap(
+                "vm_test_hooks",
+                "set_sender_address",
+                move |mut caller: Caller<'_, ModuleData>, address_ptr: u32| {
+                    let mem = get_memory(&mut caller);
+
+                    let mut address_buffer = [0; 20];
+                    mem.read(&mut caller, address_ptr as usize + 12, &mut address_buffer)
+                        .unwrap();
+
+                    let mut msg_sender = msg_sender.lock().unwrap();
+                    *msg_sender = address_buffer;
+                },
+            )
+            .unwrap();
+
+        let signer = current_tx_origin.clone();
+        linker
+            .func_wrap(
+                "vm_test_hooks",
+                "set_signer_address",
+                move |mut caller: Caller<'_, ModuleData>, address_ptr: u32| {
+                    let mem = get_memory(&mut caller);
+
+                    let mut address_buffer = [0; 20];
+                    mem.read(&mut caller, address_ptr as usize + 12, &mut address_buffer)
+                        .unwrap();
+
+                    let mut msg_sender = signer.lock().unwrap();
+                    *msg_sender = address_buffer;
+                },
+            )
+            .unwrap();
+
         Self {
             engine,
             linker,

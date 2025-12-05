@@ -39,9 +39,9 @@ pub fn run_tests(
         let result = runtime.call_test_function(test);
 
         if result.is_ok() {
-            println!("+ {test:50} {GREEN}PASSED{RESET}");
+            println!("+ {module_id}::{test:50} {GREEN}PASSED{RESET}");
         } else {
-            println!("- {test:50} {RED}FAILED{RESET}");
+            println!("- {module_id}::{test:50} {RED}FAILED{RESET}");
             failures.push(test.to_owned());
         }
     }
