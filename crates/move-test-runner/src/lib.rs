@@ -9,6 +9,7 @@ use wasm_runner::RuntimeSandbox;
 const RESET: &str = "\x1b[0m";
 const GREEN: &str = "\x1b[32m";
 const RED: &str = "\x1b[31m";
+const YELLOW: &str = "\x1b[33m";
 const CYAN: &str = "\x1b[36m";
 
 pub fn run_tests(
@@ -29,14 +30,30 @@ pub fn run_tests(
 
     let mut failures = Vec::new();
     for test in &module_data.special_attributes.test_functions {
-        print!("  {module_id}::{test} ... ");
+        print!("  {module_id}::{} ... ", test.name);
         let runtime = RuntimeSandbox::new(&compiled_wasm);
-        let result = runtime.call_test_function(test);
-        if result.is_ok() {
-            println!("{GREEN}PASSED{RESET}");
-        } else {
-            println!("{RED}FAILED{RESET}");
-            failures.push(test.to_owned());
+
+        if test.skip {
+            println!("{YELLOW}SKIPPED{RESET}");
+            continue;
+        }
+
+        let result = runtime.call_test_function(&test.name);
+        match (result.is_ok(), test.expect_failure) {
+            (true, true) => {
+                println!("{RED}FAILED{RESET}");
+                failures.push(test.to_owned());
+            }
+            (true, false) => {
+                println!("{GREEN}PASSED{RESET}");
+            }
+            (false, false) => {
+                println!("{RED}FAILED{RESET}");
+                failures.push(test.to_owned());
+            }
+            (false, true) => {
+                println!("{GREEN}PASSED{RESET}");
+            }
         }
     }
 
@@ -52,7 +69,7 @@ pub fn run_tests(
     if !failures.is_empty() {
         println!("Failed tests:");
         for failed_test in failures {
-            println!("  {module_id}::{failed_test}");
+            println!("  {module_id}::{}", failed_test.name);
         }
     }
 }

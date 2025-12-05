@@ -250,7 +250,8 @@ pub fn translate_function(
     if module_data
         .special_attributes
         .test_functions
-        .contains(&function_information.function_id.identifier)
+        .iter()
+        .any(|f| f.name == function_information.function_id.identifier)
     {
         module
             .exports

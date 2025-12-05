@@ -205,3 +205,18 @@ fun test_chain_id_changed() {
     assert!(default_chain_id() != ctx.chain_id());
     assert!(new_id == ctx.chain_id());
 }
+
+#[test, expected_failure]
+fun test_chain_id_expect_failure() {
+    let ctx = new_tx_context();
+    let new_id: u64 = 99;
+
+    set_chain_id(new_id);
+
+    assert!(default_chain_id() == ctx.chain_id());
+}
+
+#[test, skip]
+fun test_skip() {
+    assert!(true);
+}

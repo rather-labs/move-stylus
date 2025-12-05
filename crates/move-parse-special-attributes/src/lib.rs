@@ -45,6 +45,13 @@ pub struct Struct_ {
     pub loc: Loc,
 }
 
+#[derive(Debug)]
+pub struct TestFunction {
+    pub name: String,
+    pub skip: bool,
+    pub expect_failure: bool,
+}
+
 #[derive(Default, Debug)]
 pub struct SpecialAttributes {
     pub module_name: String,
@@ -55,7 +62,7 @@ pub struct SpecialAttributes {
     pub external_struct: HashMap<String, ExternalStruct>,
     pub external_call_structs: HashSet<String>,
     pub abi_errors: HashMap<String, AbiError>,
-    pub test_functions: Vec<String>,
+    pub test_functions: Vec<TestFunction>,
 }
 
 pub fn process_special_attributes(
@@ -268,7 +275,21 @@ pub fn process_special_attributes(
                             match first_modifier {
                                 // TODO: Process this only if test mode is enabled
                                 Some(FunctionModifier::Test) => {
-                                    result.test_functions.push(f.name.to_owned().to_string());
+                                    let modifiers =
+                                        modifiers.into_iter().collect::<Vec<FunctionModifier>>();
+
+                                    result.test_functions.push(TestFunction {
+                                        name: f.name.to_owned().to_string(),
+                                        skip: modifiers.contains(&FunctionModifier::Skip),
+                                        expect_failure: modifiers
+                                            .contains(&FunctionModifier::ExpectedFailure),
+                                    });
+
+                                    println!(
+                                        "{:?}",
+                                        result.test_functions[result.test_functions.len() - 1]
+                                    );
+
                                     result.functions.push(Function {
                                         name: f.name.to_owned().to_string(),
                                         modifiers: vec![],
