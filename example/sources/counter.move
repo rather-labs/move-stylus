@@ -1,4 +1,4 @@
-module hello_world::hello_world;
+module hello_world::counter;
 
 use stylus::tx_context::TxContext;
 use stylus::object as object;

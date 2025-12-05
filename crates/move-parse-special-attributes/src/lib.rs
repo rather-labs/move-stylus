@@ -285,11 +285,6 @@ pub fn process_special_attributes(
                                             .contains(&FunctionModifier::ExpectedFailure),
                                     });
 
-                                    println!(
-                                        "{:?}",
-                                        result.test_functions[result.test_functions.len() - 1]
-                                    );
-
                                     result.functions.push(Function {
                                         name: f.name.to_owned().to_string(),
                                         modifiers: vec![],
