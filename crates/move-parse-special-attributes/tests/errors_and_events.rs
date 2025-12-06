@@ -1,8 +1,8 @@
 use std::{fs, path::PathBuf};
 
 use move_parse_special_attributes::{
-    FunctionValidationError, abi_error::AbiErrorParseError, error::SpecialAttributeErrorKind,
-    event::EventParseError, process_special_attributes,
+    FunctionValidationError, StructValidationError, abi_error::AbiErrorParseError,
+    error::SpecialAttributeErrorKind, event::EventParseError, process_special_attributes,
 };
 
 #[test]
@@ -20,7 +20,7 @@ pub fn test_errors_and_events() {
         panic!("Expected error due to invalid errors and events usage");
     };
 
-    assert_eq!(special_attributes_errors.len(), 5);
+    assert_eq!(special_attributes_errors.len(), 7);
 
     assert_eq!(
         1,
@@ -77,6 +77,19 @@ pub fn test_errors_and_events() {
             .filter(|e| matches!(
                 &e.kind,
                 SpecialAttributeErrorKind::AbiError(AbiErrorParseError::InvalidAbiErrorName)
+            ))
+            .count()
+    );
+
+    assert_eq!(
+        2,
+        special_attributes_errors
+            .iter()
+            .filter(|e| matches!(
+                &e.kind,
+                SpecialAttributeErrorKind::StructValidation(
+                    StructValidationError::StructWithKeyMissingUidField(_)
+                )
             ))
             .count()
     );
