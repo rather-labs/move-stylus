@@ -8,7 +8,7 @@ use clap::*;
 use move_bytecode_to_wasm::package_module_data;
 use move_package::BuildConfig;
 use move_test_runner::run_tests;
-use std::path::Path;
+use std::{path::Path, process::exit};
 
 /// Compiles modules and run the unit tests
 #[derive(Parser)]
@@ -41,12 +41,17 @@ impl Test {
             print_error_diagnostic(*compilation_error)
         }
 
+        let mut test_failed = false;
         for (path, module_id) in &package_modules.modules_paths {
             let data = package_modules.modules_data.get(module_id).unwrap();
 
             if !data.special_attributes.test_functions.is_empty() {
-                run_tests(module_id, data, path, &build_directory);
+                test_failed = test_failed || run_tests(module_id, data, path, &build_directory);
             }
+        }
+
+        if test_failed {
+            exit(1)
         }
 
         Ok(())

@@ -81,5 +81,5 @@ pub fn run_tests(
         }
     }
 
-    failures.is_empty()
+    !failures.is_empty()
 }
