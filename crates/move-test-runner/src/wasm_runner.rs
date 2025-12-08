@@ -12,7 +12,7 @@ use crate::constants::{
     BLOCK_BASEFEE, BLOCK_GAS_LIMIT, BLOCK_NUMBER, BLOCK_TIMESTAMP, CHAIN_ID, GAS_PRICE,
     MSG_SENDER_ADDRESS, MSG_VALUE, SIGNER_ADDRESS,
 };
-use alloy_primitives::{U256, keccak256};
+use alloy_primitives::{FixedBytes, U256, keccak256};
 use anyhow::Result;
 use move_bytecode_to_wasm::data::DATA_ABORT_MESSAGE_PTR_OFFSET;
 use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store};
@@ -648,6 +648,13 @@ impl RuntimeSandbox {
             .map_err(|e| anyhow::anyhow!("error calling entrypoint: {e:?}"))?;
 
         Ok((result, store.data().return_data.clone()))
+    }
+
+    pub fn obtain_uid(&self) -> FixedBytes<32> {
+        let (topic, data) = self.log_events.lock().unwrap().recv().unwrap();
+        assert_eq!(2, topic);
+        assert_eq!(*keccak256(b"NewUID(address)").as_slice(), data[..32]);
+        FixedBytes::<32>::from_slice(&data[32..])
     }
 
     fn read_memory_from(

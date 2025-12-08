@@ -8,6 +8,7 @@ use move_bytecode_to_wasm::{translate_package, translate_single_module};
 use move_package::{BuildConfig, LintFlag};
 use move_packages_build::implicit_dependencies;
 use move_test_runner::wasm_runner::RuntimeSandbox;
+use rstest::fixture;
 use walrus::Module;
 
 fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
@@ -258,4 +259,14 @@ macro_rules! declare_fixture {
             RuntimeSandbox::from_binary(&translated_package.emit_wasm())
         }
     };
+}
+
+#[fixture]
+pub fn runtime_with_framework(
+    #[default("")] module_name: &str,
+    #[default("")] source_path: &str,
+) -> RuntimeSandbox {
+    let mut translated_package = translate_test_package_with_framework(source_path, module_name);
+
+    RuntimeSandbox::from_binary(&translated_package.emit_wasm())
 }

@@ -1,23 +1,11 @@
 mod common;
-
-use common::{runtime_sandbox::RuntimeSandbox, translate_test_package_with_framework};
-use rstest::{fixture, rstest};
+use crate::common::runtime_with_framework as runtime;
+use alloy_sol_types::{SolCall, sol};
+use move_test_runner::wasm_runner::RuntimeSandbox;
+use rstest::rstest;
 
 mod constructor {
-    use alloy_sol_types::{SolCall, sol};
-
     use super::*;
-
-    #[fixture]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "constructor";
-        const SOURCE_PATH: &str = "tests/constructor/constructor.move";
-
-        let mut translated_package =
-            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
 
     sol!(
         #[allow(missing_docs)]
@@ -27,7 +15,9 @@ mod constructor {
     );
 
     #[rstest]
-    fn test_constructor(runtime: RuntimeSandbox) {
+    fn test_constructor(
+        #[with("constructor", "tests/constructor/constructor.move")] runtime: RuntimeSandbox,
+    ) {
         // Create a new counter
         let call_data = constructorCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -63,20 +53,7 @@ mod constructor {
 }
 
 mod constructor_with_otw {
-    use alloy_sol_types::{SolCall, sol};
-
     use super::*;
-
-    #[fixture]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "constructor_with_otw";
-        const SOURCE_PATH: &str = "tests/constructor/constructor_with_otw.move";
-
-        let mut translated_package =
-            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
 
     sol!(
         #[allow(missing_docs)]
@@ -86,7 +63,10 @@ mod constructor_with_otw {
     );
 
     #[rstest]
-    fn test_constructor_with_otw(runtime: RuntimeSandbox) {
+    fn test_constructor_with_otw(
+        #[with("constructor_with_otw", "tests/constructor/constructor_with_otw.move")]
+        runtime: RuntimeSandbox,
+    ) {
         // Create a new counter
         let call_data = constructorCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -122,20 +102,7 @@ mod constructor_with_otw {
 }
 
 mod constructor_with_return {
-    use alloy_sol_types::{SolCall, sol};
-
     use super::*;
-
-    #[fixture]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "constructor_with_return";
-        const SOURCE_PATH: &str = "tests/constructor/constructor_with_return.move";
-
-        let mut translated_package =
-            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
 
     sol!(
         #[allow(missing_docs)]
@@ -144,28 +111,21 @@ mod constructor_with_return {
 
     #[rstest]
     #[should_panic]
-    fn test_constructor_with_return(runtime: RuntimeSandbox) {
+    fn test_constructor_with_return(
+        #[with(
+            "constructor_with_return",
+            "tests/constructor/constructor_with_return.move"
+        )]
+        runtime: RuntimeSandbox,
+    ) {
         let call_data = constructorCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
     }
 }
 
-mod constructor_bad_args_1 {
-    use alloy_sol_types::{SolCall, sol};
-
+mod constructor_bad_args {
     use super::*;
-
-    #[fixture]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "constructor_bad_args_1";
-        const SOURCE_PATH: &str = "tests/constructor/constructor_bad_args_1.move";
-
-        let mut translated_package =
-            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
 
     sol!(
         #[allow(missing_docs)]
@@ -174,127 +134,69 @@ mod constructor_bad_args_1 {
 
     #[rstest]
     #[should_panic]
-    fn test_constructor_bad_args_1(runtime: RuntimeSandbox) {
+    fn test_constructor_bad_args_1(
+        #[with(
+            "constructor_bad_args_1",
+            "tests/constructor/constructor_bad_args_1.move"
+        )]
+        runtime: RuntimeSandbox,
+    ) {
         let call_data = constructorCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
     }
-}
-
-mod constructor_bad_args_2 {
-    use alloy_sol_types::{SolCall, sol};
-
-    use super::*;
-
-    #[fixture]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "constructor_bad_args_2";
-        const SOURCE_PATH: &str = "tests/constructor/constructor_bad_args_2.move";
-
-        let mut translated_package =
-            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
-
-    sol!(
-        #[allow(missing_docs)]
-        function constructor() public view;
-    );
 
     #[rstest]
     #[should_panic]
-    fn test_constructor_bad_args_2(runtime: RuntimeSandbox) {
+    fn test_constructor_bad_args_2(
+        #[with(
+            "constructor_bad_args_2",
+            "tests/constructor/constructor_bad_args_2.move"
+        )]
+        runtime: RuntimeSandbox,
+    ) {
         let call_data = constructorCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
     }
-}
-
-mod constructor_bad_args_3 {
-    use alloy_sol_types::{SolCall, sol};
-
-    use super::*;
-
-    #[fixture]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "constructor_bad_args_3";
-        const SOURCE_PATH: &str = "tests/constructor/constructor_bad_args_3.move";
-
-        let mut translated_package =
-            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
-
-    sol!(
-        #[allow(missing_docs)]
-        function constructor() public view;
-    );
 
     #[rstest]
     #[should_panic]
-    fn test_constructor_bad_args_3(runtime: RuntimeSandbox) {
+    fn test_constructor_bad_args_3(
+        #[with(
+            "constructor_bad_args_3",
+            "tests/constructor/constructor_bad_args_3.move"
+        )]
+        runtime: RuntimeSandbox,
+    ) {
         let call_data = constructorCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
     }
-}
-
-mod constructor_bad_args_4 {
-    use alloy_sol_types::{SolCall, sol};
-
-    use super::*;
-
-    #[fixture]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "constructor_bad_args_4";
-        const SOURCE_PATH: &str = "tests/constructor/constructor_bad_args_4.move";
-
-        let mut translated_package =
-            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
-
-    sol!(
-        #[allow(missing_docs)]
-        function constructor() public view;
-    );
 
     #[rstest]
     #[should_panic]
-    fn test_constructor_bad_args_4(runtime: RuntimeSandbox) {
+    fn test_constructor_bad_args_4(
+        #[with(
+            "constructor_bad_args_4",
+            "tests/constructor/constructor_bad_args_4.move"
+        )]
+        runtime: RuntimeSandbox,
+    ) {
         let call_data = constructorCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
     }
-}
-
-mod constructor_bad_args_5 {
-    use alloy_sol_types::{SolCall, sol};
-
-    use super::*;
-
-    #[fixture]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "constructor_bad_args_5";
-        const SOURCE_PATH: &str = "tests/constructor/constructor_bad_args_5.move";
-
-        let mut translated_package =
-            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
-
-    sol!(
-        #[allow(missing_docs)]
-        function constructor() public view;
-    );
 
     #[rstest]
     #[should_panic]
-    fn test_constructor_bad_args_5(runtime: RuntimeSandbox) {
+    fn test_constructor_bad_args_5(
+        #[with(
+            "constructor_bad_args_5",
+            "tests/constructor/constructor_bad_args_5.move"
+        )]
+        runtime: RuntimeSandbox,
+    ) {
         let call_data = constructorCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
