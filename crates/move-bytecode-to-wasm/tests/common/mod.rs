@@ -254,7 +254,26 @@ macro_rules! declare_fixture {
         #[fixture]
         #[once]
         pub fn runtime() -> move_test_runner::wasm_runner::RuntimeSandbox {
-            let mut translated_package = translate_test_package($source_path, $module_name);
+            let mut translated_package =
+                $crate::common::translate_test_package($source_path, $module_name);
+
+            move_test_runner::wasm_runner::RuntimeSandbox::from_binary(
+                &translated_package.emit_wasm(),
+            )
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! declare_fixture_complete_package {
+    ($module_name:literal, $source_path:literal) => {
+        #[fixture]
+        #[once]
+        pub fn runtime() -> move_test_runner::wasm_runner::RuntimeSandbox {
+            let mut translated_packages =
+                $crate::common::translate_test_complete_package($source_path);
+
+            let translated_package = translated_packages.get_mut($module_name).unwrap();
 
             move_test_runner::wasm_runner::RuntimeSandbox::from_binary(
                 &translated_package.emit_wasm(),

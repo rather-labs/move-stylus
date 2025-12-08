@@ -3,7 +3,6 @@ mod common;
 use crate::common::run_test;
 use alloy_primitives::U256;
 use alloy_sol_types::{SolCall, SolType, sol};
-use common::translate_test_package;
 use move_test_runner::wasm_runner::RuntimeSandbox;
 use rstest::{fixture, rstest};
 
