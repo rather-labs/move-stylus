@@ -1,7 +1,7 @@
 pub(crate) mod abi_types;
 pub mod compilation_context;
 mod constructor;
-mod data;
+pub mod data;
 pub mod error;
 mod generics;
 mod hasher;

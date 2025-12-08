@@ -14,7 +14,7 @@ use crate::constants::{
 };
 use alloy_primitives::{U256, keccak256};
 use anyhow::Result;
-// use walrus::Module;
+use move_bytecode_to_wasm::data::DATA_ABORT_MESSAGE_PTR_OFFSET;
 use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store};
 
 pub struct ModuleData {
@@ -27,6 +27,7 @@ pub struct ExecutionData {
     pub return_data: Vec<u8>,
     pub instance: wasmtime::Instance,
     pub store: Store<ModuleData>,
+    pub execution_aborted: bool,
 }
 
 type LogEventReceiver = Arc<Mutex<mpsc::Receiver<(u32, Vec<u8>)>>>;
@@ -602,11 +603,34 @@ impl RuntimeSandbox {
             .call(&mut store, &[], &mut [])
             .map_err(|e| anyhow::anyhow!("error calling entrypoint: {e:?}"))?;
 
+        let error_pointer = Self::read_memory_from(
+            &instance,
+            &mut store,
+            DATA_ABORT_MESSAGE_PTR_OFFSET as usize,
+            4,
+        )
+        .map_err(|e| anyhow::anyhow!("there was an error reading test memory: {e:?}"))?;
+
         Ok(ExecutionData {
-            // result,
             return_data: store.data().return_data.clone(),
             instance,
             store,
+            execution_aborted: error_pointer != [0, 0, 0, 0],
         })
+    }
+
+    fn read_memory_from(
+        instance: &wasmtime::Instance,
+        store: &mut Store<ModuleData>,
+        from: usize,
+        len: usize,
+    ) -> Result<Vec<u8>> {
+        // Get exported memory
+        let memory = instance
+            .get_export(&mut *store, "memory")
+            .and_then(|e| e.into_memory())
+            .expect("Wasm module must export memory");
+
+        Ok(memory.data(&store)[from..from + len].to_vec())
     }
 }

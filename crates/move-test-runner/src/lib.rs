@@ -17,9 +17,9 @@ pub fn run_tests(
     module_data: &ModuleData,
     module_path: &Path,
     compiled_modules_path: &Path,
-) {
+) -> bool {
     println!(
-        "\nRunning {CYAN}{module_id}{RESET} tests ({})]\n",
+        "\nRunning {CYAN}{module_id}{RESET} tests ({})\n",
         module_path.display()
     );
 
@@ -30,7 +30,15 @@ pub fn run_tests(
 
     let mut failures = Vec::new();
     for test in &module_data.special_attributes.test_functions {
-        print!("  {module_id}::{} ... ", test.name);
+        print!(
+            "  {module_id}::{} {}... ",
+            test.name,
+            if test.expect_failure {
+                "[expected failure] "
+            } else {
+                ""
+            }
+        );
         let runtime = RuntimeSandbox::new(&compiled_wasm);
 
         if test.skip {
@@ -38,20 +46,20 @@ pub fn run_tests(
             continue;
         }
 
-        let result = runtime.call_test_function(&test.name);
-        match (result.is_ok(), test.expect_failure) {
-            (true, true) => {
+        let result = runtime.call_test_function(&test.name).unwrap();
+        match (result.execution_aborted, test.expect_failure) {
+            (false, true) => {
                 println!("{RED}FAILED{RESET}");
                 failures.push(test.to_owned());
-            }
-            (true, false) => {
-                println!("{GREEN}PASSED{RESET}");
             }
             (false, false) => {
+                println!("{GREEN}PASSED{RESET}");
+            }
+            (true, false) => {
                 println!("{RED}FAILED{RESET}");
                 failures.push(test.to_owned());
             }
-            (false, true) => {
+            (true, true) => {
                 println!("{GREEN}PASSED{RESET}");
             }
         }
@@ -68,8 +76,10 @@ pub fn run_tests(
 
     if !failures.is_empty() {
         println!("Failed tests:");
-        for failed_test in failures {
+        for failed_test in &failures {
             println!("  {module_id}::{}", failed_test.name);
         }
     }
+
+    failures.is_empty()
 }

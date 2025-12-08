@@ -36,7 +36,7 @@ impl Disassemble {
     pub fn execute(
         self,
         path: Option<&Path>,
-        mut config: BuildConfig,
+        config: BuildConfig,
         verbose: bool,
     ) -> anyhow::Result<()> {
         let rerooted_path = reroot_path(path)?;
@@ -48,7 +48,6 @@ impl Disassemble {
             bytecode_map,
         } = self;
         let install_dir = config.install_dir.clone();
-        config.test_mode = true;
 
         // Make sure the package is built
         let package = config.compile_package(&rerooted_path, &mut Vec::new())?;
