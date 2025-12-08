@@ -168,11 +168,19 @@ pub struct CrossContractExecutionData {
 }
 
 impl RuntimeSandbox {
-    pub fn new(compiled_module_path: &Path) -> Self {
+    pub fn from_path(compiled_module_path: &Path) -> Self {
         let engine = Engine::default();
-
         let module = WasmModule::from_file(&engine, compiled_module_path).unwrap();
+        Self::new(module, engine)
+    }
 
+    pub fn from_binary(module: &[u8]) -> Self {
+        let engine = Engine::default();
+        let module = WasmModule::from_binary(&engine, module).unwrap();
+        Self::new(module, engine)
+    }
+
+    fn new(module: WasmModule, engine: Engine) -> Self {
         let storage: Arc<Mutex<HashMap<[u8; 32], [u8; 32]>>> = Arc::new(Mutex::new(HashMap::new()));
 
         let current_tx_origin = Arc::new(Mutex::new(SIGNER_ADDRESS));
@@ -617,6 +625,29 @@ impl RuntimeSandbox {
             store,
             execution_aborted: error_pointer != [0, 0, 0, 0],
         })
+    }
+
+    /// Crates a temporary runtime sandbox instance and calls the entrypoint with the given data.
+    ///
+    /// Returns the result of the entrypoint call and the return data.
+    pub fn call_entrypoint(&self, data: Vec<u8>) -> Result<(i32, Vec<u8>)> {
+        let data_len = data.len() as i32;
+        let mut store = Store::new(
+            &self.engine,
+            ModuleData {
+                data,
+                return_data: vec![],
+            },
+        );
+        let instance = self.linker.instantiate(&mut store, &self.module)?;
+
+        let entrypoint = instance.get_typed_func::<i32, i32>(&mut store, "user_entrypoint")?;
+
+        let result = entrypoint
+            .call(&mut store, data_len)
+            .map_err(|e| anyhow::anyhow!("error calling entrypoint: {e:?}"))?;
+
+        Ok((result, store.data().return_data.clone()))
     }
 
     fn read_memory_from(

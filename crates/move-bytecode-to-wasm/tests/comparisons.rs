@@ -1,38 +1,16 @@
-use alloy_primitives::U256;
-use alloy_sol_types::{SolCall, SolType, sol};
-use anyhow::Result;
-use common::{runtime_sandbox::RuntimeSandbox, translate_test_package};
-use rstest::{fixture, rstest};
-
 mod common;
 
-fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u8>) -> Result<()> {
-    let (result, return_data) = runtime.call_entrypoint(call_data)?;
-    anyhow::ensure!(
-        result == 0,
-        "Function returned non-zero exit code: {result}"
-    );
-    anyhow::ensure!(
-        return_data == expected_result,
-        "return data mismatch:\nreturned:{return_data:?}\nexpected:{expected_result:?}"
-    );
-
-    Ok(())
-}
+use crate::common::run_test;
+use alloy_primitives::U256;
+use alloy_sol_types::{SolCall, SolType, sol};
+use common::translate_test_package;
+use move_test_runner::wasm_runner::RuntimeSandbox;
+use rstest::{fixture, rstest};
 
 mod comparisons_u8 {
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "comparisons_u8";
-        const SOURCE_PATH: &str = "tests/operations-comparisons/uint_8.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    declare_fixture!("comparisons_u8", "tests/operations-comparisons/uint_8.move");
 
     sol!(
         #[allow(missing_docs)]
@@ -72,16 +50,10 @@ mod comparisons_u8 {
 mod comparisons_u16 {
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "comparisons_u16";
-        const SOURCE_PATH: &str = "tests/operations-comparisons/uint_16.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    declare_fixture!(
+        "comparisons_u16",
+        "tests/operations-comparisons/uint_16.move"
+    );
 
     sol!(
         #[allow(missing_docs)]
@@ -121,16 +93,10 @@ mod comparisons_u16 {
 mod comparisons_u32 {
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "comparisons_u32";
-        const SOURCE_PATH: &str = "tests/operations-comparisons/uint_32.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    declare_fixture!(
+        "comparisons_u32",
+        "tests/operations-comparisons/uint_32.move"
+    );
 
     sol!(
         #[allow(missing_docs)]
@@ -170,16 +136,10 @@ mod comparisons_u32 {
 mod comparisons_u64 {
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "comparisons_u64";
-        const SOURCE_PATH: &str = "tests/operations-comparisons/uint_64.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    declare_fixture!(
+        "comparisons_u64",
+        "tests/operations-comparisons/uint_64.move"
+    );
 
     sol!(
         #[allow(missing_docs)]
@@ -219,16 +179,10 @@ mod comparisons_u64 {
 mod comparisons_u128 {
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "comparisons_u128";
-        const SOURCE_PATH: &str = "tests/operations-comparisons/uint_128.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    declare_fixture!(
+        "comparisons_u128",
+        "tests/operations-comparisons/uint_128.move"
+    );
 
     sol!(
         #[allow(missing_docs)]
@@ -268,16 +222,10 @@ mod comparisons_u128 {
 mod comparisons_u256 {
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "comparisons_u256";
-        const SOURCE_PATH: &str = "tests/operations-comparisons/uint_256.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    declare_fixture!(
+        "comparisons_u256",
+        "tests/operations-comparisons/uint_256.move"
+    );
 
     sol!(
         #[allow(missing_docs)]
