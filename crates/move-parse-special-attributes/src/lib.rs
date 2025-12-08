@@ -30,7 +30,7 @@ use function_modifiers::{Function, FunctionModifier, Visibility};
 use function_validation::validate_function;
 use move_compiler::{
     Compiler, PASS_PARSER,
-    parser::ast::{Ability_, Definition, ModuleMember},
+    parser::ast::{Ability_, Definition, ModuleMember, ModuleUse, Use},
     shared::{Identifier, NumericalAddress, files::MappedFiles},
 };
 use move_ir_types::location::Loc;
@@ -42,7 +42,7 @@ use struct_modifiers::StructModifier;
 use struct_validation::validate_struct;
 use types::Type;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Struct_ {
     pub name: String,
     pub fields: Vec<(String, Type)>,
@@ -66,6 +66,7 @@ pub struct SpecialAttributes {
 pub fn process_special_attributes(
     path: &Path,
     package_address: [u8; 32],
+    deps_structs: &HashMap<String, Vec<Struct_>>,
 ) -> Result<SpecialAttributes, (MappedFiles, Vec<SpecialAttributeError>)> {
     let (mapped_files, program_res) = Compiler::from_files(
         None,
@@ -255,6 +256,39 @@ pub fn process_special_attributes(
         }
     }
 
+    // Process use declarations.
+    // Members can either be Datatypes (structs or enums) or Functions.
+    // imported_members is a HashMap of module name to a vector of tuples,
+    // where the first element is the name of the member and the second element is the alias (if any).
+    let mut imported_members: HashMap<String, Vec<(String, Option<String>)>> = HashMap::new();
+    for source in ast.source_definitions.clone() {
+        if let Definition::Module(module) = source.def {
+            for module_member in module.members {
+                match module_member {
+                    ModuleMember::Use(ref use_decl) => {
+                        if let Use::ModuleUse(module_ident, ModuleUse::Members(members)) =
+                            &use_decl.use_
+                        {
+                            for member in members {
+                                let member_tuple = (
+                                    member.0.value.as_str().to_string(),
+                                    member.1.as_ref().map(|s| s.value.as_str().to_string()),
+                                );
+                                imported_members
+                                    .entry(module_ident.value.module.to_string())
+                                    .or_default()
+                                    .push(member_tuple);
+                            }
+                        }
+                    }
+                    _ => continue,
+                }
+            }
+        } else {
+            continue;
+        }
+    }
+
     for source in ast.source_definitions {
         if let Definition::Module(module) = source.def {
             for module_member in module.members {
@@ -274,6 +308,8 @@ pub fn process_special_attributes(
                             &result.events,
                             &result.abi_errors,
                             &result.structs,
+                            deps_structs,
+                            &imported_members,
                             package_address,
                         ) {
                             found_error = true;

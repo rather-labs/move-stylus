@@ -9,6 +9,7 @@ use crate::{
     types::Type,
 };
 
+use std::collections::HashMap;
 #[derive(thiserror::Error, Debug)]
 pub enum FunctionValidationError {
     #[error("Function with Event type parameter must be a native emit function")]
@@ -30,6 +31,9 @@ pub enum FunctionValidationError {
         "Invalid NamedId argument. NamedId is a reserved type and cannot be used as an argument."
     )]
     InvalidNamedIdArgument,
+
+    #[error("Struct not found in local or imported modules")]
+    StructNotFound,
 }
 
 impl From<&FunctionValidationError> for DiagnosticInfo {
@@ -45,7 +49,7 @@ impl From<&FunctionValidationError> for DiagnosticInfo {
 }
 
 /// Checks if a type is an Event by comparing its name with known events
-fn is_event_type(type_: &Type, events: &std::collections::HashMap<String, Event>) -> bool {
+fn is_event_type(type_: &Type, events: &HashMap<String, Event>) -> bool {
     match type_ {
         Type::UserDataType(name, _) => events.contains_key(name),
         _ => false,
@@ -53,10 +57,7 @@ fn is_event_type(type_: &Type, events: &std::collections::HashMap<String, Event>
 }
 
 /// Checks if a type is an AbiError by comparing its name with known abi_errors
-fn is_abi_error_type(
-    type_: &Type,
-    abi_errors: &std::collections::HashMap<String, AbiError>,
-) -> bool {
+fn is_abi_error_type(type_: &Type, abi_errors: &HashMap<String, AbiError>) -> bool {
     match type_ {
         Type::UserDataType(name, _) => abi_errors.contains_key(name),
         _ => false,
@@ -66,7 +67,7 @@ fn is_abi_error_type(
 /// Validates that a function with Event type parameter is a native emit function
 fn validate_emit_function(
     function: &Function,
-    events: &std::collections::HashMap<String, Event>,
+    events: &HashMap<String, Event>,
 ) -> Result<(), SpecialAttributeError> {
     let err = SpecialAttributeError {
         kind: SpecialAttributeErrorKind::FunctionValidation(
@@ -115,7 +116,7 @@ fn validate_emit_function(
 /// Validates that a function with an Error type parameter is a native revert function
 fn validate_revert_function(
     function: &Function,
-    abi_errors: &std::collections::HashMap<String, AbiError>,
+    abi_errors: &HashMap<String, AbiError>,
 ) -> Result<(), SpecialAttributeError> {
     let err = SpecialAttributeError {
         kind: SpecialAttributeErrorKind::FunctionValidation(
@@ -180,26 +181,27 @@ fn extract_struct_names(type_: &Type) -> Vec<String> {
 /// - Functions cannot take a UID as arguments, unless it is a function from the Stylus Framework package.
 pub fn validate_function(
     function: &Function,
-    events: &std::collections::HashMap<String, Event>,
-    abi_errors: &std::collections::HashMap<String, AbiError>,
+    events: &HashMap<String, Event>,
+    abi_errors: &HashMap<String, AbiError>,
     structs: &[Struct_],
+    deps_structs: &HashMap<String, Vec<Struct_>>,
+    imported_members: &HashMap<String, Vec<(String, Option<String>)>>,
     package_address: [u8; 32],
 ) -> Result<(), SpecialAttributeError> {
     let signature = crate::function_modifiers::Function::parse_signature(&function.signature);
 
     // If any of the function's parameters is a UID type and the package address does not match the Stylus Framework address, this function should be rejected as invalid.
-    // TODO: handle vectors
     if package_address != crate::reserved_modules::SF_ADDRESS {
         for param in &signature.parameters {
-            if let Type::UserDataType(name, _) = &param.type_ {
-                if name == "UID" {
+            for struct_name in extract_struct_names(&param.type_) {
+                if struct_name == "UID" {
                     return Err(SpecialAttributeError {
                         kind: SpecialAttributeErrorKind::FunctionValidation(
                             FunctionValidationError::InvalidUidArgument,
                         ),
                         line_of_code: function.loc,
                     });
-                } else if name == "NamedId" {
+                } else if struct_name == "NamedId" {
                     return Err(SpecialAttributeError {
                         kind: SpecialAttributeErrorKind::FunctionValidation(
                             FunctionValidationError::InvalidNamedIdArgument,
@@ -223,22 +225,61 @@ pub fn validate_function(
         }
 
         // Check if return type contains any structs with the key ability
-        // TODO: how do we validate external structs?
-        if extract_struct_names(&signature.return_type)
-            .iter()
-            .any(|struct_name| {
-                structs
-                    .iter()
-                    .find(|s| s.name == *struct_name)
-                    .is_some_and(|s| s.has_key)
-            })
-        {
-            return Err(SpecialAttributeError {
-                kind: SpecialAttributeErrorKind::FunctionValidation(
-                    FunctionValidationError::EntryFunctionReturnsKeyStruct,
-                ),
-                line_of_code: function.loc,
-            });
+        for struct_name in extract_struct_names(&signature.return_type) {
+            // First, check if the struct exists in local structs
+            let module_struct = structs.iter().find(|s| s.name == struct_name);
+
+            // If not found locally, check in imported members
+            let imported_struct = module_struct
+                .is_none()
+                .then(|| {
+                    imported_members.iter().find_map(|(module_name, members)| {
+                        members.iter().find_map(|(original_name, alias_opt)| {
+                            // First check the original name, if not found, check the alias
+                            if alias_opt
+                                .as_ref()
+                                .map(|a| a == &struct_name)
+                                .unwrap_or(false)
+                                || original_name == &struct_name
+                            {
+                                // If there's a match, search the struct in the dependency's structs hashmap.
+                                // This map supplements the imported members by providing extra information about structs, including whether they have the key ability.
+                                // TODO: ideally we should use module_id instead of module_name, but at this point the ast doesnt resolve named addresses, and from the compiler we get numerical addresses.
+                                deps_structs.get(module_name).and_then(|module_structs| {
+                                    module_structs.iter().find(|s| s.name == *original_name)
+                                })
+                            } else {
+                                None
+                            }
+                        })
+                    })
+                })
+                .flatten();
+
+            // If struct is not found in either local or imported, return error
+            match module_struct.or(imported_struct) {
+                None => {
+                    // TODO: here we might encounter the case where the datatype is actually an enum not an struct,
+                    // in this case we dont want to return an error, we want to ignore it.
+                    // return Err(SpecialAttributeError {
+                    //     kind: SpecialAttributeErrorKind::FunctionValidation(
+                    //         FunctionValidationError::StructNotFound,
+                    //     ),
+                    //     line_of_code: function.loc,
+                    // });
+                }
+                Some(found_struct) => {
+                    // If struct is found and has key ability, return error
+                    if found_struct.has_key {
+                        return Err(SpecialAttributeError {
+                            kind: SpecialAttributeErrorKind::FunctionValidation(
+                                FunctionValidationError::EntryFunctionReturnsKeyStruct,
+                            ),
+                            line_of_code: function.loc,
+                        });
+                    }
+                }
+            }
         }
     }
 

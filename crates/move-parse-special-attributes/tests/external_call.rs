@@ -14,9 +14,11 @@ pub fn test_external_call_general() {
     let file = std::path::Path::new("tests/external_call/sources/external_call.move");
     let absolute: PathBuf = fs::canonicalize(file).unwrap();
 
-    let Err((_, special_attributes_errors)) =
-        process_special_attributes(&absolute, package_address)
-    else {
+    let Err((_, special_attributes_errors)) = process_special_attributes(
+        &absolute,
+        package_address,
+        &std::collections::HashMap::new(),
+    ) else {
         panic!("Expected error due to invalid external_call functions");
     };
 

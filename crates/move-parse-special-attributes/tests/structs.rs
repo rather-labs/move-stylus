@@ -13,9 +13,11 @@ pub fn test_struct_validation() {
     let file = std::path::Path::new("tests/structs/sources/struct_validations.move");
     let absolute: PathBuf = fs::canonicalize(file).unwrap();
 
-    let Err((_, special_attributes_errors)) =
-        process_special_attributes(&absolute, package_address)
-    else {
+    let Err((_, special_attributes_errors)) = process_special_attributes(
+        &absolute,
+        package_address,
+        &std::collections::HashMap::new(),
+    ) else {
         panic!("Expected error due to invalid struct validation");
     };
 

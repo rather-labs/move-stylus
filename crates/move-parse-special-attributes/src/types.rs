@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use move_compiler::parser::ast::{NameAccessChain_, Type_};
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Type {
     Address,
     Bool,

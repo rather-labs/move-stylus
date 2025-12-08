@@ -146,14 +146,28 @@ pub fn translate_package(
             }
         }
 
-        let special_attributes =
-            match process_special_attributes(&root_compiled_module.source_path, package_address) {
-                Ok(sa) => sa,
-                Err((_mf, e)) => {
-                    errors.extend(e.into_iter().map(CodeError::SpecialAttributesError));
-                    continue;
-                }
-            };
+        // Build a HashMap of structs by module name from all dependencies.
+        // This allows proper validation of entry function return values, ensuring they do not return imported structs with the key ability.
+        let mut deps_structs: HashMap<String, Vec<move_parse_special_attributes::Struct_>> =
+            HashMap::new();
+        for md in modules_data.values() {
+            deps_structs.insert(
+                md.id.module_name.clone(),
+                md.special_attributes.structs.clone(),
+            );
+        }
+
+        let special_attributes = match process_special_attributes(
+            &root_compiled_module.source_path,
+            package_address,
+            &deps_structs,
+        ) {
+            Ok(sa) => sa,
+            Err((_mf, e)) => {
+                errors.extend(e.into_iter().map(CodeError::SpecialAttributesError));
+                continue;
+            }
+        };
 
         let root_module_data = ModuleData::build_module_data(
             root_module_id.clone(),
@@ -286,14 +300,30 @@ pub fn package_module_data(
             }
         }
 
-        let special_attributes =
-            match process_special_attributes(&root_compiled_module.source_path, package_address) {
-                Ok(sa) => sa,
-                Err((_mf, e)) => {
-                    errors.extend(e.into_iter().map(CodeError::SpecialAttributesError));
-                    continue;
-                }
-            };
+        // Create a mapping from each dependency's module name to the list of structs obtained via the special attributes crate.
+        // This allows proper validation of entry function return values, ensuring they do not return imported structs with the key ability.
+        let mut deps_structs: std::collections::HashMap<
+            String,
+            Vec<move_parse_special_attributes::Struct_>,
+        > = std::collections::HashMap::new();
+        for md in modules_data.values() {
+            deps_structs.insert(
+                md.id.module_name.clone(),
+                md.special_attributes.structs.clone(),
+            );
+        }
+
+        let special_attributes = match process_special_attributes(
+            &root_compiled_module.source_path,
+            package_address,
+            &deps_structs,
+        ) {
+            Ok(sa) => sa,
+            Err((_mf, e)) => {
+                errors.extend(e.into_iter().map(CodeError::SpecialAttributesError));
+                continue;
+            }
+        };
 
         let root_module_data = ModuleData::build_module_data(
             root_module_id.clone(),
@@ -388,14 +418,30 @@ pub fn process_dependency_tree<'move_package>(
             }
         }
 
-        let special_attributes =
-            match process_special_attributes(&dependency_module.source_path, dependency_address) {
-                Ok(sa) => sa,
-                Err((_mf, e)) => {
-                    errors.extend(e.into_iter().map(CodeError::SpecialAttributesError));
-                    continue;
-                }
-            };
+        // Create a mapping from each dependency's module name to the list of structs obtained via the special attributes crate.
+        // This allows proper validation of entry function return values, ensuring they do not return imported structs with the key ability.
+        let mut deps_structs: std::collections::HashMap<
+            String,
+            Vec<move_parse_special_attributes::Struct_>,
+        > = std::collections::HashMap::new();
+        for md in dependencies_data.values() {
+            deps_structs.insert(
+                md.id.module_name.clone(),
+                md.special_attributes.structs.clone(),
+            );
+        }
+
+        let special_attributes = match process_special_attributes(
+            &dependency_module.source_path,
+            dependency_address,
+            &deps_structs,
+        ) {
+            Ok(sa) => sa,
+            Err((_mf, e)) => {
+                errors.extend(e.into_iter().map(CodeError::SpecialAttributesError));
+                continue;
+            }
+        };
 
         let dependency_module_data = ModuleData::build_module_data(
             module_id.clone(),
