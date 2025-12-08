@@ -230,7 +230,7 @@ pub fn translate_test_package_with_framework_result(
 }
 
 pub fn run_test(
-    runtime: &RuntimeSandbox,
+    runtime: &crate::common::RuntimeSandbox,
     call_data: Vec<u8>,
     expected_result: Vec<u8>,
 ) -> Result<(), anyhow::Error> {
@@ -253,10 +253,12 @@ macro_rules! declare_fixture {
     ($module_name:literal, $source_path:literal) => {
         #[fixture]
         #[once]
-        pub fn runtime() -> RuntimeSandbox {
+        pub fn runtime() -> move_test_runner::wasm_runner::RuntimeSandbox {
             let mut translated_package = translate_test_package($source_path, $module_name);
 
-            RuntimeSandbox::from_binary(&translated_package.emit_wasm())
+            move_test_runner::wasm_runner::RuntimeSandbox::from_binary(
+                &translated_package.emit_wasm(),
+            )
         }
     };
 }
