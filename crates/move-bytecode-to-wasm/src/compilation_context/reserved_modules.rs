@@ -20,7 +20,9 @@ pub const SF_MODULE_NAME_TYPES: &str = "types";
 pub const SF_MODULE_NAME_TABLE: &str = "table";
 pub const SF_MODULE_NAME_ERROR: &str = "error";
 pub const SF_MODULE_NAME_FALLBACK: &str = "fallback";
+pub const SF_MODULE_TEST_SCENARIO: &str = "test_scenario";
 
 // Module names for standard lib
 pub const STDLIB_MODULE_NAME_ASCII: &str = "ascii";
 pub const STDLIB_MODULE_NAME_STRING: &str = "string";
+pub const STDLIB_MODULE_UNIT_TEST: &str = "unit_test";

@@ -13,6 +13,7 @@ mod tests;
 mod transaction;
 pub mod transfer;
 mod types;
+mod unit_test;
 
 use std::hash::Hasher;
 
@@ -26,11 +27,12 @@ use crate::{
         reserved_modules::{
             SF_MODULE_NAME_DYNAMIC_FIELD, SF_MODULE_NAME_ERROR, SF_MODULE_NAME_EVENT,
             SF_MODULE_NAME_FALLBACK, SF_MODULE_NAME_OBJECT, SF_MODULE_NAME_TRANSFER,
-            SF_MODULE_NAME_TX_CONTEXT, SF_MODULE_NAME_TYPES, STYLUS_FRAMEWORK_ADDRESS,
+            SF_MODULE_NAME_TX_CONTEXT, SF_MODULE_NAME_TYPES, SF_MODULE_TEST_SCENARIO,
+            STANDARD_LIB_ADDRESS, STDLIB_MODULE_UNIT_TEST, STYLUS_FRAMEWORK_ADDRESS,
         },
     },
     hasher::get_hasher,
-    hostio,
+    hostio::{self, host_functions::HOST_MODULE_NAME, host_test_functions::TEST_HOST_MODULE_NAME},
     runtime::RuntimeFunction,
     translation::intermediate_types::IntermediateType,
 };
@@ -87,15 +89,38 @@ impl NativeFunction {
     const NATIVE_REMOVE_CHILD_OBJECT: &str = "remove_child_object";
     const NATIVE_HAS_CHILD_OBJECT: &str = "has_child_object";
 
+    // Fallback functions
+    const NATIVE_CALLDATA_AS_VECTOR: &str = "calldata_as_vector";
+    const NATIVE_CALLDATA_LENGTH: &str = "calldata_length";
+
+    // Tests
+    const NATIVE_POISON: &str = "poison";
+    const NATIVE_NEW_TX_CONTEXT: &str = "new_tx_context";
+    const NATIVE_DROP_STORAGE_OBJECT: &str = "drop_storage_object";
+    const NATIVE_SET_SENDER_ADDRESS: &str = "set_sender_address";
+    const NATIVE_SET_SIGNER_ADDRESS: &str = "set_signer_address";
+    const NATIVE_SET_BLOCK_BASEFEE: &str = "set_block_basefee";
+    const NATIVE_SET_GAS_PRICE: &str = "set_gas_price";
+    const NATIVE_SET_BLOCK_NUMBER: &str = "set_block_number";
+    const NATIVE_SET_GAS_LIMIT: &str = "set_gas_limit";
+    const NATIVE_SET_BLOCK_TIMESTAMP: &str = "set_block_timestamp";
+    const NATIVE_SET_CHAIN_ID: &str = "set_chain_id";
+
     // Host functions
     const HOST_BLOCK_NUMBER: &str = "block_number";
     const HOST_BLOCK_GAS_LIMIT: &str = "block_gas_limit";
     const HOST_BLOCK_TIMESTAMP: &str = "block_timestamp";
     const HOST_CHAIN_ID: &str = "chainid";
 
-    // Fallback functions
-    const NATIVE_CALLDATA_AS_VECTOR: &str = "calldata_as_vector";
-    const NATIVE_CALLDATA_LENGTH: &str = "calldata_length";
+    // Host test functions
+    const HOST_SET_SENDER_ADDRESS: &str = "set_sender_address";
+    const HOST_SET_SIGNER_ADDRESS: &str = "set_signer_address";
+    const HOST_SET_BLOCK_BASEFEE: &str = "set_block_basefee";
+    const HOST_SET_GAS_PRICE: &str = "set_gas_price";
+    const HOST_SET_BLOCK_NUMBER: &str = "set_block_number";
+    const HOST_SET_GAS_LIMIT: &str = "set_gas_limit";
+    const HOST_SET_BLOCK_TIMESTAMP: &str = "set_block_timestamp";
+    const HOST_SET_CHAIN_ID: &str = "set_chain_id";
 
     /// Links the function into the module and returns its id. If the function is already present
     /// it just returns the id.
@@ -116,7 +141,8 @@ impl NativeFunction {
         // Some functions are implemented by host functions directly. For those, we just import and
         // use them without wrapping them.
         if let Some(host_fn_name) = Self::host_fn_name(name) {
-            let host_fn = if let Ok(function_id) = module.imports.get_func("vm_hooks", host_fn_name)
+            let host_fn = if let Ok(function_id) =
+                module.imports.get_func(HOST_MODULE_NAME, host_fn_name)
             {
                 function_id
             } else {
@@ -161,13 +187,113 @@ impl NativeFunction {
             return Ok(host_fn);
         }
 
+        if let Some(host_test_fn_name) = Self::host_test_fn_name(name) {
+            let host_fn = if let Ok(function_id) = module
+                .imports
+                .get_func(TEST_HOST_MODULE_NAME, host_test_fn_name)
+            {
+                function_id
+            } else {
+                match (host_test_fn_name, *address, module_name.as_str()) {
+                    (
+                        Self::HOST_SET_SENDER_ADDRESS,
+                        STYLUS_FRAMEWORK_ADDRESS,
+                        SF_MODULE_TEST_SCENARIO,
+                    ) => {
+                        let (function_id, _) =
+                            hostio::host_test_functions::set_sender_address(module);
+
+                        function_id
+                    }
+                    (
+                        Self::HOST_SET_SIGNER_ADDRESS,
+                        STYLUS_FRAMEWORK_ADDRESS,
+                        SF_MODULE_TEST_SCENARIO,
+                    ) => {
+                        let (function_id, _) =
+                            hostio::host_test_functions::set_signer_address(module);
+                        function_id
+                    }
+                    (
+                        Self::HOST_SET_BLOCK_BASEFEE,
+                        STYLUS_FRAMEWORK_ADDRESS,
+                        SF_MODULE_TEST_SCENARIO,
+                    ) => {
+                        let (function_id, _) =
+                            hostio::host_test_functions::set_block_basefee(module);
+                        function_id
+                    }
+                    (
+                        Self::HOST_SET_GAS_PRICE,
+                        STYLUS_FRAMEWORK_ADDRESS,
+                        SF_MODULE_TEST_SCENARIO,
+                    ) => {
+                        let (function_id, _) = hostio::host_test_functions::set_gas_price(module);
+                        function_id
+                    }
+                    (
+                        Self::HOST_SET_BLOCK_NUMBER,
+                        STYLUS_FRAMEWORK_ADDRESS,
+                        SF_MODULE_TEST_SCENARIO,
+                    ) => {
+                        let (function_id, _) =
+                            hostio::host_test_functions::set_block_number(module);
+                        function_id
+                    }
+
+                    (
+                        Self::HOST_SET_GAS_LIMIT,
+                        STYLUS_FRAMEWORK_ADDRESS,
+                        SF_MODULE_TEST_SCENARIO,
+                    ) => {
+                        let (function_id, _) = hostio::host_test_functions::set_gas_limit(module);
+                        function_id
+                    }
+                    (
+                        Self::HOST_SET_BLOCK_TIMESTAMP,
+                        STYLUS_FRAMEWORK_ADDRESS,
+                        SF_MODULE_TEST_SCENARIO,
+                    ) => {
+                        let (function_id, _) =
+                            hostio::host_test_functions::set_block_timestamp(module);
+                        function_id
+                    }
+                    (
+                        Self::HOST_SET_CHAIN_ID,
+                        STYLUS_FRAMEWORK_ADDRESS,
+                        SF_MODULE_TEST_SCENARIO,
+                    ) => {
+                        let (function_id, _) = hostio::host_test_functions::set_chain_id(module);
+                        function_id
+                    }
+                    _ => {
+                        return Err(NativeFunctionError::HostFunctionNotSupported(
+                            host_test_fn_name.to_string(),
+                        ));
+                    }
+                }
+            };
+
+            return Ok(host_fn);
+        }
+
         if let Some(function) = module.funcs.by_name(&native_fn_name) {
             Ok(function)
         } else {
             Ok(match (name, *address, module_name.as_str()) {
+                (Self::NATIVE_POISON, STANDARD_LIB_ADDRESS, STDLIB_MODULE_UNIT_TEST) => {
+                    unit_test::add_poison_fn(module, module_id)
+                }
+                (
+                    Self::NATIVE_NEW_TX_CONTEXT,
+                    STYLUS_FRAMEWORK_ADDRESS,
+                    SF_MODULE_TEST_SCENARIO,
+                ) => unit_test::add_new_tx_context_fn(module, module_id, compilation_ctx),
+
                 (Self::NATIVE_SENDER, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TX_CONTEXT) => {
                     transaction::add_native_sender_fn(module, compilation_ctx, module_id)
                 }
+
                 (Self::NATIVE_MSG_VALUE, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TX_CONTEXT) => {
                     transaction::add_native_msg_value_fn(module, compilation_ctx, module_id)
                 }
@@ -271,6 +397,14 @@ impl NativeFunction {
         } = module_id;
 
         let function_id = match (name, *address, module_name.as_str()) {
+            //
+            // Tests
+            //
+            (
+                Self::NATIVE_DROP_STORAGE_OBJECT,
+                STYLUS_FRAMEWORK_ADDRESS,
+                SF_MODULE_TEST_SCENARIO,
+            ) => unit_test::add_drop_storage_object_fn(module, module_id),
             //
             // Transfer
             //
@@ -454,6 +588,21 @@ impl NativeFunction {
             Self::NATIVE_BLOCK_GAS_LIMIT => Some(Self::HOST_BLOCK_GAS_LIMIT),
             Self::NATIVE_BLOCK_TIMESTAMP => Some(Self::HOST_BLOCK_TIMESTAMP),
             Self::NATIVE_CHAIN_ID => Some(Self::HOST_CHAIN_ID),
+            _ => None,
+        }
+    }
+
+    /// Maps the native function name to the host function name.
+    fn host_test_fn_name(name: &str) -> Option<&'static str> {
+        match name {
+            Self::NATIVE_SET_SENDER_ADDRESS => Some(Self::HOST_SET_SENDER_ADDRESS),
+            Self::NATIVE_SET_SIGNER_ADDRESS => Some(Self::HOST_SET_SIGNER_ADDRESS),
+            Self::NATIVE_SET_BLOCK_BASEFEE => Some(Self::HOST_SET_BLOCK_BASEFEE),
+            Self::NATIVE_SET_GAS_PRICE => Some(Self::HOST_SET_GAS_PRICE),
+            Self::NATIVE_SET_BLOCK_NUMBER => Some(Self::HOST_SET_BLOCK_NUMBER),
+            Self::NATIVE_SET_GAS_LIMIT => Some(Self::HOST_SET_GAS_LIMIT),
+            Self::NATIVE_SET_BLOCK_TIMESTAMP => Some(Self::HOST_SET_BLOCK_TIMESTAMP),
+            Self::NATIVE_SET_CHAIN_ID => Some(Self::HOST_SET_CHAIN_ID),
             _ => None,
         }
     }

@@ -32,6 +32,7 @@ move-bytecode-to-wasm = { path = "crates/move-bytecode-to-wasm" }
 move-packages-build = { path = "crates/move-packages-build" }
 move-evm-abi-generator = { path = "crates/move-evm-abi-generator" }
 move-parse-special-attributes = { path = "crates/move-parse-special-attributes" }
+move-test-runner = { path = "crates/move-test-runner" }
 move-ir-types = { git = "https://github.com/MystenLabs/sui" }
 
 

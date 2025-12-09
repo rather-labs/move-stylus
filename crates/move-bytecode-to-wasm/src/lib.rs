@@ -1,7 +1,7 @@
 pub(crate) mod abi_types;
 pub mod compilation_context;
 mod constructor;
-mod data;
+pub mod data;
 pub mod error;
 mod generics;
 mod hasher;
@@ -334,6 +334,7 @@ pub fn process_dependency_tree<'move_package>(
             module_name: dependency.name().to_string(),
             address: dependency.address().into_bytes().into(),
         };
+
         // If the HashMap contains the key, we already processed that dependency
         if !dependencies_data.contains_key(&module_id) {
             if verbose {
