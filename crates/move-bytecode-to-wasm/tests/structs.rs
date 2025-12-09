@@ -1,40 +1,16 @@
-use alloy_primitives::{U256, address};
-use alloy_sol_types::SolValue;
-use alloy_sol_types::abi::TokenSeq;
-use alloy_sol_types::{SolCall, SolType, sol};
-use anyhow::Result;
-use common::{runtime_sandbox::RuntimeSandbox, translate_test_package};
-use rstest::{fixture, rstest};
-
 mod common;
 
-fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u8>) -> Result<()> {
-    let (result, return_data) = runtime.call_entrypoint(call_data)?;
-    anyhow::ensure!(
-        result == 0,
-        "Function returned non-zero exit code: {result}"
-    );
-    anyhow::ensure!(
-        return_data == expected_result,
-        "return data mismatch:\nreturned:{return_data:?}\nexpected:{expected_result:?}"
-    );
-
-    Ok(())
-}
+use crate::common::run_test;
+use alloy_primitives::{U256, address};
+use alloy_sol_types::{SolCall, SolType, SolValue, abi::TokenSeq, sol};
+use move_test_runner::wasm_runner::RuntimeSandbox;
+use rstest::{fixture, rstest};
 
 mod struct_fields {
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "struct_fields";
-        const SOURCE_PATH: &str = "tests/structs/struct_fields.move";
+    declare_fixture!("struct_fields", "tests/structs/struct_fields.move");
 
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
     sol!(
         #[allow(missing_docs)]
         function echoBool(bool a) external returns (bool);
@@ -94,16 +70,7 @@ mod struct_fields {
 mod struct_mut_fields {
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "struct_mut_fields";
-        const SOURCE_PATH: &str = "tests/structs/struct_mut_fields.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    declare_fixture!("struct_mut_fields", "tests/structs/struct_mut_fields.move");
 
     sol!(
         #[allow(missing_docs)]
@@ -163,16 +130,10 @@ mod struct_mut_fields {
 mod struct_abi_packing_unpacking {
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "struct_abi_packing_unpacking";
-        const SOURCE_PATH: &str = "tests/structs/struct_packing_abi_unpacking.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    declare_fixture!(
+        "struct_abi_packing_unpacking",
+        "tests/structs/struct_packing_abi_unpacking.move"
+    );
 
     sol! {
         struct Baz {
@@ -609,16 +570,10 @@ mod struct_abi_packing_unpacking {
 mod struct_pack_unpack {
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "struct_pack_unpack";
-        const SOURCE_PATH: &str = "tests/structs/struct_pack_unpack.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    declare_fixture!(
+        "struct_pack_unpack",
+        "tests/structs/struct_pack_unpack.move"
+    );
 
     sol! {
         struct Baz {
@@ -944,16 +899,8 @@ mod struct_pack_unpack {
 mod struct_copy {
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "struct_copy";
-        const SOURCE_PATH: &str = "tests/structs/struct_copy.move";
+    declare_fixture!("struct_copy", "tests/structs/struct_copy.move");
 
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
     sol!(
         #[allow(missing_docs)]
         struct Foo {
@@ -1122,16 +1069,11 @@ mod struct_copy {
 mod generic_struct_fields {
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "generic_struct_fields";
-        const SOURCE_PATH: &str = "tests/structs/generic_struct_fields.move";
+    declare_fixture!(
+        "generic_struct_fields",
+        "tests/structs/generic_struct_fields.move"
+    );
 
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
     sol!(
         #[allow(missing_docs)]
         function echoBool(bool a) external returns (bool, bool);
@@ -1195,16 +1137,11 @@ mod generic_struct_fields {
 mod generic_struct_mut_fields {
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "generic_struct_mut_fields";
-        const SOURCE_PATH: &str = "tests/structs/generic_struct_mut_fields.move";
+    declare_fixture!(
+        "generic_struct_mut_fields",
+        "tests/structs/generic_struct_mut_fields.move"
+    );
 
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
     sol!(
         #[allow(missing_docs)]
         function echoBool(bool a, bool b) external returns (bool, bool);
@@ -1271,16 +1208,10 @@ mod generic_struct_mut_fields {
 mod generic_struct_abi_packing_unpacking {
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "generic_struct_abi_packing_unpacking";
-        const SOURCE_PATH: &str = "tests/structs/generic_struct_abi_packing_unpacking.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    declare_fixture!(
+        "generic_struct_abi_packing_unpacking",
+        "tests/structs/generic_struct_abi_packing_unpacking.move"
+    );
 
     sol! {
         struct Baz {
@@ -1740,16 +1671,10 @@ mod generic_struct_abi_packing_unpacking {
 mod generic_struct_pack_unpack {
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "generic_struct_pack_unpack";
-        const SOURCE_PATH: &str = "tests/structs/generic_struct_pack_unpack.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    declare_fixture!(
+        "generic_struct_pack_unpack",
+        "tests/structs/generic_struct_pack_unpack.move"
+    );
 
     sol! {
         struct Baz {
@@ -2086,16 +2011,10 @@ mod generic_struct_pack_unpack {
 mod generic_struct_misc {
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "generic_struct_misc";
-        const SOURCE_PATH: &str = "tests/structs/generic_struct_misc.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    declare_fixture!(
+        "generic_struct_misc",
+        "tests/structs/generic_struct_misc.move"
+    );
 
     sol! {
         struct Foo {
@@ -2249,16 +2168,7 @@ mod generic_struct_misc {
 mod struct_misc {
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "struct_misc";
-        const SOURCE_PATH: &str = "tests/structs/struct_misc.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    declare_fixture!("struct_misc", "tests/structs/struct_misc.move");
 
     sol! {
         // Empty structs in Move are filled with a dummy field. We need to explicitly define it so
@@ -2339,18 +2249,9 @@ mod struct_misc {
 }
 
 mod external_struct_copy {
-    use crate::common::translate_test_complete_package;
-
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        let mut translated_packages = translate_test_complete_package("tests/structs/external");
-
-        let translated_package = translated_packages.get_mut("external_struct_copy").unwrap();
-        RuntimeSandbox::new(translated_package)
-    }
+    declare_fixture_complete_package!("external_struct_copy", "tests/structs/external");
 
     sol!(
         #[allow(missing_docs)]
@@ -2508,20 +2409,9 @@ mod external_struct_copy {
 }
 
 mod external_generic_struct_copy {
-    use crate::common::translate_test_complete_package;
-
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        let mut translated_packages = translate_test_complete_package("tests/structs/external");
-
-        let translated_package = translated_packages
-            .get_mut("external_generic_struct_copy")
-            .unwrap();
-        RuntimeSandbox::new(translated_package)
-    }
+    declare_fixture_complete_package!("external_generic_struct_copy", "tests/structs/external");
 
     sol!(
         #[allow(missing_docs)]
