@@ -3,6 +3,7 @@ mod common;
 use crate::common::runtime_with_framework as runtime;
 use alloy_primitives::{FixedBytes, U256, address, hex, keccak256};
 use alloy_sol_types::sol;
+use move_test_runner::constants::MSG_SENDER_ADDRESS;
 use move_test_runner::constants::SIGNER_ADDRESS;
 use move_test_runner::wasm_runner::RuntimeSandbox;
 use rstest::rstest;
@@ -2188,8 +2189,6 @@ mod storage_transfer {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        runtime.print_storage();
-
         let object_id = FixedBytes::<32>::from_slice(
             &hex::decode("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb")
                 .unwrap(),
@@ -2201,12 +2200,12 @@ mod storage_transfer {
 
         // Check if the 2 slots corresponding to the Var struct under the SIGNER_ADDRESS key are empty after the freeze
         let var_uid_slot_bytes: [u8; 32] = [
-            93, 247, 165, 32, 139, 166, 195, 236, 47, 167, 72, 117, 174, 153, 62, 53, 76, 142, 238,
-            122, 118, 205, 148, 75, 134, 218, 76, 250, 55, 149, 13, 24,
+            68, 3, 231, 226, 205, 228, 8, 70, 51, 84, 182, 15, 113, 190, 199, 118, 176, 64, 3, 212,
+            161, 124, 104, 159, 179, 185, 36, 30, 225, 140, 146, 77,
         ];
         let bar_uid_slot_bytes: [u8; 32] = [
-            93, 247, 165, 32, 139, 166, 195, 236, 47, 167, 72, 117, 174, 153, 62, 53, 76, 142, 238,
-            122, 118, 205, 148, 75, 134, 218, 76, 250, 55, 149, 13, 25,
+            68, 3, 231, 226, 205, 228, 8, 70, 51, 84, 182, 15, 113, 190, 199, 118, 176, 64, 3, 212,
+            161, 124, 104, 159, 179, 185, 36, 30, 225, 140, 146, 78,
         ];
 
         // Check if the slots exist and are zero
@@ -3927,7 +3926,6 @@ mod trusted_swap {
 
 mod wrapped_objects {
     use alloy_sol_types::{SolCall, SolValue, sol};
-    use move_test_runner::constants::MSG_SENDER_ADDRESS;
 
     use super::*;
 
@@ -4034,6 +4032,8 @@ mod wrapped_objects {
         #[with("wrapped_objects", "tests/storage/wrapped_objects.move")] runtime: RuntimeSandbox,
         #[case] tto: bool,
     ) {
+        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
+
         let (alpha_id, beta_id) = if tto {
             // Create alpha first for TTO method
             let call_data = createAlphaCall::new((102,)).abi_encode();
@@ -4100,6 +4100,8 @@ mod wrapped_objects {
         #[with("wrapped_objects", "tests/storage/wrapped_objects.move")] runtime: RuntimeSandbox,
         #[case] tto: bool,
     ) {
+        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
+
         let (alpha_id, beta_id, gamma_id) = if tto {
             // Create beta first for TTO method
             let call_data = createBetaCall::new(()).abi_encode();
@@ -4172,6 +4174,8 @@ mod wrapped_objects {
         #[with("wrapped_objects", "tests/storage/wrapped_objects.move")] runtime: RuntimeSandbox,
         #[case] tto: bool,
     ) {
+        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
+
         let (alpha_1_id, alpha_2_id, delta_id) = if tto {
             // Create alphas first for TTO method
             let call_data = createAlphaCall::new((101,)).abi_encode();
@@ -4251,6 +4255,8 @@ mod wrapped_objects {
         #[with("wrapped_objects", "tests/storage/wrapped_objects.move")] runtime: RuntimeSandbox,
         #[case] tto: bool,
     ) {
+        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
+
         let (alpha_1_id, alpha_2_id, alpha_3_id, alpha_4_id, delta_1_id, delta_2_id, epsilon_id) =
             if tto {
                 let call_data = createAlphaCall::new((101,)).abi_encode();
@@ -4391,6 +4397,8 @@ mod wrapped_objects {
     fn test_transferring_beta(
         #[with("wrapped_objects", "tests/storage/wrapped_objects.move")] runtime: RuntimeSandbox,
     ) {
+        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
+
         let call_data = createBetaCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -4399,6 +4407,8 @@ mod wrapped_objects {
         let beta_id = runtime.obtain_uid();
 
         let beta_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &beta_id.0);
+
+        runtime.print_storage();
 
         // Transfer beta to the recipient
         let call_data = transferBetaCall::new((beta_id, RECIPIENT_ADDRESS.into())).abi_encode();
@@ -4441,6 +4451,8 @@ mod wrapped_objects {
     fn test_transferring_gamma(
         #[with("wrapped_objects", "tests/storage/wrapped_objects.move")] runtime: RuntimeSandbox,
     ) {
+        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
+
         let call_data = createGammaCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -4497,6 +4509,8 @@ mod wrapped_objects {
     fn test_transferring_delta(
         #[with("wrapped_objects", "tests/storage/wrapped_objects.move")] runtime: RuntimeSandbox,
     ) {
+        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
+
         let call_data = createDeltaCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -4554,6 +4568,8 @@ mod wrapped_objects {
     fn test_rebuilding_gamma(
         #[with("wrapped_objects", "tests/storage/wrapped_objects.move")] runtime: RuntimeSandbox,
     ) {
+        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
+
         let call_data = createGammaCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -4614,6 +4630,8 @@ mod wrapped_objects {
     fn test_destruct_delta_to_beta(
         #[with("wrapped_objects", "tests/storage/wrapped_objects.move")] runtime: RuntimeSandbox,
     ) {
+        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
+
         let call_data = createDeltaCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -4676,6 +4694,8 @@ mod wrapped_objects {
     fn test_pushing_alpha_into_delta(
         #[with("wrapped_objects", "tests/storage/wrapped_objects.move")] runtime: RuntimeSandbox,
     ) {
+        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
+
         // Create empty delta
         let call_data = createEmptyDeltaCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -4882,6 +4902,8 @@ mod wrapped_objects {
     fn test_destruct_epsilon(
         #[with("wrapped_objects", "tests/storage/wrapped_objects.move")] runtime: RuntimeSandbox,
     ) {
+        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
+
         let call_data = createEpsilonCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -4993,6 +5015,8 @@ mod wrapped_objects {
     fn test_pushing_and_popping_alpha_from_zeta(
         #[with("wrapped_objects", "tests/storage/wrapped_objects.move")] runtime: RuntimeSandbox,
     ) {
+        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
+
         let call_data = createEmptyZetaCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -5128,6 +5152,8 @@ mod wrapped_objects {
     fn test_popping_from_empty_zeta(
         #[with("wrapped_objects", "tests/storage/wrapped_objects.move")] runtime: RuntimeSandbox,
     ) {
+        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
+
         let call_data = createEmptyZetaCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -5226,6 +5252,8 @@ mod wrapped_objects {
     fn test_pushing_and_popping_from_bora(
         #[with("wrapped_objects", "tests/storage/wrapped_objects.move")] runtime: RuntimeSandbox,
     ) {
+        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
+
         let call_data = createEtaCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
