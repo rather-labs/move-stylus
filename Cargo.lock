@@ -3346,6 +3346,7 @@ dependencies = [
  "move-package",
  "move-packages-build",
  "move-stdlib-natives",
+ "move-test-runner",
  "move-unit-test",
  "move-vm-runtime",
  "move-vm-test-utils",
@@ -3716,6 +3717,19 @@ dependencies = [
  "once_cell",
  "phf",
  "serde",
+]
+
+[[package]]
+name = "move-test-runner"
+version = "0.1.0"
+dependencies = [
+ "alloy-primitives",
+ "anyhow",
+ "move-bytecode-to-wasm",
+ "move-packages-build",
+ "rstest",
+ "wasmprinter 0.228.0",
+ "wasmtime",
 ]
 
 [[package]]

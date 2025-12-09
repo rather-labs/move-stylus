@@ -51,6 +51,13 @@ pub struct Struct_ {
     pub has_key: bool,
 }
 
+#[derive(Debug)]
+pub struct TestFunction {
+    pub name: String,
+    pub skip: bool,
+    pub expect_failure: bool,
+}
+
 #[derive(Default, Debug)]
 pub struct SpecialAttributes {
     pub module_name: String,
@@ -61,6 +68,7 @@ pub struct SpecialAttributes {
     pub external_struct: HashMap<String, ExternalStruct>,
     pub external_call_structs: HashSet<String>,
     pub abi_errors: HashMap<String, AbiError>,
+    pub test_functions: Vec<TestFunction>,
 }
 
 /// ModuleId represents a unique identifier for a Move module.
@@ -383,6 +391,25 @@ pub fn process_special_attributes(
 
                             let first_modifier = modifiers.pop_front();
                             match first_modifier {
+                                // TODO: Process this only if test mode is enabled
+                                Some(FunctionModifier::Test) => {
+                                    let modifiers =
+                                        modifiers.into_iter().collect::<Vec<FunctionModifier>>();
+
+                                    result.test_functions.push(TestFunction {
+                                        name: f.name.to_owned().to_string(),
+                                        skip: modifiers.contains(&FunctionModifier::Skip),
+                                        expect_failure: modifiers
+                                            .contains(&FunctionModifier::ExpectedFailure),
+                                    });
+
+                                    result.functions.push(Function {
+                                        name: f.name.to_owned().to_string(),
+                                        modifiers: vec![],
+                                        signature,
+                                        visibility,
+                                    });
+                                }
                                 Some(FunctionModifier::ExternalCall) => {
                                     let modifiers =
                                         modifiers.into_iter().collect::<Vec<FunctionModifier>>();

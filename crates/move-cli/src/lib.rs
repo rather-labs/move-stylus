@@ -6,7 +6,9 @@ pub mod base;
 pub(crate) mod build_config;
 pub(crate) mod error;
 
-use base::{abi_generate::AbiGenerate, build::Build, deploy::Deploy, info::Info, new::New};
+use base::{
+    abi_generate::AbiGenerate, build::Build, deploy::Deploy, info::Info, new::New, test::Test,
+};
 
 #[cfg(debug_assertions)]
 use base::disassemble::Disassemble;
@@ -59,6 +61,7 @@ pub enum Command {
     Deploy(Deploy),
     Info(Info),
     New(New),
+    Test(Test),
 }
 
 pub fn run_cli(move_args: Move, cmd: Command) -> Result<()> {
@@ -85,6 +88,11 @@ pub fn run_cli(move_args: Move, cmd: Command) -> Result<()> {
         Command::Info(c) => c.execute(move_args.package_path.as_deref(), build_config),
         Command::New(c) => c.execute_with_defaults(move_args.package_path.as_deref()),
         Command::Deploy(c) => c.execute(move_args.package_path.as_deref()),
+        Command::Test(c) => c.execute(
+            move_args.package_path.as_deref(),
+            build_config,
+            move_args.verbose,
+        ),
     }
 }
 

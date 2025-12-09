@@ -30,6 +30,7 @@ move-abstract-interpreter.workspace = true
 move-bytecode-to-wasm.workspace = true
 move-packages-build.workspace = true
 move-evm-abi-generator.workspace = true
+move-test-runner.workspace = true
 wasmprinter.workspace = true
 
 [[bin]]

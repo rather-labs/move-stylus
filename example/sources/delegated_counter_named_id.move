@@ -26,7 +26,7 @@ entry fun create(contract_logic: address, ctx: &TxContext) {
 }
 
 /// Increment a counter by 1.
-entry fun increment(counter: &Counter) {
+entry fun increment(counter: &mut Counter) {
     let delegated_counter = dci::new(
         contract_calls::new(counter.contract_address)
             .delegate()

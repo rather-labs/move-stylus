@@ -7,6 +7,7 @@ pub mod deploy;
 pub mod disassemble;
 pub mod info;
 pub mod new;
+pub mod test;
 
 use move_bytecode_to_wasm::{
     error::{CompilationError, ICEError, ICEErrorKind},
@@ -35,17 +36,7 @@ pub fn translate_package_cli(
     emit_wat: bool,
     verbose: bool,
 ) -> Result<(), Box<CompilationError>> {
-    let build_directory = if let Some(install_dir) = install_dir {
-        install_dir.join(format!(
-            "build/{}/wasm",
-            package.compiled_package_info.package_name
-        ))
-    } else {
-        rerooted_path.join(format!(
-            "build/{}/wasm",
-            package.compiled_package_info.package_name
-        ))
-    };
+    let build_directory = get_build_directory(rerooted_path, &package, &install_dir);
 
     // Create the build directory if it doesn't exist
     std::fs::create_dir_all(&build_directory)
@@ -71,4 +62,22 @@ pub fn translate_package_cli(
     }
 
     Ok(())
+}
+
+pub fn get_build_directory(
+    rerooted_path: &Path,
+    package: &CompiledPackage,
+    install_dir: &Option<PathBuf>,
+) -> PathBuf {
+    if let Some(install_dir) = install_dir {
+        install_dir.join(format!(
+            "build/{}/wasm",
+            package.compiled_package_info.package_name
+        ))
+    } else {
+        rerooted_path.join(format!(
+            "build/{}/wasm",
+            package.compiled_package_info.package_name
+        ))
+    }
 }

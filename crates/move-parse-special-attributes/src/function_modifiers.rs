@@ -46,6 +46,9 @@ pub enum FunctionModifier {
     Payable,
     ExternalCall,
     Abi,
+    Test,
+    Skip,
+    ExpectedFailure,
 }
 
 impl Function {
@@ -76,6 +79,9 @@ impl FunctionModifier {
             Self::Payable => "payable",
             Self::ExternalCall => "external_call",
             Self::Abi => "abi",
+            Self::Test => "test",
+            Self::Skip => "skip",
+            Self::ExpectedFailure => "expected_failure",
         }
     }
 
@@ -92,6 +98,9 @@ impl FunctionModifier {
                 "payable" => vec![Self::Payable],
                 "external_call" => vec![Self::ExternalCall],
                 "abi" => vec![Self::Abi],
+                "test" => vec![Self::Test],
+                "skip" => vec![Self::Skip],
+                "expected_failure" => vec![Self::ExpectedFailure],
                 _ => vec![],
             },
             _ => vec![],

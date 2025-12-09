@@ -741,9 +741,25 @@ impl ModuleData {
                 type_instantiations: None,
             };
 
-            // If we find this function, means the module is compiled in test mode. We should not
-            // process this function because it is injected by move and not used in WASM context
+            // If we find this function, means the module is compiled in test mode. This function
+            // is never called, it is just there to pollute the module so it can't be linked in
+            // production mode
             if function_name == "unit_test_poison" {
+                let function_def =
+                    move_module.function_def_at(FunctionDefinitionIndex::new(index as u16));
+
+                function_information.push(MappedFunction::new(
+                    function_id.clone(),
+                    move_function_arguments,
+                    move_function_return,
+                    &[],
+                    function_def,
+                    datatype_handles_map,
+                )?);
+
+                function_definitions.insert(function_id.clone(), function_def);
+
+                function_calls.push(function_id);
                 continue;
             }
 
