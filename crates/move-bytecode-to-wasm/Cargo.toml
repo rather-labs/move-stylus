@@ -13,7 +13,7 @@ move-compiler.workspace = true
 
 alloy-primitives = "1.0.0"
 alloy-sol-types = "1.0.0"
-walrus.workspace = true
+walrus = "0.23"
 wasmparser = "0.228"
 thiserror = "2"
 relooper = "0.1.0"

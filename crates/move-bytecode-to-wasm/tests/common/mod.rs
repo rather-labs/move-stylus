@@ -229,13 +229,13 @@ pub fn translate_test_package_with_framework_result(
     translate_single_module(package, module_name)
 }
 
+#[allow(dead_code)]
 pub fn run_test(
     runtime: &crate::common::RuntimeSandbox,
     call_data: Vec<u8>,
     expected_result: Vec<u8>,
 ) -> Result<(), anyhow::Error> {
     let (result, return_data) = runtime.call_entrypoint(call_data)?;
-    println!("{result:?} {return_data:?}");
     anyhow::ensure!(
         result == 0,
         "Function returned non-zero exit code: {result}"

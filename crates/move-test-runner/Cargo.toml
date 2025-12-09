@@ -8,7 +8,6 @@ move-bytecode-to-wasm.workspace = true
 anyhow.workspace = true
 move-packages-build.workspace = true
 wasmprinter.workspace = true
-walrus.workspace = true
 rstest = "0.25.0"
 wasmtime = "31.0.0"
 alloy-primitives = "1.0.0"

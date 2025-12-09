@@ -671,7 +671,7 @@ impl RuntimeSandbox {
 
         let entrypoint = instance.get_typed_func::<i32, i32>(&mut store, "user_entrypoint")?;
 
-        let result = entrypoint
+        entrypoint
             .call(&mut store, data_len)
             .map_err(|e| anyhow::anyhow!("error calling entrypoint: {e:?}"))?;
 
