@@ -40,6 +40,8 @@ pub struct RuntimeSandbox {
     module: WasmModule,
     pub log_events: LogEventReceiver,
     pub cross_contract_calls: CrossCrontractExecutionReceiver,
+    current_tx_origin: Arc<Mutex<[u8; 20]>>,
+    current_msg_sender: Arc<Mutex<[u8; 20]>>,
     storage: Arc<Mutex<HashMap<[u8; 32], [u8; 32]>>>,
     cross_contract_call_return_data: Arc<Mutex<Vec<u8>>>,
     cross_contract_call_succeed: Arc<AtomicBool>,
@@ -586,6 +588,8 @@ impl RuntimeSandbox {
             module,
             log_events: Arc::new(Mutex::new(log_receiver)),
             cross_contract_calls: Arc::new(Mutex::new(cce_receiver)),
+            current_tx_origin,
+            current_msg_sender,
             storage,
             cross_contract_call_return_data,
             cross_contract_call_succeed,
@@ -716,5 +720,36 @@ impl RuntimeSandbox {
 
     pub fn set_cross_contract_return_data(&self, data: Vec<u8>) {
         *self.cross_contract_call_return_data.lock().unwrap() = data;
+    }
+
+    pub fn set_msg_sender(&self, new_address: [u8; 20]) {
+        *self.current_msg_sender.lock().unwrap() = new_address;
+    }
+
+    pub fn set_tx_origin(&self, new_address: [u8; 20]) {
+        *self.current_tx_origin.lock().unwrap() = new_address;
+    }
+
+    pub fn get_tx_origin(&self) -> [u8; 20] {
+        *self.current_tx_origin.lock().unwrap()
+    }
+
+    pub fn get_storage_at_slot(&self, slot: [u8; 32]) -> [u8; 32] {
+        let storage = self.storage.lock().unwrap();
+        *storage.get(&slot).unwrap()
+    }
+
+    pub fn get_storage(&self) -> HashMap<[u8; 32], [u8; 32]> {
+        self.storage.lock().unwrap().clone()
+    }
+
+    pub fn print_storage(&self) {
+        let storage = self.storage.lock().unwrap();
+        let mut entries: Vec<_> = storage.iter().collect();
+        entries.sort_by_key(|(key, _)| *key);
+
+        for (key, value) in entries {
+            println!("key: {key:?} \n\t value: {value:?}");
+        }
     }
 }
