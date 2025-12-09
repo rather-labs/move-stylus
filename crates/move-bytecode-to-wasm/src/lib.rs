@@ -69,6 +69,15 @@ pub fn translate_package(
     module_name: Option<String>,
     verbose: bool,
 ) -> Result<HashMap<String, Module>, CompilationError> {
+    // HashMap of package name to address
+    // This includes all the dependencies of the root package
+    let address_alias_instantiation: HashMap<String, [u8; 32]> = package
+        .compiled_package_info
+        .address_alias_instantiation
+        .iter()
+        .map(|(key, value)| (key.as_str().to_string(), value.into_bytes()))
+        .collect();
+
     let root_compiled_units: Vec<&CompiledUnitWithSource> = if let Some(module_name) = module_name {
         package
             .root_compiled_units
@@ -133,6 +142,7 @@ pub fn translate_package(
             &root_compiled_units,
             &root_compiled_module_unit.immediate_dependencies(),
             &mut function_definitions,
+            &address_alias_instantiation,
             verbose,
         ) {
             match dependencies_errors {
@@ -146,13 +156,18 @@ pub fn translate_package(
             }
         }
 
-        // Build a HashMap of structs by module name from all dependencies.
+        // Build a HashMap of structs by module id from all dependencies.
         // This allows proper validation of entry function return values, ensuring they do not return imported structs with the key ability.
-        let mut deps_structs: HashMap<String, Vec<move_parse_special_attributes::Struct_>> =
-            HashMap::new();
+        let mut deps_structs: HashMap<
+            move_parse_special_attributes::ModuleId,
+            Vec<move_parse_special_attributes::Struct_>,
+        > = HashMap::new();
         for md in modules_data.values() {
             deps_structs.insert(
-                md.id.module_name.clone(),
+                move_parse_special_attributes::ModuleId {
+                    address: <[u8; 32]>::try_from(md.id.address.as_slice()).unwrap(),
+                    module_name: md.id.module_name.clone(),
+                },
                 md.special_attributes.structs.clone(),
             );
         }
@@ -161,6 +176,7 @@ pub fn translate_package(
             &root_compiled_module.source_path,
             package_address,
             &deps_structs,
+            &address_alias_instantiation,
         ) {
             Ok(sa) => sa,
             Err((_mf, e)) => {
@@ -253,6 +269,14 @@ pub fn package_module_data(
     module_name: Option<String>,
     verbose: bool,
 ) -> Result<PackageModuleData, CompilationError> {
+    // HashMap of package name to address
+    let address_alias_instantiation: HashMap<String, [u8; 32]> = package
+        .compiled_package_info
+        .address_alias_instantiation
+        .iter()
+        .map(|(key, value)| (key.as_str().to_string(), value.into_bytes()))
+        .collect();
+
     let mut modules_data = HashMap::new();
     let mut modules_paths = HashMap::new();
     let mut errors = Vec::new();
@@ -287,6 +311,7 @@ pub fn package_module_data(
             &root_compiled_units,
             &root_compiled_module_unit.immediate_dependencies(),
             &mut function_definitions,
+            &address_alias_instantiation,
             verbose,
         ) {
             match dependencies_errors {
@@ -300,15 +325,18 @@ pub fn package_module_data(
             }
         }
 
-        // Create a mapping from each dependency's module name to the list of structs obtained via the special attributes crate.
+        // Create a mapping from each dependency's module id to the list of structs obtained via the special attributes crate.
         // This allows proper validation of entry function return values, ensuring they do not return imported structs with the key ability.
         let mut deps_structs: std::collections::HashMap<
-            String,
+            move_parse_special_attributes::ModuleId,
             Vec<move_parse_special_attributes::Struct_>,
         > = std::collections::HashMap::new();
         for md in modules_data.values() {
             deps_structs.insert(
-                md.id.module_name.clone(),
+                move_parse_special_attributes::ModuleId {
+                    address: <[u8; 32]>::try_from(md.id.address.as_slice()).unwrap(),
+                    module_name: md.id.module_name.clone(),
+                },
                 md.special_attributes.structs.clone(),
             );
         }
@@ -317,6 +345,7 @@ pub fn package_module_data(
             &root_compiled_module.source_path,
             package_address,
             &deps_structs,
+            &address_alias_instantiation,
         ) {
             Ok(sa) => sa,
             Err((_mf, e)) => {
@@ -360,6 +389,7 @@ pub fn process_dependency_tree<'move_package>(
     root_compiled_units: &'move_package [&CompiledUnitWithSource],
     dependencies: &[move_core_types::language_storage::ModuleId],
     function_definitions: &mut GlobalFunctionTable<'move_package>,
+    address_alias_instantiation: &HashMap<String, [u8; 32]>,
     verbose: bool,
 ) -> Result<(), DependencyProcessingError> {
     let mut errors = Vec::new();
@@ -400,6 +430,7 @@ pub fn process_dependency_tree<'move_package>(
                 root_compiled_units,
                 immediate_dependencies,
                 function_definitions,
+                address_alias_instantiation,
                 verbose,
             )
         } else {
@@ -418,15 +449,18 @@ pub fn process_dependency_tree<'move_package>(
             }
         }
 
-        // Create a mapping from each dependency's module name to the list of structs obtained via the special attributes crate.
+        // Create a mapping from each dependency's module id to the list of structs obtained via the special attributes crate.
         // This allows proper validation of entry function return values, ensuring they do not return imported structs with the key ability.
         let mut deps_structs: std::collections::HashMap<
-            String,
+            move_parse_special_attributes::ModuleId,
             Vec<move_parse_special_attributes::Struct_>,
         > = std::collections::HashMap::new();
         for md in dependencies_data.values() {
             deps_structs.insert(
-                md.id.module_name.clone(),
+                move_parse_special_attributes::ModuleId {
+                    address: <[u8; 32]>::try_from(md.id.address.as_slice()).unwrap(),
+                    module_name: md.id.module_name.clone(),
+                },
                 md.special_attributes.structs.clone(),
             );
         }
@@ -435,6 +469,7 @@ pub fn process_dependency_tree<'move_package>(
             &dependency_module.source_path,
             dependency_address,
             &deps_structs,
+            address_alias_instantiation,
         ) {
             Ok(sa) => sa,
             Err((_mf, e)) => {

@@ -1,7 +1,7 @@
 use std::{fs, path::PathBuf};
 
 use move_parse_special_attributes::{
-    FunctionValidationError, error::SpecialAttributeErrorKind, process_special_attributes,
+    FunctionValidationError, ModuleId, error::SpecialAttributeErrorKind, process_special_attributes,
 };
 
 #[test]
@@ -10,6 +10,30 @@ pub fn test_function_validation() {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0,
     ];
+
+    let address_alias_instantiation = std::collections::HashMap::from([
+        (
+            "std".to_string(),
+            [
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ],
+        ),
+        (
+            "stylus".to_string(),
+            [
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 2,
+            ],
+        ),
+        (
+            "test".to_string(),
+            [
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0,
+            ],
+        ),
+    ]);
 
     // Build HashMap with ModuleId -> Vec<Struct_>
     let mut deps_structs = std::collections::HashMap::new();
@@ -22,15 +46,19 @@ pub fn test_function_validation() {
         &external_absolute,
         package_address,
         &std::collections::HashMap::new(),
+        &address_alias_instantiation,
     )
     .expect("misc_external.move should process successfully");
 
     deps_structs.insert(
-        external_special_attributes.module_name.clone(),
+        ModuleId {
+            address: package_address,
+            module_name: external_special_attributes.module_name.clone(),
+        },
         external_special_attributes.structs,
     );
 
-    // First, process misc_external.move to get its structs
+    // Then, process misc_external_2.move to get its structs
     let external_file = std::path::Path::new("tests/functions/sources/misc_external_2.move");
     let external_absolute: PathBuf = fs::canonicalize(external_file).unwrap();
 
@@ -38,11 +66,15 @@ pub fn test_function_validation() {
         &external_absolute,
         package_address,
         &std::collections::HashMap::new(),
+        &address_alias_instantiation,
     )
     .expect("misc_external_2.move should process successfully");
 
     deps_structs.insert(
-        external_special_attributes.module_name.clone(),
+        ModuleId {
+            address: package_address,
+            module_name: external_special_attributes.module_name.clone(),
+        },
         external_special_attributes.structs,
     );
 
@@ -50,9 +82,12 @@ pub fn test_function_validation() {
     let file = std::path::Path::new("tests/functions/sources/misc.move");
     let absolute: PathBuf = fs::canonicalize(file).unwrap();
 
-    let Err((_, special_attributes_errors)) =
-        process_special_attributes(&absolute, package_address, &deps_structs)
-    else {
+    let Err((_, special_attributes_errors)) = process_special_attributes(
+        &absolute,
+        package_address,
+        &deps_structs,
+        &address_alias_instantiation,
+    ) else {
         panic!("Expected error due to invalid function validation");
     };
 

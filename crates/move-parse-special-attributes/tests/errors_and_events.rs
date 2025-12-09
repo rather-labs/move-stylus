@@ -11,6 +11,29 @@ pub fn test_errors_and_events() {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0,
     ];
+    let address_alias_instantiation = std::collections::HashMap::from([
+        (
+            "std".to_string(),
+            [
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ],
+        ),
+        (
+            "stylus".to_string(),
+            [
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 2,
+            ],
+        ),
+        (
+            "test".to_string(),
+            [
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0,
+            ],
+        ),
+    ]);
     let file = std::path::Path::new("tests/errors_and_events/sources/misc.move");
     let absolute: PathBuf = fs::canonicalize(file).unwrap();
 
@@ -18,6 +41,7 @@ pub fn test_errors_and_events() {
         &absolute,
         package_address,
         &std::collections::HashMap::new(),
+        &address_alias_instantiation,
     ) else {
         panic!("Expected error due to invalid errors and events usage");
     };

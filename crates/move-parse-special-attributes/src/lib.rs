@@ -63,10 +63,19 @@ pub struct SpecialAttributes {
     pub abi_errors: HashMap<String, AbiError>,
 }
 
+/// ModuleId represents a unique identifier for a Move module.
+/// This is a local definition to avoid circular dependencies with move-bytecode-to-wasm.
+#[derive(PartialEq, Eq, Hash, Debug, Clone)]
+pub struct ModuleId {
+    pub address: [u8; 32],
+    pub module_name: String,
+}
+
 pub fn process_special_attributes(
     path: &Path,
     package_address: [u8; 32],
-    deps_structs: &HashMap<String, Vec<Struct_>>,
+    deps_structs: &HashMap<ModuleId, Vec<Struct_>>,
+    address_alias_instantiation: &HashMap<String, [u8; 32]>,
 ) -> Result<SpecialAttributes, (MappedFiles, Vec<SpecialAttributeError>)> {
     let (mapped_files, program_res) = Compiler::from_files(
         None,
@@ -258,9 +267,9 @@ pub fn process_special_attributes(
 
     // Process use declarations.
     // Members can either be Datatypes (structs or enums) or Functions.
-    // imported_members is a HashMap of module name to a vector of tuples,
+    // imported_members is a HashMap of module id (address + module name) to a vector of tuples,
     // where the first element is the name of the member and the second element is the alias (if any).
-    let mut imported_members: HashMap<String, Vec<(String, Option<String>)>> = HashMap::new();
+    let mut imported_members: HashMap<ModuleId, Vec<(String, Option<String>)>> = HashMap::new();
     for source in ast.source_definitions.clone() {
         if let Definition::Module(module) = source.def {
             for module_member in module.members {
@@ -269,13 +278,62 @@ pub fn process_special_attributes(
                         if let Use::ModuleUse(module_ident, ModuleUse::Members(members)) =
                             &use_decl.use_
                         {
+                            // Extract address from module_ident
+                            let module_address = match &module_ident.value.address.value {
+                                move_compiler::parser::ast::LeadingNameAccess_::AnonymousAddress(addr) => {
+                                    // AnonymousAddress contains NumericalAddress, convert to bytes
+                                    Some(addr.into_inner().into_bytes())
+                                }
+                                move_compiler::parser::ast::LeadingNameAccess_::GlobalAddress(name) => {
+                                    // GlobalAddress is a named address, look it up in address_alias_instantiation
+                                    address_alias_instantiation
+                                        .get(name.value.as_str())
+                                        .copied()
+                                        .or_else(|| {
+                                            found_error = true;
+                                            module_errors.push(SpecialAttributeError {
+                                                kind: SpecialAttributeErrorKind::NamedAddressNotFound(
+                                                    name.value.as_str().to_string(),
+                                                ),
+                                                line_of_code: use_decl.loc,
+                                            });
+                                            None
+                                        })
+                                }
+                                move_compiler::parser::ast::LeadingNameAccess_::Name(name) => {
+                                    // Name is also a named address, look it up in address_alias_instantiation
+                                    address_alias_instantiation
+                                        .get(name.value.as_str())
+                                        .copied()
+                                        .or_else(|| {
+                                            found_error = true;
+                                            module_errors.push(SpecialAttributeError {
+                                                kind: SpecialAttributeErrorKind::NamedAddressNotFound(
+                                                    name.value.as_str().to_string(),
+                                                ),
+                                                line_of_code: use_decl.loc,
+                                            });
+                                            None
+                                        })
+                                }
+                            };
+
+                            let Some(module_address) = module_address else {
+                                continue;
+                            };
+
+                            let module_id = ModuleId {
+                                address: module_address,
+                                module_name: module_ident.value.module.to_string(),
+                            };
+
                             for member in members {
                                 let member_tuple = (
                                     member.0.value.as_str().to_string(),
                                     member.1.as_ref().map(|s| s.value.as_str().to_string()),
                                 );
                                 imported_members
-                                    .entry(module_ident.value.module.to_string())
+                                    .entry(module_id.to_owned())
                                     .or_default()
                                     .push(member_tuple);
                             }

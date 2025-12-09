@@ -50,6 +50,9 @@ pub enum SpecialAttributeErrorKind {
         "Struct '{0}' is reserved by the Stylus Framework and cannot be defined in module '{1}'."
     )]
     FrameworkReservedStruct(String, String),
+
+    #[error("Named address '{0}' not found in address_alias_instantiation")]
+    NamedAddressNotFound(String),
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -84,6 +87,13 @@ impl From<&SpecialAttributeError> for Diagnostic {
             ),
             SpecialAttributeErrorKind::FrameworkReservedStruct(_, _) => custom(
                 "Struct validation error",
+                Severity::BlockingError,
+                3,
+                3,
+                Box::leak(value.to_string().into_boxed_str()),
+            ),
+            SpecialAttributeErrorKind::NamedAddressNotFound(_) => custom(
+                "Address resolution error",
                 Severity::BlockingError,
                 3,
                 3,

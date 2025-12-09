@@ -9,6 +9,7 @@ use crate::{
     types::Type,
 };
 
+use crate::ModuleId;
 use std::collections::HashMap;
 #[derive(thiserror::Error, Debug)]
 pub enum FunctionValidationError {
@@ -184,8 +185,8 @@ pub fn validate_function(
     events: &HashMap<String, Event>,
     abi_errors: &HashMap<String, AbiError>,
     structs: &[Struct_],
-    deps_structs: &HashMap<String, Vec<Struct_>>,
-    imported_members: &HashMap<String, Vec<(String, Option<String>)>>,
+    deps_structs: &HashMap<ModuleId, Vec<Struct_>>,
+    imported_members: &HashMap<ModuleId, Vec<(String, Option<String>)>>,
     package_address: [u8; 32],
 ) -> Result<(), SpecialAttributeError> {
     let signature = crate::function_modifiers::Function::parse_signature(&function.signature);
@@ -229,23 +230,22 @@ pub fn validate_function(
             // First, check if the struct exists in local structs
             let module_struct = structs.iter().find(|s| s.name == struct_name);
 
-            // If not found locally, check in imported members
+            // If not defined in the module, check in imported members
             let imported_struct = module_struct
                 .is_none()
                 .then(|| {
-                    imported_members.iter().find_map(|(module_name, members)| {
+                    imported_members.iter().find_map(|(module_id, members)| {
                         members.iter().find_map(|(original_name, alias_opt)| {
                             // First check the original name, if not found, check the alias
-                            if alias_opt
-                                .as_ref()
-                                .map(|a| a == &struct_name)
-                                .unwrap_or(false)
-                                || original_name == &struct_name
+                            if original_name == &struct_name
+                                || alias_opt
+                                    .as_ref()
+                                    .map(|a| a == &struct_name)
+                                    .unwrap_or(false)
                             {
                                 // If there's a match, search the struct in the dependency's structs hashmap.
                                 // This map supplements the imported members by providing extra information about structs, including whether they have the key ability.
-                                // TODO: ideally we should use module_id instead of module_name, but at this point the ast doesnt resolve named addresses, and from the compiler we get numerical addresses.
-                                deps_structs.get(module_name).and_then(|module_structs| {
+                                deps_structs.get(module_id).and_then(|module_structs| {
                                     module_structs.iter().find(|s| s.name == *original_name)
                                 })
                             } else {

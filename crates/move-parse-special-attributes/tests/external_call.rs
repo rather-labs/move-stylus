@@ -14,10 +14,35 @@ pub fn test_external_call_general() {
     let file = std::path::Path::new("tests/external_call/sources/external_call.move");
     let absolute: PathBuf = fs::canonicalize(file).unwrap();
 
+    let address_alias_instantiation = std::collections::HashMap::from([
+        (
+            "std".to_string(),
+            [
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ],
+        ),
+        (
+            "stylus".to_string(),
+            [
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 2,
+            ],
+        ),
+        (
+            "test".to_string(),
+            [
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0,
+            ],
+        ),
+    ]);
+
     let Err((_, special_attributes_errors)) = process_special_attributes(
         &absolute,
         package_address,
         &std::collections::HashMap::new(),
+        &address_alias_instantiation,
     ) else {
         panic!("Expected error due to invalid external_call functions");
     };
