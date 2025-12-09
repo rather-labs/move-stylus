@@ -55,6 +55,7 @@ entry fun deref_nested_struct(x: Foo<u16>): Foo<u16> {
     *z
 }
 
+#[allow(unused_mut_parameter)]
 entry fun deref_mut_arg(x: &mut Foo<u16>): Foo<u16> {
     *x
 }
