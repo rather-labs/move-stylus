@@ -1,4 +1,4 @@
-mod constants;
+pub mod constants;
 pub mod wasm_runner;
 
 use std::path::Path;

@@ -291,3 +291,15 @@ pub fn runtime_with_framework(
 
     RuntimeSandbox::from_binary(&translated_package.emit_wasm())
 }
+
+#[fixture]
+pub fn runtime_package_with_framework(
+    #[default("")] module_name: &str,
+    #[default("")] source_path: &str,
+) -> RuntimeSandbox {
+    let mut translated_packages = translate_test_complete_package_with_framework(source_path);
+
+    let translated_package = translated_packages.get_mut(module_name).unwrap();
+
+    RuntimeSandbox::from_binary(&translated_package.emit_wasm())
+}

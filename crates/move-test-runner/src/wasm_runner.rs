@@ -151,6 +151,7 @@ macro_rules! link_test_fn_write_u64_constant {
     () => {};
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum CrossContractCallType {
     Call,
     StaticCall,
@@ -650,6 +651,42 @@ impl RuntimeSandbox {
         Ok((result, store.data().return_data.clone()))
     }
 
+    /// Crates a temporary runtime sandbox instance and calls the entrypoint with the given data.
+    ///
+    /// Returns the result of the entrypoint call and the return data.
+    pub fn call_entrypoint_with_data(&self, data: Vec<u8>) -> Result<ExecutionData> {
+        let data_len = data.len() as i32;
+        let mut store = Store::new(
+            &self.engine,
+            ModuleData {
+                data,
+                return_data: vec![],
+            },
+        );
+        let instance = self.linker.instantiate(&mut store, &self.module)?;
+
+        let entrypoint = instance.get_typed_func::<i32, i32>(&mut store, "user_entrypoint")?;
+
+        let result = entrypoint
+            .call(&mut store, data_len)
+            .map_err(|e| anyhow::anyhow!("error calling entrypoint: {e:?}"))?;
+
+        let error_pointer = Self::read_memory_from(
+            &instance,
+            &mut store,
+            DATA_ABORT_MESSAGE_PTR_OFFSET as usize,
+            4,
+        )
+        .map_err(|e| anyhow::anyhow!("there was an error reading test memory: {e:?}"))?;
+
+        Ok(ExecutionData {
+            return_data: store.data().return_data.clone(),
+            instance,
+            store,
+            execution_aborted: error_pointer != [0, 0, 0, 0],
+        })
+    }
+
     pub fn obtain_uid(&self) -> FixedBytes<32> {
         let (topic, data) = self.log_events.lock().unwrap().recv().unwrap();
         assert_eq!(2, topic);
@@ -657,7 +694,7 @@ impl RuntimeSandbox {
         FixedBytes::<32>::from_slice(&data[32..])
     }
 
-    fn read_memory_from(
+    pub fn read_memory_from(
         instance: &wasmtime::Instance,
         store: &mut Store<ModuleData>,
         from: usize,
@@ -670,5 +707,14 @@ impl RuntimeSandbox {
             .expect("Wasm module must export memory");
 
         Ok(memory.data(&store)[from..from + len].to_vec())
+    }
+
+    pub fn set_cross_contract_call_success(&self, success: bool) {
+        self.cross_contract_call_succeed
+            .store(success, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    pub fn set_cross_contract_return_data(&self, data: Vec<u8>) {
+        *self.cross_contract_call_return_data.lock().unwrap() = data;
     }
 }
