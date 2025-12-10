@@ -36,7 +36,7 @@ impl Test {
             package_module_data(&package, None, verbose).map_err(print_error_diagnostic)?;
 
         if let Err(compilation_error) =
-            translate_package_cli(package, &rerooted_path, install_dir, false, verbose)
+            translate_package_cli(package, &rerooted_path, install_dir, false, verbose, false)
         {
             print_error_diagnostic(*compilation_error)
         }

@@ -31,7 +31,9 @@ move-bytecode-to-wasm.workspace = true
 move-packages-build.workspace = true
 move-evm-abi-generator.workspace = true
 move-test-runner.workspace = true
+wasm-opt = "0.116.1"
 wasmprinter.workspace = true
+walrus = "0.23"
 
 [[bin]]
 name = "move"
