@@ -27,16 +27,17 @@ entry fun call_dummy(v: vector<u64>) {
 
 entry fun vec_from_element(index: u64): vector<u64> {
     let v = vector[10u64, 20u64];
-    let x = v[index];  
+    let x = v[index];
     vector[x]
 }
 
 entry fun get_element_vector(index: u64): vector<u64> {
     let v = vector[vector[10u64, 20u64], vector[30u64, 40u64]];
-    let x = v[index];  
+    let x = v[index];
     x
 }
 
+#[allow(unused_mut_parameter)]
 entry fun deref_mut_arg(x: &mut vector<u64> ): vector<u64> {
  *x
 }
@@ -56,7 +57,7 @@ entry fun miscellaneous_0(): vector<u64> {
 entry fun miscellaneous_1(): vector<u64> {
     let v = vector[vector[10u64, 20u64], vector[30u64, 40u64]];
     dummy(&v[0]);
-    let x = v[0]; 
+    let x = v[0];
     let y = x[1];
     vector[y, v[1][1]]
 }
@@ -76,7 +77,7 @@ entry fun freeze_ref(y: vector<u64>): vector<u64> {
     let mut x = vector<u64>[1, 2, 3];
     let x_mut_ref: &mut vector<u64> = &mut x;
     *x_mut_ref = y;
-    let x_frozen_ref: &vector<u64> = freeze(x_mut_ref); 
+    let x_frozen_ref: &vector<u64> = freeze(x_mut_ref);
     *x_frozen_ref
 }
 

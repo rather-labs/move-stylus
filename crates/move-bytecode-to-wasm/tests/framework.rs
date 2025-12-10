@@ -1,50 +1,20 @@
-use alloy_sol_types::SolValue;
-use alloy_sol_types::abi::TokenSeq;
-use alloy_sol_types::{SolCall, SolType, sol};
-use anyhow::Result;
-use common::runtime_sandbox::RuntimeSandbox;
-use rstest::{fixture, rstest};
-
 mod common;
 
-fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u8>) -> Result<()> {
-    let (result, return_data) = runtime.call_entrypoint(call_data)?;
-    anyhow::ensure!(
-        result == 0,
-        "Function returned non-zero exit code: {result}"
-    );
-    anyhow::ensure!(
-        return_data == expected_result,
-        "return data mismatch:\nreturned:{return_data:?}\nexpected:{expected_result:?}"
-    );
-
-    Ok(())
-}
+use crate::common::run_test;
+use alloy_primitives::{Address, U256, address, hex, keccak256};
+use alloy_sol_types::{SolCall, SolType, SolValue, abi::TokenSeq, sol};
+use move_test_runner::{
+    constants::{
+        BLOCK_BASEFEE, BLOCK_GAS_LIMIT, BLOCK_NUMBER, BLOCK_TIMESTAMP, GAS_PRICE,
+        MSG_SENDER_ADDRESS, MSG_VALUE,
+    },
+    wasm_runner::{CrossContractCallType, ExecutionData, RuntimeSandbox},
+};
+use rstest::rstest;
 
 mod tx_context {
-    use alloy_primitives::{Address, hex};
-
-    use crate::common::{
-        runtime_sandbox::constants::{
-            BLOCK_BASEFEE, BLOCK_GAS_LIMIT, BLOCK_NUMBER, BLOCK_TIMESTAMP, GAS_PRICE,
-            MSG_SENDER_ADDRESS, MSG_VALUE,
-        },
-        translate_test_package_with_framework,
-    };
-
     use super::*;
-
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "tx_context";
-        const SOURCE_PATH: &str = "tests/framework/tx_context.move";
-
-        let mut translated_package =
-            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    use crate::common::runtime_with_framework as runtime;
 
     sol!(
         #[allow(missing_docs)]
@@ -67,7 +37,9 @@ mod tx_context {
     #[case(getBlockTimestampCall::new(()), (BLOCK_TIMESTAMP,))]
     #[case(getGasPriceCall::new(()), (GAS_PRICE,))]
     fn test_tx_context<T: SolCall, V: SolValue>(
-        #[by_ref] runtime: &RuntimeSandbox,
+        #[by_ref]
+        #[with("tx_context", "tests/framework/tx_context.move")]
+        runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: V,
     ) where
@@ -85,19 +57,21 @@ mod tx_context {
     #[case(
         getFreshObjectAddressCall::new(()),
         (
-            hex::decode("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")
+            hex::decode("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb")
                 .map(|h| <[u8; 32]>::try_from(h).unwrap())
                 .unwrap(),
-            hex::decode("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989")
+            hex::decode("e014f8017b7a8c4a930b9b7fcf7731e1a3d955813e4d729c5abf81df5adb08a7")
                 .map(|h| <[u8; 32]>::try_from(h).unwrap())
                 .unwrap(),
-            hex::decode("b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255")
+            hex::decode("79f6f905732424817cc3297d425cd1313a7afd112df46d08303219989d6a7b09")
                 .map(|h| <[u8; 32]>::try_from(h).unwrap())
                 .unwrap()
         )
     )]
     fn test_tx_fresh_id<T: SolCall>(
-        #[by_ref] runtime: &RuntimeSandbox,
+        #[by_ref]
+        #[with("tx_context", "tests/framework/tx_context.move")]
+        runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: ([u8; 32], [u8; 32], [u8; 32]),
     ) {
@@ -111,22 +85,8 @@ mod tx_context {
 }
 
 mod event {
-    use alloy_primitives::{address, hex, keccak256};
-
-    use crate::common::translate_test_package_with_framework;
-
     use super::*;
-
-    #[fixture]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "event";
-        const SOURCE_PATH: &str = "tests/framework/event.move";
-
-        let mut translated_package =
-            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    use crate::common::runtime_with_framework as runtime;
 
     sol!(
         #[allow(missing_docs)]
@@ -522,7 +482,7 @@ mod event {
         }.abi_encode()).to_vec()
     ].concat())]
     fn test_emit_event<T: SolCall>(
-        runtime: RuntimeSandbox,
+        #[with("event", "tests/framework/event.move")] runtime: RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_topic: u32,
         #[case] expected_data: Vec<u8>,
@@ -539,23 +499,8 @@ mod event {
 }
 
 mod cross_contract_calls {
-    use alloy_primitives::{Address, U256, address};
-
-    use crate::common::{
-        runtime_sandbox::CrossContractCallType, translate_test_complete_package_with_framework,
-    };
-
     use super::*;
-
-    #[fixture]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "cross_contract_calls";
-        const SOURCE_PATH: &str = "tests/framework";
-
-        let mut translated_packages = translate_test_complete_package_with_framework(SOURCE_PATH);
-        let translated_package = translated_packages.get_mut(MODULE_NAME).unwrap();
-        RuntimeSandbox::new(translated_package)
-    }
+    use crate::common::runtime_package_with_framework as runtime;
 
     sol!(
         #[allow(missing_docs)]
@@ -885,7 +830,7 @@ mod cross_contract_calls {
         u64::MAX,
     )]
     fn test_cross_contract_call_empty_calls<T: SolCall>(
-        runtime: RuntimeSandbox,
+        #[with("cross_contract_calls", "tests/framework")] runtime: RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_cross_contract_calldata: Vec<u8>,
         #[case] success: bool,
@@ -915,26 +860,11 @@ mod cross_contract_calls {
 
 mod cross_contract_calls_result {
     #![allow(clippy::too_many_arguments)]
-    use alloy_primitives::{Address, U256, address};
-
-    use crate::common::{
-        runtime_sandbox::CrossContractCallType, translate_test_complete_package_with_framework,
-    };
-
     use super::*;
+    use crate::common::runtime_package_with_framework as runtime;
 
     const GET_RESULT_ERROR_CODE: &str = "101";
     const DATA_ABORT_MESSAGE_PTR_OFFSET: usize = 256;
-
-    #[fixture]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "cross_contract_calls_result";
-        const SOURCE_PATH: &str = "tests/framework";
-
-        let mut translated_packages = translate_test_complete_package_with_framework(SOURCE_PATH);
-        let translated_package = translated_packages.get_mut(MODULE_NAME).unwrap();
-        RuntimeSandbox::new(translated_package)
-    }
 
     sol!(
         #[allow(missing_docs)]
@@ -1445,7 +1375,7 @@ mod cross_contract_calls_result {
         vec![3, 1, 4, 1, 5].abi_encode(),
     )]
     fn test_cross_contract_call_with_result_calls<T: SolCall>(
-        runtime: RuntimeSandbox,
+        #[with("cross_contract_calls_result", "tests/framework")] runtime: RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_cross_contract_calldata: Vec<u8>,
         #[case] success: bool,
@@ -1516,17 +1446,15 @@ mod cross_contract_calls_result {
     #[case(ccCall3WithArgsCall::new((ADDRESS, 3, 84, get_foo(), get_bar())))]
     #[case(ccCall4WithArgsCall::new((ADDRESS, 84, get_foo(), get_bar(), vec![1, 2, 3, 4, 5])))]
     fn test_cross_contract_call_with_result_get_result_panic_if_fails<T: SolCall>(
-        runtime: RuntimeSandbox,
+        #[with("cross_contract_calls_result", "tests/framework")] runtime: RuntimeSandbox,
         #[case] call_data: T,
     ) {
-        use crate::common::runtime_sandbox::ExecutionData;
-
         runtime.set_cross_contract_call_success(false);
         let ExecutionData {
-            result: _,
             return_data: _,
             instance,
             mut store,
+            ..
         } = runtime
             .call_entrypoint_with_data(call_data.abi_encode())
             .unwrap();
@@ -1566,22 +1494,8 @@ mod cross_contract_calls_result {
 }
 
 mod error {
-    use alloy_primitives::{U256, address, keccak256};
-
-    use crate::common::translate_test_package_with_framework;
-
     use super::*;
-
-    #[fixture]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "error";
-        const SOURCE_PATH: &str = "tests/framework/error.move";
-
-        let mut translated_package =
-            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    use crate::common::runtime_with_framework as runtime;
 
     sol!(
         struct SimpleError {
@@ -1683,7 +1597,7 @@ mod error {
         ].concat()
     )]
     fn test_revert<T: SolCall>(
-        runtime: RuntimeSandbox,
+        #[with("error", "tests/framework/error.move")] runtime: RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_data: Vec<u8>,
     ) {

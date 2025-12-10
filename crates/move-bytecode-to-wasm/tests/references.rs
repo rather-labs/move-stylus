@@ -1,29 +1,17 @@
-use alloy_primitives::U256;
-use alloy_sol_types::abi::TokenSeq;
-use alloy_sol_types::{SolCall, SolType, SolValue, sol};
-use anyhow::Result;
-use common::{runtime_sandbox::RuntimeSandbox, translate_test_package};
-use rstest::{fixture, rstest};
-
 mod common;
 
-fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u8>) -> Result<()> {
-    let (result, return_data) = runtime.call_entrypoint(call_data)?;
-    println!("return_data: {return_data:?}");
-    anyhow::ensure!(
-        result == 0,
-        "Function returned non-zero exit code: {result}"
-    );
-    anyhow::ensure!(
-        return_data == expected_result,
-        "return data mismatch:\nreturned:{return_data:?}\nexpected:{expected_result:?}"
-    );
-
-    Ok(())
-}
+use crate::common::run_test;
+use alloy_primitives::U256;
+use alloy_primitives::address;
+use alloy_sol_types::abi::TokenSeq;
+use alloy_sol_types::{SolCall, SolType, SolValue, sol};
+use move_test_runner::wasm_runner::RuntimeSandbox;
+use rstest::{fixture, rstest};
 
 mod reference_bool {
     use super::*;
+
+    declare_fixture!("bool", "tests/references/bool.move");
 
     sol!(
         #[allow(missing_docs)]
@@ -37,16 +25,6 @@ mod reference_bool {
         function miscellaneous1() external returns (bool[]);
         function identityBoolRef(bool x) external returns (bool);
     );
-
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "bool";
-        const SOURCE_PATH: &str = "tests/references/bool.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-        RuntimeSandbox::new(&mut translated_package)
-    }
 
     #[rstest]
     #[case(derefBoolCall::new((true,)), true)]
@@ -80,6 +58,8 @@ mod reference_bool {
 mod reference_uint_8 {
     use super::*;
 
+    declare_fixture!("uint_8", "tests/references/uint_8.move");
+
     sol!(
         #[allow(missing_docs)]
         function derefU8(uint8 x) external returns (uint8);
@@ -93,16 +73,6 @@ mod reference_uint_8 {
         function freezeRef(uint8 x) external returns (uint8);
         function identityU8Ref(uint8 x) external returns (uint8);
     );
-
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "uint_8";
-        const SOURCE_PATH: &str = "tests/references/uint_8.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-        RuntimeSandbox::new(&mut translated_package)
-    }
 
     #[rstest]
     #[case(derefU8Call::new((250,)), 250)]
@@ -137,6 +107,8 @@ mod reference_uint_8 {
 mod reference_uint_16 {
     use super::*;
 
+    declare_fixture!("uint_16", "tests/references/uint_16.move");
+
     sol!(
         #[allow(missing_docs)]
         function derefU16(uint16 x) external returns (uint16);
@@ -150,16 +122,6 @@ mod reference_uint_16 {
         function freezeRef(uint16 x) external returns (uint16);
         function identityU16Ref(uint16 x) external returns (uint16);
     );
-
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "uint_16";
-        const SOURCE_PATH: &str = "tests/references/uint_16.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-        RuntimeSandbox::new(&mut translated_package)
-    }
 
     #[rstest]
     #[case(derefU16Call::new((250,)), 250)]
@@ -194,6 +156,8 @@ mod reference_uint_16 {
 mod reference_uint_32 {
     use super::*;
 
+    declare_fixture!("uint_32", "tests/references/uint_32.move");
+
     sol!(
         #[allow(missing_docs)]
         function derefU32(uint32 x) external returns (uint32);
@@ -207,16 +171,6 @@ mod reference_uint_32 {
         function freezeRef(uint32 x) external returns (uint32[]);
         function identityU32Ref(uint32 x) external returns (uint32);
     );
-
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "uint_32";
-        const SOURCE_PATH: &str = "tests/references/uint_32.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-        RuntimeSandbox::new(&mut translated_package)
-    }
 
     #[rstest]
     #[case(derefU32Call::new((250,)), 250)]
@@ -251,6 +205,8 @@ mod reference_uint_32 {
 mod reference_uint_64 {
     use super::*;
 
+    declare_fixture!("uint_64", "tests/references/uint_64.move");
+
     sol!(
         #[allow(missing_docs)]
         function derefU64(uint64 x) external returns (uint64);
@@ -264,16 +220,6 @@ mod reference_uint_64 {
         function freezeRef(uint64 x) external returns (uint64[]);
         function identityU64Ref(uint64 x) external returns (uint64);
     );
-
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "uint_64";
-        const SOURCE_PATH: &str = "tests/references/uint_64.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-        RuntimeSandbox::new(&mut translated_package)
-    }
 
     #[rstest]
     #[case(derefU64Call::new((250,)), 250)]
@@ -308,6 +254,8 @@ mod reference_uint_64 {
 mod reference_uint_128 {
     use super::*;
 
+    declare_fixture!("uint_128", "tests/references/uint_128.move");
+
     sol!(
         #[allow(missing_docs)]
         function derefU128(uint128 x) external returns (uint128);
@@ -321,16 +269,6 @@ mod reference_uint_128 {
         function freezeRef(uint128 x) external returns (uint128[]);
         function identityU128Ref(uint128 x) external returns (uint128);
     );
-
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "uint_128";
-        const SOURCE_PATH: &str = "tests/references/uint_128.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-        RuntimeSandbox::new(&mut translated_package)
-    }
 
     #[rstest]
     #[case(derefU128Call::new((250,)), 250)]
@@ -365,6 +303,8 @@ mod reference_uint_128 {
 mod reference_uint_256 {
     use super::*;
 
+    declare_fixture!("uint_256", "tests/references/uint_256.move");
+
     sol!(
         #[allow(missing_docs)]
         function derefU256(uint256 x) external returns (uint256);
@@ -378,16 +318,6 @@ mod reference_uint_256 {
         function freezeRef(uint256 x) external returns (uint256[]);
         function identityU256Ref(uint256 x) external returns (uint256);
     );
-
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "uint_256";
-        const SOURCE_PATH: &str = "tests/references/uint_256.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-        RuntimeSandbox::new(&mut translated_package)
-    }
 
     #[rstest]
     #[case(derefU256Call::new((U256::from(250),)), U256::from(250))]
@@ -423,6 +353,8 @@ mod reference_address {
     use super::*;
     use alloy_primitives::{Address, address};
 
+    declare_fixture!("ref_address", "tests/references/address.move");
+
     sol!(
         #[allow(missing_docs)]
         function derefAddress(address x) external returns (address);
@@ -436,16 +368,6 @@ mod reference_address {
         function freezeRef(address x) external returns (address);
         function identityAddressRef(address x) external returns (address);
     );
-
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "ref_address";
-        const SOURCE_PATH: &str = "tests/references/address.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-        RuntimeSandbox::new(&mut translated_package)
-    }
 
     #[rstest]
     #[case(derefAddressCall::new((address!("0x1234567890abcdef1234567890abcdef12345678"),)), address!("0x1234567890abcdef1234567890abcdef12345678"))]
@@ -479,20 +401,12 @@ mod reference_address {
 mod reference_signer {
     use super::*;
 
+    declare_fixture!("ref_signer", "tests/references/signer.move");
+
     sol!(
         #[allow(missing_docs)]
         function useDummy() external returns (address);  // Returns the signer
     );
-
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "ref_signer";
-        const SOURCE_PATH: &str = "tests/references/signer.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-        RuntimeSandbox::new(&mut translated_package)
-    }
 
     #[rstest]
     #[should_panic]
@@ -508,6 +422,8 @@ mod reference_signer {
 }
 mod reference_vec_8 {
     use super::*;
+
+    declare_fixture!("vec_8", "tests/references/vec_8.move");
 
     sol!(
         #[allow(missing_docs)]
@@ -527,16 +443,6 @@ mod reference_vec_8 {
         function freezeRef(uint8[] x) external returns (uint8[]);
         function identityVecRef(uint8[] x) external returns (uint8[]);
     );
-
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "vec_8";
-        const SOURCE_PATH: &str = "tests/references/vec_8.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-        RuntimeSandbox::new(&mut translated_package)
-    }
 
     #[rstest]
     #[case(derefCall::new((vec![1, 2, 3],)), vec![1, 2, 3])]
@@ -579,6 +485,8 @@ mod reference_vec_8 {
 mod reference_vec_64 {
     use super::*;
 
+    declare_fixture!("vec_64", "tests/references/vec_64.move");
+
     sol!(
         #[allow(missing_docs)]
         function deref(uint64[] x) external returns (uint64[]);
@@ -596,16 +504,6 @@ mod reference_vec_64 {
         function freezeRef(uint64[] x) external returns (uint64[]);
         function identityVecRef(uint64[] x) external returns (uint64[]);
     );
-
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "vec_64";
-        const SOURCE_PATH: &str = "tests/references/vec_64.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-        RuntimeSandbox::new(&mut translated_package)
-    }
 
     #[rstest]
     #[case(derefCall::new((vec![1, 2, 3],)), vec![1, 2, 3])]
@@ -635,6 +533,8 @@ mod reference_vec_64 {
 mod reference_vec_256 {
     use super::*;
 
+    declare_fixture!("vec_256", "tests/references/vec_256.move");
+
     sol!(
         #[allow(missing_docs)]
         function deref(uint256[] x) external returns (uint256[]);
@@ -652,16 +552,6 @@ mod reference_vec_256 {
         function freezeRef(uint256[] x) external returns (uint256[]);
         function identityVecRef(uint256[] x) external returns (uint256[]);
     );
-
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "vec_256";
-        const SOURCE_PATH: &str = "tests/references/vec_256.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-        RuntimeSandbox::new(&mut translated_package)
-    }
 
     #[rstest]
     #[case(derefCall::new((vec![U256::from(1), U256::from(2), U256::from(3)],)), vec![U256::from(1), U256::from(2), U256::from(3)])]
@@ -702,10 +592,9 @@ mod reference_vec_256 {
 }
 
 mod reference_structs {
-    use alloy_primitives::address;
-    use alloy_sol_types::SolValue;
-
     use super::*;
+
+    declare_fixture!("structs", "tests/references/structs.move");
 
     sol!(
         #[allow(missing_docs)]
@@ -767,16 +656,6 @@ mod reference_structs {
                 b: vec![U256::MAX],
             },
         }
-    }
-
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "structs";
-        const SOURCE_PATH: &str = "tests/references/structs.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-        RuntimeSandbox::new(&mut translated_package)
     }
 
     #[rstest]
@@ -859,10 +738,9 @@ mod reference_structs {
 }
 
 mod reference_structs_generic {
-    use alloy_primitives::address;
-    use alloy_sol_types::SolValue;
-
     use super::*;
+
+    declare_fixture!("structs_generic", "tests/references/structs_generic.move");
 
     sol!(
         #[allow(missing_docs)]
@@ -928,16 +806,6 @@ mod reference_structs_generic {
                 b: vec![U256::MAX],
             },
         }
-    }
-
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "structs_generic";
-        const SOURCE_PATH: &str = "tests/references/structs_generic.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-        RuntimeSandbox::new(&mut translated_package)
     }
 
     #[rstest]
@@ -1024,12 +892,9 @@ mod reference_structs_generic {
 }
 
 mod external_struct {
-    use alloy_primitives::address;
-    use alloy_sol_types::SolValue;
-
-    use crate::common::translate_test_complete_package;
-
     use super::*;
+
+    declare_fixture_complete_package!("external_struct", "tests/references/external");
 
     sol!(
         #[allow(missing_docs)]
@@ -1112,15 +977,6 @@ mod external_struct {
         }
     }
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        let mut translated_packages = translate_test_complete_package("tests/references/external");
-
-        let translated_package = translated_packages.get_mut("external_struct").unwrap();
-        RuntimeSandbox::new(translated_package)
-    }
-
     #[rstest]
     #[case(derefStructCall::new((get_foo(),)),get_foo())]
     #[case(derefStructRefCall::new((get_foo(),)),get_foo())]
@@ -1152,12 +1008,9 @@ mod external_struct {
 }
 
 mod external_generic_struct {
-    use alloy_primitives::address;
-    use alloy_sol_types::SolValue;
-
-    use crate::common::translate_test_complete_package;
-
     use super::*;
+
+    declare_fixture_complete_package!("external_generic_struct", "tests/references/external");
 
     sol!(
         #[allow(missing_docs)]
@@ -1252,17 +1105,6 @@ mod external_generic_struct {
         }
     }
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        let mut translated_packages = translate_test_complete_package("tests/references/external");
-
-        let translated_package = translated_packages
-            .get_mut("external_generic_struct")
-            .unwrap();
-        RuntimeSandbox::new(translated_package)
-    }
-
     #[rstest]
     #[case(derefStructCall::new((get_foo(),)),get_foo())]
     #[case(derefStructRefCall::new((get_foo(),)),get_foo())]
@@ -1294,20 +1136,9 @@ mod external_generic_struct {
 }
 
 mod reference_arguments {
-    use alloy_primitives::{U256, address};
-
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "reference_args";
-        const SOURCE_PATH: &str = "tests/references/arguments.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    declare_fixture!("reference_args", "tests/references/arguments.move");
 
     sol! {
         struct Bar {
