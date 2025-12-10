@@ -3430,7 +3430,6 @@ dependencies = [
  "move-unit-test",
  "move-vm-runtime",
  "move-vm-test-utils",
- "walrus",
  "wasm-opt",
  "wasmprinter 0.228.0",
 ]
