@@ -2,7 +2,7 @@ use crate::{
     abi_error::AbiError,
     error::{SpecialAttributeError, SpecialAttributeErrorKind},
     event::Event,
-    reserved_modules::StylusFrameworkPackage,
+    reserved_modules::{SF_ADDRESS, SF_RESERVED_STRUCTS},
     types::Type,
 };
 use move_compiler::diagnostics::codes::{DiagnosticInfo, Severity, custom};
@@ -55,7 +55,6 @@ pub fn validate_struct(
     struct_: &crate::Struct_,
     module_name: &str,
     package_address: [u8; 32],
-    stylus_framework: &StylusFrameworkPackage,
     events: &HashMap<String, Event>,
     abi_errors: &HashMap<String, AbiError>,
 ) -> Vec<SpecialAttributeError> {
@@ -66,14 +65,12 @@ pub fn validate_struct(
         struct_,
         module_name,
         package_address,
-        stylus_framework,
     ));
 
     // 2. Validate UID/NamedId field placement rules
     errors.extend(validate_uid_and_named_id_placement(
         struct_,
         package_address,
-        stylus_framework,
     ));
 
     // 3. Validate that no fields contain nested events or errors
@@ -88,12 +85,11 @@ pub fn validate_struct(
 fn validate_uid_and_named_id_placement(
     struct_: &crate::Struct_,
     package_address: [u8; 32],
-    stylus_framework: &StylusFrameworkPackage,
 ) -> Vec<SpecialAttributeError> {
     let mut errors = Vec::new();
 
     // Only validate structs not from Stylus Framework
-    if package_address != stylus_framework.address {
+    if package_address != SF_ADDRESS {
         if struct_.has_key {
             // Struct with key ability: first field must be UID or NamedId named "id", no other field can be
             // For now we allow empty structs to have the key ability, but that may change in the future.
@@ -170,14 +166,11 @@ fn check_if_stylus_framework_reserved(
     struct_: &crate::Struct_,
     module_name: &str,
     package_address: [u8; 32],
-    stylus_framework: &StylusFrameworkPackage,
 ) -> Vec<SpecialAttributeError> {
     let mut errors = Vec::new();
 
     // Check if the struct is reserved by the Stylus Framework
-    if package_address != stylus_framework.address
-        && stylus_framework.is_reserved_struct(module_name, &struct_.name)
-    {
+    if package_address != SF_ADDRESS && SF_RESERVED_STRUCTS.contains(&struct_.name.as_str()) {
         errors.push(SpecialAttributeError {
             kind: SpecialAttributeErrorKind::StructValidation(
                 StructValidationError::FrameworkReservedStruct(

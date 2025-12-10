@@ -18,7 +18,7 @@ pub use event::Event;
 use event::EventParseError;
 pub use external_call::error::{ExternalCallFunctionError, ExternalCallStructError};
 pub use function_validation::FunctionValidationError;
-pub use reserved_modules::StylusFrameworkPackage;
+pub use reserved_modules::{SF_ADDRESS, SF_RESERVED_STRUCTS};
 pub use struct_validation::StructValidationError;
 // TODO: Create error struct with LOC and error info
 
@@ -93,8 +93,6 @@ pub fn process_special_attributes(
     )
     .run::<PASS_PARSER>()
     .unwrap();
-
-    let stylus_framework = &crate::reserved_modules::STYLUS_FRAMEWORK;
 
     let mut result = SpecialAttributes::default();
     let mut module_errors = Vec::new();
@@ -263,7 +261,6 @@ pub fn process_special_attributes(
             s,
             &result.module_name,
             package_address,
-            stylus_framework,
             &result.events,
             &result.abi_errors,
         );

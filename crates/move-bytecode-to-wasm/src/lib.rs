@@ -158,19 +158,7 @@ pub fn translate_package(
 
         // Build a HashMap of structs by module id from all dependencies.
         // This allows proper validation of entry function return values, ensuring they do not return imported structs with the key ability.
-        let mut deps_structs: HashMap<
-            move_parse_special_attributes::ModuleId,
-            Vec<move_parse_special_attributes::Struct_>,
-        > = HashMap::new();
-        for md in modules_data.values() {
-            deps_structs.insert(
-                move_parse_special_attributes::ModuleId {
-                    address: <[u8; 32]>::try_from(md.id.address.as_slice()).unwrap(),
-                    module_name: md.id.module_name.clone(),
-                },
-                md.special_attributes.structs.clone(),
-            );
-        }
+        let deps_structs = build_dependency_structs_map(&modules_data);
 
         let special_attributes = match process_special_attributes(
             &root_compiled_module.source_path,
@@ -327,19 +315,7 @@ pub fn package_module_data(
 
         // Create a mapping from each dependency's module id to the list of structs obtained via the special attributes crate.
         // This allows proper validation of entry function return values, ensuring they do not return imported structs with the key ability.
-        let mut deps_structs: std::collections::HashMap<
-            move_parse_special_attributes::ModuleId,
-            Vec<move_parse_special_attributes::Struct_>,
-        > = std::collections::HashMap::new();
-        for md in modules_data.values() {
-            deps_structs.insert(
-                move_parse_special_attributes::ModuleId {
-                    address: <[u8; 32]>::try_from(md.id.address.as_slice()).unwrap(),
-                    module_name: md.id.module_name.clone(),
-                },
-                md.special_attributes.structs.clone(),
-            );
-        }
+        let deps_structs = build_dependency_structs_map(&modules_data);
 
         let special_attributes = match process_special_attributes(
             &root_compiled_module.source_path,
@@ -452,19 +428,7 @@ pub fn process_dependency_tree<'move_package>(
 
         // Create a mapping from each dependency's module id to the list of structs obtained via the special attributes crate.
         // This allows proper validation of entry function return values, ensuring they do not return imported structs with the key ability.
-        let mut deps_structs: std::collections::HashMap<
-            move_parse_special_attributes::ModuleId,
-            Vec<move_parse_special_attributes::Struct_>,
-        > = std::collections::HashMap::new();
-        for md in dependencies_data.values() {
-            deps_structs.insert(
-                move_parse_special_attributes::ModuleId {
-                    address: <[u8; 32]>::try_from(md.id.address.as_slice()).unwrap(),
-                    module_name: md.id.module_name.clone(),
-                },
-                md.special_attributes.structs.clone(),
-            );
-        }
+        let deps_structs = build_dependency_structs_map(dependencies_data);
 
         let special_attributes = match process_special_attributes(
             &dependency_module.source_path,
@@ -504,4 +468,26 @@ pub fn process_dependency_tree<'move_package>(
     } else {
         Err(DependencyProcessingError::CodeError(errors))
     }
+}
+
+/// Builds a HashMap mapping module IDs to their structs from all dependencies.
+///
+/// This function extracts struct information from `ModuleData` and converts it into
+/// a format compatible with `move_parse_special_attributes::ModuleId`. This mapping
+/// is essential for validating entry function return values, ensuring they do not
+/// return imported structs with the `key` ability.
+fn build_dependency_structs_map(
+    modules_data: &HashMap<ModuleId, ModuleData>,
+) -> HashMap<move_parse_special_attributes::ModuleId, Vec<move_parse_special_attributes::Struct_>> {
+    let mut deps_structs = HashMap::new();
+    for md in modules_data.values() {
+        deps_structs.insert(
+            move_parse_special_attributes::ModuleId {
+                address: <[u8; 32]>::try_from(md.id.address.as_slice()).unwrap(),
+                module_name: md.id.module_name.clone(),
+            },
+            md.special_attributes.structs.clone(),
+        );
+    }
+    deps_structs
 }
