@@ -4,11 +4,13 @@ use move_compiler::{
 };
 
 use crate::{
-    AbiError, Event,
+    AbiError, Event, Struct_,
     error::{SpecialAttributeError, SpecialAttributeErrorKind},
     types::Type,
 };
 
+use crate::ModuleId;
+use std::collections::HashMap;
 #[derive(thiserror::Error, Debug)]
 pub enum FunctionValidationError {
     #[error("Function with Event type parameter must be a native emit function")]
@@ -19,6 +21,20 @@ pub enum FunctionValidationError {
 
     #[error("Generic functions cannot be entrypoints")]
     GenericFunctionsIsEntry,
+
+    #[error("Entry functions cannot return structs with the key ability")]
+    EntryFunctionReturnsKeyStruct,
+
+    #[error("Invalid UID argument. UID is a reserved type and cannot be used as an argument.")]
+    InvalidUidArgument,
+
+    #[error(
+        "Invalid NamedId argument. NamedId is a reserved type and cannot be used as an argument."
+    )]
+    InvalidNamedIdArgument,
+
+    #[error("Struct not found in local or imported modules")]
+    StructNotFound,
 }
 
 impl From<&FunctionValidationError> for DiagnosticInfo {
@@ -34,7 +50,7 @@ impl From<&FunctionValidationError> for DiagnosticInfo {
 }
 
 /// Checks if a type is an Event by comparing its name with known events
-fn is_event_type(type_: &Type, events: &std::collections::HashMap<String, Event>) -> bool {
+fn is_event_type(type_: &Type, events: &HashMap<String, Event>) -> bool {
     match type_ {
         Type::UserDataType(name, _) => events.contains_key(name),
         _ => false,
@@ -42,10 +58,7 @@ fn is_event_type(type_: &Type, events: &std::collections::HashMap<String, Event>
 }
 
 /// Checks if a type is an AbiError by comparing its name with known abi_errors
-fn is_abi_error_type(
-    type_: &Type,
-    abi_errors: &std::collections::HashMap<String, AbiError>,
-) -> bool {
+fn is_abi_error_type(type_: &Type, abi_errors: &HashMap<String, AbiError>) -> bool {
     match type_ {
         Type::UserDataType(name, _) => abi_errors.contains_key(name),
         _ => false,
@@ -55,7 +68,7 @@ fn is_abi_error_type(
 /// Validates that a function with Event type parameter is a native emit function
 fn validate_emit_function(
     function: &Function,
-    events: &std::collections::HashMap<String, Event>,
+    events: &HashMap<String, Event>,
 ) -> Result<(), SpecialAttributeError> {
     let err = SpecialAttributeError {
         kind: SpecialAttributeErrorKind::FunctionValidation(
@@ -104,7 +117,7 @@ fn validate_emit_function(
 /// Validates that a function with an Error type parameter is a native revert function
 fn validate_revert_function(
     function: &Function,
-    abi_errors: &std::collections::HashMap<String, AbiError>,
+    abi_errors: &HashMap<String, AbiError>,
 ) -> Result<(), SpecialAttributeError> {
     let err = SpecialAttributeError {
         kind: SpecialAttributeErrorKind::FunctionValidation(
@@ -150,26 +163,119 @@ fn validate_revert_function(
     Ok(())
 }
 
+/// Extracts all struct names from a type (recursively handles vectors, tuples, etc.)
+fn extract_struct_names(type_: &Type) -> Vec<String> {
+    match type_ {
+        Type::UserDataType(name, _) => vec![name.clone()],
+        Type::Vector(inner) => extract_struct_names(inner),
+        Type::Tuple(types) => types.iter().flat_map(extract_struct_names).collect(),
+        _ => Vec::new(),
+    }
+}
+
 /// Validates that a function is correct:
 ///
 /// - If the function is generic, it cannot be an entrypoint.
 /// - If the function has an Event parameter, it must be an emit function; otherwise, it is invalid.
 /// - If the function has an AbiError parameter, it must be a revert function; otherwise, it is invalid.
-/// - If neither type is present, the function is always considered valid.
+/// - Entry functions cannot return structs with the key ability.
+/// - Functions cannot take a UID as arguments, unless it is a function from the Stylus Framework package.
 pub fn validate_function(
     function: &Function,
-    events: &std::collections::HashMap<String, Event>,
-    abi_errors: &std::collections::HashMap<String, AbiError>,
+    events: &HashMap<String, Event>,
+    abi_errors: &HashMap<String, AbiError>,
+    structs: &[Struct_],
+    deps_structs: &HashMap<ModuleId, Vec<Struct_>>,
+    imported_members: &HashMap<ModuleId, Vec<(String, Option<String>)>>,
+    package_address: [u8; 32],
 ) -> Result<(), SpecialAttributeError> {
-    if !function.signature.type_parameters.is_empty() && function.entry.is_some() {
-        return Err(SpecialAttributeError {
-            kind: SpecialAttributeErrorKind::FunctionValidation(
-                FunctionValidationError::GenericFunctionsIsEntry,
-            ),
-            line_of_code: function.loc,
-        });
-    }
     let signature = crate::function_modifiers::Function::parse_signature(&function.signature);
+
+    // If any of the function's parameters is a UID type and the package address does not match the Stylus Framework address, this function should be rejected as invalid.
+    if package_address != crate::reserved_modules::SF_ADDRESS {
+        for param in &signature.parameters {
+            for struct_name in extract_struct_names(&param.type_) {
+                if struct_name == "UID" {
+                    return Err(SpecialAttributeError {
+                        kind: SpecialAttributeErrorKind::FunctionValidation(
+                            FunctionValidationError::InvalidUidArgument,
+                        ),
+                        line_of_code: function.loc,
+                    });
+                } else if struct_name == "NamedId" {
+                    return Err(SpecialAttributeError {
+                        kind: SpecialAttributeErrorKind::FunctionValidation(
+                            FunctionValidationError::InvalidNamedIdArgument,
+                        ),
+                        line_of_code: function.loc,
+                    });
+                }
+            }
+        }
+    }
+
+    if function.entry.is_some() {
+        // If the function is generic and is entry, it should be rejected as invalid.
+        if !function.signature.type_parameters.is_empty() {
+            return Err(SpecialAttributeError {
+                kind: SpecialAttributeErrorKind::FunctionValidation(
+                    FunctionValidationError::GenericFunctionsIsEntry,
+                ),
+                line_of_code: function.loc,
+            });
+        }
+
+        // Check if return type contains any structs with the key ability
+        for struct_name in extract_struct_names(&signature.return_type) {
+            // First, check if the struct exists in local structs
+            let module_struct = structs.iter().find(|s| s.name == struct_name);
+
+            // If not defined in the module, check in imported members
+            let imported_struct = module_struct
+                .is_none()
+                .then(|| {
+                    imported_members.iter().find_map(|(module_id, members)| {
+                        members.iter().find_map(|(original_name, alias_opt)| {
+                            // First check the original name, if not found, check the alias
+                            if original_name == &struct_name
+                                || alias_opt
+                                    .as_ref()
+                                    .map(|a| a == &struct_name)
+                                    .unwrap_or(false)
+                            {
+                                // If there's a match, search the struct in the dependency's structs hashmap.
+                                // This map supplements the imported members by providing extra information about structs, including whether they have the key ability.
+                                deps_structs.get(module_id).and_then(|module_structs| {
+                                    module_structs.iter().find(|s| s.name == *original_name)
+                                })
+                            } else {
+                                None
+                            }
+                        })
+                    })
+                })
+                .flatten();
+
+            // If struct is not found in either local or imported, return error
+            match module_struct.or(imported_struct) {
+                None => {
+                    // Note: here we might encounter the case where the datatype is actually an enum not an struct,
+                    // in this case we dont want to return an error, we want to ignore it.
+                }
+                Some(found_struct) => {
+                    // If struct is found and has key ability, return error
+                    if found_struct.has_key {
+                        return Err(SpecialAttributeError {
+                            kind: SpecialAttributeErrorKind::FunctionValidation(
+                                FunctionValidationError::EntryFunctionReturnsKeyStruct,
+                            ),
+                            line_of_code: function.loc,
+                        });
+                    }
+                }
+            }
+        }
+    }
 
     for param in &signature.parameters {
         if is_event_type(&param.type_, events) {

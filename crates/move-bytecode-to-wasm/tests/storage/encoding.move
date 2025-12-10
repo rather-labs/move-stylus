@@ -35,9 +35,30 @@ public struct StaticFields has key {
     g: address,
 }
 
+public struct StaticFields_ {
+    id: address,
+    a: u256,
+    b: u128,
+    c: u64,
+    d: u32,
+    e: u16,
+    f: u8,
+    g: address,
+}
+
 /// Test structure with mixed primitive types
 public struct StaticFields2 has key {
     id: UID,
+    a: u8,
+    b: address,
+    c: u64,
+    d: u16,
+    e: u8,
+}
+
+/// Test structure with mixed primitive types
+public struct StaticFields2_ {
+    id: address,
     a: u8,
     b: address,
     c: u64,
@@ -54,9 +75,26 @@ public struct StaticFields3 has key {
     d: address,
 }
 
+public struct StaticFields3_ {
+    id: address,
+    a: u8,
+    b: address,
+    c: u64,
+    d: address,
+}
+
 /// Test structure with nested static child
 public struct StaticNestedStruct has key {
     id: UID,
+    a: u64,
+    b: bool,
+    c: StaticNestedStructChild,
+    f: u128,
+    g: u32,
+}
+
+public struct StaticNestedStruct_ {
+    id: address,
     a: u64,
     b: bool,
     c: StaticNestedStructChild,
@@ -86,9 +124,32 @@ public struct DynamicStruct has key {
     g: u256,
 }
 
+public struct DynamicStruct_ {
+    id: address,
+    a: u32,
+    b: bool,
+    c: vector<u64>,
+    d: vector<u128>,
+    e: u64,
+    f: u128,
+    g: u256,
+}
+
 /// Test structure with various vector types
 public struct DynamicStruct2 has key {
     id: UID,
+    a: vector<bool>,
+    b: vector<u8>,
+    c: vector<u16>,
+    d: vector<u32>,
+    e: vector<u64>,
+    f: vector<u128>,
+    g: vector<u256>,
+    h: vector<address>,
+}
+
+public struct DynamicStruct2_ {
+    id: address,
     a: vector<bool>,
     b: vector<u8>,
     c: vector<u16>,
@@ -108,9 +169,23 @@ public struct DynamicStruct3 has key {
     d: vector<vector<u128>>,
 }
 
+public struct DynamicStruct3_ {
+    id: address,
+    a: vector<vector<u8>>,
+    b: vector<vector<u32>>,
+    c: vector<vector<u64>>,
+    d: vector<vector<u128>>,
+}
+
 /// Test structure with nested struct vectors
 public struct DynamicStruct4 has key {
     id: UID,
+    a: vector<DynamicNestedStructChild>,
+    b: vector<StaticNestedStructChild>,
+}
+
+public struct DynamicStruct4_ {
+    id: address,
     a: vector<DynamicNestedStructChild>,
     b: vector<StaticNestedStructChild>,
 }
@@ -121,9 +196,20 @@ public struct DynamicStruct5 has key {
     a: vector<NestedStructChildWrapper>,
 }
 
+public struct DynamicStruct5_ {
+    id: address,
+    a: vector<NestedStructChildWrapper>,
+}
+
 /// Generic test structure
 public struct GenericStruct<T> has key, store {
     id: UID,
+    a: vector<T>,
+    b: T,
+}
+
+public struct GenericStruct_<T> {
+    id: address,
     a: vector<T>,
     b: T,
 }
@@ -150,9 +236,21 @@ public struct Bar has key, store {
     a: u64,
 }
 
+public struct Bar_ {
+    id: address,
+    a: u64,
+}
+
 /// Struct containing a wrapped object
 public struct Foo has key, store {
     id: UID,
+    a: u64,
+    b: Bar,
+    c: u32,
+}
+
+public struct Foo_ {
+    id: address,
     a: u64,
     b: Bar,
     c: u32,
@@ -166,6 +264,13 @@ public struct MegaFoo has key {
     c: u32,
 }
 
+public struct MegaFoo_ {
+    id: address,
+    a: u64,
+    b: Foo,
+    c: u32,
+}
+
 /// Complex struct with multiple wrapped objects and vectors
 public struct Var has key {
     id: UID,
@@ -174,8 +279,22 @@ public struct Var has key {
     c: vector<Bar>,
 }
 
+public struct Var_ {
+    id: address,
+    a: Bar,
+    b: Foo,
+    c: vector<Bar>,
+}
+
 public struct GenericWrapper<T> has key {
     id: UID,
+    a: T,
+    b: GenericStruct<T>,
+    c: T
+}
+
+public struct GenericWrapper_<T> {
+    id: address,
     a: T,
     b: GenericStruct<T>,
     c: T
@@ -204,8 +323,14 @@ entry fun save_static_fields(
 }
 
 /// Read a StaticFields structure from storage
-entry fun read_static_fields(uid: u256): StaticFields {
-    read_slot<StaticFields>(0, uid)
+entry fun read_static_fields(uid: u256): StaticFields_ {
+    let struct_ = read_slot<StaticFields>(0, uid);
+    let StaticFields { id, a, b, c, d, e, f, g } = struct_;
+    let addr = id.to_address();
+    id.delete();
+    StaticFields_ {
+        id: addr, a, b, c, d, e, f, g
+    }
 }
 
 /// Save a StaticFields2 structure to storage
@@ -225,8 +350,14 @@ entry fun save_static_fields_2(
 }
 
 /// Read a StaticFields2 structure from storage
-entry fun read_static_fields_2(uid: u256): StaticFields2 {
-    read_slot<StaticFields2>(0, uid)
+entry fun read_static_fields_2(uid: u256): StaticFields2_ {
+    let struct_ = read_slot<StaticFields2>(0, uid);
+    let StaticFields2 { id, a, b, c, d, e } = struct_;
+    let addr = id.to_address();
+    id.delete();
+    StaticFields2_ {
+        id: addr, a, b, c, d, e
+    }
 }
 
 /// Save a StaticFields3 structure to storage
@@ -245,8 +376,14 @@ entry fun save_static_fields_3(
 }
 
 /// Read a StaticFields3 structure from storage
-entry fun read_static_fields_3(uid: u256): StaticFields3 {
-    read_slot<StaticFields3>(0, uid)
+entry fun read_static_fields_3(uid: u256): StaticFields3_ {
+    let struct_ = read_slot<StaticFields3>(0, uid);
+    let StaticFields3 { id, a, b, c, d } = struct_;
+    let addr = id.to_address();
+    id.delete();
+    StaticFields3_ {
+        id: addr, a, b, c, d
+    }
 }
 
 /// Save a StaticNestedStruct structure to storage
@@ -268,8 +405,14 @@ entry fun save_static_nested_struct(
 }
 
 /// Read a StaticNestedStruct structure from storage
-entry fun read_static_nested_struct(uid: u256): StaticNestedStruct {
-    read_slot<StaticNestedStruct>(0, uid)
+entry fun read_static_nested_struct(uid: u256): StaticNestedStruct_ {
+    let struct_ = read_slot<StaticNestedStruct>(0, uid);
+    let StaticNestedStruct { id, a, b, c, f, g } = struct_;
+    let addr = id.to_address();
+    id.delete();
+    StaticNestedStruct_ {
+        id: addr, a, b, c, f, g
+    }
 }
 
 // ============================================================================
@@ -295,8 +438,14 @@ entry fun save_dynamic_struct(
 }
 
 /// Read a DynamicStruct structure from storage
-entry fun read_dynamic_struct(uid: u256): DynamicStruct {
-    read_slot<DynamicStruct>(0, uid)
+entry fun read_dynamic_struct(uid: u256): DynamicStruct_ {
+    let struct_ = read_slot<DynamicStruct>(0, uid);
+    let DynamicStruct { id, a, b, c, d, e, f, g } = struct_;
+    let addr = id.to_address();
+    id.delete();
+    DynamicStruct_ {
+        id: addr, a, b, c, d, e, f, g
+    }
 }
 
 /// Save a DynamicStruct2 structure to storage
@@ -319,8 +468,14 @@ entry fun save_dynamic_struct_2(
 }
 
 /// Read a DynamicStruct2 structure from storage
-entry fun read_dynamic_struct_2(uid: u256): DynamicStruct2 {
-    read_slot<DynamicStruct2>(0, uid)
+entry fun read_dynamic_struct_2(uid: u256): DynamicStruct2_ {
+    let struct_ = read_slot<DynamicStruct2>(0, uid);
+    let DynamicStruct2 { id, a, b, c, d, e, f, g, h } = struct_;
+    let addr = id.to_address();
+    id.delete();
+    DynamicStruct2_ {
+        id: addr, a, b, c, d, e, f, g, h
+    }
 }
 
 /// Save a DynamicStruct3 structure to storage
@@ -339,8 +494,14 @@ entry fun save_dynamic_struct_3(
 }
 
 /// Read a DynamicStruct3 structure from storage
-entry fun read_dynamic_struct_3(uid: u256): DynamicStruct3 {
-    read_slot<DynamicStruct3>(0, uid)
+entry fun read_dynamic_struct_3(uid: u256): DynamicStruct3_ {
+    let struct_ = read_slot<DynamicStruct3>(0, uid);
+    let DynamicStruct3 { id, a, b, c, d } = struct_;
+    let addr = id.to_address();
+    id.delete();
+    DynamicStruct3_ {
+        id: addr, a, b, c, d
+    }
 }
 
 /// Save a DynamicStruct4 structure to storage
@@ -368,8 +529,14 @@ entry fun save_dynamic_struct_4(
 }
 
 /// Read a DynamicStruct4 structure from storage
-entry fun read_dynamic_struct_4(uid: u256): DynamicStruct4 {
-    read_slot<DynamicStruct4>(0, uid)
+entry fun read_dynamic_struct_4(uid: u256): DynamicStruct4_ {
+    let struct_ = read_slot<DynamicStruct4>(0, uid);
+    let DynamicStruct4 { id, a, b } = struct_;
+    let addr = id.to_address();
+    id.delete();
+    DynamicStruct4_ {
+        id: addr, a, b
+    }
 }
 
 /// Save a DynamicStruct5 structure to storage
@@ -411,8 +578,14 @@ entry fun save_dynamic_struct_5(
 }
 
 /// Read a DynamicStruct5 structure from storage
-entry fun read_dynamic_struct_5(uid: u256): DynamicStruct5 {
-    read_slot<DynamicStruct5>(0, uid)
+entry fun read_dynamic_struct_5(uid: u256): DynamicStruct5_ {
+    let struct_ = read_slot<DynamicStruct5>(0, uid);
+    let DynamicStruct5 { id, a } = struct_;
+    let addr = id.to_address();
+    id.delete();
+    DynamicStruct5_ {
+        id: addr, a
+    }
 }
 
 /// Save a GenericStruct<u32> structure to storage
@@ -429,8 +602,14 @@ entry fun save_generic_struct_32(
 }
 
 /// Read a GenericStruct<u32> structure from storage
-entry fun read_generic_struct_32(uid: u256): GenericStruct<u32> {
-    read_slot<GenericStruct<u32>>(0, uid)
+entry fun read_generic_struct_32(uid: u256): GenericStruct_<u32> {
+    let struct_ = read_slot<GenericStruct<u32>>(0, uid);
+    let GenericStruct<u32> { id, a, b } = struct_;
+    let addr = id.to_address();
+    id.delete();
+    GenericStruct_<u32> {
+        id: addr, a, b
+    }
 }
 
 // ============================================================================
@@ -455,8 +634,14 @@ entry fun save_foo(ctx: &mut TxContext) {
 }
 
 /// Read a Foo structure from storage
-entry fun read_foo(uid: u256): Foo {
-    read_slot<Foo>(0, uid)
+entry fun read_foo(uid: u256): Foo_ {
+    let foo = read_slot<Foo>(0, uid);
+    let Foo { id, a, b, c } = foo;
+    let addr = id.to_address();
+    id.delete();
+    Foo_ {
+        id: addr, a, b, c
+    }
 }
 
 /// Save a MegaFoo structure to storage
@@ -484,8 +669,14 @@ entry fun save_mega_foo(ctx: &mut TxContext) {
 }
 
 /// Read a MegaFoo structure from storage
-entry fun read_mega_foo(uid: u256): MegaFoo {
-    read_slot<MegaFoo>(0, uid)
+entry fun read_mega_foo(uid: u256): MegaFoo_ {
+    let mega_foo = read_slot<MegaFoo>(0, uid);
+    let MegaFoo { id, a, b, c } = mega_foo;
+    let addr = id.to_address();
+    id.delete();
+    MegaFoo_ {
+        id: addr, a, b, c
+    }
 }
 
 /// Save a Var structure to storage
@@ -533,8 +724,14 @@ entry fun save_var(ctx: &mut TxContext) {
 }
 
 /// Read a Var structure from storage
-entry fun read_var(uid: u256): Var {
-    read_slot<Var>(0, uid)
+entry fun read_var(uid: u256): Var_ {
+    let var = read_slot<Var>(0, uid);
+    let Var { id, a, b, c } = var;
+    let addr = id.to_address();
+    id.delete();
+    Var_ {
+        id: addr, a, b, c
+    }
 }
 
 entry fun save_generic_wrapper_32(ctx: &mut TxContext) {
@@ -547,8 +744,14 @@ entry fun save_generic_wrapper_32(ctx: &mut TxContext) {
     save_in_slot(wrapper, 0);
 }
 
-entry fun read_generic_wrapper_32(uid: u256): GenericWrapper<u32> {
-    read_slot<GenericWrapper<u32>>(0, uid)
+entry fun read_generic_wrapper_32(uid: u256): GenericWrapper_<u32> {
+    let wrapper = read_slot<GenericWrapper<u32>>(0, uid);
+    let GenericWrapper<u32> { id, a, b, c } = wrapper;
+    let addr = id.to_address();
+    id.delete();
+    GenericWrapper_<u32> {
+        id: addr, a, b, c
+    }
 }
 
 // Enums encoding
