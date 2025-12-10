@@ -259,14 +259,8 @@ pub fn validate_function(
             // If struct is not found in either local or imported, return error
             match module_struct.or(imported_struct) {
                 None => {
-                    // TODO: here we might encounter the case where the datatype is actually an enum not an struct,
+                    // Note: here we might encounter the case where the datatype is actually an enum not an struct,
                     // in this case we dont want to return an error, we want to ignore it.
-                    // return Err(SpecialAttributeError {
-                    //     kind: SpecialAttributeErrorKind::FunctionValidation(
-                    //         FunctionValidationError::StructNotFound,
-                    //     ),
-                    //     line_of_code: function.loc,
-                    // });
                 }
                 Some(found_struct) => {
                     // If struct is found and has key ability, return error
