@@ -127,3 +127,7 @@ entry fun test_mutate_mut_ref_vector_2(mut x: vector<u32>): vector<u32> {
     mutate_mut_ref_vector(&mut x);
     x
 }
+
+entry fun test_contains(v: &vector<u32>, e: &u32): bool {
+    vector::contains<u32>(v, e)
+}

@@ -1535,27 +1535,25 @@ fn translate_instruction(
             types_stack.push(IntermediateType::IMutRef(Box::new(field_type)));
         }
         Bytecode::VecUnpack(signature_index, length) => {
-            let inner =
+            let expected_vec_inner =
                 bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
-            let inner = if type_contains_generics(&inner) {
-                if let Some(caller_type_instances) =
-                    &mapped_function.function_id.type_instantiations
-                {
-                    replace_type_parameters(&inner, caller_type_instances)
-                } else {
-                    return Err(TranslationError::CouldNotInstantiateGenericTypes);
-                }
-            } else {
-                inner
-            };
+            let expected_vec_inner = get_expected_vec_inner(expected_vec_inner, mapped_function)?;
 
-            types_stack.pop_expecting(&IntermediateType::IVector(Box::new(inner.clone())))?;
+            types_stack.pop_expecting(&IntermediateType::IVector(Box::new(
+                expected_vec_inner.clone(),
+            )))?;
 
-            IVector::vec_unpack_instructions(&inner, module, builder, compilation_ctx, *length)?;
+            IVector::vec_unpack_instructions(
+                &expected_vec_inner,
+                module,
+                builder,
+                compilation_ctx,
+                *length,
+            )?;
 
             for _ in 0..*length {
-                types_stack.push(inner.clone());
+                types_stack.push(expected_vec_inner.clone());
             }
         }
         // Vector instructions
@@ -1570,6 +1568,8 @@ fn translate_instruction(
 
             let expected_vec_inner =
                 bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
+
+            let expected_vec_inner = get_expected_vec_inner(expected_vec_inner, mapped_function)?;
 
             if *vec_inner != expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
@@ -1597,6 +1597,8 @@ fn translate_instruction(
 
             let expected_vec_inner =
                 bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
+
+            let expected_vec_inner = get_expected_vec_inner(expected_vec_inner, mapped_function)?;
 
             if *vec_inner != expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
@@ -1632,23 +1634,13 @@ fn translate_instruction(
             // }
             // ```
 
-            let inner =
+            let expected_vec_inner =
                 bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
-            let inner = if type_contains_generics(&inner) {
-                if let Some(caller_type_instances) =
-                    &mapped_function.function_id.type_instantiations
-                {
-                    replace_type_parameters(&inner, caller_type_instances)
-                } else {
-                    return Err(TranslationError::CouldNotInstantiateGenericTypes);
-                }
-            } else {
-                inner
-            };
+            let expected_vec_inner = get_expected_vec_inner(expected_vec_inner, mapped_function)?;
 
             IVector::vec_pack_instructions(
-                &inner,
+                &expected_vec_inner,
                 module,
                 builder,
                 compilation_ctx,
@@ -1658,11 +1650,11 @@ fn translate_instruction(
             // Remove the packing values from types stack and check if the types are correct
             let mut n = *num_elements as usize;
             while n > 0 {
-                types_stack.pop_expecting(&inner)?;
+                types_stack.pop_expecting(&expected_vec_inner)?;
                 n -= 1;
             }
 
-            types_stack.push(IntermediateType::IVector(Box::new(inner)));
+            types_stack.push(IntermediateType::IVector(Box::new(expected_vec_inner)));
         }
         Bytecode::VecPopBack(signature_index) => {
             let ty = types_stack.pop()?;
@@ -1679,14 +1671,9 @@ fn translate_instruction(
             let expected_vec_inner =
                 bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
-            let expected_vec_inner = if let IntermediateType::ITypeParameter(_) = expected_vec_inner
-            {
-                &*vec_inner
-            } else {
-                &expected_vec_inner
-            };
+            let expected_vec_inner = get_expected_vec_inner(expected_vec_inner, mapped_function)?;
 
-            if *vec_inner != *expected_vec_inner {
+            if *vec_inner != expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
                     expected: expected_vec_inner.clone(),
                     found: *vec_inner,
@@ -1740,27 +1727,22 @@ fn translate_instruction(
                 (IntermediateType::IVector(vec_inner), "vector", *mut_inner)
             );
 
-            let expected_elem_type =
-                bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
-
-            let expected_elem_type = if let IntermediateType::ITypeParameter(_) = expected_elem_type
-            {
-                &*vec_inner
-            } else {
-                &expected_elem_type
-            };
-
-            if *vec_inner != *expected_elem_type {
+            if elem_ty != *vec_inner {
                 return Err(TranslationError::TypeMismatch {
-                    expected: expected_elem_type.clone(),
-                    found: *vec_inner,
+                    expected: *vec_inner,
+                    found: elem_ty,
                 });
             }
 
-            if &elem_ty != expected_elem_type {
+            let expected_vec_inner =
+                bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
+
+            let expected_vec_inner = get_expected_vec_inner(expected_vec_inner, mapped_function)?;
+
+            if *vec_inner != expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
-                    expected: expected_elem_type.clone(),
-                    found: elem_ty,
+                    expected: expected_vec_inner.clone(),
+                    found: *vec_inner,
                 });
             }
 
@@ -1789,17 +1771,7 @@ fn translate_instruction(
             let expected_vec_inner =
                 bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
-            let expected_vec_inner = if type_contains_generics(&expected_vec_inner) {
-                if let Some(caller_type_instances) =
-                    &mapped_function.function_id.type_instantiations
-                {
-                    replace_type_parameters(&expected_vec_inner, caller_type_instances)
-                } else {
-                    return Err(TranslationError::CouldNotInstantiateGenericTypes);
-                }
-            } else {
-                expected_vec_inner
-            };
+            let expected_vec_inner = get_expected_vec_inner(expected_vec_inner, mapped_function)?;
 
             if *vec_inner != expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
@@ -3341,4 +3313,22 @@ pub(crate) fn translate_and_link_functions(
     }
 
     Ok(())
+}
+
+fn get_expected_vec_inner(
+    expected_vec_inner: IntermediateType,
+    function_information: &MappedFunction,
+) -> Result<IntermediateType, TranslationError> {
+    if type_contains_generics(&expected_vec_inner) {
+        if let Some(caller_type_instances) = &function_information.function_id.type_instantiations {
+            Ok(replace_type_parameters(
+                &expected_vec_inner,
+                caller_type_instances,
+            ))
+        } else {
+            Err(TranslationError::CouldNotInstantiateGenericTypes)
+        }
+    } else {
+        Ok(expected_vec_inner)
+    }
 }
