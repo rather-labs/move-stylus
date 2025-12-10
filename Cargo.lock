@@ -3263,6 +3263,7 @@ dependencies = [
  "move-package",
  "move-packages-build",
  "move-parse-special-attributes",
+ "move-test-runner",
  "relooper",
  "rstest",
  "thiserror 2.0.17",

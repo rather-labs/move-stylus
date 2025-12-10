@@ -1,39 +1,18 @@
-use alloy_sol_types::SolValue;
-use alloy_sol_types::abi::TokenSeq;
-use alloy_sol_types::{SolCall, SolType, sol};
-use anyhow::Result;
-use common::{runtime_sandbox::RuntimeSandbox, translate_test_package};
-use rstest::{fixture, rstest};
-
 mod common;
 
-fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u8>) -> Result<()> {
-    let (result, return_data) = runtime.call_entrypoint(call_data)?;
-    anyhow::ensure!(
-        result == 0,
-        "Function returned non-zero exit code: {result}"
-    );
-    anyhow::ensure!(
-        return_data == expected_result,
-        "return data mismatch:\nreturned:{return_data:?}\nexpected:{expected_result:?}"
-    );
-
-    Ok(())
-}
+use crate::common::run_test;
+use alloy_primitives::U256;
+use alloy_sol_types::{SolCall, SolType, SolValue, abi::TokenSeq, sol};
+use move_test_runner::wasm_runner::RuntimeSandbox;
+use rstest::{fixture, rstest};
 
 mod enum_abi_packing_unpacking {
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "enum_abi_packing_unpacking";
-        const SOURCE_PATH: &str = "tests/enums/enum_abi_packing_unpacking.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    declare_fixture!(
+        "enum_abi_packing_unpacking",
+        "tests/enums/enum_abi_packing_unpacking.move"
+    );
 
     sol! {
         enum SimpleEnum {
@@ -83,20 +62,7 @@ mod enum_abi_packing_unpacking {
 mod enum_with_fields {
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "enum_with_fields";
-        const SOURCE_PATH: &str = "tests/enums/enum_with_fields.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
-
-    use alloy_primitives::U256;
-    use alloy_sol_types::SolValue; // for .abi_encode()
-    use alloy_sol_types::sol; // runtime bytes
+    declare_fixture!("enum_with_fields", "tests/enums/enum_with_fields.move");
 
     sol! {
         function packUnpackPlanet(uint8 index) external returns (uint64, uint64);
@@ -210,16 +176,7 @@ mod enum_with_fields {
 mod control_flow {
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "enums_control_flow";
-        const SOURCE_PATH: &str = "tests/enums/enums_control_flow.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    declare_fixture!("enums_control_flow", "tests/enums/enums_control_flow.move");
 
     sol! {
         enum Number {
@@ -400,19 +357,8 @@ mod control_flow {
 
 mod geometry {
     use super::*;
-    use alloy_sol_types::sol;
-    use alloy_sol_types::{SolCall, SolValue}; // for .abi_encode() // runtime bytes
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "enums_geometry";
-        const SOURCE_PATH: &str = "tests/enums/geometry.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    declare_fixture!("enums_geometry", "tests/enums/geometry.move");
 
     sol! {
         function testSquare(uint64 side) external returns (uint64, uint64);
@@ -452,19 +398,11 @@ mod geometry {
 
 mod magical_creatures {
     use super::*;
-    use alloy_sol_types::sol;
-    use alloy_sol_types::{SolCall, SolValue};
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "enums_magical_creatures";
-        const SOURCE_PATH: &str = "tests/enums/magical_creatures.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    declare_fixture!(
+        "enums_magical_creatures",
+        "tests/enums/magical_creatures.move"
+    );
 
     sol! {
         function testBeast(uint32 level, uint64 ferocity) external returns (uint32, uint64, uint32, uint64);
@@ -497,19 +435,8 @@ mod magical_creatures {
 
 mod stars {
     use super::*;
-    use alloy_sol_types::sol;
-    use alloy_sol_types::{SolCall, SolValue};
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "stars";
-        const SOURCE_PATH: &str = "tests/enums/stars.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    declare_fixture!("stars", "tests/enums/stars.move");
 
     sol! {
         enum Core {
@@ -574,19 +501,11 @@ mod stars {
 
 mod lab_experiment {
     use super::*;
-    use alloy_sol_types::sol;
-    use alloy_sol_types::{SolCall, SolValue};
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "elements_experiment";
-        const SOURCE_PATH: &str = "tests/enums/elements_experiment.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    declare_fixture!(
+        "elements_experiment",
+        "tests/enums/elements_experiment.move"
+    );
 
     sol! {
         enum State {
@@ -653,19 +572,8 @@ mod lab_experiment {
 
 mod generic_enums {
     use super::*;
-    use alloy_sol_types::sol;
-    use alloy_sol_types::{SolCall, SolValue};
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "generic_enums";
-        const SOURCE_PATH: &str = "tests/enums/generic_enums.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    declare_fixture!("generic_enums", "tests/enums/generic_enums.move");
 
     sol! {
         function packUnpackFoo(uint8 variant_index, uint64 value64, uint32 value32) external returns (uint64, uint32);

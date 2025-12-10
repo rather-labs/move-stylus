@@ -7,9 +7,9 @@ use std::{
 use move_bytecode_to_wasm::{translate_package, translate_single_module};
 use move_package::{BuildConfig, LintFlag};
 use move_packages_build::implicit_dependencies;
+use move_test_runner::wasm_runner::RuntimeSandbox;
+use rstest::fixture;
 use walrus::Module;
-
-pub mod runtime_sandbox;
 
 fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
     if !dst.exists() {
@@ -227,4 +227,79 @@ pub fn translate_test_package_with_framework_result(
         .unwrap();
 
     translate_single_module(package, module_name)
+}
+
+#[allow(dead_code)]
+pub fn run_test(
+    runtime: &crate::common::RuntimeSandbox,
+    call_data: Vec<u8>,
+    expected_result: Vec<u8>,
+) -> Result<(), anyhow::Error> {
+    let (result, return_data) = runtime.call_entrypoint(call_data)?;
+    anyhow::ensure!(
+        result == 0,
+        "Function returned non-zero exit code: {result}"
+    );
+    anyhow::ensure!(
+        return_data == expected_result,
+        "return data mismatch:\nreturned:{return_data:?}\nexpected:{expected_result:?}"
+    );
+
+    Ok(())
+}
+
+#[macro_export]
+macro_rules! declare_fixture {
+    ($module_name:literal, $source_path:literal) => {
+        #[fixture]
+        #[once]
+        pub fn runtime() -> move_test_runner::wasm_runner::RuntimeSandbox {
+            let mut translated_package =
+                $crate::common::translate_test_package($source_path, $module_name);
+
+            move_test_runner::wasm_runner::RuntimeSandbox::from_binary(
+                &translated_package.emit_wasm(),
+            )
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! declare_fixture_complete_package {
+    ($module_name:literal, $source_path:literal) => {
+        #[fixture]
+        #[once]
+        pub fn runtime() -> move_test_runner::wasm_runner::RuntimeSandbox {
+            let mut translated_packages =
+                $crate::common::translate_test_complete_package($source_path);
+
+            let translated_package = translated_packages.get_mut($module_name).unwrap();
+
+            move_test_runner::wasm_runner::RuntimeSandbox::from_binary(
+                &translated_package.emit_wasm(),
+            )
+        }
+    };
+}
+
+#[fixture]
+pub fn runtime_with_framework(
+    #[default("")] module_name: &str,
+    #[default("")] source_path: &str,
+) -> RuntimeSandbox {
+    let mut translated_package = translate_test_package_with_framework(source_path, module_name);
+
+    RuntimeSandbox::from_binary(&translated_package.emit_wasm())
+}
+
+#[fixture]
+pub fn runtime_package_with_framework(
+    #[default("")] module_name: &str,
+    #[default("")] source_path: &str,
+) -> RuntimeSandbox {
+    let mut translated_packages = translate_test_complete_package_with_framework(source_path);
+
+    let translated_package = translated_packages.get_mut(module_name).unwrap();
+
+    RuntimeSandbox::from_binary(&translated_package.emit_wasm())
 }

@@ -23,6 +23,7 @@ entry fun deref_nested_address(x: address): address {
     *z
 }
 
+#[allow(unused_mut_parameter)]
 entry fun deref_mut_arg(x: &mut address ): address {
  *x
 }
@@ -61,6 +62,6 @@ entry fun freeze_ref(y: address): address {
     let mut x = @0x01;
     let x_mut_ref: &mut address = &mut x;
     *x_mut_ref = y;
-    let x_frozen_ref: &address = freeze(x_mut_ref); 
+    let x_frozen_ref: &address = freeze(x_mut_ref);
     *x_frozen_ref
 }

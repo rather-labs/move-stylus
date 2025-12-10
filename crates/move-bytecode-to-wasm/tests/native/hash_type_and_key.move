@@ -14,11 +14,13 @@ native fun hash_type_and_key<K: copy + drop + store>(
 // is correct.
 native fun get_last_memory_position(): u32;
 
+#[allow(unused_field)]
 public struct Bar has copy, drop, store {
     n: u32,
     o: u128,
 }
 
+#[allow(unused_field)]
 public struct Foo has copy, drop, store {
     p: Bar,
     q: address,
@@ -33,6 +35,7 @@ public struct Foo has copy, drop, store {
     z: u256,
 }
 
+#[allow(unused_field)]
 public struct Baz<T: copy + drop + store> has copy, drop, store {
     g: T,
     p: Bar,

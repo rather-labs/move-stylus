@@ -1,32 +1,10 @@
+mod common;
 use alloy_sol_types::{SolCall, SolType, SolValue, abi::TokenSeq, sol};
-use anyhow::Result;
-use common::{runtime_sandbox::RuntimeSandbox, translate_test_complete_package};
+use common::run_test;
+use move_test_runner::wasm_runner::RuntimeSandbox;
 use rstest::{fixture, rstest};
 
-mod common;
-
-fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u8>) -> Result<()> {
-    let (result, return_data) = runtime.call_entrypoint(call_data)?;
-    anyhow::ensure!(
-        result == 0,
-        "Function returned non-zero exit code: {result}"
-    );
-    anyhow::ensure!(
-        return_data == expected_result,
-        "return data mismatch:\nreturned:{return_data:?}\nexpected:{expected_result:?}"
-    );
-
-    Ok(())
-}
-
-#[fixture]
-#[once]
-fn runtime() -> RuntimeSandbox {
-    let mut translated_packages = translate_test_complete_package("tests/dependencies");
-
-    let translated_package = translated_packages.get_mut("main").unwrap();
-    RuntimeSandbox::new(translated_package)
-}
+declare_fixture_complete_package!("main", "tests/dependencies");
 
 sol!(
     struct AnotherTest {

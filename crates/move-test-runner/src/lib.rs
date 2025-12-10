@@ -1,5 +1,5 @@
-mod constants;
-mod wasm_runner;
+pub mod constants;
+pub mod wasm_runner;
 
 use std::path::Path;
 
@@ -39,7 +39,7 @@ pub fn run_tests(
                 ""
             }
         );
-        let runtime = RuntimeSandbox::new(&compiled_wasm);
+        let runtime = RuntimeSandbox::from_path(&compiled_wasm);
 
         if test.skip {
             println!("{YELLOW}SKIPPED{RESET}");
