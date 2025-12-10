@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use move_compiler::parser::ast::{NameAccessChain_, Type_};
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Type {
     Address,
     Bool,
@@ -18,6 +18,8 @@ pub enum Type {
     Unit,
     Tuple(Vec<Type>),
     Function(Vec<Type>, Rc<Type>),
+    Ref(Rc<Type>),
+    MutRef(Rc<Type>),
 }
 
 impl Type {
@@ -80,7 +82,13 @@ impl Type {
                     Self::UserDataType(last_entry.name.to_string(), types)
                 }
             },
-            Type_::Ref(_, spanned) => Self::parse_type(&spanned.value),
+            Type_::Ref(is_mut, spanned) => {
+                if *is_mut {
+                    Self::MutRef(Rc::new(Self::parse_type(&spanned.value)))
+                } else {
+                    Self::Ref(Rc::new(Self::parse_type(&spanned.value)))
+                }
+            }
             Type_::Unit => Self::Unit,
             Type_::Multiple(spanneds) => {
                 let types = spanneds
