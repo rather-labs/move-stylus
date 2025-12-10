@@ -52,7 +52,7 @@ entry fun create_shield(armor: u8, ctx: &mut TxContext) {
     transfer::transfer(shield, ctx.sender())
 }
 
-entry fun equip_sword(warrior: &mut Warrior, sword: Sword, ctx: &mut TxContext) {
+entry fun equip_sword(warrior: &mut Warrior, sword: Sword, ctx: &TxContext) {
     if (warrior.sword.is_some()) {
         let old_sword = warrior.sword.extract();
         transfer::transfer(old_sword, ctx.sender());
@@ -60,7 +60,7 @@ entry fun equip_sword(warrior: &mut Warrior, sword: Sword, ctx: &mut TxContext) 
     warrior.sword.fill(sword);
 }
 
-entry fun equip_shield(warrior: &mut Warrior, shield: Shield, ctx: &mut TxContext) {
+entry fun equip_shield(warrior: &mut Warrior, shield: Shield, ctx: &TxContext) {
     if (warrior.shield.is_some()) {
         let old_shield = warrior.shield.extract();
         transfer::transfer(old_shield, ctx.sender());
@@ -68,7 +68,7 @@ entry fun equip_shield(warrior: &mut Warrior, shield: Shield, ctx: &mut TxContex
     warrior.shield.fill(shield);
 }
 
-entry fun change_faction(warrior: &mut Warrior, faction: Faction, ctx: &mut TxContext) {
+entry fun change_faction(warrior: &mut Warrior, faction: Faction) {
     warrior.faction = faction;
 }
 

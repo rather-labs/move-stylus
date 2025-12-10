@@ -1,27 +1,15 @@
-use alloy_primitives::U256;
-use alloy_sol_types::{SolCall, SolType, sol};
-use anyhow::Result;
-use common::{runtime_sandbox::RuntimeSandbox, translate_test_package};
-use rstest::{fixture, rstest};
-
 mod common;
 
-fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u8>) -> Result<()> {
-    let (result, return_data) = runtime.call_entrypoint(call_data)?;
-    anyhow::ensure!(
-        result == 0,
-        "Function returned non-zero exit code: {result}"
-    );
-    anyhow::ensure!(
-        return_data == expected_result,
-        "return data mismatch: {return_data:?} != {expected_result:?}"
-    );
-
-    Ok(())
-}
+use crate::common::run_test;
+use alloy_primitives::U256;
+use alloy_sol_types::{SolCall, SolType, sol};
+use move_test_runner::wasm_runner::RuntimeSandbox;
+use rstest::{fixture, rstest};
 
 mod uint_8 {
     use super::*;
+
+    declare_fixture!("uint_8", "tests/operations-bitwise/uint_8.move");
 
     sol!(
         #[allow(missing_docs)]
@@ -31,16 +19,6 @@ mod uint_8 {
         function shiftLeft(uint8 x, uint8 slots) external returns (uint8);
         function shiftRight(uint8 x, uint8 slots) external returns (uint8);
     );
-
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "uint_8";
-        const SOURCE_PATH: &str = "tests/operations-bitwise/uint_8.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-        RuntimeSandbox::new(&mut translated_package)
-    }
 
     #[rstest]
     #[case(orCall::new((250, 250)), 250)]
@@ -127,6 +105,8 @@ mod uint_8 {
 mod uint_16 {
     use super::*;
 
+    declare_fixture!("uint_16", "tests/operations-bitwise/uint_16.move");
+
     sol!(
         #[allow(missing_docs)]
         function or(uint16 x, uint16 y) external returns (uint16);
@@ -135,16 +115,6 @@ mod uint_16 {
         function shiftLeft(uint16 x, uint8 slots) external returns (uint16);
         function shiftRight(uint16 x, uint8 slots) external returns (uint16);
     );
-
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "uint_16";
-        const SOURCE_PATH: &str = "tests/operations-bitwise/uint_16.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-        RuntimeSandbox::new(&mut translated_package)
-    }
 
     #[rstest]
     #[case(orCall::new((1616, 1616)), 1616)]
@@ -229,6 +199,8 @@ mod uint_16 {
 mod uint_32 {
     use super::*;
 
+    declare_fixture!("uint_32", "tests/operations-bitwise/uint_32.move");
+
     sol!(
         #[allow(missing_docs)]
         function or(uint32 x, uint32 y) external returns (uint32);
@@ -237,16 +209,6 @@ mod uint_32 {
         function shiftLeft(uint32 x, uint8 slots) external returns (uint32);
         function shiftRight(uint32 x, uint8 slots) external returns (uint32);
     );
-
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "uint_32";
-        const SOURCE_PATH: &str = "tests/operations-bitwise/uint_32.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-        RuntimeSandbox::new(&mut translated_package)
-    }
 
     #[rstest]
     #[case(orCall::new((3232, 3232)), 3232)]
@@ -332,6 +294,8 @@ mod uint_32 {
 mod uint_64 {
     use super::*;
 
+    declare_fixture!("uint_64", "tests/operations-bitwise/uint_64.move");
+
     sol!(
         #[allow(missing_docs)]
         function or(uint64 x, uint64 y) external returns (uint64);
@@ -340,16 +304,6 @@ mod uint_64 {
         function shiftLeft(uint64 x, uint8 slots) external returns (uint64);
         function shiftRight(uint64 x, uint8 slots) external returns (uint64);
     );
-
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "uint_64";
-        const SOURCE_PATH: &str = "tests/operations-bitwise/uint_64.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-        RuntimeSandbox::new(&mut translated_package)
-    }
 
     #[rstest]
     #[case(orCall::new((6464, 6464)), 6464)]
@@ -434,6 +388,8 @@ mod uint_64 {
 mod uint_128 {
     use super::*;
 
+    declare_fixture!("uint_128", "tests/operations-bitwise/uint_128.move");
+
     sol!(
         #[allow(missing_docs)]
         function or(uint128 x, uint128 y) external returns (uint128);
@@ -442,16 +398,6 @@ mod uint_128 {
         function shiftLeft(uint128 x, uint8 slots) external returns (uint128);
         function shiftRight(uint128 x, uint8 slots) external returns (uint128);
     );
-
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "uint_128";
-        const SOURCE_PATH: &str = "tests/operations-bitwise/uint_128.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-        RuntimeSandbox::new(&mut translated_package)
-    }
 
     #[rstest]
     #[case(orCall::new((128128, 128128)), 128128)]
@@ -536,6 +482,8 @@ mod uint_128 {
 mod uint_256 {
     use super::*;
 
+    declare_fixture!("uint_256", "tests/operations-bitwise/uint_256.move");
+
     sol!(
         #[allow(missing_docs)]
         function or(uint256 x, uint256 y) external returns (uint256);
@@ -544,16 +492,6 @@ mod uint_256 {
         function shiftLeft(uint256 x, uint8 slots) external returns (uint256);
         function shiftRight(uint256 x, uint8 slots) external returns (uint256);
     );
-
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "uint_256";
-        const SOURCE_PATH: &str = "tests/operations-bitwise/uint_256.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-        RuntimeSandbox::new(&mut translated_package)
-    }
 
     #[rstest]
     #[case(orCall::new((U256::from(256256), U256::from(256256))), U256::from(256256))]

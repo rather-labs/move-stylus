@@ -1,23 +1,12 @@
 mod common;
 
-use common::{runtime_sandbox::RuntimeSandbox, translate_test_package_with_framework};
-use rstest::{fixture, rstest};
+use crate::common::runtime_with_framework as runtime;
+use alloy_sol_types::{SolCall, sol};
+use move_test_runner::wasm_runner::RuntimeSandbox;
+use rstest::rstest;
 
 mod receive {
-    use alloy_sol_types::{SolCall, sol};
-
     use super::*;
-
-    #[fixture]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "receive";
-        const SOURCE_PATH: &str = "tests/receive/receive.move";
-
-        let mut translated_package =
-            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
 
     sol!(
         #[allow(missing_docs)]
@@ -25,7 +14,7 @@ mod receive {
     );
 
     #[rstest]
-    fn test_receive(runtime: RuntimeSandbox) {
+    fn test_receive(#[with("receive", "tests/receive/receive.move")] runtime: RuntimeSandbox) {
         // Create a new counter
         let call_data = receiveCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -34,20 +23,7 @@ mod receive {
 }
 
 mod receive_with_tx_context {
-    use alloy_sol_types::{SolCall, sol};
-
     use super::*;
-
-    #[fixture]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "receive_with_tx_context";
-        const SOURCE_PATH: &str = "tests/receive/receive_with_tx_context.move";
-
-        let mut translated_package =
-            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
 
     sol!(
         #[allow(missing_docs)]
@@ -55,7 +31,13 @@ mod receive_with_tx_context {
     );
 
     #[rstest]
-    fn test_receive_with_tx_context(runtime: RuntimeSandbox) {
+    fn test_receive_with_tx_context(
+        #[with(
+            "receive_with_tx_context",
+            "tests/receive/receive_with_tx_context.move"
+        )]
+        runtime: RuntimeSandbox,
+    ) {
         // Create a new counter
         let call_data = receiveCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -64,8 +46,8 @@ mod receive_with_tx_context {
 }
 
 mod receive_bad {
+    use super::*;
     use crate::common::translate_test_package_with_framework;
-    use rstest::rstest;
 
     #[rstest]
     #[should_panic(expected = "ReceiveFunctionBadVisibility")]

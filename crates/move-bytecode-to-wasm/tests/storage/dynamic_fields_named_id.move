@@ -17,7 +17,7 @@ entry fun create_foo() {
     transfer::share_object(foo);
 }
 
-entry fun create_foo_owned(ctx: &mut TxContext) {
+entry fun create_foo_owned(ctx: &TxContext) {
     let foo = Foo { id: object::new_named_id<FOO_>() };
     transfer::transfer(foo, ctx.sender());
 }

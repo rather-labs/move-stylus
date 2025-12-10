@@ -53,7 +53,7 @@ fun get_creature_power_rating(creature: &Creature): u64 {
         },
         Creature::SpiritVariant(spirit) => {
             let mut i = 0;
-            let mut chant_power = 0u64;   
+            let mut chant_power = 0u64;
             while (i < vector::length(&spirit.chants)) {
                 let chant = *vector::borrow(&spirit.chants, i);
                 chant_power = chant_power + vector::length(&chant);
@@ -95,7 +95,7 @@ fun create_beast(level: u32, ferocity: u64): Beast {
 }
 
 fun create_golem(level: u32, density: u128, shards: vector<u64>): Golem {
-    let v = vector[vector[false], vector[true], vector[false], vector[true]];
+    let _v = vector[vector[false], vector[true], vector[false], vector[true]];
     Golem {
         level,
         density,

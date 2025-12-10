@@ -23,6 +23,7 @@ entry fun deref_nested_bool(x: bool): bool {
     *z
 }
 
+#[allow(unused_mut_parameter)]
 entry fun deref_mut_arg(x: &mut bool ): bool {
  *x
 }
@@ -54,6 +55,6 @@ entry fun freeze_ref(y: bool): bool {
     let mut x = true;
     let x_mut_ref: &mut bool = &mut x;
     *x_mut_ref = y;
-    let x_frozen_ref: &bool = freeze(x_mut_ref); 
+    let x_frozen_ref: &bool = freeze(x_mut_ref);
     *x_frozen_ref
 }
