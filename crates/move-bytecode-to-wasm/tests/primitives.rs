@@ -1410,6 +1410,7 @@ mod vec_32 {
         function testMutateMutRefVector(uint32[] x) external returns (uint32[]);
         function testMutateMutRefVector2(uint32[] x) external returns (uint32[]);
         function testContains(uint32[] v, uint32 e) external returns (bool);
+        function testRemove(uint32[] v, uint64 index) external returns (uint32[]);
     );
 
     #[rstest]
@@ -1439,6 +1440,7 @@ mod vec_32 {
     #[case(testMutateMutRefVector2Call::new((vec![1u32],)), vec![1, 42, 43, 44])]
     #[case(testContainsCall::new((vec![1u32, 2u32, 3u32], 2u32)), (true,))]
     #[case(testContainsCall::new((vec![1u32, 2u32, 3u32], 4u32)), (false,))]
+    #[case(testRemoveCall::new((vec![1u32, 2u32, 3u32], 1u64)), vec![1, 3])]
     fn test_vec_32<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,

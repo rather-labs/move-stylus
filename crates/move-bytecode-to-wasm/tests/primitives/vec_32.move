@@ -131,3 +131,8 @@ entry fun test_mutate_mut_ref_vector_2(mut x: vector<u32>): vector<u32> {
 entry fun test_contains(v: &vector<u32>, e: &u32): bool {
     vector::contains<u32>(v, e)
 }
+
+entry fun test_remove(v: &mut vector<u32>, index: u64): vector<u32> {
+    vector::remove<u32>(v, index);
+    *v
+}
