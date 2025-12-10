@@ -27,6 +27,16 @@ use stylus::table as table;
 // event Approval(address indexed _owner, address indexed _approved, uint256 indexed _tokenId);
 // event ApprovalForAll(address indexed _owner, address indexed _operator, bool _approved);
 
+// Errors: ERC721Errors
+// ERC721InvalidOwner(owner)
+// ERC721NonexistentToken(tokenId)
+// ERC721IncorrectOwner(sender, tokenId, owner)
+// ERC721InvalidSender(sender)
+// ERC721InvalidReceiver(receiver)
+// ERC721InsufficientApproval(operator, tokenId)
+// ERC721InvalidApprover(approver)
+// ERC721InvalidOperator(operator)
+
 
 const EInssuficientFunds: u64 = 1;
 const ENotAllowed: u64 = 2;
@@ -34,17 +44,14 @@ const EAlreadyMinted: u64 = 3;
 const ETokenNotMinted: u64 = 4;
 const EZeroAddress: u64 = 5;
 
-public struct TOTAL_SUPPLY has key {}
 public struct CONTRACT_INFO has key {}
-public struct ALLOWANCE_ has key {}
-public struct BALANCE_ has key {}
+public struct TOTAL_SUPPLY has key {}
 public struct OWNERS_ has key {}
+public struct BALANCE_ has key {}
+public struct TOKEN_APPROVALS has key {}
+public struct OPERATOR_APPROVALS has key {}
 
-public struct TotalSupply has key {
-    id: NamedId<TOTAL_SUPPLY>,
-    total: u256,
-}
-
+// Structs:
 public struct Info has key {
     id: NamedId<CONTRACT_INFO>,
     name: String,
@@ -52,12 +59,27 @@ public struct Info has key {
     decimals: u8,
 }
 
-// Emitted when `token_id` token is transferred from `from` to `to`.
-#[ext(event, indexes = 2)]
-public struct Transfer has copy, drop {
-    from: address,
-    to: address,
-    token_id: u256
+public struct TotalSupply has key {
+    id: NamedId<TOTAL_SUPPLY>,
+    total: u256,
+}
+
+public struct Owners has key {
+    id: NamedId<OWNERS_>,
+}
+
+public struct Balance has key {
+    id: NamedId<BALANCE_>,
+}
+
+// Holds the approved address (operator)permitted to transfer a particular token.
+public struct TokenApprovals has key {
+    id: NamedId<TOKEN_APPROVALS>,
+}
+
+// Indicates whether an operator has approval to manage all tokens owned by a specific address.
+public struct OperatorApprovals has key {
+    id: NamedId<OPERATOR_APPROVALS>,
 }
 
 // Emitted when `owner` enables `approved` to manage the `token_id` token.
@@ -76,18 +98,15 @@ public struct ApprovalForAll has copy, drop {
     approved: bool
 }
 
-public struct Balance has key {
-    id: NamedId<BALANCE_>,
+// Emitted when `token_id` token is transferred from `from` to `to`.
+#[ext(event, indexes = 2)]
+public struct Transfer has copy, drop {
+    from: address,
+    to: address,
+    token_id: u256
 }
 
-public struct Allowance has key {
-    id: NamedId<ALLOWANCE_>,
-}
-
-public struct Owners has key {
-    id: NamedId<OWNERS_>,
-}
-
+// Constructor
 fun init(_ctx: &mut TxContext) {
     transfer::freeze_object(Info {
         id: object::new_named_id<CONTRACT_INFO>(),
@@ -101,12 +120,20 @@ fun init(_ctx: &mut TxContext) {
         total: 0,
     });
 
-    transfer::share_object(Allowance {
-        id: object::new_named_id<ALLOWANCE_>(),
+    transfer::share_object(Owners {
+        id: object::new_named_id<OWNERS_>(),
     });
 
     transfer::share_object(Balance {
         id: object::new_named_id<BALANCE_>(),
+    });
+
+    transfer::share_object(TokenApprovals {
+        id: object::new_named_id<TOKEN_APPROVALS>(),
+    });
+
+    transfer::share_object(OperatorApprovals {
+        id: object::new_named_id<OPERATOR_APPROVALS>(),
     });
 }
 
@@ -153,7 +180,7 @@ entry fun burn(
     token_id: u256,
     owners: &mut Owners,
     balance: &mut Balance,
-    allowance: &mut Allowance,
+    token_approvals: &mut TokenApprovals,
     total_supply: &mut TotalSupply,
 ) {
     // Check if the token has been minted
@@ -173,14 +200,11 @@ entry fun burn(
     // Decrement the total supply by 1
     total_supply.total = total_supply.total - 1;
 
-    // Get the owner's allowance table
-    let owner_allowance = field::borrow_mut<ALLOWANCE_, address, Table<u256, vector<address>>>(
-        &mut allowance.id,
-        owner
-    );
-
-    // Remove the token_id from the owner's allowance table
-    owner_allowance.remove(token_id);
+    // Remove the token_id from the token_approvals table 
+    // (TODO: is this the same as setting the zero address as approved?)
+    if (field::exists_(&token_approvals.id, token_id)) {
+        field::remove<TOKEN_APPROVALS, u256, address>(&mut token_approvals.id, token_id);
+    };
 
     emit(Transfer {
         from: owner,
@@ -240,7 +264,7 @@ entry fun approve(
     to: address,
     token_id: u256,
     owners: &mut Owners,
-    allowance: &mut Allowance,
+    token_approvals: &mut TokenApprovals,
     ctx: &mut TxContext,
 ): bool {
     // Check if the sender is the owner of the token (TODO: or an approved operator...)
@@ -248,26 +272,18 @@ entry fun approve(
         abort(ENotAllowed)
     };
 
-    // Get the sender's allowance table
-    let sender_allowance = if (field::exists_(&allowance.id, ctx.sender())) {
-        field::borrow_mut<ALLOWANCE_, address, Table<u256, vector<address>>>(&mut allowance.id, ctx.sender())
+    // Approve `to` to operate on `token_id`
+    if (field::exists_(&token_approvals.id, token_id)) {
+        *field::borrow_mut<TOKEN_APPROVALS, u256, address>(&mut token_approvals.id, token_id) = to;
     } else {
         field::add(
-            &mut allowance.id,
-            ctx.sender(),
-            table::new<address, u256>(ctx)
+            &mut token_approvals.id,
+            token_id,
+            to
         );
-        field::borrow_mut<ALLOWANCE_, address, Table<u256, vector<address>>>(&mut allowance.id, ctx.sender())
     };
 
-    // Get the allowance for the `token_id` and push the `to` address to it
-    if (sender_allowance.contains(token_id)) {
-        let allowance = sender_allowance.borrow_mut(token_id);
-        vector::push_back(allowance, to);
-    } else {
-        sender_allowance.add(token_id, vector[to]);
-    };
-
+    // Emit the Approval event
     emit(Approval {
         owner: ctx.sender(),
         approved: to,
@@ -275,6 +291,106 @@ entry fun approve(
     });
 
     true
+}
+
+// Returns the account approved for `token_id` token.
+//
+// Requirements:
+// - `token_id` must exist.
+entry fun getApproved(token_id: u256, token_approvals: &TokenApprovals): address {
+    if (field::exists_(&token_approvals.id, token_id)) {
+        *field::borrow<TOKEN_APPROVALS, u256, address>(&token_approvals.id, token_id)
+    } else {
+        // Return the zero address if `token_id` has no approved operators
+        @0x0
+    }
+}
+
+// Approve or remove `operator` as an operator for the caller.
+// Operators can call transferFrom() or safeTransferFrom() for any token owned by the caller.
+//
+// Requirements:
+// - The operator cannot be the address zero.
+// 
+// Emits an ApprovalForAll event.
+entry fun setApprovalForAll(
+    operator: address,
+    approved: bool,
+    operator_approvals: &mut OperatorApprovals,
+    ctx: &mut TxContext,
+) {
+    if (approved) {
+        // If approved is true, set or add the entry
+        if (field::exists_(&operator_approvals.id, ctx.sender())) {
+            *field::borrow_mut<OPERATOR_APPROVALS, address, address>(&mut operator_approvals.id, ctx.sender()) = operator;
+        } else {
+            field::add(&mut operator_approvals.id, ctx.sender(), operator);
+        };
+    } else {
+        // If approved is false, remove the entry entirely if it exists
+        if (field::exists_(&operator_approvals.id, ctx.sender())) {
+            field::remove<OPERATOR_APPROVALS, address, address>(&mut operator_approvals.id, ctx.sender());
+        };
+    };
+}
+
+// Returns if the operator is allowed to manage all of the assets of owner.
+//
+// See setApprovalForAll()
+entry fun isApprovedForAll(
+    owner: address,
+    operator: address,
+    operator_approvals: &OperatorApprovals
+): bool {
+    if (field::exists_(&operator_approvals.id, owner)) {
+        *field::borrow<OPERATOR_APPROVALS, address, address>(&operator_approvals.id, owner) == operator
+    } else {
+        false
+    }
+}
+
+// Returns whether spender is allowed to manage owner's tokens, or tokenId in particular (ignoring whether it is owned by owner).
+//
+// Warning: this function assumes that `owner` is the actual owner of `token_id` and does not verify this assumption.
+fun isAuthorized_(
+    owner: address,
+    spender: address,
+    token_id: u256,
+    token_approvals: &TokenApprovals,
+    operator_approvals: &OperatorApprovals
+): bool {
+    // Check if spender is approved for all tokens of owner
+    if (field::exists_(&operator_approvals.id, owner)) {
+        if (*field::borrow<OPERATOR_APPROVALS, address, address>(&operator_approvals.id, owner) == spender) {
+            return true
+        }
+    };
+
+    // Check if spender is approved for this specific token
+    if (field::exists_(&token_approvals.id, token_id)) {
+        return *field::borrow<TOKEN_APPROVALS, u256, address>(&token_approvals.id, token_id) == spender
+    };
+
+    false
+}
+
+// Checks if `spender` can operate on `token_id`, assuming the provided `owner` is the actual owner.
+//
+// Reverts if:
+// - `spender` does not have approval from `owner` for `token_id`.
+// - `spender` does not have approval to manage all of `owner`'s assets.
+//
+// Warning: this function assumes that `owner` is the actual owner of `token_id` and does not verify this assumption.
+fun checkAuthorized_(
+    owner: address,
+    spender: address,
+    token_id: u256,
+    token_approvals: &TokenApprovals,
+    operator_approvals: &OperatorApprovals
+) {
+    if (!isAuthorized_(owner, spender, token_id, token_approvals, operator_approvals)) {
+        abort(ENotAllowed)
+    }
 }
 
 // Transfers `token_id` from `from` to `to`. It imposes no restrictions on msg.sender.
@@ -290,7 +406,7 @@ entry fun transfer(
     token_id: u256,
     owners: &mut Owners,
     balance: &mut Balance,
-    allowance: &mut Allowance,
+    token_approvals: &mut TokenApprovals,
 ): bool {
     // Check if `to` is the zero address
     if (to == @0x0) {
@@ -318,7 +434,7 @@ entry fun transfer(
     // Add `token_id` to `to`'s owners table
     field::add(&mut owners.id, token_id, to);
 
-    // Add `token_id` to `to`'s balance table
+    // Increment `to`'s balance by 1
     if (field::exists_(&balance.id, to)) {
         let balance_amount = field::borrow_mut(&mut balance.id, to);
         *balance_amount = *balance_amount + 1;
@@ -327,12 +443,8 @@ entry fun transfer(
     };
 
     // The approval is cleared when the token is transferred.
-    if (field::exists_(&allowance.id, owner)) {
-        let owner_allowance = field::borrow_mut<ALLOWANCE_, address, Table<u256, vector<address>>>(
-            &mut allowance.id,
-            owner
-        );
-        owner_allowance.remove(token_id);
+    if (field::exists_(&token_approvals.id, token_id)) {
+        field::remove<TOKEN_APPROVALS, u256, address>(&mut token_approvals.id, token_id);
     };
 
     // Emit the Transfer event
@@ -363,7 +475,8 @@ entry fun transfer_from(
     token_id: u256,
     owners: &mut Owners,
     balance: &mut Balance,
-    allowance: &mut Allowance,
+    token_approvals: &mut TokenApprovals,
+    operator_approvals: &OperatorApprovals,
     ctx: &TxContext,
 ): bool {
     // Check if `from` is the zero address
@@ -381,23 +494,8 @@ entry fun transfer_from(
         abort(ENotAllowed)
     };
 
-    // Check if the caller is the owner of the token, or if it is approved to transfer the token
-    if (from != ctx.sender()) {
-        if (!field::exists_(&allowance.id, ctx.sender())) {
-            abort(ENotAllowed)
-        };
-        let owner_allowance = field::borrow_mut<ALLOWANCE_, address, Table<u256, vector<address>>>(
-            &mut allowance.id,
-            from
-        );
-        if (!owner_allowance.contains(token_id)) {
-            abort(ENotAllowed)
-        };
-        let token_allowance = owner_allowance.borrow_mut(token_id);
-        if (!vector::contains(token_allowance, &ctx.sender())) {
-            abort(ENotAllowed)
-        };
-    };
+    // Check if the caller is authorized
+    checkAuthorized_(from, ctx.sender(), token_id, token_approvals, operator_approvals);
 
     // Remove `token_id` from `from`'s owners table
     field::remove<OWNERS_, u256, address>(&mut owners.id, token_id);
@@ -414,7 +512,7 @@ entry fun transfer_from(
     // Add `token_id` to `to`'s owners table
     field::add(&mut owners.id, token_id, to);
 
-    // Add `token_id` to `to`'s balance table
+    // Increment `to`'s balance by 1
     if (field::exists_(&balance.id, to)) {
         let balance_amount = field::borrow_mut(&mut balance.id, to);
         *balance_amount = *balance_amount + 1;
@@ -423,12 +521,8 @@ entry fun transfer_from(
     };
 
     // The approval is cleared when the token is transferred.
-    if (field::exists_(&allowance.id, from)) {
-        let owner_allowance = field::borrow_mut<ALLOWANCE_, address, Table<u256, vector<address>>>(
-                &mut allowance.id,
-                from
-            );
-        owner_allowance.remove(token_id);
+    if (field::exists_(&token_approvals.id, token_id)) {
+        field::remove<TOKEN_APPROVALS, u256, address>(&mut token_approvals.id, token_id);
     };
 
     // Emit the Transfer event
