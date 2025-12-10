@@ -23,6 +23,7 @@ entry fun deref_nested_u16(x: u16): u16 {
     *z
 }
 
+#[allow(unused_mut_parameter)]
 entry fun deref_mut_arg(x: &mut u16 ): u16 {
  *x
 }
@@ -57,6 +58,6 @@ entry fun freeze_ref(y: u16 ): u16 {
     let mut x = 1;
     let x_mut_ref: &mut u16 = &mut x;
     *x_mut_ref = y;
-    let x_frozen_ref: &u16 = freeze(x_mut_ref); 
+    let x_frozen_ref: &u16 = freeze(x_mut_ref);
     *x_frozen_ref
 }

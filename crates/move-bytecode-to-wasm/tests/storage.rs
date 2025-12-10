@@ -1,10 +1,12 @@
 mod common;
 
-use alloy_primitives::hex;
-use alloy_primitives::{FixedBytes, U256, keccak256};
-use common::runtime_sandbox::constants::SIGNER_ADDRESS;
-use common::{runtime_sandbox::RuntimeSandbox, translate_test_package_with_framework};
-use rstest::{fixture, rstest};
+use crate::common::runtime_with_framework as runtime;
+use alloy_primitives::{FixedBytes, U256, address, hex, keccak256};
+use alloy_sol_types::sol;
+use move_test_runner::constants::MSG_SENDER_ADDRESS;
+use move_test_runner::constants::SIGNER_ADDRESS;
+use move_test_runner::wasm_runner::RuntimeSandbox;
+use rstest::rstest;
 
 const SHARED: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
 const FROZEN: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2];
@@ -65,25 +67,8 @@ pub fn assert_empty_storage(
 }
 
 mod counter {
-    use alloy_primitives::address;
-    use alloy_sol_types::{SolCall, sol};
-
     use super::*;
-
-    // NOTE: we can't use this fixture as #[once] because in order to catch events, we use an mpsc
-    // channel. If we use this as #[once], there's a possibility this runtime is used in more than one
-    // thread. If that happens, messages from test A can be received by test B.
-    // Using once instance per thread assures this won't happen.
-    #[fixture]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "counter";
-        const SOURCE_PATH: &str = "tests/storage/counter.move";
-
-        let mut translated_package =
-            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    use alloy_sol_types::SolCall;
 
     sol!(
         #[allow(missing_docs)]
@@ -94,7 +79,9 @@ mod counter {
     );
 
     #[rstest]
-    fn test_storage_counter(runtime: RuntimeSandbox) {
+    fn test_storage_counter(
+        #[with("counter", "tests/storage/counter.move")] runtime: RuntimeSandbox,
+    ) {
         // Create a new counter
         let call_data = createCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -164,25 +151,8 @@ mod counter {
 }
 
 mod counter_named_id {
-    use alloy_primitives::address;
-    use alloy_sol_types::{SolCall, sol};
-
     use super::*;
-
-    // NOTE: we can't use this fixture as #[once] because in order to catch events, we use an mpsc
-    // channel. If we use this as #[once], there's a possibility this runtime is used in more than one
-    // thread. If that happens, messages from test A can be received by test B.
-    // Using once instance per thread assures this won't happen.
-    #[fixture]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "counter_named_id";
-        const SOURCE_PATH: &str = "tests/storage/counter_named_id.move";
-
-        let mut translated_package =
-            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    use alloy_sol_types::SolCall;
 
     sol!(
         #[allow(missing_docs)]
@@ -193,7 +163,9 @@ mod counter_named_id {
     );
 
     #[rstest]
-    fn test_storage_counter_named_id(runtime: RuntimeSandbox) {
+    fn test_storage_counter_named_id(
+        #[with("counter_named_id", "tests/storage/counter_named_id.move")] runtime: RuntimeSandbox,
+    ) {
         // Create a new counter
         let call_data = createCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -260,27 +232,8 @@ mod counter_named_id {
 }
 
 mod capability {
-    use alloy_primitives::address;
-    use alloy_sol_types::{SolCall, sol};
-
-    use crate::common::runtime_sandbox::constants::SIGNER_ADDRESS;
-
     use super::*;
-
-    // NOTE: we can't use this fixture as #[once] because in order to catch events, we use an mpsc
-    // channel. If we use this as #[once], there's a possibility this runtime is used in more than one
-    // thread. If that happens, messages from test A can be received by test B.
-    // Using once instance per thread assures this won't happen.
-    #[fixture]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "capability";
-        const SOURCE_PATH: &str = "tests/storage/capability.move";
-
-        let mut translated_package =
-            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    use alloy_sol_types::SolCall;
 
     sol!(
         #[allow(missing_docs)]
@@ -289,7 +242,9 @@ mod capability {
     );
 
     #[rstest]
-    fn test_capability(runtime: RuntimeSandbox) {
+    fn test_capability(
+        #[with("capability", "tests/storage/capability.move")] runtime: RuntimeSandbox,
+    ) {
         // Set the sender as the signer, because the owner will be the sender (and we are sending
         // the transaction from the same address that signs it)
         runtime.set_msg_sender(SIGNER_ADDRESS);
@@ -318,21 +273,8 @@ mod capability {
 }
 
 mod storage_transfer_named_id {
-    use alloy_primitives::address;
-    use alloy_sol_types::{SolCall, SolValue, sol};
-
     use super::*;
-
-    #[fixture]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "transfer_named_id";
-        const SOURCE_PATH: &str = "tests/storage/transfer_named_id.move";
-
-        let mut translated_package =
-            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    use alloy_sol_types::{SolCall, SolValue};
 
     sol!(
         #[allow(missing_docs)]
@@ -446,7 +388,10 @@ mod storage_transfer_named_id {
 
     // Test create frozen object
     #[rstest]
-    fn test_frozen_object(runtime: RuntimeSandbox) {
+    fn test_frozen_object(
+        #[with("transfer_named_id", "tests/storage/transfer_named_id.move")]
+        runtime: RuntimeSandbox,
+    ) {
         let call_data = createFrozenCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -461,7 +406,10 @@ mod storage_transfer_named_id {
 
     // Tests operations on a shared object: reading, updating values, etc.
     #[rstest]
-    fn test_shared_object(runtime: RuntimeSandbox) {
+    fn test_shared_object(
+        #[with("transfer_named_id", "tests/storage/transfer_named_id.move")]
+        runtime: RuntimeSandbox,
+    ) {
         // Create a new counter
         let call_data = createSharedCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -557,7 +505,10 @@ mod storage_transfer_named_id {
 
     // Tests operations on an owned object: reading, updating values, etc.
     #[rstest]
-    fn test_owned_object(runtime: RuntimeSandbox) {
+    fn test_owned_object(
+        #[with("transfer_named_id", "tests/storage/transfer_named_id.move")]
+        runtime: RuntimeSandbox,
+    ) {
         // Create a new counter
         let call_data = createOwnedCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -630,7 +581,10 @@ mod storage_transfer_named_id {
 
     // Tests the share of an object in both owned and shared cases.
     #[rstest]
-    fn test_share_owned_object(runtime: RuntimeSandbox) {
+    fn test_share_owned_object(
+        #[with("transfer_named_id", "tests/storage/transfer_named_id.move")]
+        runtime: RuntimeSandbox,
+    ) {
         // Create a new object
         let call_data = createOwnedCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -686,7 +640,10 @@ mod storage_transfer_named_id {
 
     // Tests the freeze of an object in both owned case.
     #[rstest]
-    fn test_freeze_owned_object(runtime: RuntimeSandbox) {
+    fn test_freeze_owned_object(
+        #[with("transfer_named_id", "tests/storage/transfer_named_id.move")]
+        runtime: RuntimeSandbox,
+    ) {
         // Create a new object
         let call_data = createOwnedCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -751,7 +708,10 @@ mod storage_transfer_named_id {
     // Tests trying to read an owned object with a signer that is not the owner.
     #[rstest]
     #[should_panic(expected = "unreachable")]
-    fn test_signer_owner_mismatch(runtime: RuntimeSandbox) {
+    fn test_signer_owner_mismatch(
+        #[with("transfer_named_id", "tests/storage/transfer_named_id.move")]
+        runtime: RuntimeSandbox,
+    ) {
         let call_data = createOwnedCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -774,7 +734,10 @@ mod storage_transfer_named_id {
     // Tests the freeze of an object that is not owned by the signer.
     #[rstest]
     #[should_panic(expected = "unreachable")]
-    fn test_freeze_not_owned_object(runtime: RuntimeSandbox) {
+    fn test_freeze_not_owned_object(
+        #[with("transfer_named_id", "tests/storage/transfer_named_id.move")]
+        runtime: RuntimeSandbox,
+    ) {
         let call_data = createOwnedCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -789,7 +752,10 @@ mod storage_transfer_named_id {
     // Tests the freeze of a shared object.
     #[rstest]
     #[should_panic(expected = "unreachable")]
-    fn test_freeze_shared_object(runtime: RuntimeSandbox) {
+    fn test_freeze_shared_object(
+        #[with("transfer_named_id", "tests/storage/transfer_named_id.move")]
+        runtime: RuntimeSandbox,
+    ) {
         // Create a new object
         let call_data = createSharedCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -806,7 +772,11 @@ mod storage_transfer_named_id {
     #[case(false)]
     #[should_panic(expected = "unreachable")]
     #[case(true)]
-    fn test_share_or_transfer_frozen(runtime: RuntimeSandbox, #[case] share: bool) {
+    fn test_share_or_transfer_frozen(
+        #[with("transfer_named_id", "tests/storage/transfer_named_id.move")]
+        runtime: RuntimeSandbox,
+        #[case] share: bool,
+    ) {
         let call_data = createOwnedCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -829,7 +799,10 @@ mod storage_transfer_named_id {
 
     #[rstest]
     #[should_panic(expected = "unreachable")]
-    fn test_delete_frozen_object(runtime: RuntimeSandbox) {
+    fn test_delete_frozen_object(
+        #[with("transfer_named_id", "tests/storage/transfer_named_id.move")]
+        runtime: RuntimeSandbox,
+    ) {
         let call_data = createFrozenCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -848,7 +821,10 @@ mod storage_transfer_named_id {
 
     // Test delete owned object
     #[rstest]
-    fn test_delete_owned_object(runtime: RuntimeSandbox) {
+    fn test_delete_owned_object(
+        #[with("transfer_named_id", "tests/storage/transfer_named_id.move")]
+        runtime: RuntimeSandbox,
+    ) {
         let call_data = createOwnedCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -875,7 +851,10 @@ mod storage_transfer_named_id {
 
     // Test delete owned object
     #[rstest]
-    fn test_delete_shared_object(runtime: RuntimeSandbox) {
+    fn test_delete_shared_object(
+        #[with("transfer_named_id", "tests/storage/transfer_named_id.move")]
+        runtime: RuntimeSandbox,
+    ) {
         let call_data = createSharedCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -901,7 +880,10 @@ mod storage_transfer_named_id {
     }
 
     #[rstest]
-    fn test_get_foo(runtime: RuntimeSandbox) {
+    fn test_get_foo(
+        #[with("transfer_named_id", "tests/storage/transfer_named_id.move")]
+        runtime: RuntimeSandbox,
+    ) {
         // Create a new counter
         let call_data = createOwnedCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -923,7 +905,10 @@ mod storage_transfer_named_id {
     }
 
     #[rstest]
-    fn test_delete_bar(runtime: RuntimeSandbox) {
+    fn test_delete_bar(
+        #[with("transfer_named_id", "tests/storage/transfer_named_id.move")]
+        runtime: RuntimeSandbox,
+    ) {
         let call_data = createBarCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -957,7 +942,11 @@ mod storage_transfer_named_id {
     #[rstest]
     #[case(false)]
     #[case(true)]
-    fn test_delete_baz(runtime: RuntimeSandbox, #[case] share: bool) {
+    fn test_delete_baz(
+        #[with("transfer_named_id", "tests/storage/transfer_named_id.move")]
+        runtime: RuntimeSandbox,
+        #[case] share: bool,
+    ) {
         let call_data = createBazCall::new((SIGNER_ADDRESS.into(), share)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -993,7 +982,10 @@ mod storage_transfer_named_id {
     }
 
     #[rstest]
-    fn test_delete_bez(runtime: RuntimeSandbox) {
+    fn test_delete_bez(
+        #[with("transfer_named_id", "tests/storage/transfer_named_id.move")]
+        runtime: RuntimeSandbox,
+    ) {
         let call_data = createBezCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -1043,7 +1035,10 @@ mod storage_transfer_named_id {
     }
 
     #[rstest]
-    fn test_delete_biz(runtime: RuntimeSandbox) {
+    fn test_delete_biz(
+        #[with("transfer_named_id", "tests/storage/transfer_named_id.move")]
+        runtime: RuntimeSandbox,
+    ) {
         let call_data = createBizCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -1097,21 +1092,8 @@ mod storage_transfer_named_id {
 }
 
 mod storage_transfer {
-    use alloy_primitives::{FixedBytes, address};
-    use alloy_sol_types::{SolCall, SolValue, sol};
-
     use super::*;
-
-    #[fixture]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "transfer";
-        const SOURCE_PATH: &str = "tests/storage/transfer.move";
-
-        let mut translated_package =
-            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    use alloy_sol_types::{SolCall, SolValue, sol};
 
     sol!(
         #[allow(missing_docs)]
@@ -1241,7 +1223,9 @@ mod storage_transfer {
 
     // Test create frozen object
     #[rstest]
-    fn test_frozen_object(runtime: RuntimeSandbox) {
+    fn test_frozen_object(
+        #[with("transfer", "tests/storage/transfer.move")] runtime: RuntimeSandbox,
+    ) {
         let call_data = createFrozenCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -1259,7 +1243,9 @@ mod storage_transfer {
 
     // Tests operations on a shared object: reading, updating values, etc.
     #[rstest]
-    fn test_shared_object(runtime: RuntimeSandbox) {
+    fn test_shared_object(
+        #[with("transfer", "tests/storage/transfer.move")] runtime: RuntimeSandbox,
+    ) {
         // Create a new counter
         let call_data = createSharedCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -1358,7 +1344,9 @@ mod storage_transfer {
 
     // Tests operations on an owned object: reading, updating values, etc.
     #[rstest]
-    fn test_owned_object(runtime: RuntimeSandbox) {
+    fn test_owned_object(
+        #[with("transfer", "tests/storage/transfer.move")] runtime: RuntimeSandbox,
+    ) {
         // Create a new counter
         let call_data = createOwnedCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -1434,7 +1422,9 @@ mod storage_transfer {
 
     // Tests the share of an object in both owned and shared cases.
     #[rstest]
-    fn test_share_owned_object(runtime: RuntimeSandbox) {
+    fn test_share_owned_object(
+        #[with("transfer", "tests/storage/transfer.move")] runtime: RuntimeSandbox,
+    ) {
         // Create a new object
         let call_data = createOwnedCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -1493,7 +1483,9 @@ mod storage_transfer {
 
     // Tests the freeze of an object in both owned case.
     #[rstest]
-    fn test_freeze_owned_object(runtime: RuntimeSandbox) {
+    fn test_freeze_owned_object(
+        #[with("transfer", "tests/storage/transfer.move")] runtime: RuntimeSandbox,
+    ) {
         // Create a new object
         let call_data = createOwnedCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -1561,7 +1553,9 @@ mod storage_transfer {
     // Tests trying to read an owned object with a signer that is not the owner.
     #[rstest]
     #[should_panic(expected = "unreachable")]
-    fn test_signer_owner_mismatch(runtime: RuntimeSandbox) {
+    fn test_signer_owner_mismatch(
+        #[with("transfer", "tests/storage/transfer.move")] runtime: RuntimeSandbox,
+    ) {
         let call_data = createOwnedCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -1587,7 +1581,9 @@ mod storage_transfer {
     // Tests the freeze of an object that is not owned by the signer.
     #[rstest]
     #[should_panic(expected = "unreachable")]
-    fn test_freeze_not_owned_object(runtime: RuntimeSandbox) {
+    fn test_freeze_not_owned_object(
+        #[with("transfer", "tests/storage/transfer.move")] runtime: RuntimeSandbox,
+    ) {
         let call_data = createOwnedCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -1605,7 +1601,9 @@ mod storage_transfer {
     // Tests the freeze of a shared object.
     #[rstest]
     #[should_panic(expected = "unreachable")]
-    fn test_freeze_shared_object(runtime: RuntimeSandbox) {
+    fn test_freeze_shared_object(
+        #[with("transfer", "tests/storage/transfer.move")] runtime: RuntimeSandbox,
+    ) {
         // Create a new object
         let call_data = createSharedCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -1625,7 +1623,10 @@ mod storage_transfer {
     #[case(false)]
     #[should_panic(expected = "unreachable")]
     #[case(true)]
-    fn test_share_or_transfer_frozen(runtime: RuntimeSandbox, #[case] share: bool) {
+    fn test_share_or_transfer_frozen(
+        #[with("transfer", "tests/storage/transfer.move")] runtime: RuntimeSandbox,
+        #[case] share: bool,
+    ) {
         let call_data = createOwnedCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -1651,7 +1652,9 @@ mod storage_transfer {
 
     #[rstest]
     #[should_panic(expected = "unreachable")]
-    fn test_delete_frozen_object(runtime: RuntimeSandbox) {
+    fn test_delete_frozen_object(
+        #[with("transfer", "tests/storage/transfer.move")] runtime: RuntimeSandbox,
+    ) {
         let call_data = createFrozenCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -1672,7 +1675,9 @@ mod storage_transfer {
 
     // Test delete owned object
     #[rstest]
-    fn test_delete_owned_object(runtime: RuntimeSandbox) {
+    fn test_delete_owned_object(
+        #[with("transfer", "tests/storage/transfer.move")] runtime: RuntimeSandbox,
+    ) {
         let call_data = createOwnedCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -1699,7 +1704,9 @@ mod storage_transfer {
     }
 
     #[rstest]
-    fn test_delete_shared_object(runtime: RuntimeSandbox) {
+    fn test_delete_shared_object(
+        #[with("transfer", "tests/storage/transfer.move")] runtime: RuntimeSandbox,
+    ) {
         let call_data = createSharedCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -1726,7 +1733,7 @@ mod storage_transfer {
     }
 
     #[rstest]
-    fn test_get_foo(runtime: RuntimeSandbox) {
+    fn test_get_foo(#[with("transfer", "tests/storage/transfer.move")] runtime: RuntimeSandbox) {
         // Create a new counter
         let call_data = createOwnedCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -1749,7 +1756,7 @@ mod storage_transfer {
     }
 
     #[rstest]
-    fn test_delete_bar(runtime: RuntimeSandbox) {
+    fn test_delete_bar(#[with("transfer", "tests/storage/transfer.move")] runtime: RuntimeSandbox) {
         let call_data = createBarCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -1783,7 +1790,10 @@ mod storage_transfer {
     #[rstest]
     #[case(false)]
     #[case(true)]
-    fn test_delete_baz(runtime: RuntimeSandbox, #[case] share: bool) {
+    fn test_delete_baz(
+        #[with("transfer", "tests/storage/transfer.move")] runtime: RuntimeSandbox,
+        #[case] share: bool,
+    ) {
         let call_data = createBazCall::new((SIGNER_ADDRESS.into(), share)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -1819,7 +1829,7 @@ mod storage_transfer {
     }
 
     #[rstest]
-    fn test_delete_bez(runtime: RuntimeSandbox) {
+    fn test_delete_bez(#[with("transfer", "tests/storage/transfer.move")] runtime: RuntimeSandbox) {
         let call_data = createBezCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -1882,7 +1892,7 @@ mod storage_transfer {
     }
 
     #[rstest]
-    fn test_delete_biz(runtime: RuntimeSandbox) {
+    fn test_delete_biz(#[with("transfer", "tests/storage/transfer.move")] runtime: RuntimeSandbox) {
         let call_data = createBizCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -1948,7 +1958,9 @@ mod storage_transfer {
     }
 
     #[rstest]
-    fn test_delete_many(runtime: RuntimeSandbox) {
+    fn test_delete_many(
+        #[with("transfer", "tests/storage/transfer.move")] runtime: RuntimeSandbox,
+    ) {
         let call_data = createSharedCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -1974,7 +1986,9 @@ mod storage_transfer {
     }
 
     #[rstest]
-    fn test_delete_owned_var(runtime: RuntimeSandbox) {
+    fn test_delete_owned_var(
+        #[with("transfer", "tests/storage/transfer.move")] runtime: RuntimeSandbox,
+    ) {
         let call_data = createVarCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -1987,7 +2001,7 @@ mod storage_transfer {
             id: UID {
                 id: ID {
                     bytes: U256::from_str_radix(
-                        "7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de",
+                        "facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb",
                         16,
                     )
                     .unwrap()
@@ -1998,7 +2012,7 @@ mod storage_transfer {
                 id: UID {
                     id: ID {
                         bytes: U256::from_str_radix(
-                            "bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989",
+                            "e014f8017b7a8c4a930b9b7fcf7731e1a3d955813e4d729c5abf81df5adb08a7",
                             16,
                         )
                         .unwrap()
@@ -2027,7 +2041,9 @@ mod storage_transfer {
     // First we test deleting a Var shared upon creation
     // Then we test deleting a Var owned upon creation and later shared
     #[rstest]
-    fn test_delete_shared_var(runtime: RuntimeSandbox) {
+    fn test_delete_shared_var(
+        #[with("transfer", "tests/storage/transfer.move")] runtime: RuntimeSandbox,
+    ) {
         let call_data = createVarSharedCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -2040,7 +2056,7 @@ mod storage_transfer {
             id: UID {
                 id: ID {
                     bytes: U256::from_str_radix(
-                        "7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de",
+                        "facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb",
                         16,
                     )
                     .unwrap()
@@ -2051,7 +2067,7 @@ mod storage_transfer {
                 id: UID {
                     id: ID {
                         bytes: U256::from_str_radix(
-                            "bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989",
+                            "e014f8017b7a8c4a930b9b7fcf7731e1a3d955813e4d729c5abf81df5adb08a7",
                             16,
                         )
                         .unwrap()
@@ -2082,7 +2098,7 @@ mod storage_transfer {
         assert_eq!(0, result);
 
         let object_id = FixedBytes::<32>::from_slice(
-            &hex::decode("b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255")
+            &hex::decode("79f6f905732424817cc3297d425cd1313a7afd112df46d08303219989d6a7b09")
                 .unwrap(),
         );
 
@@ -2092,7 +2108,7 @@ mod storage_transfer {
             id: UID {
                 id: ID {
                     bytes: U256::from_str_radix(
-                        "b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255",
+                        "79f6f905732424817cc3297d425cd1313a7afd112df46d08303219989d6a7b09",
                         16,
                     )
                     .unwrap()
@@ -2103,7 +2119,7 @@ mod storage_transfer {
                 id: UID {
                     id: ID {
                         bytes: U256::from_str_radix(
-                            "1f0c5f0153ea5a939636c6a5f255f2fb613b03bef89fb34529e246fe1697a741",
+                            "12b23b08610619d2c73d9c594768afa7bcc248bd34e1f202173e5c92014ae02e",
                             16,
                         )
                         .unwrap()
@@ -2127,7 +2143,7 @@ mod storage_transfer {
             id: UID {
                 id: ID {
                     bytes: U256::from_str_radix(
-                        "b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255",
+                        "79f6f905732424817cc3297d425cd1313a7afd112df46d08303219989d6a7b09",
                         16,
                     )
                     .unwrap()
@@ -2138,7 +2154,7 @@ mod storage_transfer {
                 id: UID {
                     id: ID {
                         bytes: U256::from_str_radix(
-                            "1f0c5f0153ea5a939636c6a5f255f2fb613b03bef89fb34529e246fe1697a741",
+                            "12b23b08610619d2c73d9c594768afa7bcc248bd34e1f202173e5c92014ae02e",
                             16,
                         )
                         .unwrap()
@@ -2165,14 +2181,16 @@ mod storage_transfer {
     }
 
     #[rstest]
-    fn test_freeze_owned_var(runtime: RuntimeSandbox) {
+    fn test_freeze_owned_var(
+        #[with("transfer", "tests/storage/transfer.move")] runtime: RuntimeSandbox,
+    ) {
         // Create owned var and freeze it
         let call_data = createVarCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
         let object_id = FixedBytes::<32>::from_slice(
-            &hex::decode("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")
+            &hex::decode("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb")
                 .unwrap(),
         );
 
@@ -2182,12 +2200,12 @@ mod storage_transfer {
 
         // Check if the 2 slots corresponding to the Var struct under the SIGNER_ADDRESS key are empty after the freeze
         let var_uid_slot_bytes: [u8; 32] = [
-            93, 247, 165, 32, 139, 166, 195, 236, 47, 167, 72, 117, 174, 153, 62, 53, 76, 142, 238,
-            122, 118, 205, 148, 75, 134, 218, 76, 250, 55, 149, 13, 24,
+            68, 3, 231, 226, 205, 228, 8, 70, 51, 84, 182, 15, 113, 190, 199, 118, 176, 64, 3, 212,
+            161, 124, 104, 159, 179, 185, 36, 30, 225, 140, 146, 77,
         ];
         let bar_uid_slot_bytes: [u8; 32] = [
-            93, 247, 165, 32, 139, 166, 195, 236, 47, 167, 72, 117, 174, 153, 62, 53, 76, 142, 238,
-            122, 118, 205, 148, 75, 134, 218, 76, 250, 55, 149, 13, 25,
+            68, 3, 231, 226, 205, 228, 8, 70, 51, 84, 182, 15, 113, 190, 199, 118, 176, 64, 3, 212,
+            161, 124, 104, 159, 179, 185, 36, 30, 225, 140, 146, 78,
         ];
 
         // Check if the slots exist and are zero
@@ -2203,7 +2221,7 @@ mod storage_transfer {
             id: UID {
                 id: ID {
                     bytes: U256::from_str_radix(
-                        "7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de",
+                        "facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb",
                         16,
                     )
                     .unwrap()
@@ -2214,7 +2232,7 @@ mod storage_transfer {
                 id: UID {
                     id: ID {
                         bytes: U256::from_str_radix(
-                            "bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989",
+                            "e014f8017b7a8c4a930b9b7fcf7731e1a3d955813e4d729c5abf81df5adb08a7",
                             16,
                         )
                         .unwrap()
@@ -2233,13 +2251,15 @@ mod storage_transfer {
     // Delete var and share bar
     // Check that all original slots are empty: Var is delete and Bar is moved
     // After that, try getting bar and then deleting it
-    fn test_delete_var_and_transfer_bar(runtime: RuntimeSandbox) {
+    fn test_delete_var_and_transfer_bar(
+        #[with("transfer", "tests/storage/transfer.move")] runtime: RuntimeSandbox,
+    ) {
         let call_data = createVarCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
         let object_id = FixedBytes::<32>::from_slice(
-            &hex::decode("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")
+            &hex::decode("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb")
                 .unwrap(),
         );
 
@@ -2264,7 +2284,7 @@ mod storage_transfer {
 
         // Bar id
         let object_id = FixedBytes::<32>::from_slice(
-            &hex::decode("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989")
+            &hex::decode("e014f8017b7a8c4a930b9b7fcf7731e1a3d955813e4d729c5abf81df5adb08a7")
                 .unwrap(),
         );
 
@@ -2275,7 +2295,7 @@ mod storage_transfer {
             id: UID {
                 id: ID {
                     bytes: U256::from_str_radix(
-                        "bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989",
+                        "e014f8017b7a8c4a930b9b7fcf7731e1a3d955813e4d729c5abf81df5adb08a7",
                         16,
                     )
                     .unwrap()
@@ -2300,7 +2320,7 @@ mod storage_transfer {
     }
 
     #[rstest]
-    fn test_delete_vaz(runtime: RuntimeSandbox) {
+    fn test_delete_vaz(#[with("transfer", "tests/storage/transfer.move")] runtime: RuntimeSandbox) {
         let call_data = createVazCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -2313,7 +2333,7 @@ mod storage_transfer {
             id: UID {
                 id: ID {
                     bytes: U256::from_str_radix(
-                        "7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de",
+                        "facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb",
                         16,
                     )
                     .unwrap()
@@ -2325,7 +2345,7 @@ mod storage_transfer {
                 id: UID {
                     id: ID {
                         bytes: U256::from_str_radix(
-                            "bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989",
+                            "e014f8017b7a8c4a930b9b7fcf7731e1a3d955813e4d729c5abf81df5adb08a7",
                             16,
                         )
                         .unwrap()
@@ -2340,7 +2360,7 @@ mod storage_transfer {
                 id: UID {
                     id: ID {
                         bytes: U256::from_str_radix(
-                            "b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255",
+                            "79f6f905732424817cc3297d425cd1313a7afd112df46d08303219989d6a7b09",
                             16,
                         )
                         .unwrap()
@@ -2367,7 +2387,9 @@ mod storage_transfer {
     }
 
     #[rstest]
-    fn test_delete_epic_var(runtime: RuntimeSandbox) {
+    fn test_delete_epic_var(
+        #[with("transfer", "tests/storage/transfer.move")] runtime: RuntimeSandbox,
+    ) {
         let call_data = createEpicVarCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -2381,7 +2403,7 @@ mod storage_transfer {
             id: UID {
                 id: ID {
                     bytes: U256::from_str_radix(
-                        "7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de",
+                        "facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb",
                         16,
                     )
                     .unwrap()
@@ -2393,7 +2415,7 @@ mod storage_transfer {
                 id: UID {
                     id: ID {
                         bytes: U256::from_str_radix(
-                            "bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989",
+                            "e014f8017b7a8c4a930b9b7fcf7731e1a3d955813e4d729c5abf81df5adb08a7",
                             16,
                         )
                         .unwrap()
@@ -2409,7 +2431,7 @@ mod storage_transfer {
                     id: UID {
                         id: ID {
                             bytes: U256::from_str_radix(
-                                "b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255",
+                                "79f6f905732424817cc3297d425cd1313a7afd112df46d08303219989d6a7b09",
                                 16,
                             )
                             .unwrap()
@@ -2423,7 +2445,7 @@ mod storage_transfer {
                     id: UID {
                         id: ID {
                             bytes: U256::from_str_radix(
-                                "1f0c5f0153ea5a939636c6a5f255f2fb613b03bef89fb34529e246fe1697a741",
+                                "12b23b08610619d2c73d9c594768afa7bcc248bd34e1f202173e5c92014ae02e",
                                 16,
                             )
                             .unwrap()
@@ -2451,26 +2473,8 @@ mod storage_transfer {
 }
 
 mod storage_encoding {
-    use alloy_primitives::{U256, address};
-    use alloy_sol_types::SolValue;
-    use alloy_sol_types::{SolCall, sol};
-
     use super::*;
-
-    // NOTE: we can't use this fixture as #[once] because in order to catch events, we use an mpsc
-    // channel. If we use this as #[once], there's a possibility this runtime is used in more than one
-    // thread. If that happens, messages from test A can be received by test B.
-    // Using once instance per thread assures this won't happen.
-    #[fixture]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "storage_encoding";
-        const SOURCE_PATH: &str = "tests/storage/encoding.move";
-
-        let mut translated_package =
-            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    use alloy_sol_types::{SolCall, SolValue, sol};
 
     sol!(
         #[allow(missing_docs)]
@@ -2745,9 +2749,9 @@ mod storage_encoding {
         U256::from_str_radix("ffeeeeddddddddccccccccccccccccbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
     ],
-        readStaticFieldsCall::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
+        readStaticFieldsCall::new((U256::from_le_bytes(hex!("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb")),)),
         StaticFields {
-            id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
+            id: UID { id: ID { bytes: U256::from_str_radix("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb", 16).unwrap().into() } },
             a: U256::from_str_radix("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 16).unwrap(),
             b: 0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
             c: 0xcccccccccccccccc,
@@ -2771,9 +2775,9 @@ mod storage_encoding {
         U256::from_str_radix("06000500000004000000000000000300000000000000000000000000000002", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
     ],
-        readStaticFieldsCall::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
+        readStaticFieldsCall::new((U256::from_le_bytes(hex!("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb")),)),
         StaticFields {
-            id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
+            id: UID { id: ID { bytes: U256::from_str_radix("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb", 16).unwrap().into() } },
             a: U256::from(1),
             b: 2,
             c: 3,
@@ -2793,9 +2797,9 @@ mod storage_encoding {
         U256::from_str_radix("000000cafecafecafecafecafecafecafecafecafecafeff8302f0af284e5ac4", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000000000000000000000ffeeeecccccccccccccccc", 16).unwrap().to_be_bytes(),
     ],
-        readStaticFields2Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
+        readStaticFields2Call::new((U256::from_le_bytes(hex!("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb")),)),
         StaticFields2 {
-            id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
+            id: UID { id: ID { bytes: U256::from_str_radix("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb", 16).unwrap().into() } },
             a: 0xff,
             b: address!("0xcafecafecafecafecafecafecafecafecafecafe"),
             c: 0xcccccccccccccccc,
@@ -2813,9 +2817,9 @@ mod storage_encoding {
         U256::from_str_radix("000000cafecafecafecafecafecafecafecafecafecafe018302f0af284e5ac4", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000400030000000000000002", 16).unwrap().to_be_bytes(),
     ],
-        readStaticFields2Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
+        readStaticFields2Call::new((U256::from_le_bytes(hex!("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb")),)),
         StaticFields2 {
-            id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
+            id: UID { id: ID { bytes: U256::from_str_radix("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb", 16).unwrap().into() } },
             a: 1,
             b: address!("0xcafecafecafecafecafecafecafecafecafecafe"),
             c: 2,
@@ -2832,9 +2836,9 @@ mod storage_encoding {
         U256::from_str_radix("000000cafecafecafecafecafecafecafecafecafecafe01b3f6054d24105600", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("00000000beefbeefbeefbeefbeefbeefbeefbeefbeefbeef0000000000000002", 16).unwrap().to_be_bytes(),
     ],
-        readStaticFields3Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
+        readStaticFields3Call::new((U256::from_le_bytes(hex!("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb")),)),
         StaticFields3 {
-           id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
+           id: UID { id: ID { bytes: U256::from_str_radix("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb", 16).unwrap().into() } },
            a: 1,
            b: address!("0xcafecafecafecafecafecafecafecafecafecafe"),
            c: 2,
@@ -2850,9 +2854,9 @@ mod storage_encoding {
         U256::from_str_radix("000000cafecafecafecafecafecafecafecafecafecafeffb3f6054d24105600", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("00000000beefbeefbeefbeefbeefbeefbeefbeefbeefbeefcccccccccccccccc", 16).unwrap().to_be_bytes(),
     ],
-        readStaticFields3Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
+        readStaticFields3Call::new((U256::from_le_bytes(hex!("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb")),)),
         StaticFields3 {
-            id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
+            id: UID { id: ID { bytes: U256::from_str_radix("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb", 16).unwrap().into() } },
             a: 0xff,
             b: address!("0xcafecafecafecafecafecafecafecafecafecafe"),
             c: 0xcccccccccccccccc,
@@ -2871,9 +2875,9 @@ mod storage_encoding {
         U256::from_str_radix("000000000000000000000000cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000400000000000000000000000000000003", 16).unwrap().to_be_bytes(),
     ],
-        readStaticNestedStructCall::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
+        readStaticNestedStructCall::new((U256::from_le_bytes(hex!("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb")),)),
         StaticNestedStruct {
-           id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
+           id: UID { id: ID { bytes: U256::from_str_radix("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb", 16).unwrap().into() } },
            a: 1,
            b: true,
            c: StaticNestedStructChild {
@@ -2896,9 +2900,9 @@ mod storage_encoding {
         U256::from_str_radix("000000000000000000000000cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000ddddddddcccccccccccccccccccccccccccccccc", 16).unwrap().to_be_bytes(),
     ],
-        readStaticNestedStructCall::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
+        readStaticNestedStructCall::new((U256::from_le_bytes(hex!("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb")),)),
         StaticNestedStruct {
-           id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
+           id: UID { id: ID { bytes: U256::from_str_radix("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb", 16).unwrap().into() } },
            a: 0xaaaaaaaaaaaaaaaa,
            b: true,
            c: StaticNestedStructChild {
@@ -2910,7 +2914,7 @@ mod storage_encoding {
         }
     )]
     fn test_static_fields<T: SolCall, U: SolCall, V: SolValue>(
-        runtime: RuntimeSandbox,
+        #[with("storage_encoding", "tests/storage/encoding.move")] runtime: RuntimeSandbox,
         #[case] call_data_encode: T,
         #[case] expected_encode: Vec<[u8; 32]>,
         #[case] call_data_decode: U,
@@ -2971,9 +2975,9 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000005000000000000000400000000000000030000000000000002", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000006", 16).unwrap().to_be_bytes(),
     ],
-        readDynamicStructCall::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
+        readDynamicStructCall::new((U256::from_le_bytes(hex!("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb")),)),
         DynamicStruct {
-           id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
+           id: UID { id: ID { bytes: U256::from_str_radix("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb", 16).unwrap().into() } },
            a: 46,
            b: true,
            c: vec![2, 3, 4, 5, 6],
@@ -3010,9 +3014,9 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000000000000000000000800000000000000000000000000000007", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000009", 16).unwrap().to_be_bytes(),
     ],
-        readDynamicStructCall::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
+        readDynamicStructCall::new((U256::from_le_bytes(hex!("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb")),)),
         DynamicStruct {
-           id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
+           id: UID { id: ID { bytes: U256::from_str_radix("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb", 16).unwrap().into() } },
            a: u32::MAX,
            b: true,
            c: vec![],
@@ -3078,9 +3082,9 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000000000000001111111111111111111111111111111111111111", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000002222222222222222222222222222222222222222", 16).unwrap().to_be_bytes(),
     ],
-        readDynamicStruct2Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
+        readDynamicStruct2Call::new((U256::from_le_bytes(hex!("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb")),)),
         DynamicStruct2 {
-        id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
+        id: UID { id: ID { bytes: U256::from_str_radix("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb", 16).unwrap().into() } },
            a: vec![true, false, true],
            b: vec![1, 2, 3, 4, 5],
            c: vec![6, 7, 8, 9],
@@ -3153,9 +3157,9 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000000000000000000001200000000000000000000000000000011", 16).unwrap().to_be_bytes(), // u128[] elements #1
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000013", 16).unwrap().to_be_bytes(), // u128[] elements #2
     ],
-        readDynamicStruct3Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
+        readDynamicStruct3Call::new((U256::from_le_bytes(hex!("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb")),)),
         DynamicStruct3 {
-           id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
+           id: UID { id: ID { bytes: U256::from_str_radix("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb", 16).unwrap().into() } },
            a: vec![vec![1, 2, 3], vec![4, 5]],
            b: vec![vec![6, 7], vec![8], vec![9, 10]],
            c: vec![vec![11, 12, 13, 14], vec![], vec![15, 16]],
@@ -3206,9 +3210,9 @@ mod storage_encoding {
         U256::from_str_radix("0000000011111111111111111111111111111111111111110000000000000030", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000011111111111111111111111111111111111111110000000000000031", 16).unwrap().to_be_bytes(),
     ],
-        readDynamicStruct4Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
+        readDynamicStruct4Call::new((U256::from_le_bytes(hex!("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb")),)),
         DynamicStruct4 {
-        id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
+        id: UID { id: ID { bytes: U256::from_str_radix("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb", 16).unwrap().into() } },
            a: vec![DynamicNestedStructChild { a: vec![1, 2, 3], b: 123 }, DynamicNestedStructChild { a: vec![1, 2, 3], b: 124 }],
            b: vec![StaticNestedStructChild { d: 47, e: address!("0x1111111111111111111111111111111111111111") }, StaticNestedStructChild { d: 48, e: address!("0x1111111111111111111111111111111111111111") }, StaticNestedStructChild { d: 49, e: address!("0x1111111111111111111111111111111111111111") }],
         }
@@ -3227,9 +3231,9 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000000000000000000000000000000000000003a71241b10e629e0", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
     ],
-        readDynamicStruct5Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
+        readDynamicStruct5Call::new((U256::from_le_bytes(hex!("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb")),)),
         DynamicStruct5 {
-        id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
+        id: UID { id: ID { bytes: U256::from_str_radix("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb", 16).unwrap().into() } },
            a: vec![
                NestedStructChildWrapper {
                    a: vec![
@@ -3271,15 +3275,15 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000000000000000000000000000000000000030000000200000001", 16).unwrap().to_be_bytes(), // First element
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(), // Second element
     ],
-        readGenericStruct32Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
+        readGenericStruct32Call::new((U256::from_le_bytes(hex!("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb")),)),
         GenericStruct32 {
-            id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
+            id: UID { id: ID { bytes: U256::from_str_radix("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb", 16).unwrap().into() } },
             a: vec![1, 2, 3],
             b: 1,
         }
     )]
     fn test_dynamic_fields<T: SolCall, U: SolCall, V: SolValue>(
-        runtime: RuntimeSandbox,
+        #[with("storage_encoding", "tests/storage/encoding.move")] runtime: RuntimeSandbox,
         #[case] call_data_encode: T,
         #[case] expected_slots: Vec<[u8; 32]>,
         #[case] expected_encode: Vec<[u8; 32]>,
@@ -3312,21 +3316,21 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
 
-        U256::from_str_radix("b3f87769e0f4505eb27364fe9b31c117ff789e8aa785586680a6c1cb0f592652", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("544b730dcadfbf3c87d176fbcee0c1f462952c8bc9747841d1bfff2c9f84c07d", 16).unwrap().to_be_bytes(),
     ],
     vec![
         U256::from_str_radix("0000000000000000000000000000000000000000000000653d02a210b08857c8", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000066", 16).unwrap().to_be_bytes(),
 
         U256::from_str_radix("00000000000000000000000000000000000000000000002a1afe8c88bc2c2d3f", 16).unwrap().to_be_bytes(),
     ],
-        readFooCall::new((U256::from_le_bytes(hex!("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989")),)),
+        readFooCall::new((U256::from_le_bytes(hex!("e014f8017b7a8c4a930b9b7fcf7731e1a3d955813e4d729c5abf81df5adb08a7")),)),
         Foo {
-            id: UID { id: ID { bytes: U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().into()  } },
+            id: UID { id: ID { bytes: U256::from_str_radix("e014f8017b7a8c4a930b9b7fcf7731e1a3d955813e4d729c5abf81df5adb08a7", 16).unwrap().into()  } },
             a: 101,
             b: Bar {
-                id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into()  } },
+                id: UID { id: ID { bytes: U256::from_str_radix("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb", 16).unwrap().into()  } },
                 a: 42,
             },
             c: 102,
@@ -3339,34 +3343,34 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
         // Foo
-        U256::from_str_radix("3560195e435d1f629e64ba21b204d3190c17b5cf38d1e100e4939dff8e98638d", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("3560195e435d1f629e64ba21b204d3190c17b5cf38d1e100e4939dff8e98638e", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("3560195e435d1f629e64ba21b204d3190c17b5cf38d1e100e4939dff8e98638f", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("41ce687bc1e261a2e85acd0ef77dd1988f72f509c308effe56ce774de82de154", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("41ce687bc1e261a2e85acd0ef77dd1988f72f509c308effe56ce774de82de155", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("41ce687bc1e261a2e85acd0ef77dd1988f72f509c308effe56ce774de82de156", 16).unwrap().to_be_bytes(),
         //Bar
-        U256::from_str_radix("b3f87769e0f4505eb27364fe9b31c117ff789e8aa785586680a6c1cb0f592652", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("544b730dcadfbf3c87d176fbcee0c1f462952c8bc9747841d1bfff2c9f84c07d", 16).unwrap().to_be_bytes(),
     ],
     vec![
         // MegaFoo
         U256::from_str_radix("00000000000000000000000000000000000000000000004d68e61705cbfc7a75", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("e014f8017b7a8c4a930b9b7fcf7731e1a3d955813e4d729c5abf81df5adb08a7", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000058", 16).unwrap().to_be_bytes(),
         // Foo
         U256::from_str_radix("0000000000000000000000000000000000000000000000653d02a210b08857c8", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000066", 16).unwrap().to_be_bytes(),
         // Bar
         U256::from_str_radix("00000000000000000000000000000000000000000000002a1afe8c88bc2c2d3f", 16).unwrap().to_be_bytes(),
 
     ],
-        readMegaFooCall::new((U256::from_le_bytes(hex!("b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255")),)),
+        readMegaFooCall::new((U256::from_le_bytes(hex!("79f6f905732424817cc3297d425cd1313a7afd112df46d08303219989d6a7b09")),)),
     MegaFoo {
-            id: UID { id: ID { bytes: U256::from_str_radix("b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255", 16).unwrap().into()  } },
+            id: UID { id: ID { bytes: U256::from_str_radix("79f6f905732424817cc3297d425cd1313a7afd112df46d08303219989d6a7b09", 16).unwrap().into()  } },
             a: 77,
             b: Foo {
-                id: UID { id: ID { bytes: U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().into()  } },
+                id: UID { id: ID { bytes: U256::from_str_radix("e014f8017b7a8c4a930b9b7fcf7731e1a3d955813e4d729c5abf81df5adb08a7", 16).unwrap().into()  } },
                 a: 101,
                 b: Bar {
-                    id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into()  } },
+                    id: UID { id: ID { bytes: U256::from_str_radix("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb", 16).unwrap().into()  } },
                     a: 42,
                 },
                 c: 102,
@@ -3374,85 +3378,86 @@ mod storage_encoding {
             c: 88,
         }
     )]
-    #[case(saveVarCall::new(()),
-    vec![
-        // Var
-        [0x00; 32],
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
-        //Bar
-        U256::from_str_radix("918d490f3f5a5af006896b3a37d65a9b496b1db689b87334200c90ab4023c178", 16).unwrap().to_be_bytes(),
-        // Foo
-        U256::from_str_radix("322a33ca5945c1c34a8261d3e947c675478f7d28fef6f722a010b01be97bd034", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("322a33ca5945c1c34a8261d3e947c675478f7d28fef6f722a010b01be97bd035", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("322a33ca5945c1c34a8261d3e947c675478f7d28fef6f722a010b01be97bd036", 16).unwrap().to_be_bytes(),
-        //Bar in Foo
-        U256::from_str_radix("751256a7a9ce5df532239c40b31940a9a4fe03b965b20192b8f02653745a9369", 16).unwrap().to_be_bytes(),
-        // Bar vector
-        U256::from_str_radix("c2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85b", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("c2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85c", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("c2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85d", 16).unwrap().to_be_bytes(),
+    #[
+        case(saveVarCall::new(()),
+        vec![
+            // Var
+            [0x00; 32],
+            U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(),
+            U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
+            U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
+            //Bar
+            U256::from_str_radix("634e0cfe4d3eccb1f12a03ba6ba3b01bd270c3c2c5b79677ad2457cdaf0f0a31", 16).unwrap().to_be_bytes(),
+            // Foo
+            U256::from_str_radix("c17378e604db2bc240aa6a3925e1a9ff01f240512daf5ebf77e81574fe46b1dc", 16).unwrap().to_be_bytes(),
+            U256::from_str_radix("c17378e604db2bc240aa6a3925e1a9ff01f240512daf5ebf77e81574fe46b1dd", 16).unwrap().to_be_bytes(),
+            U256::from_str_radix("c17378e604db2bc240aa6a3925e1a9ff01f240512daf5ebf77e81574fe46b1de", 16).unwrap().to_be_bytes(),
+            //Bar in Foo
+            U256::from_str_radix("569ec9813e0e506fe3c07267d57c7d60af218b1971df8a17e8c3d9422ee45112", 16).unwrap().to_be_bytes(),
+            // Bar vector
+            U256::from_str_radix("c2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85b", 16).unwrap().to_be_bytes(),
+            U256::from_str_radix("c2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85c", 16).unwrap().to_be_bytes(),
+            U256::from_str_radix("c2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85d", 16).unwrap().to_be_bytes(),
 
-        U256::from_str_radix("ae7e0571fa79d756545e084ec0d0c624cdbe4a05e898a1cf0e32a0821c5a6911", 16).unwrap().to_be_bytes(),
+            U256::from_str_radix("d23d7ae789a511af9316daeb224298ce268bff3b0086cd9cc109986d5c6866c8", 16).unwrap().to_be_bytes(),
 
-        U256::from_str_radix("26a28b6df88122dd5c0e1993dcda278372d63dbd74d0b08e3d76c6012a7da7f8", 16).unwrap().to_be_bytes(),
+            U256::from_str_radix("eb6730eee37055d961becf7da68a370e7d01e385e23eccc77adff27323431635", 16).unwrap().to_be_bytes(),
 
-        U256::from_str_radix("e41226abe04fb72908c78250de568834065f6d35bc75081a3368d6a693296f5a", 16).unwrap().to_be_bytes(),
-    ],
-    vec![
-        // Var
-        U256::from_str_radix("000000000000000000000000000000000000000000000000a05005766d1c7798", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("d929b3310243fae82a39e83032462fceb274b042b98732db8c6e9fbeab70c3c9", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
-        // Bar
-        U256::from_str_radix("00000000000000000000000000000000000000000000002a1afe8c88bc2c2d3f", 16).unwrap().to_be_bytes(),
-        // Foo
-        U256::from_str_radix("0000000000000000000000000000000000000000000000653d02a210b08857c8", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000066", 16).unwrap().to_be_bytes(),
-        // Bar in Foo
-        U256::from_str_radix("0000000000000000000000000000000000000000000000291afe8c88bc2c2d3f", 16).unwrap().to_be_bytes(),
-        // Bar vector
-        U256::from_str_radix("b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("1f0c5f0153ea5a939636c6a5f255f2fb613b03bef89fb34529e246fe1697a741", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("60b770a33dfbcb5aaea4306257d155502df85b76449b216c476fcfcd437c152e", 16).unwrap().to_be_bytes(),
+            U256::from_str_radix("00721786a36420c69f024f5947485b51f91128b6a3167578dd192e106df958cf", 16).unwrap().to_be_bytes(),
+        ],
+        vec![
+            // Var
+            U256::from_str_radix("000000000000000000000000000000000000000000000000a05005766d1c7798", 16).unwrap().to_be_bytes(),
+            U256::from_str_radix("e014f8017b7a8c4a930b9b7fcf7731e1a3d955813e4d729c5abf81df5adb08a7", 16).unwrap().to_be_bytes(),
+            U256::from_str_radix("0f10fee34b569ef88274c8700225c115c5bc8e1db0ffddd1133715912144d3ee", 16).unwrap().to_be_bytes(),
+            U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
+            // Bar
+            U256::from_str_radix("00000000000000000000000000000000000000000000002a1afe8c88bc2c2d3f", 16).unwrap().to_be_bytes(),
+            // Foo
+            U256::from_str_radix("0000000000000000000000000000000000000000000000653d02a210b08857c8", 16).unwrap().to_be_bytes(),
+            U256::from_str_radix("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb", 16).unwrap().to_be_bytes(),
+            U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000066", 16).unwrap().to_be_bytes(),
+            // Bar in Foo
+            U256::from_str_radix("0000000000000000000000000000000000000000000000291afe8c88bc2c2d3f", 16).unwrap().to_be_bytes(),
+            // Bar vector
+            U256::from_str_radix("79f6f905732424817cc3297d425cd1313a7afd112df46d08303219989d6a7b09", 16).unwrap().to_be_bytes(),
+            U256::from_str_radix("12b23b08610619d2c73d9c594768afa7bcc248bd34e1f202173e5c92014ae02e", 16).unwrap().to_be_bytes(),
+            U256::from_str_radix("b082f003cf7e89a005efbd95cd08519ae08b6e8e31de5fed37659f47fc64181d", 16).unwrap().to_be_bytes(),
 
-        U256::from_str_radix("00000000000000000000000000000000000000000000002b1afe8c88bc2c2d3f", 16).unwrap().to_be_bytes(),
+            U256::from_str_radix("00000000000000000000000000000000000000000000002b1afe8c88bc2c2d3f", 16).unwrap().to_be_bytes(),
 
-        U256::from_str_radix("00000000000000000000000000000000000000000000002c1afe8c88bc2c2d3f", 16).unwrap().to_be_bytes(),
+            U256::from_str_radix("00000000000000000000000000000000000000000000002c1afe8c88bc2c2d3f", 16).unwrap().to_be_bytes(),
 
-        U256::from_str_radix("00000000000000000000000000000000000000000000002d1afe8c88bc2c2d3f", 16).unwrap().to_be_bytes(),
+            U256::from_str_radix("00000000000000000000000000000000000000000000002d1afe8c88bc2c2d3f", 16).unwrap().to_be_bytes(),
 
-    ],
-    readVarCall::new((U256::from_le_bytes(hex!("d51bb5edad7d1535fb0a47b2d03d08c0fe02560a3de80e55815fedb1ce1be09b")),)),
+        ],
+        readVarCall::new((U256::from_le_bytes(hex!("8148947c60769a1ac082a29bf80e4ff473e568ad39ff9bc45c3144244974525f")),)),
             Var {
-            id: UID { id: ID { bytes: U256::from_str_radix("d51bb5edad7d1535fb0a47b2d03d08c0fe02560a3de80e55815fedb1ce1be09b", 16).unwrap().into()  } },
+            id: UID { id: ID { bytes: U256::from_str_radix("8148947c60769a1ac082a29bf80e4ff473e568ad39ff9bc45c3144244974525f", 16).unwrap().into()  } },
             a: Bar {
-                id: UID { id: ID { bytes: U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().into()  } },
+                id: UID { id: ID { bytes: U256::from_str_radix("e014f8017b7a8c4a930b9b7fcf7731e1a3d955813e4d729c5abf81df5adb08a7", 16).unwrap().into()  } },
                 a: 42,
             },
             b: Foo {
-                id: UID { id: ID { bytes: U256::from_str_radix("d929b3310243fae82a39e83032462fceb274b042b98732db8c6e9fbeab70c3c9", 16).unwrap().into()  } },
+                id: UID { id: ID { bytes: U256::from_str_radix("0f10fee34b569ef88274c8700225c115c5bc8e1db0ffddd1133715912144d3ee", 16).unwrap().into()  } },
                 a: 101,
                 b: Bar {
-                    id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into()  } },
+                    id: UID { id: ID { bytes: U256::from_str_radix("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb", 16).unwrap().into()  } },
                     a: 41,
                 },
                 c: 102,
             },
             c: vec![
                 Bar {
-                    id: UID { id: ID { bytes: U256::from_str_radix("b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255", 16).unwrap().into()  } },
+                    id: UID { id: ID { bytes: U256::from_str_radix("79f6f905732424817cc3297d425cd1313a7afd112df46d08303219989d6a7b09", 16).unwrap().into()  } },
                     a: 43,
                 },
                 Bar {
-                    id: UID { id: ID { bytes: U256::from_str_radix("1f0c5f0153ea5a939636c6a5f255f2fb613b03bef89fb34529e246fe1697a741", 16).unwrap().into()  } },
+                    id: UID { id: ID { bytes: U256::from_str_radix("12b23b08610619d2c73d9c594768afa7bcc248bd34e1f202173e5c92014ae02e", 16).unwrap().into()  } },
                     a: 44,
                 },
                 Bar {
-                    id: UID { id: ID { bytes: U256::from_str_radix("60b770a33dfbcb5aaea4306257d155502df85b76449b216c476fcfcd437c152e", 16).unwrap().into()  } },
+                    id: UID { id: ID { bytes: U256::from_str_radix("b082f003cf7e89a005efbd95cd08519ae08b6e8e31de5fed37659f47fc64181d", 16).unwrap().into()  } },
                     a: 45,
                 }
             ],
@@ -3464,15 +3469,15 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
 
-        U256::from_str_radix("398fdf7528e5068055009aa3b7c48e06f0127b5d8c57be483a07b5cd9100322e", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("398fdf7528e5068055009aa3b7c48e06f0127b5d8c57be483a07b5cd9100322f", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("398fdf7528e5068055009aa3b7c48e06f0127b5d8c57be483a07b5cd91003230", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("e7e785c40b41016ba8a2c189cbdbaa2cd93428804f2352d2d6e24604a35cbeb5", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("e7e785c40b41016ba8a2c189cbdbaa2cd93428804f2352d2d6e24604a35cbeb6", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("e7e785c40b41016ba8a2c189cbdbaa2cd93428804f2352d2d6e24604a35cbeb7", 16).unwrap().to_be_bytes(),
 
-        U256::from_str_radix("580978fee9799ff96dcfcd540232ed2f7cd5bade678a1ccae6650e39d39559dd", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0922fff1cd0697e05be30fd001a86b5e89506d7c8304ebb077dc95f3791d7e86", 16).unwrap().to_be_bytes(),
     ],
     vec![
         U256::from_str_radix("000000000000000000000000000000000000000000000065d0ae4436393e9304", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("e014f8017b7a8c4a930b9b7fcf7731e1a3d955813e4d729c5abf81df5adb08a7", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000066", 16).unwrap().to_be_bytes(),
 
         U256::from_str_radix("0000000000000000000000000000000000000000000000007767397bdbd83f17", 16).unwrap().to_be_bytes(),
@@ -3481,12 +3486,12 @@ mod storage_encoding {
 
         U256::from_str_radix("000000000000000000000000000000000000000000000063000000580000004d", 16).unwrap().to_be_bytes(),
     ],
-    readGenericWrapper32Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
+    readGenericWrapper32Call::new((U256::from_le_bytes(hex!("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb")),)),
     GenericWrapper32 {
-            id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into()  } },
+            id: UID { id: ID { bytes: U256::from_str_radix("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb", 16).unwrap().into()  } },
             a: 101,
             b: GenericStruct32 {
-                id: UID { id: ID { bytes: U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().into()  } },
+                id: UID { id: ID { bytes: U256::from_str_radix("e014f8017b7a8c4a930b9b7fcf7731e1a3d955813e4d729c5abf81df5adb08a7", 16).unwrap().into()  } },
                 a: vec![77, 88, 99],
                 b: 1234,
             },
@@ -3494,7 +3499,7 @@ mod storage_encoding {
         }
     )]
     fn test_wrapped_objects<T: SolCall, U: SolCall, V: SolValue>(
-        runtime: RuntimeSandbox,
+        #[with("storage_encoding", "tests/storage/encoding.move")] runtime: RuntimeSandbox,
         #[case] call_data_encode: T,
         #[case] expected_slots: Vec<[u8; 32]>,
         #[case] expected_encode: Vec<[u8; 32]>,
@@ -3512,6 +3517,7 @@ mod storage_encoding {
             assert_eq!(expected_encode[i], storage, "Mismatch at slot {i}");
         }
 
+        // println!("{:?}", call_data_decode.abi_encode());
         // Use the read function to check if it decodes correctly
         let (result, result_data) = runtime
             .call_entrypoint(call_data_decode.abi_encode())
@@ -3531,12 +3537,12 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000005", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000006", 16).unwrap().to_be_bytes(),
 
-        U256::from_str_radix("398fdf7528e5068055009aa3b7c48e06f0127b5d8c57be483a07b5cd9100322e", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("e7e785c40b41016ba8a2c189cbdbaa2cd93428804f2352d2d6e24604a35cbeb5", 16).unwrap().to_be_bytes(),
 
     ],
     vec![
         U256::from_str_radix("000000000000000000000000000000000000000000000000e44c0fd261f480c4", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("e014f8017b7a8c4a930b9b7fcf7731e1a3d955813e4d729c5abf81df5adb08a7", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000002a01000000000000006300000058004d01", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000000000010000000000000000000000000000002b", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000006f", 16).unwrap().to_be_bytes(),
@@ -3607,7 +3613,7 @@ mod storage_encoding {
         U256::from_str_radix("00002d0000002c00000000000000000000000000000000000000000000000000", 16).unwrap().to_be_bytes(),
     ],)]
     fn test_structs_with_enums<T: SolCall>(
-        runtime: RuntimeSandbox,
+        #[with("storage_encoding", "tests/storage/encoding.move")] runtime: RuntimeSandbox,
         #[case] call_data_encode: T,
         #[case] expected_slots: Vec<[u8; 32]>,
         #[case] expected_encode: Vec<[u8; 32]>,
@@ -3628,25 +3634,8 @@ mod storage_encoding {
 }
 
 mod trusted_swap {
-    use alloy_sol_types::SolValue;
-    use alloy_sol_types::{SolCall, sol};
-
     use super::*;
-
-    // NOTE: we can't use this fixture as #[once] because in order to catch events, we use an mpsc
-    // channel. If we use this as #[once], there's a possibility this runtime is used in more than one
-    // thread. If that happens, messages from test A can be received by test B.
-    // Using once instance per thread assures this won't happen.
-    #[fixture]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "trusted_swap";
-        const SOURCE_PATH: &str = "tests/storage/trusted_swap.move";
-
-        let mut translated_package =
-            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    use alloy_sol_types::{SolCall, SolValue, sol};
 
     sol!(
         #[allow(missing_docs)]
@@ -3684,7 +3673,9 @@ mod trusted_swap {
     const SERVICE: [u8; 20] = [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
 
     #[rstest]
-    fn test_successful_swap(runtime: RuntimeSandbox) {
+    fn test_successful_swap(
+        #[with("trusted_swap", "tests/storage/trusted_swap.move")] runtime: RuntimeSandbox,
+    ) {
         ////// First owner creates an object //////
         runtime.set_msg_sender(OWNER_A);
         runtime.set_tx_origin(OWNER_A);
@@ -3812,7 +3803,9 @@ mod trusted_swap {
 
     #[rstest]
     #[should_panic]
-    fn test_swap_too_cheap(runtime: RuntimeSandbox) {
+    fn test_swap_too_cheap(
+        #[with("trusted_swap", "tests/storage/trusted_swap.move")] runtime: RuntimeSandbox,
+    ) {
         // Create an object
         runtime.set_msg_sender(OWNER_A);
         runtime.set_tx_origin(OWNER_A);
@@ -3833,7 +3826,9 @@ mod trusted_swap {
 
     #[rstest]
     #[should_panic]
-    fn test_swap_different_scarcity(runtime: RuntimeSandbox) {
+    fn test_swap_different_scarcity(
+        #[with("trusted_swap", "tests/storage/trusted_swap.move")] runtime: RuntimeSandbox,
+    ) {
         ////// First owner creates an object //////
         runtime.set_msg_sender(OWNER_A);
         runtime.set_tx_origin(OWNER_A);
@@ -3882,7 +3877,9 @@ mod trusted_swap {
 
     #[rstest]
     #[should_panic]
-    fn test_swap_same_style(runtime: RuntimeSandbox) {
+    fn test_swap_same_style(
+        #[with("trusted_swap", "tests/storage/trusted_swap.move")] runtime: RuntimeSandbox,
+    ) {
         ////// First owner creates an object //////
         runtime.set_msg_sender(OWNER_A);
         runtime.set_tx_origin(OWNER_A);
@@ -3929,24 +3926,11 @@ mod trusted_swap {
         assert_eq!(0, result);
     }
 }
+
 mod wrapped_objects {
-    use crate::common::runtime_sandbox::constants::MSG_SENDER_ADDRESS;
     use alloy_sol_types::{SolCall, SolValue, sol};
 
     use super::*;
-
-    #[fixture]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "wrapped_objects";
-        const SOURCE_PATH: &str = "tests/storage/wrapped_objects.move";
-
-        let mut translated_package =
-            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
-
-        let runtime = RuntimeSandbox::new(&mut translated_package);
-        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
-        runtime
-    }
 
     sol!(
         #[allow(missing_docs)]
@@ -4047,7 +4031,12 @@ mod wrapped_objects {
     #[rstest]
     #[case(false)]
     #[case(true)]
-    fn test_creating_and_deleting_beta(runtime: RuntimeSandbox, #[case] tto: bool) {
+    fn test_creating_and_deleting_beta(
+        #[with("wrapped_objects", "tests/storage/wrapped_objects.move")] runtime: RuntimeSandbox,
+        #[case] tto: bool,
+    ) {
+        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
+
         let (alpha_id, beta_id) = if tto {
             // Create alpha first for TTO method
             let call_data = createAlphaCall::new((102,)).abi_encode();
@@ -4110,7 +4099,12 @@ mod wrapped_objects {
     #[rstest]
     #[case(false)]
     #[case(true)]
-    fn test_creating_and_deleting_gamma(runtime: RuntimeSandbox, #[case] tto: bool) {
+    fn test_creating_and_deleting_gamma(
+        #[with("wrapped_objects", "tests/storage/wrapped_objects.move")] runtime: RuntimeSandbox,
+        #[case] tto: bool,
+    ) {
+        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
+
         let (alpha_id, beta_id, gamma_id) = if tto {
             // Create beta first for TTO method
             let call_data = createBetaCall::new(()).abi_encode();
@@ -4179,7 +4173,12 @@ mod wrapped_objects {
     #[rstest]
     #[case(false)]
     #[case(true)]
-    fn test_creating_and_deleting_delta(runtime: RuntimeSandbox, #[case] tto: bool) {
+    fn test_creating_and_deleting_delta(
+        #[with("wrapped_objects", "tests/storage/wrapped_objects.move")] runtime: RuntimeSandbox,
+        #[case] tto: bool,
+    ) {
+        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
+
         let (alpha_1_id, alpha_2_id, delta_id) = if tto {
             // Create alphas first for TTO method
             let call_data = createAlphaCall::new((101,)).abi_encode();
@@ -4255,7 +4254,12 @@ mod wrapped_objects {
     #[rstest]
     #[case(false)]
     #[case(true)]
-    fn test_creating_and_deleting_epsilon(runtime: RuntimeSandbox, #[case] tto: bool) {
+    fn test_creating_and_deleting_epsilon(
+        #[with("wrapped_objects", "tests/storage/wrapped_objects.move")] runtime: RuntimeSandbox,
+        #[case] tto: bool,
+    ) {
+        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
+
         let (alpha_1_id, alpha_2_id, alpha_3_id, alpha_4_id, delta_1_id, delta_2_id, epsilon_id) =
             if tto {
                 let call_data = createAlphaCall::new((101,)).abi_encode();
@@ -4393,7 +4397,11 @@ mod wrapped_objects {
         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
 
     #[rstest]
-    fn test_transferring_beta(runtime: RuntimeSandbox) {
+    fn test_transferring_beta(
+        #[with("wrapped_objects", "tests/storage/wrapped_objects.move")] runtime: RuntimeSandbox,
+    ) {
+        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
+
         let call_data = createBetaCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -4402,6 +4410,8 @@ mod wrapped_objects {
         let beta_id = runtime.obtain_uid();
 
         let beta_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &beta_id.0);
+
+        runtime.print_storage();
 
         // Transfer beta to the recipient
         let call_data = transferBetaCall::new((beta_id, RECIPIENT_ADDRESS.into())).abi_encode();
@@ -4441,7 +4451,11 @@ mod wrapped_objects {
     }
 
     #[rstest]
-    fn test_transferring_gamma(runtime: RuntimeSandbox) {
+    fn test_transferring_gamma(
+        #[with("wrapped_objects", "tests/storage/wrapped_objects.move")] runtime: RuntimeSandbox,
+    ) {
+        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
+
         let call_data = createGammaCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -4495,7 +4509,11 @@ mod wrapped_objects {
     }
 
     #[rstest]
-    fn test_transferring_delta(runtime: RuntimeSandbox) {
+    fn test_transferring_delta(
+        #[with("wrapped_objects", "tests/storage/wrapped_objects.move")] runtime: RuntimeSandbox,
+    ) {
+        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
+
         let call_data = createDeltaCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -4550,7 +4568,11 @@ mod wrapped_objects {
         );
     }
     #[rstest]
-    fn test_rebuilding_gamma(runtime: RuntimeSandbox) {
+    fn test_rebuilding_gamma(
+        #[with("wrapped_objects", "tests/storage/wrapped_objects.move")] runtime: RuntimeSandbox,
+    ) {
+        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
+
         let call_data = createGammaCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -4608,7 +4630,11 @@ mod wrapped_objects {
     }
 
     #[rstest]
-    fn test_destruct_delta_to_beta(runtime: RuntimeSandbox) {
+    fn test_destruct_delta_to_beta(
+        #[with("wrapped_objects", "tests/storage/wrapped_objects.move")] runtime: RuntimeSandbox,
+    ) {
+        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
+
         let call_data = createDeltaCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -4668,7 +4694,11 @@ mod wrapped_objects {
     }
 
     #[rstest]
-    fn test_pushing_alpha_into_delta(runtime: RuntimeSandbox) {
+    fn test_pushing_alpha_into_delta(
+        #[with("wrapped_objects", "tests/storage/wrapped_objects.move")] runtime: RuntimeSandbox,
+    ) {
+        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
+
         // Create empty delta
         let call_data = createEmptyDeltaCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -4775,12 +4805,6 @@ mod wrapped_objects {
             ],
             "Slot should not be empty"
         );
-        /*
-         *
-            U256::from_str_radix("ebc75c981e6b1aa3", 16)
-                .unwrap()
-                .to_be_bytes(),
-        */
 
         // Read delta after the pop and assert the data is correct
         let call_data = readDeltaCall::new((delta_id,)).abi_encode();
@@ -4878,7 +4902,11 @@ mod wrapped_objects {
     }
 
     #[rstest]
-    fn test_destruct_epsilon(runtime: RuntimeSandbox) {
+    fn test_destruct_epsilon(
+        #[with("wrapped_objects", "tests/storage/wrapped_objects.move")] runtime: RuntimeSandbox,
+    ) {
+        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
+
         let call_data = createEpsilonCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -4987,7 +5015,11 @@ mod wrapped_objects {
     }
 
     #[rstest]
-    fn test_pushing_and_popping_alpha_from_zeta(runtime: RuntimeSandbox) {
+    fn test_pushing_and_popping_alpha_from_zeta(
+        #[with("wrapped_objects", "tests/storage/wrapped_objects.move")] runtime: RuntimeSandbox,
+    ) {
+        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
+
         let call_data = createEmptyZetaCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -5120,7 +5152,11 @@ mod wrapped_objects {
     }
 
     #[rstest]
-    fn test_popping_from_empty_zeta(runtime: RuntimeSandbox) {
+    fn test_popping_from_empty_zeta(
+        #[with("wrapped_objects", "tests/storage/wrapped_objects.move")] runtime: RuntimeSandbox,
+    ) {
+        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
+
         let call_data = createEmptyZetaCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -5216,7 +5252,11 @@ mod wrapped_objects {
     }
 
     #[rstest]
-    fn test_pushing_and_popping_from_bora(runtime: RuntimeSandbox) {
+    fn test_pushing_and_popping_from_bora(
+        #[with("wrapped_objects", "tests/storage/wrapped_objects.move")] runtime: RuntimeSandbox,
+    ) {
+        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
+
         let call_data = createEtaCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -5313,21 +5353,6 @@ mod dynamic_storage_fields {
 
     use super::*;
 
-    // NOTE: we can't use this fixture as #[once] because in order to catch events, we use an mpsc
-    // channel. If we use this as #[once], there's a possibility this runtime is used in more than one
-    // thread. If that happens, messages from test A can be received by test B.
-    // Using once instance per thread assures this won't happen.
-    #[fixture]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "dynamic_fields";
-        const SOURCE_PATH: &str = "tests/storage/dynamic_fields.move";
-
-        let mut translated_package =
-            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
-
     sol!(
         #[allow(missing_docs)]
         function createFoo() public view;
@@ -5347,7 +5372,10 @@ mod dynamic_storage_fields {
     #[rstest]
     #[case(true)]
     #[case(false)]
-    fn test_dynamic_fields(runtime: RuntimeSandbox, #[case] owned: bool) {
+    fn test_dynamic_fields(
+        #[with("dynamic_fields", "tests/storage/dynamic_fields.move")] runtime: RuntimeSandbox,
+        #[case] owned: bool,
+    ) {
         if owned {
             runtime.set_msg_sender(SIGNER_ADDRESS);
             let call_data = createFooOwnedCall::new(()).abi_encode();
@@ -5541,21 +5569,6 @@ mod dynamic_storage_fields_named_id {
 
     use super::*;
 
-    // NOTE: we can't use this fixture as #[once] because in order to catch events, we use an mpsc
-    // channel. If we use this as #[once], there's a possibility this runtime is used in more than one
-    // thread. If that happens, messages from test A can be received by test B.
-    // Using once instance per thread assures this won't happen.
-    #[fixture]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "dynamic_fields_named_id";
-        const SOURCE_PATH: &str = "tests/storage/dynamic_fields_named_id.move";
-
-        let mut translated_package =
-            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
-
     sol!(
         #[allow(missing_docs)]
         function createFoo() public view;
@@ -5575,7 +5588,14 @@ mod dynamic_storage_fields_named_id {
     #[rstest]
     #[case(true)]
     #[case(false)]
-    fn test_dynamic_fields_named_id(runtime: RuntimeSandbox, #[case] owned: bool) {
+    fn test_dynamic_fields_named_id(
+        #[with(
+            "dynamic_fields_named_id",
+            "tests/storage/dynamic_fields_named_id.move"
+        )]
+        runtime: RuntimeSandbox,
+        #[case] owned: bool,
+    ) {
         if owned {
             runtime.set_msg_sender(SIGNER_ADDRESS);
             let call_data = createFooOwnedCall::new(()).abi_encode();
@@ -5762,21 +5782,6 @@ mod dynamic_table {
 
     use super::*;
 
-    // NOTE: we can't use this fixture as #[once] because in order to catch events, we use an mpsc
-    // channel. If we use this as #[once], there's a possibility this runtime is used in more than one
-    // thread. If that happens, messages from test A can be received by test B.
-    // Using once instance per thread assures this won't happen.
-    #[fixture]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "dynamic_table";
-        const SOURCE_PATH: &str = "tests/storage/dynamic_table.move";
-
-        let mut translated_package =
-            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
-
     sol!(
         #[allow(missing_docs)]
 
@@ -5798,7 +5803,10 @@ mod dynamic_table {
     #[rstest]
     #[case(true)]
     #[case(false)]
-    fn test_dynamic_table(runtime: RuntimeSandbox, #[case] owned: bool) {
+    fn test_dynamic_table(
+        #[with("dynamic_table", "tests/storage/dynamic_table.move")] runtime: RuntimeSandbox,
+        #[case] owned: bool,
+    ) {
         if owned {
             runtime.set_msg_sender(SIGNER_ADDRESS);
             let call_data = createFooOwnedCall::new(()).abi_encode();
@@ -5929,21 +5937,6 @@ mod erc20 {
 
     use super::*;
 
-    // NOTE: we can't use this fixture as #[once] because in order to catch events, we use an mpsc
-    // channel. If we use this as #[once], there's a possibility this runtime is used in more than one
-    // thread. If that happens, messages from test A can be received by test B.
-    // Using once instance per thread assures this won't happen.
-    #[fixture]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "erc20";
-        const SOURCE_PATH: &str = "tests/storage/erc20.move";
-
-        let mut translated_package =
-            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
-
     sol!(
         #[allow(missing_docs)]
 
@@ -5967,7 +5960,7 @@ mod erc20 {
     );
 
     #[rstest]
-    fn test_erc20(runtime: RuntimeSandbox) {
+    fn test_erc20(#[with("erc20", "tests/storage/erc20.move")] runtime: RuntimeSandbox) {
         let address_1 = address!("0xcafecafecafecafecafecafecafecafecafecafe");
         runtime.set_msg_sender(**address_1);
         runtime.set_tx_origin(**address_1);
@@ -6121,19 +6114,7 @@ mod erc20 {
 
 mod simple_warrior {
     use super::*;
-    use crate::common::runtime_sandbox::constants::SIGNER_ADDRESS;
-    use alloy_sol_types::{SolCall, SolValue, sol};
-
-    #[fixture]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "simple_warrior";
-        const SOURCE_PATH: &str = "tests/storage/simple_warrior.move";
-
-        let mut translated_package =
-            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    use alloy_sol_types::{SolCall, SolValue};
 
     sol!(
         #[allow(missing_docs)]
@@ -6193,7 +6174,9 @@ mod simple_warrior {
     );
 
     #[rstest]
-    fn test_equip_warrior(runtime: RuntimeSandbox) {
+    fn test_equip_warrior(
+        #[with("simple_warrior", "tests/storage/simple_warrior.move")] runtime: RuntimeSandbox,
+    ) {
         runtime.set_msg_sender(SIGNER_ADDRESS);
 
         // Create warrior
@@ -6412,19 +6395,8 @@ mod simple_warrior {
 
 mod enums {
     use super::*;
-    use crate::common::runtime_sandbox::constants::SIGNER_ADDRESS;
     use alloy_primitives::address;
     use alloy_sol_types::{SolCall, SolValue, sol};
-
-    #[fixture]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "enums";
-        const SOURCE_PATH: &str = "tests/storage/enums.move";
-        let mut translated_package =
-            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
 
     sol!(
         #[derive(Debug)]
@@ -6503,7 +6475,9 @@ mod enums {
     );
 
     #[rstest]
-    fn test_struct_with_simple_enums(runtime: RuntimeSandbox) {
+    fn test_struct_with_simple_enums(
+        #[with("enums", "tests/storage/enums.move")] runtime: RuntimeSandbox,
+    ) {
         runtime.set_msg_sender(SIGNER_ADDRESS);
 
         let call_data = createStructWithSimpleEnumsCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
@@ -6567,7 +6541,7 @@ mod enums {
     }
 
     #[rstest]
-    fn test_foo_struct(runtime: RuntimeSandbox) {
+    fn test_foo_struct(#[with("enums", "tests/storage/enums.move")] runtime: RuntimeSandbox) {
         runtime.set_msg_sender(SIGNER_ADDRESS);
 
         let call_data = createFooStructCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
@@ -6628,7 +6602,7 @@ mod enums {
     }
 
     #[rstest]
-    fn test_bar_struct(runtime: RuntimeSandbox) {
+    fn test_bar_struct(#[with("enums", "tests/storage/enums.move")] runtime: RuntimeSandbox) {
         runtime.set_msg_sender(SIGNER_ADDRESS);
 
         let call_data = createBarStructCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
@@ -6696,7 +6670,9 @@ mod enums {
     }
 
     #[rstest]
-    fn test_generic_bar_struct(runtime: RuntimeSandbox) {
+    fn test_generic_bar_struct(
+        #[with("enums", "tests/storage/enums.move")] runtime: RuntimeSandbox,
+    ) {
         runtime.set_msg_sender(SIGNER_ADDRESS);
 
         let call_data = createGenericBarStructCall::new((SIGNER_ADDRESS.into(),)).abi_encode();

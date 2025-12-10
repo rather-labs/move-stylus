@@ -54,7 +54,7 @@ entry fun get_color(s: &StructWithSimpleEnums): &Colors {
 }
 
 entry fun destroy_struct_with_simple_enums(s: StructWithSimpleEnums) {
-    let StructWithSimpleEnums { id, n, c } = s;
+    let StructWithSimpleEnums { id, n: _, c: _ } = s;
     object::delete(id);
 }
 
@@ -76,10 +76,6 @@ entry fun create_foo_struct(recipient: address, ctx: &mut TxContext) {
         a: FooEnum::A { x: 1, y: 2 },
     };
     transfer::transfer(s, recipient);
-}
-
-fun set_variant(s: &mut FooStruct, a: FooEnum) {
-    s.a = a;
 }
 
 entry fun set_variant_a(s: &mut FooStruct, x: u16, y: u32) {

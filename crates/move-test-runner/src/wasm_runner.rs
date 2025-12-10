@@ -12,7 +12,7 @@ use crate::constants::{
     BLOCK_BASEFEE, BLOCK_GAS_LIMIT, BLOCK_NUMBER, BLOCK_TIMESTAMP, CHAIN_ID, GAS_PRICE,
     MSG_SENDER_ADDRESS, MSG_VALUE, SIGNER_ADDRESS,
 };
-use alloy_primitives::{U256, keccak256};
+use alloy_primitives::{FixedBytes, U256, keccak256};
 use anyhow::Result;
 use move_bytecode_to_wasm::data::DATA_ABORT_MESSAGE_PTR_OFFSET;
 use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store};
@@ -40,6 +40,8 @@ pub struct RuntimeSandbox {
     module: WasmModule,
     pub log_events: LogEventReceiver,
     pub cross_contract_calls: CrossCrontractExecutionReceiver,
+    current_tx_origin: Arc<Mutex<[u8; 20]>>,
+    current_msg_sender: Arc<Mutex<[u8; 20]>>,
     storage: Arc<Mutex<HashMap<[u8; 32], [u8; 32]>>>,
     cross_contract_call_return_data: Arc<Mutex<Vec<u8>>>,
     cross_contract_call_succeed: Arc<AtomicBool>,
@@ -151,6 +153,7 @@ macro_rules! link_test_fn_write_u64_constant {
     () => {};
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum CrossContractCallType {
     Call,
     StaticCall,
@@ -168,11 +171,19 @@ pub struct CrossContractExecutionData {
 }
 
 impl RuntimeSandbox {
-    pub fn new(compiled_module_path: &Path) -> Self {
+    pub fn from_path(compiled_module_path: &Path) -> Self {
         let engine = Engine::default();
-
         let module = WasmModule::from_file(&engine, compiled_module_path).unwrap();
+        Self::new(module, engine)
+    }
 
+    pub fn from_binary(module: &[u8]) -> Self {
+        let engine = Engine::default();
+        let module = WasmModule::from_binary(&engine, module).unwrap();
+        Self::new(module, engine)
+    }
+
+    fn new(module: WasmModule, engine: Engine) -> Self {
         let storage: Arc<Mutex<HashMap<[u8; 32], [u8; 32]>>> = Arc::new(Mutex::new(HashMap::new()));
 
         let current_tx_origin = Arc::new(Mutex::new(SIGNER_ADDRESS));
@@ -577,6 +588,8 @@ impl RuntimeSandbox {
             module,
             log_events: Arc::new(Mutex::new(log_receiver)),
             cross_contract_calls: Arc::new(Mutex::new(cce_receiver)),
+            current_tx_origin,
+            current_msg_sender,
             storage,
             cross_contract_call_return_data,
             cross_contract_call_succeed,
@@ -619,7 +632,73 @@ impl RuntimeSandbox {
         })
     }
 
-    fn read_memory_from(
+    /// Crates a temporary runtime sandbox instance and calls the entrypoint with the given data.
+    ///
+    /// Returns the result of the entrypoint call and the return data.
+    pub fn call_entrypoint(&self, data: Vec<u8>) -> Result<(i32, Vec<u8>)> {
+        let data_len = data.len() as i32;
+        let mut store = Store::new(
+            &self.engine,
+            ModuleData {
+                data,
+                return_data: vec![],
+            },
+        );
+        let instance = self.linker.instantiate(&mut store, &self.module)?;
+
+        let entrypoint = instance.get_typed_func::<i32, i32>(&mut store, "user_entrypoint")?;
+
+        let result = entrypoint
+            .call(&mut store, data_len)
+            .map_err(|e| anyhow::anyhow!("error calling entrypoint: {e:?}"))?;
+
+        Ok((result, store.data().return_data.clone()))
+    }
+
+    /// Crates a temporary runtime sandbox instance and calls the entrypoint with the given data.
+    ///
+    /// Returns the result of the entrypoint call and the return data.
+    pub fn call_entrypoint_with_data(&self, data: Vec<u8>) -> Result<ExecutionData> {
+        let data_len = data.len() as i32;
+        let mut store = Store::new(
+            &self.engine,
+            ModuleData {
+                data,
+                return_data: vec![],
+            },
+        );
+        let instance = self.linker.instantiate(&mut store, &self.module)?;
+
+        let entrypoint = instance.get_typed_func::<i32, i32>(&mut store, "user_entrypoint")?;
+
+        entrypoint
+            .call(&mut store, data_len)
+            .map_err(|e| anyhow::anyhow!("error calling entrypoint: {e:?}"))?;
+
+        let error_pointer = Self::read_memory_from(
+            &instance,
+            &mut store,
+            DATA_ABORT_MESSAGE_PTR_OFFSET as usize,
+            4,
+        )
+        .map_err(|e| anyhow::anyhow!("there was an error reading test memory: {e:?}"))?;
+
+        Ok(ExecutionData {
+            return_data: store.data().return_data.clone(),
+            instance,
+            store,
+            execution_aborted: error_pointer != [0, 0, 0, 0],
+        })
+    }
+
+    pub fn obtain_uid(&self) -> FixedBytes<32> {
+        let (topic, data) = self.log_events.lock().unwrap().recv().unwrap();
+        assert_eq!(2, topic);
+        assert_eq!(*keccak256(b"NewUID(address)").as_slice(), data[..32]);
+        FixedBytes::<32>::from_slice(&data[32..])
+    }
+
+    pub fn read_memory_from(
         instance: &wasmtime::Instance,
         store: &mut Store<ModuleData>,
         from: usize,
@@ -632,5 +711,45 @@ impl RuntimeSandbox {
             .expect("Wasm module must export memory");
 
         Ok(memory.data(&store)[from..from + len].to_vec())
+    }
+
+    pub fn set_cross_contract_call_success(&self, success: bool) {
+        self.cross_contract_call_succeed
+            .store(success, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    pub fn set_cross_contract_return_data(&self, data: Vec<u8>) {
+        *self.cross_contract_call_return_data.lock().unwrap() = data;
+    }
+
+    pub fn set_msg_sender(&self, new_address: [u8; 20]) {
+        *self.current_msg_sender.lock().unwrap() = new_address;
+    }
+
+    pub fn set_tx_origin(&self, new_address: [u8; 20]) {
+        *self.current_tx_origin.lock().unwrap() = new_address;
+    }
+
+    pub fn get_tx_origin(&self) -> [u8; 20] {
+        *self.current_tx_origin.lock().unwrap()
+    }
+
+    pub fn get_storage_at_slot(&self, slot: [u8; 32]) -> [u8; 32] {
+        let storage = self.storage.lock().unwrap();
+        *storage.get(&slot).unwrap()
+    }
+
+    pub fn get_storage(&self) -> HashMap<[u8; 32], [u8; 32]> {
+        self.storage.lock().unwrap().clone()
+    }
+
+    pub fn print_storage(&self) {
+        let storage = self.storage.lock().unwrap();
+        let mut entries: Vec<_> = storage.iter().collect();
+        entries.sort_by_key(|(key, _)| *key);
+
+        for (key, value) in entries {
+            println!("key: {key:?} \n\t value: {value:?}");
+        }
     }
 }

@@ -1,37 +1,14 @@
-use alloy_sol_types::{SolCall, SolType, sol};
-use anyhow::Result;
-use common::{runtime_sandbox::RuntimeSandbox, translate_test_package};
-use rstest::{fixture, rstest};
-
 mod common;
 
-fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u8>) -> Result<()> {
-    let (result, return_data) = runtime.call_entrypoint(call_data)?;
-    anyhow::ensure!(
-        result == 0,
-        "Function returned non-zero exit code: {result}"
-    );
-    anyhow::ensure!(
-        return_data == expected_result,
-        "return data mismatch:\nreturned:{return_data:?}\nexpected:{expected_result:?}"
-    );
-
-    Ok(())
-}
+use crate::common::run_test;
+use alloy_sol_types::{SolCall, SolType, sol};
+use move_test_runner::wasm_runner::RuntimeSandbox;
+use rstest::{fixture, rstest};
 
 mod control_flow_u8 {
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "control_flow_u8";
-        const SOURCE_PATH: &str = "tests/control-flow/control_flow_u8.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    declare_fixture!("control_flow_u8", "tests/control-flow/control_flow_u8.move");
 
     sol!(
         #[allow(missing_docs)]
@@ -97,16 +74,10 @@ mod control_flow_u8 {
 mod control_flow_u64 {
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "control_flow_u64";
-        const SOURCE_PATH: &str = "tests/control-flow/control_flow_u64.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    declare_fixture!(
+        "control_flow_u64",
+        "tests/control-flow/control_flow_u64.move"
+    );
 
     sol!(
         #[allow(missing_docs)]

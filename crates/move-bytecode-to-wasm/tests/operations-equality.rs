@@ -1,38 +1,15 @@
-use alloy_primitives::{U256, address};
-use alloy_sol_types::{SolCall, SolType, sol};
-use anyhow::Result;
-use common::{runtime_sandbox::RuntimeSandbox, translate_test_package};
-use rstest::{fixture, rstest};
-
 mod common;
 
-fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u8>) -> Result<()> {
-    let (result, return_data) = runtime.call_entrypoint(call_data)?;
-    anyhow::ensure!(
-        result == 0,
-        "Function returned non-zero exit code: {result}"
-    );
-    anyhow::ensure!(
-        return_data == expected_result,
-        "return data mismatch:\nreturned:{return_data:?}\nexpected:{expected_result:?}"
-    );
-
-    Ok(())
-}
+use crate::common::run_test;
+use alloy_primitives::{U256, address};
+use alloy_sol_types::{SolCall, SolType, sol};
+use move_test_runner::wasm_runner::RuntimeSandbox;
+use rstest::{fixture, rstest};
 
 mod primitives {
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "equality";
-        const SOURCE_PATH: &str = "tests/operations-equality/primitives.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    declare_fixture!("equality", "tests/operations-equality/primitives.move");
 
     sol!(
         #[allow(missing_docs)]
@@ -136,15 +113,7 @@ mod primitives {
 mod vector {
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "equality_vectors";
-        const SOURCE_PATH: &str = "tests/operations-equality/vectors.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    declare_fixture!("equality_vectors", "tests/operations-equality/vectors.move");
 
     sol!(
         #[allow(missing_docs)]
@@ -696,15 +665,10 @@ mod vector {
 mod references {
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "equality_references";
-        const SOURCE_PATH: &str = "tests/operations-equality/references.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    declare_fixture!(
+        "equality_references",
+        "tests/operations-equality/references.move"
+    );
 
     sol!(
         #[allow(missing_docs)]
@@ -1046,16 +1010,7 @@ mod references {
 mod structs {
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "equality_structs";
-        const SOURCE_PATH: &str = "tests/operations-equality/structs.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    declare_fixture!("equality_structs", "tests/operations-equality/structs.move");
 
     sol!(
         #[allow(missing_docs)]
@@ -1173,21 +1128,12 @@ mod structs {
 }
 
 mod external_structs {
-    use crate::common::translate_test_complete_package;
-
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        let mut translated_packages =
-            translate_test_complete_package("tests/operations-equality/external");
-
-        let translated_package = translated_packages
-            .get_mut("equality_external_structs")
-            .unwrap();
-        RuntimeSandbox::new(translated_package)
-    }
+    declare_fixture_complete_package!(
+        "equality_external_structs",
+        "tests/operations-equality/external"
+    );
 
     sol!(
         #[allow(missing_docs)]
@@ -1307,14 +1253,7 @@ mod external_structs {
 mod enums {
     use super::*;
 
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "equality_enums";
-        const SOURCE_PATH: &str = "tests/operations-equality/enums.move";
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    declare_fixture!("equality_enums", "tests/operations-equality/enums.move");
 
     sol!(
         #[allow(missing_docs)]

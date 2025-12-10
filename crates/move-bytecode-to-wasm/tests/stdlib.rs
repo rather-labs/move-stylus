@@ -1,47 +1,25 @@
 mod common;
 
+use crate::common::{run_test, translate_test_package};
 use alloy_sol_types::{SolCall, SolType, SolValue, abi::TokenSeq, sol};
-use anyhow::Result;
-use common::{runtime_sandbox::RuntimeSandbox, translate_test_package};
+use move_test_runner::wasm_runner::RuntimeSandbox;
 use rstest::{fixture, rstest};
 
-fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u8>) -> Result<()> {
-    let (result, return_data) = runtime.call_entrypoint(call_data)?;
+mod use_stdlib {
+    use super::*;
 
-    anyhow::ensure!(
-        result == 0,
-        "Function returned non-zero exit code: {result}"
-    );
-    anyhow::ensure!(
-        return_data == expected_result,
-        "return data mismatch:\nreturned:{return_data:?}\nexpected:{expected_result:?}"
-    );
-
-    Ok(())
-}
-
-/// This test is here to check if code that use the standard library gets compiled to Move
-/// Bytecode.
-#[test]
-fn test_use_stdlib() {
-    const MODULE_NAME: &str = "use_stdlib";
-    const SOURCE_PATH: &str = "tests/stdlib/use_stdlib.move";
-
-    translate_test_package(SOURCE_PATH, MODULE_NAME);
+    /// This test is here to check if code that use the standard library gets compiled to Move
+    /// Bytecode.
+    #[test]
+    fn test_use_stdlib() {
+        translate_test_package("tests/stdlib/use_stdlib.move", "use_stdlib");
+    }
 }
 
 mod string {
     use super::*;
 
-    const MODULE_NAME: &str = "string";
-    const SOURCE_PATH: &str = "tests/stdlib/string.move";
-
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-        RuntimeSandbox::new(&mut translated_package)
-    }
+    declare_fixture!("string", "tests/stdlib/string.move");
 
     sol!(
         #[allow(missing_docs)]
