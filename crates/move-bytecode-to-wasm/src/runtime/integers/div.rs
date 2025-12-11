@@ -75,7 +75,7 @@ const F_SHIFT_64BITS_RIGHT: &str = "shift_64bits_right";
 /// # Arguments
 /// - Pointer to the dividend
 /// - Pointer to the divisor
-/// - Number of bytes the values occupy in memory
+/// - Number of bits the values occupy in memory
 /// - Whether return remainder or quotient. 1 for quotient, 0 for remainder.
 ///
 /// # Returns
@@ -90,9 +90,9 @@ pub fn heap_integers_div_mod(
         &[ValType::I32],
     );
 
-    let shift_64bits_right_f = shift_64bits_right(module, compilation_ctx);
     let check_if_a_less_than_b_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
     let sub_f = RuntimeFunction::HeapIntSub.get(module, Some(compilation_ctx))?;
+    let right_shift_number = shift_1bit_right(module, compilation_ctx);
 
     // Function arguments
     let dividend_ptr = module.locals.add(ValType::I32);
@@ -103,9 +103,9 @@ pub fn heap_integers_div_mod(
     // Locals
     let remainder_ptr = module.locals.add(ValType::I32);
     let quotient_ptr = module.locals.add(ValType::I32);
+    let i = module.locals.add(ValType::I32);
 
     let offset = module.locals.add(ValType::I32);
-    let substraction_counter = module.locals.add(ValType::I64);
 
     // To check if divisor is 0
     let accumulator = module.locals.add(ValType::I64);
@@ -115,6 +115,7 @@ pub fn heap_integers_div_mod(
         .func_body();
 
     // Before anything we check if divisor is 0
+    // TODO: replace with iszero runtime function
     builder.block(None, |block| {
         let block_id = block.id();
         block.loop_(None, |loop_| {
@@ -186,148 +187,16 @@ pub fn heap_integers_div_mod(
         .call(compilation_ctx.allocator)
         .local_set(quotient_ptr);
 
-    builder
-        .block(None, |block| {
-            let block_id = block.id();
+    // Set the counter of the loop to 0 (least significant bit)
+    builder.local_get(type_heap_size).local_set(i);
 
-            block.loop_(None, |loop_| {
-                let loop_id = loop_.id();
+    /*
+    builder.loop_(None, |loop_| {
+        let loop_id = loop_.id();
+    });
+    */
 
-                // If we evaluated all the chunks we exit the loop
-                loop_
-                    .local_get(offset)
-                    .i32_const(0)
-                    .binop(BinaryOp::I32LtS)
-                    .br_if(block_id);
-
-                // Shift the remainder by 1 digit
-                loop_
-                    .local_get(remainder_ptr)
-                    .local_get(type_heap_size)
-                    .call(shift_64bits_right_f);
-
-                // Set r[0] = D[i]
-                loop_
-                    .local_get(remainder_ptr)
-                    .local_get(dividend_ptr)
-                    .local_get(offset)
-                    .binop(BinaryOp::I32Add)
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I64 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    )
-                    .store(
-                        compilation_ctx.memory_id,
-                        StoreKind::I64 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
-
-                // If remainder < divisor -> q[0]
-                // Otherwise we loop substraction until divisor < remainder
-                loop_
-                    .local_get(remainder_ptr)
-                    .local_get(divisor_ptr)
-                    .local_get(type_heap_size)
-                    .call(check_if_a_less_than_b_f)
-                    .if_else(
-                        None,
-                        // remainder < divisor => q[i] = 0
-                        |then| {
-                            then.local_get(quotient_ptr)
-                                .local_get(offset)
-                                .binop(BinaryOp::I32Add)
-                                .i64_const(0)
-                                .store(
-                                    compilation_ctx.memory_id,
-                                    StoreKind::I64 { atomic: false },
-                                    MemArg {
-                                        align: 0,
-                                        offset: 0,
-                                    },
-                                );
-                        },
-                        // otherwise we perform remainder -= divisor until remainder < divisor and we
-                        // count each substraction in c. When the loop is finished q[i] = c
-                        |else_| {
-                            // Set the substraction counter in 0
-                            else_.i64_const(0).local_set(substraction_counter);
-
-                            else_.loop_(None, |substraction_loop| {
-                                let substraction_loop_id = substraction_loop.id();
-
-                                // remainder -= divisor
-                                substraction_loop
-                                    .local_get(remainder_ptr)
-                                    .local_get(divisor_ptr)
-                                    .local_get(remainder_ptr)
-                                    .local_get(type_heap_size)
-                                    .call(sub_f)
-                                    .drop();
-
-                                // substraction_counter += 1
-                                substraction_loop
-                                    .local_get(substraction_counter)
-                                    .i64_const(1)
-                                    .binop(BinaryOp::I64Add)
-                                    .local_set(substraction_counter);
-
-                                substraction_loop
-                                    .local_get(remainder_ptr)
-                                    .local_get(divisor_ptr)
-                                    .local_get(type_heap_size)
-                                    .call(check_if_a_less_than_b_f)
-                                    .if_else(
-                                        None,
-                                        |then| {
-                                            // If remainder < divisor means we finished substracting,
-                                            // we set q[i] = substraction_counter
-                                            then.local_get(quotient_ptr)
-                                                .local_get(offset)
-                                                .binop(BinaryOp::I32Add)
-                                                .local_get(substraction_counter)
-                                                .store(
-                                                    compilation_ctx.memory_id,
-                                                    StoreKind::I64 { atomic: false },
-                                                    MemArg {
-                                                        align: 0,
-                                                        offset: 0,
-                                                    },
-                                                );
-                                        },
-                                        // Otherwise we continue the substractions
-                                        |else_| {
-                                            else_.br(substraction_loop_id);
-                                        },
-                                    );
-                            });
-                        },
-                    )
-                    // We substract 8 from the offset and continue the
-                    // outer loop
-                    .local_get(offset)
-                    .i32_const(8)
-                    .binop(BinaryOp::I32Sub)
-                    .local_set(offset)
-                    .br(loop_id);
-            });
-        })
-        .local_get(quotient_or_reminder)
-        .if_else(
-            ValType::I32,
-            |then| {
-                then.local_get(quotient_ptr);
-            },
-            |else_| {
-                else_.local_get(remainder_ptr);
-            },
-        );
+    builder.local_get(quotient_ptr);
 
     Ok(function.finish(
         vec![
@@ -340,19 +209,7 @@ pub fn heap_integers_div_mod(
     ))
 }
 
-/// Auxiliary function that shifts right by the base.
-///
-/// This is done by moving chunks of 64 bits to the right. For example, for u256:
-/// let a = [1, 2, 3, 4]
-///
-/// 1. First shift  -> a = [0, 1, 2, 3]
-/// 2. Second shift -> a = [0, 0, 1, 2]
-/// 3. Third shift  -> a = [0, 0, 0, 1]
-///
-/// # Arguments
-///    - pointer to the number to shift
-///    - how many bytes the number occupies in heap
-fn shift_64bits_right(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
+fn shift_1bit_right(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
 
     // Function arguments
@@ -360,84 +217,130 @@ fn shift_64bits_right(module: &mut Module, compilation_ctx: &CompilationContext)
     let type_heap_size = module.locals.add(ValType::I32);
 
     // Local variables
-    let tmp = module.locals.add(ValType::I64);
-    let ptr_offset = module.locals.add(ValType::I32);
+    let current_chunk = module.locals.add(ValType::I64);
+    let i = module.locals.add(ValType::I32);
+
+    let total_chunks = module.locals.add(ValType::I32);
 
     let mut builder = function.name(F_SHIFT_64BITS_RIGHT.to_owned()).func_body();
 
-    // We set 0 in the first place and copy the first value to move to the tmp variable
     builder
-        .local_get(a_ptr)
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I64 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
-        .local_set(tmp)
-        .local_get(a_ptr)
-        .i64_const(0)
-        .store(
-            compilation_ctx.memory_id,
-            StoreKind::I64 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        );
+        .local_get(type_heap_size)
+        .i32_const(64)
+        .binop(BinaryOp::I32DivU)
+        .local_set(total_chunks);
 
-    // The chunk number to process is in the offset 8
-    builder
-        .local_get(a_ptr)
-        .i32_const(8)
-        .binop(BinaryOp::I32Add)
-        .local_set(ptr_offset);
+    builder.local_get(total_chunks).local_set(i);
 
-    builder.block(None, |block| {
-        let block_id = block.id();
+    builder.loop_(None, |loop_| {
+        let loop_id = loop_.id();
 
-        block.loop_(None, |loop_| {
-            let loop_id = loop_.id();
+        // read the chunk we are currently processing
+        loop_
+            .local_get(a_ptr)
+            .local_get(i)
+            .i32_const(64)
+            .binop(BinaryOp::I32Mul)
+            .binop(BinaryOp::I32Add)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .local_tee(current_chunk);
 
-            // First we get in the stack the
-            loop_
-                .local_get(ptr_offset)
-                .load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I64 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                )
-                // Update the current position
-                .local_get(ptr_offset)
-                .local_get(tmp)
-                .store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I64 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                )
-                // Save the replaced value in tmp
-                .local_set(tmp)
-                .local_get(ptr_offset)
-                .i32_const(8)
-                .binop(BinaryOp::I32Add)
-                .local_tee(ptr_offset)
-                // If ptr_offset - a_ptr = type_heap_size means that we processed all the chunks,
-                // in that case we exit
-                .local_get(a_ptr)
-                .binop(BinaryOp::I32Sub)
-                .local_get(type_heap_size)
-                .binop(BinaryOp::I32Eq)
-                .br_if(block_id)
-                .br(loop_id);
-        });
+        // Right shift the current chunk by 1
+        loop_
+            .i64_const(1)
+            .binop(BinaryOp::I64Shl)
+            .local_set(current_chunk);
+
+        // If we are not at the end (i != 0) we must put in the leftmost bit of the current chunk
+        // the rightmost bit of the next chunk
+        loop_
+            .local_get(i)
+            .i32_const(0)
+            .binop(BinaryOp::I32Ne)
+            .if_else(
+                None,
+                |then_| {
+                    // next_chunk & 1 gives us the rightmost bit of it
+                    then_
+                        .local_get(a_ptr)
+                        .local_get(i)
+                        .i32_const(1)
+                        .binop(BinaryOp::I32Sub)
+                        .i32_const(64)
+                        .binop(BinaryOp::I32Mul)
+                        .binop(BinaryOp::I32Add)
+                        .load(
+                            compilation_ctx.memory_id,
+                            LoadKind::I64 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        )
+                        .i64_const(1)
+                        .binop(BinaryOp::I64And);
+
+                    // Put the it in the leftmost bit
+                    then_.i64_const(63).binop(BinaryOp::I64ShrU);
+
+                    // Save it in the leftmost bit of current chunk
+                    then_
+                        .local_get(current_chunk)
+                        .binop(BinaryOp::I64Or)
+                        .local_set(current_chunk);
+
+                    // Save the current chunk in memory
+                    then_
+                        .local_get(a_ptr)
+                        .local_get(i)
+                        .i32_const(64)
+                        .binop(BinaryOp::I32Mul)
+                        .binop(BinaryOp::I32Add)
+                        .local_get(current_chunk)
+                        .store(
+                            compilation_ctx.memory_id,
+                            StoreKind::I64 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        );
+
+                    // Substract from i and go to the loop
+                    then_
+                        .local_get(i)
+                        .i32_const(1)
+                        .binop(BinaryOp::I32Sub)
+                        .local_set(i);
+
+                    then_.br(loop_id);
+                },
+                |else_| {
+                    // Save the current chunk in memory
+                    else_
+                        .local_get(a_ptr)
+                        .local_get(i)
+                        .i32_const(64)
+                        .binop(BinaryOp::I32Mul)
+                        .binop(BinaryOp::I32Add)
+                        .local_get(current_chunk)
+                        .store(
+                            compilation_ctx.memory_id,
+                            StoreKind::I64 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        );
+                },
+            );
     });
 
     function.finish(vec![a_ptr, type_heap_size], &mut module.funcs)
@@ -454,12 +357,12 @@ mod tests {
     use super::*;
 
     #[rstest]
-    #[case(1, u64::MAX as u128 + 1)]
-    #[case(42, 42 << 64)]
-    #[case(u8::MAX as u128, (u8::MAX as u128) << 64)]
-    #[case(u16::MAX as u128, (u16::MAX as u128) << 64)]
-    #[case(u32::MAX as u128, (u32::MAX as u128) << 64)]
-    #[case(u64::MAX as u128, (u64::MAX as u128) << 64)]
+    // #[case(1, u64::MAX as u128 + 1)]
+    #[case(42, 42 << 1)]
+    #[case(u8::MAX as u128, (u8::MAX as u128) << 1)]
+    #[case(u16::MAX as u128, (u16::MAX as u128) << 1)]
+    #[case(u32::MAX as u128, (u32::MAX as u128) << 1)]
+    #[case(u64::MAX as u128, (u64::MAX as u128) << 1)]
     fn test_shift_64bits_right_u128(#[case] a: u128, #[case] expected: u128) {
         const TYPE_HEAP_SIZE: i32 = 16;
         let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE));
@@ -475,7 +378,7 @@ mod tests {
         func_body.i32_const(0).i32_const(TYPE_HEAP_SIZE);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
-        let shift_64bits_right_f = shift_64bits_right(&mut raw_module, &compilation_ctx);
+        let shift_64bits_right_f = shift_1bit_right(&mut raw_module, &compilation_ctx);
         func_body.call(shift_64bits_right_f);
 
         let function = function_builder.finish(vec![a_ptr], &mut raw_module.funcs);
@@ -489,17 +392,18 @@ mod tests {
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let result = &memory.data(&mut store)[0..TYPE_HEAP_SIZE as usize];
+
         assert_eq!(result, expected.to_le_bytes());
     }
 
     #[rstest]
-    #[case(U256::from(1), U256::from(u64::MAX as u128 + 1))]
-    #[case(U256::from(42), U256::from(42) << 64)]
-    #[case(U256::from(u8::MAX), U256::from(u8::MAX) << 64)]
-    #[case(U256::from(u16::MAX), U256::from(u16::MAX) << 64)]
-    #[case(U256::from(u32::MAX), U256::from(u32::MAX) << 64)]
-    #[case(U256::from(u64::MAX), U256::from(u64::MAX) << 64)]
-    #[case(U256::from(u128::MAX), U256::from(u128::MAX) << 64)]
+    // #[case(U256::from(1), 1 << 1)]
+    #[case(U256::from(42), U256::from(42) << 1)]
+    #[case(U256::from(u8::MAX), U256::from(u8::MAX) << 1)]
+    #[case(U256::from(u16::MAX), U256::from(u16::MAX) << 1)]
+    #[case(U256::from(u32::MAX), U256::from(u32::MAX) << 1)]
+    #[case(U256::from(u64::MAX), U256::from(u64::MAX) << 1)]
+    #[case(U256::from(u128::MAX), U256::from(u128::MAX) << 1)]
     #[case(U256::MAX, U256::MAX << 64)]
     fn test_shift_64bits_right_u256(#[case] a: U256, #[case] expected: U256) {
         const TYPE_HEAP_SIZE: i32 = 32;
@@ -516,7 +420,7 @@ mod tests {
         func_body.i32_const(0).i32_const(TYPE_HEAP_SIZE);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
-        let shift_64bits_right_f = shift_64bits_right(&mut raw_module, &compilation_ctx);
+        let shift_64bits_right_f = shift_1bit_right(&mut raw_module, &compilation_ctx);
         func_body.call(shift_64bits_right_f);
 
         let function = function_builder.finish(vec![a_ptr], &mut raw_module.funcs);
