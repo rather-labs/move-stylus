@@ -5,7 +5,7 @@ use move_binary_format::file_format::{
 };
 use walrus::{
     InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
-    ir::{LoadKind, MemArg, StoreKind},
+    ir::{InstrSeqId, LoadKind, MemArg, StoreKind},
 };
 
 use super::{
@@ -208,6 +208,8 @@ pub fn prepare_function_return(
     builder: &mut InstrSeqBuilder,
     returns: &[IntermediateType],
     compilation_ctx: &CompilationContext,
+    result_block_id: InstrSeqId,
+    result_local_id: LocalId,
 ) -> Result<(), TranslationError> {
     if !returns.is_empty() {
         let mut locals = Vec::new();
@@ -219,15 +221,13 @@ pub fn prepare_function_return(
         }
         locals.reverse();
 
-        let pointer = module.locals.add(ValType::I32);
-
         builder.i32_const(total_size as i32);
         builder.call(compilation_ctx.allocator);
-        builder.local_set(pointer);
+        builder.local_set(result_local_id);
 
         let mut offset = 0;
         for (return_ty, local) in returns.iter().zip(locals.iter()) {
-            builder.local_get(pointer);
+            builder.local_get(result_local_id);
             builder.local_get(*local);
 
             if return_ty.stack_data_size()? == 4 {
@@ -247,11 +247,9 @@ pub fn prepare_function_return(
             }
             offset += return_ty.stack_data_size()?;
         }
-
-        builder.local_get(pointer);
     }
 
-    builder.return_();
+    builder.br(result_block_id);
 
     Ok(())
 }

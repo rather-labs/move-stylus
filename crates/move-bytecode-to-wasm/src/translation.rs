@@ -175,6 +175,8 @@ struct TranslateFlowContext<'a> {
     control_targets: &'a mut ControlTargets,
     jump_table: &'a mut Option<JumpTableData>,
     dynamic_fields_global_variables: &'a mut Vec<(GlobalId, IntermediateType)>,
+    result_block_id: InstrSeqId,
+    result_local_id: LocalId,
 }
 
 /// Translates a move function to WASM
@@ -222,26 +224,47 @@ pub fn translate_function(
     let mut uid_locals: HashMap<u8, StorageIdParentInformation> = HashMap::new();
     let mut control_targets = ControlTargets::new();
 
-    let mut ctx = TranslateFlowContext {
-        compilation_ctx,
-        module_data,
-        function_table,
-        function_information,
-        function_locals: &function_locals,
-        uid_locals: &mut uid_locals,
-        types_stack: &mut types_stack,
-        control_targets: &mut control_targets,
-        jump_table: &mut None, // The current jump table we are translating
-        dynamic_fields_global_variables,
-    };
+    let mut flow_result: Result<(), TranslationError> = Ok(());
 
-    translate_flow(
-        &mut ctx,
-        &mut builder,
-        module,
-        &flow,
-        &mut functions_to_link,
-    )?;
+    // This block wraps the entire function's control flow. When a Ret instruction is encountered,
+    // instead of returning directly, we store the result in a local variable and branch back to this block.
+    // After the flow completes, the result is loaded from the local and pushed onto the stack to match the function's return type.
+    let result_local_id = module.locals.add(ValType::I32);
+    builder.block(None, |result_block| {
+        let result_block_id = result_block.id();
+
+        // Create the context for the translation of the flow
+        let mut ctx = TranslateFlowContext {
+            compilation_ctx,
+            module_data,
+            function_table,
+            function_information,
+            function_locals: &function_locals,
+            uid_locals: &mut uid_locals,
+            types_stack: &mut types_stack,
+            control_targets: &mut control_targets,
+            jump_table: &mut None,
+            dynamic_fields_global_variables,
+            result_block_id,
+            result_local_id,
+        };
+
+        // Translate the flow of the function
+        flow_result = translate_flow(
+            &mut ctx,
+            result_block,
+            module,
+            &flow,
+            &mut functions_to_link,
+        );
+    });
+
+    // If the function has return values, push the return local to the stack
+    if !function_information.results.is_empty() {
+        builder.local_get(result_local_id);
+    }
+
+    flow_result?;
 
     let function_id = function.finish(arguments, &mut module.funcs);
 
@@ -278,23 +301,8 @@ fn translate_flow(
             next,
             ..
         } => {
-            // If the immediate flow contains a Ret instruction, set the result type of the block to the function's return type.
-            let ty = InstrSeqType::new(
-                &mut module.types,
-                &[],
-                if instructions
-                    .last()
-                    .is_some_and(|b| matches!(b, Bytecode::Ret))
-                    || immediate.dominates_return()
-                {
-                    &ctx.function_information.results
-                } else {
-                    &[]
-                },
-            );
-
             let mut inner_result = Ok(());
-            builder.block(ty, |block| {
+            builder.block(None, |block| {
                 // Add the simple scope to the control targets.
                 ctx.control_targets.push_simple_scope(
                     block.id(),
@@ -337,23 +345,12 @@ fn translate_flow(
             next,
             ..
         } => {
-            // If the inner flow contains a Ret instruction, set the result type of the block to the function's return type.
-            let ty = InstrSeqType::new(
-                &mut module.types,
-                &[],
-                if inner.dominates_return() {
-                    &ctx.function_information.results
-                } else {
-                    &[]
-                },
-            );
-
             // We wrap the loop in a block so we have a "landing spot" if we need to break out of it
             // (in case we encounter a BranchMode::LoopBreak).
             let mut inner_result = Ok(());
-            builder.block(ty, |block| {
+            builder.block(None, |block| {
                 let block_id = block.id();
-                block.loop_(ty, |loop_| {
+                block.loop_(None, |loop_| {
                     // Add the loop targets to the control targets.
                     ctx.control_targets
                         .set_loop_targets(*loop_id, block_id, loop_.id());
@@ -402,92 +399,24 @@ fn translate_flow(
             let condition = module.locals.add(ValType::I32);
             builder.local_set(condition);
 
-            let then_ty = if then_body.dominates_return() {
-                ctx.function_information.results.clone()
-            } else {
-                vec![]
-            };
-
-            let else_ty = if else_body.dominates_return() {
-                ctx.function_information.results.clone()
-            } else {
-                vec![]
-            };
-
-            if then_ty == else_ty {
-                // CASE 1: both arms have the same result type (often empty)
-                let join_ty = InstrSeqType::new(&mut module.types, &[], &then_ty);
-
-                let mut inner_result = Ok(());
-                builder.block(join_ty, |join| {
-                    let join_id = join.id();
-                    join.block(None::<ValType>, |guard| {
-                        guard.local_get(condition);
-                        guard.br_if(guard.id());
-                        // ELSE (inside guard)
-                        inner_result =
-                            translate_flow(ctx, guard, module, else_body, functions_to_link);
-                        guard.br(join_id); // reconverge
-                    });
-                    if inner_result.is_ok() {
-                        // THEN (after guard)
-                        inner_result =
-                            translate_flow(ctx, join, module, then_body, functions_to_link);
-                    }
+            let mut inner_result = Ok(());
+            builder.block(None, |join| {
+                let join_id = join.id();
+                join.block(None::<ValType>, |guard| {
+                    guard.local_get(condition);
+                    guard.br_if(guard.id());
+                    // ELSE (inside guard)
+                    inner_result = translate_flow(ctx, guard, module, else_body, functions_to_link);
+                    guard.br(join_id); // reconverge
                 });
-                inner_result?;
-            } else if !then_ty.is_empty() && else_ty.is_empty() {
-                // CASE 2: ONLY THEN yields values; ELSE is empty
-                let join_ty = InstrSeqType::new(&mut module.types, &[], &then_ty);
-
-                let mut inner_result = Ok(());
-                builder.block(join_ty, |join| {
-                    join.block(None::<ValType>, |guard| {
-                        guard.local_get(condition);
-                        guard.br_if(guard.id());
-                        // ELSE (no result) inside guard
-                        inner_result =
-                            translate_flow(ctx, guard, module, else_body, functions_to_link);
-                    });
-                    // THEN (produces join result) after guard
-                    if inner_result.is_ok() {
-                        inner_result =
-                            translate_flow(ctx, join, module, then_body, functions_to_link);
-                    }
-                });
-                inner_result?;
-            } else if then_ty.is_empty() && !else_ty.is_empty() {
-                // CASE 3: ONLY ELSE yields values; THEN is empty
-                let join_ty = InstrSeqType::new(&mut module.types, &[], &else_ty);
-
-                let mut inner_result = Ok(());
-                builder.block(join_ty, |join| {
-                    join.block(None::<ValType>, |guard| {
-                        guard.local_get(condition);
-                        guard.unop(UnaryOp::I32Eqz); // flip so true => ELSE
-                        guard.br_if(guard.id());
-                        // THEN (no result) inside guard
-                        inner_result =
-                            translate_flow(ctx, guard, module, then_body, functions_to_link);
-                    });
-                    // ELSE (produces join result) after guard
-                    if inner_result.is_ok() {
-                        inner_result =
-                            translate_flow(ctx, join, module, else_body, functions_to_link);
-                    }
-                });
-                inner_result?;
-            } else {
-                // Both arms yield but with different types → no valid Wasm join
-                return Err(TranslationError::IfElseMismatch(
-                    then_ty.clone(),
-                    else_ty.clone(),
-                ));
-            }
+                if inner_result.is_ok() {
+                    // THEN (after guard)
+                    inner_result = translate_flow(ctx, join, module, then_body, functions_to_link);
+                }
+            });
+            inner_result?;
         }
         Flow::Switch { cases } => {
-            let mut cases = cases.clone();
-
             // label -> enclosing block id map for br_table targets
             let mut label_to_block: HashMap<u16, InstrSeqId> = HashMap::new();
 
@@ -555,62 +484,19 @@ fn translate_flow(
                 Ok(())
             }
 
-            // Check out if any of the Switch cases returns a value (contains a `Ret` instruction).
-            // - If the function returns something, find the single yielding case.
-            // - If more than one case returns a value, panic (this should never happen, as Move creates a merge block
-            // where those cases converge and where the actual value is pushed to the stack).
-            // - If the function doesn't return anything, use Empty for yielding_case.
-            let yielding_case = if !ctx.function_information.results.is_empty() {
-                let mut found = None;
-                for (i, c) in cases.iter().enumerate() {
-                    if c.dominates_return() {
-                        if found.is_some() {
-                            return Err(TranslationError::SwitchMoreThanOneCase);
-                        }
-                        found = Some(i);
-                    }
-                }
-                match found {
-                    Some(i) => Box::new(cases.remove(i)),
-                    None => Box::new(Flow::Empty),
-                }
-            } else {
-                Box::new(Flow::Empty)
-            };
+            // Create targets deepest-first by iterating cases in reverse
+            let cases_rev: Vec<&Flow> = cases.iter().rev().collect();
 
-            let case_ty = InstrSeqType::new(&mut module.types, &[ValType::I32], &[]);
-
-            // Open a block for the yielding case.
-            let mut inner_result: Result<(), TranslationError> = Ok(());
-            builder.block(case_ty, |yielding_block| {
-                inner_result = (|| {
-                    // Create targets deepest-first by iterating cases in reverse
-                    let cases_rev: Vec<&Flow> = cases.iter().rev().collect();
-
-                    // If the yielding case is not empty, map its label to the yielding block
-                    if !matches!(*yielding_case, Flow::Empty) {
-                        label_to_block.insert(yielding_case.get_label()?, yielding_block.id());
-                    }
-
-                    // Build target labels and emit br_table; each case body is emitted after its label
-                    open_cases(
-                        yielding_block,
-                        module,
-                        ctx,
-                        functions_to_link,
-                        &cases_rev,
-                        &mut label_to_block,
-                        0,
-                    )?;
-
-                    Ok(())
-                })();
-            });
-
-            inner_result?;
-
-            // Emit yielding case body if any
-            translate_flow(ctx, builder, module, &yielding_case, functions_to_link)?;
+            // Build target labels and emit br_table; each case body is emitted after its label
+            open_cases(
+                builder,
+                module,
+                ctx,
+                functions_to_link,
+                &cases_rev,
+                &mut label_to_block,
+                0,
+            )?;
         }
         Flow::Empty => (),
     }
@@ -1890,6 +1776,8 @@ fn translate_instruction(
                 builder,
                 &mapped_function.signature.returns,
                 compilation_ctx,
+                translate_flow_ctx.result_block_id,
+                translate_flow_ctx.result_local_id,
             )?;
 
             // We dont pop the return values from the stack, we just check if the types match
