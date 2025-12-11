@@ -10,6 +10,7 @@ use crate::{
 
 // Auxiliary function names
 const F_SHIFT_64BITS_RIGHT: &str = "shift_64bits_right";
+const F_SHIFT_64BITS_LEFT: &str = "shift_64bits_left";
 
 /// Implements the long division algorithm for 128 and 256 bit integers.
 ///
@@ -212,36 +213,38 @@ pub fn heap_integers_div_mod(
 fn shift_1bit_right(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
 
-    // Function arguments
-    let a_ptr = module.locals.add(ValType::I32);
-    let type_heap_size = module.locals.add(ValType::I32);
-
-    // Local variables
-    let current_chunk = module.locals.add(ValType::I64);
-    let i = module.locals.add(ValType::I32);
-
-    let total_chunks = module.locals.add(ValType::I32);
-
     let mut builder = function.name(F_SHIFT_64BITS_RIGHT.to_owned()).func_body();
 
-    builder
-        .local_get(type_heap_size)
-        .i32_const(64)
-        .binop(BinaryOp::I32DivU)
-        .local_set(total_chunks);
+    // Function arguments
+    let a_ptr = module.locals.add(ValType::I32);
+    let n = module.locals.add(ValType::I32);
 
-    builder.local_get(total_chunks).local_set(i);
+    let i = module.locals.add(ValType::I32);
+    let addr = module.locals.add(ValType::I32);
+    let word = module.locals.add(ValType::I64);
+    let carry = module.locals.add(ValType::I64);
+    let next = module.locals.add(ValType::I64);
+    let injected = module.locals.add(ValType::I64);
+
+    builder.i64_const(0).local_set(carry);
+
+    builder
+        .local_get(n)
+        .i32_const(1)
+        .binop(BinaryOp::I32Sub)
+        .local_set(i);
 
     builder.loop_(None, |loop_| {
         let loop_id = loop_.id();
 
-        // read the chunk we are currently processing
+        // addr of word i
         loop_
-            .local_get(a_ptr)
             .local_get(i)
-            .i32_const(64)
-            .binop(BinaryOp::I32Mul)
+            .i32_const(3)
+            .binop(BinaryOp::I32Shl)
+            .local_get(a_ptr)
             .binop(BinaryOp::I32Add)
+            .local_tee(addr)
             .load(
                 compilation_ctx.memory_id,
                 LoadKind::I64 { atomic: false },
@@ -250,106 +253,154 @@ fn shift_1bit_right(module: &mut Module, compilation_ctx: &CompilationContext) -
                     offset: 0,
                 },
             )
-            .local_tee(current_chunk);
+            .local_set(word);
 
-        // Right shift the current chunk by 1
+        // Capture LSB before changing the word
         loop_
+            .local_get(word)
             .i64_const(1)
-            .binop(BinaryOp::I64Shl)
-            .local_set(current_chunk);
+            .binop(BinaryOp::I64And)
+            .local_set(next);
 
-        // If we are not at the end (i != 0) we must put in the leftmost bit of the current chunk
-        // the rightmost bit of the next chunk
+        // injected bit
+        loop_
+            .local_get(carry)
+            .i64_const(63)
+            .binop(BinaryOp::I64Shl)
+            .local_set(injected);
+
+        // compute new word
+
+        loop_
+            .local_get(word)
+            .i64_const(1)
+            .binop(BinaryOp::I64ShrU)
+            .local_get(injected)
+            .binop(BinaryOp::I64Or)
+            .local_set(word);
+
+        // store back
+        loop_.local_get(addr).local_get(word).store(
+            compilation_ctx.memory_id,
+            StoreKind::I64 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
+
+        // propagate carry downward
+        loop_.local_get(next).local_set(carry);
+
+        loop_
+            .local_get(i)
+            .i32_const(1)
+            .binop(BinaryOp::I32Sub)
+            .local_set(i);
+
         loop_
             .local_get(i)
             .i32_const(0)
-            .binop(BinaryOp::I32Ne)
-            .if_else(
-                None,
-                |then_| {
-                    // next_chunk & 1 gives us the rightmost bit of it
-                    then_
-                        .local_get(a_ptr)
-                        .local_get(i)
-                        .i32_const(1)
-                        .binop(BinaryOp::I32Sub)
-                        .i32_const(64)
-                        .binop(BinaryOp::I32Mul)
-                        .binop(BinaryOp::I32Add)
-                        .load(
-                            compilation_ctx.memory_id,
-                            LoadKind::I64 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        )
-                        .i64_const(1)
-                        .binop(BinaryOp::I64And);
-
-                    // Put the it in the leftmost bit
-                    then_.i64_const(63).binop(BinaryOp::I64ShrU);
-
-                    // Save it in the leftmost bit of current chunk
-                    then_
-                        .local_get(current_chunk)
-                        .binop(BinaryOp::I64Or)
-                        .local_set(current_chunk);
-
-                    // Save the current chunk in memory
-                    then_
-                        .local_get(a_ptr)
-                        .local_get(i)
-                        .i32_const(64)
-                        .binop(BinaryOp::I32Mul)
-                        .binop(BinaryOp::I32Add)
-                        .local_get(current_chunk)
-                        .store(
-                            compilation_ctx.memory_id,
-                            StoreKind::I64 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        );
-
-                    // Substract from i and go to the loop
-                    then_
-                        .local_get(i)
-                        .i32_const(1)
-                        .binop(BinaryOp::I32Sub)
-                        .local_set(i);
-
-                    then_.br(loop_id);
-                },
-                |else_| {
-                    // Save the current chunk in memory
-                    else_
-                        .local_get(a_ptr)
-                        .local_get(i)
-                        .i32_const(64)
-                        .binop(BinaryOp::I32Mul)
-                        .binop(BinaryOp::I32Add)
-                        .local_get(current_chunk)
-                        .store(
-                            compilation_ctx.memory_id,
-                            StoreKind::I64 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        );
-                },
-            );
+            .binop(BinaryOp::I32GeS)
+            .br_if(loop_id);
     });
 
-    function.finish(vec![a_ptr, type_heap_size], &mut module.funcs)
+    function.finish(vec![a_ptr, n], &mut module.funcs)
+}
+
+fn shift_1bit_left(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
+
+    let mut builder = function.name(F_SHIFT_64BITS_LEFT.to_owned()).func_body();
+
+    // Function arguments
+    let a_ptr = module.locals.add(ValType::I32);
+    let n = module.locals.add(ValType::I32);
+
+    let i = module.locals.add(ValType::I32);
+    let addr = module.locals.add(ValType::I32);
+    let word = module.locals.add(ValType::I64);
+    let carry = module.locals.add(ValType::I64);
+    let next = module.locals.add(ValType::I64);
+
+    builder.i64_const(0).local_set(carry);
+    builder.i32_const(0).local_set(i);
+
+    builder.loop_(None, |loop_| {
+        let loop_id = loop_.id();
+
+        // addr of word i
+        loop_
+            .local_get(i)
+            .i32_const(3)
+            .binop(BinaryOp::I32Shl)
+            .local_get(a_ptr)
+            .binop(BinaryOp::I32Add)
+            .local_tee(addr)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .local_set(word);
+
+        // Capture MSB before changing the word (next carry)
+        loop_
+            .local_get(word)
+            .i64_const(63)
+            .binop(BinaryOp::I64ShrU)
+            .i64_const(1)
+            .binop(BinaryOp::I64And)
+            .local_set(next);
+
+        // compute new word
+        loop_
+            .local_get(word)
+            .i64_const(1)
+            .binop(BinaryOp::I64Shl)
+            .local_get(carry)
+            .binop(BinaryOp::I64Or)
+            .local_set(word);
+
+        // store back
+        loop_.local_get(addr).local_get(word).store(
+            compilation_ctx.memory_id,
+            StoreKind::I64 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
+
+        // propagate carry upward
+        loop_.local_get(next).local_set(carry);
+
+        // i++
+        loop_
+            .local_get(i)
+            .i32_const(1)
+            .binop(BinaryOp::I32Add)
+            .local_set(i);
+
+        loop_
+            .local_get(i)
+            .local_get(n)
+            .binop(BinaryOp::I32LtU)
+            .br_if(loop_id);
+    });
+
+    function.finish(vec![a_ptr, n], &mut module.funcs)
 }
 
 #[cfg(test)]
 mod tests {
     use crate::test_compilation_context;
-    use crate::test_tools::{build_module, setup_wasmtime_module};
+    use crate::test_tools::{
+        build_module, get_linker_with_host_debug_functions, setup_wasmtime_module,
+    };
     use alloy_primitives::U256;
     use rstest::rstest;
     use walrus::FunctionBuilder;
@@ -357,12 +408,79 @@ mod tests {
     use super::*;
 
     #[rstest]
-    // #[case(1, u64::MAX as u128 + 1)]
+    #[case(1025, 1025 << 1)]
+    #[case(1, 1 << 1)]
     #[case(42, 42 << 1)]
     #[case(u8::MAX as u128, (u8::MAX as u128) << 1)]
     #[case(u16::MAX as u128, (u16::MAX as u128) << 1)]
     #[case(u32::MAX as u128, (u32::MAX as u128) << 1)]
     #[case(u64::MAX as u128, (u64::MAX as u128) << 1)]
+    fn test_shift_1bit_left_u128(#[case] a: u128, #[case] expected: u128) {
+        const TYPE_HEAP_SIZE: i32 = 16;
+        let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE));
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[]);
+
+        let a_ptr = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        // arguments for shift_64bits_right (a_ptr, size in heap)
+        func_body.i32_const(0).i32_const(2);
+
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let shift_64bits_right_f = shift_1bit_left(&mut raw_module, &compilation_ctx);
+        func_body.call(shift_64bits_right_f);
+
+        let function = function_builder.finish(vec![a_ptr], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let linker = get_linker_with_host_debug_functions();
+
+        let data = a.to_le_bytes();
+        let (_, instance, mut store, entrypoint) = setup_wasmtime_module::<i32, ()>(
+            &mut raw_module,
+            data.to_vec(),
+            "test_function",
+            Some(linker),
+        );
+
+        entrypoint.call(&mut store, 0).unwrap();
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+        let result = &memory.data(&mut store)[0..TYPE_HEAP_SIZE as usize];
+
+        println!("original");
+        for byte in a.to_le_bytes() {
+            print!("{byte:08b} ");
+        }
+        println!();
+
+        println!("result {}", u128::from_le_bytes(result.try_into().unwrap()));
+        for byte in result {
+            print!("{byte:08b} ");
+        }
+        println!();
+
+        println!("expected");
+        for byte in expected.to_le_bytes() {
+            print!("{byte:08b} ");
+        }
+        println!();
+
+        println!("---------> {expected} {:?}", expected.to_le_bytes());
+        assert_eq!(result, expected.to_le_bytes());
+    }
+
+    #[rstest]
+    #[case(1025, 1025 >> 1)]
+    #[case(1, 1 >> 1)]
+    #[case(42, 42 >> 1)]
+    #[case(u8::MAX as u128, (u8::MAX as u128) >> 1)]
+    #[case(u16::MAX as u128, (u16::MAX as u128) >> 1)]
+    #[case(u32::MAX as u128, (u32::MAX as u128) >> 1)]
+    #[case(u64::MAX as u128, (u64::MAX as u128) >> 1)]
     fn test_shift_64bits_right_u128(#[case] a: u128, #[case] expected: u128) {
         const TYPE_HEAP_SIZE: i32 = 16;
         let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE));
@@ -375,7 +493,7 @@ mod tests {
         let mut func_body = function_builder.func_body();
 
         // arguments for shift_64bits_right (a_ptr, size in heap)
-        func_body.i32_const(0).i32_const(TYPE_HEAP_SIZE);
+        func_body.i32_const(0).i32_const(2);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
         let shift_64bits_right_f = shift_1bit_right(&mut raw_module, &compilation_ctx);
@@ -384,27 +502,51 @@ mod tests {
         let function = function_builder.finish(vec![a_ptr], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
+        let linker = get_linker_with_host_debug_functions();
+
         let data = a.to_le_bytes();
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module::<i32, ()>(&mut raw_module, data.to_vec(), "test_function", None);
+        let (_, instance, mut store, entrypoint) = setup_wasmtime_module::<i32, ()>(
+            &mut raw_module,
+            data.to_vec(),
+            "test_function",
+            Some(linker),
+        );
 
         entrypoint.call(&mut store, 0).unwrap();
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let result = &memory.data(&mut store)[0..TYPE_HEAP_SIZE as usize];
 
+        println!("original");
+        for byte in a.to_le_bytes() {
+            print!("{byte:08b} ");
+        }
+        println!();
+
+        println!("result {}", u128::from_le_bytes(result.try_into().unwrap()));
+        for byte in result {
+            print!("{byte:08b} ");
+        }
+        println!();
+
+        println!("expected");
+        for byte in expected.to_le_bytes() {
+            print!("{byte:08b} ");
+        }
+        println!();
+
+        println!("---------> {expected} {:?}", expected.to_le_bytes());
         assert_eq!(result, expected.to_le_bytes());
     }
 
     #[rstest]
-    // #[case(U256::from(1), 1 << 1)]
-    #[case(U256::from(42), U256::from(42) << 1)]
-    #[case(U256::from(u8::MAX), U256::from(u8::MAX) << 1)]
-    #[case(U256::from(u16::MAX), U256::from(u16::MAX) << 1)]
-    #[case(U256::from(u32::MAX), U256::from(u32::MAX) << 1)]
-    #[case(U256::from(u64::MAX), U256::from(u64::MAX) << 1)]
-    #[case(U256::from(u128::MAX), U256::from(u128::MAX) << 1)]
-    #[case(U256::MAX, U256::MAX << 64)]
+    #[case(U256::from(1), U256::from(1) >> 1)]
+    #[case(U256::from(42), U256::from(42) >> 1)]
+    #[case(U256::from(u8::MAX), U256::from(u8::MAX) >> 1)]
+    #[case(U256::from(u16::MAX), U256::from(u16::MAX) >> 1)]
+    #[case(U256::from(u32::MAX), U256::from(u32::MAX) >> 1)]
+    #[case(U256::from(u64::MAX), U256::from(u64::MAX) >> 1)]
+    #[case(U256::from(u128::MAX), U256::from(u128::MAX) >> 1)]
     fn test_shift_64bits_right_u256(#[case] a: U256, #[case] expected: U256) {
         const TYPE_HEAP_SIZE: i32 = 32;
         let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE));
@@ -417,7 +559,7 @@ mod tests {
         let mut func_body = function_builder.func_body();
 
         // arguments for shift_64bits_right (a_ptr, size in heap)
-        func_body.i32_const(0).i32_const(TYPE_HEAP_SIZE);
+        func_body.i32_const(0).i32_const(4);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
         let shift_64bits_right_f = shift_1bit_right(&mut raw_module, &compilation_ctx);
@@ -426,14 +568,100 @@ mod tests {
         let function = function_builder.finish(vec![a_ptr], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
+        let linker = get_linker_with_host_debug_functions();
         let data = a.to_le_bytes::<32>();
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module::<i32, ()>(&mut raw_module, data.to_vec(), "test_function", None);
+        let (_, instance, mut store, entrypoint) = setup_wasmtime_module::<i32, ()>(
+            &mut raw_module,
+            data.to_vec(),
+            "test_function",
+            Some(linker),
+        );
 
         entrypoint.call(&mut store, 0).unwrap();
-
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let result = &memory.data(&mut store)[0..TYPE_HEAP_SIZE as usize];
+
+        println!("original");
+        for byte in a.to_le_bytes::<32>() {
+            print!("{byte:08b}");
+        }
+        println!();
+
+        println!("result");
+        for byte in result {
+            print!("{byte:08b}");
+        }
+        println!();
+
+        println!("expected");
+        for byte in expected.to_le_bytes::<32>() {
+            print!("{byte:08b}");
+        }
+        println!();
+
+        assert_eq!(result, expected.to_le_bytes::<32>());
+    }
+
+    #[rstest]
+    #[case(U256::from(1), U256::from(1) << 1)]
+    #[case(U256::from(42), U256::from(42) << 1)]
+    #[case(U256::from(u8::MAX), U256::from(u8::MAX) << 1)]
+    #[case(U256::from(u16::MAX), U256::from(u16::MAX) << 1)]
+    #[case(U256::from(u32::MAX), U256::from(u32::MAX) << 1)]
+    #[case(U256::from(u64::MAX), U256::from(u64::MAX) << 1)]
+    #[case(U256::from(u128::MAX), U256::from(u128::MAX) << 1)]
+    fn test_shift_1bit_left_u256(#[case] a: U256, #[case] expected: U256) {
+        const TYPE_HEAP_SIZE: i32 = 32;
+        let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE));
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[]);
+
+        let a_ptr = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        // arguments for shift_64bits_right (a_ptr, size in heap)
+        func_body.i32_const(0).i32_const(4);
+
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let shift_64bits_right_f = shift_1bit_left(&mut raw_module, &compilation_ctx);
+        func_body.call(shift_64bits_right_f);
+
+        let function = function_builder.finish(vec![a_ptr], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let linker = get_linker_with_host_debug_functions();
+        let data = a.to_le_bytes::<32>();
+        let (_, instance, mut store, entrypoint) = setup_wasmtime_module::<i32, ()>(
+            &mut raw_module,
+            data.to_vec(),
+            "test_function",
+            Some(linker),
+        );
+
+        entrypoint.call(&mut store, 0).unwrap();
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+        let result = &memory.data(&mut store)[0..TYPE_HEAP_SIZE as usize];
+
+        println!("original");
+        for byte in a.to_le_bytes::<32>() {
+            print!("{byte:08b}");
+        }
+        println!();
+
+        println!("result");
+        for byte in result {
+            print!("{byte:08b}");
+        }
+        println!();
+
+        println!("expected");
+        for byte in expected.to_le_bytes::<32>() {
+            print!("{byte:08b}");
+        }
+        println!();
+
         assert_eq!(result, expected.to_le_bytes::<32>());
     }
 
