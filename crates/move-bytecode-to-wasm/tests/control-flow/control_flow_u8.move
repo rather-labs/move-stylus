@@ -154,3 +154,32 @@ entry fun check_even_after_loop(x: u8): u8 {
    let j = check_even(i);
    j
 }
+
+entry fun misc_2(
+    c1: bool,
+    c2: bool,
+): u8 {
+    if (c1) {
+        if (c2) {
+            return 1
+        } 
+        else {
+            return 0
+        }
+    };
+
+    0
+}
+
+entry fun misc_3(
+    c1: bool,
+    c2: bool,
+): u8 {
+    if (c1) {
+        if (c2) {
+            return 1
+        } 
+    };
+
+    0
+}

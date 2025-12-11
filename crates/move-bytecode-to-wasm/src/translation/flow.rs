@@ -166,31 +166,4 @@ impl<'code_unit> Flow<'code_unit> {
             _ => Err(TranslationError::NotSimpleFlowWithLabel),
         }
     }
-
-    /// Returns true if this flow dominates a subgraph that includes a return instruction.
-    /// Used to determine the block's result type.
-    pub fn dominates_return(&self) -> bool {
-        match self {
-            Flow::Simple {
-                instructions,
-                immediate,
-                next,
-                ..
-            } => {
-                instructions
-                    .last()
-                    .is_some_and(|b| matches!(b, Bytecode::Ret))
-                    || immediate.dominates_return()
-                    || next.dominates_return()
-            }
-            Flow::Loop { inner, next, .. } => inner.dominates_return() || next.dominates_return(),
-            Flow::IfElse {
-                then_body,
-                else_body,
-                ..
-            } => then_body.dominates_return() || else_body.dominates_return(),
-            Flow::Switch { cases } => cases.iter().any(|c| c.dominates_return()),
-            Flow::Empty => false,
-        }
-    }
 }
