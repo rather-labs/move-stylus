@@ -95,7 +95,7 @@ impl Disassemble {
         }
 
         if let Err(compilation_error) =
-            translate_package_cli(package, &rerooted_path, install_dir, true, verbose)
+            translate_package_cli(package, &rerooted_path, install_dir, true, verbose, false)
         {
             print_error_diagnostic(*compilation_error)
         }

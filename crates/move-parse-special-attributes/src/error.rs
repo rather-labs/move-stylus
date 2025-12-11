@@ -17,6 +17,7 @@ use crate::{
         external_struct::ExternalStructError,
     },
     function_validation::FunctionValidationError,
+    struct_validation::StructValidationError,
 };
 
 #[derive(thiserror::Error, Debug)]
@@ -39,14 +40,19 @@ pub enum SpecialAttributeErrorKind {
     #[error("Function validation error: {0}")]
     FunctionValidation(#[from] FunctionValidationError),
 
+    #[error("Struct validation error: {0}")]
+    StructValidation(#[from] StructValidationError),
+
     #[error("Too many attributes found")]
     TooManyAttributes,
 
-    #[error("Events cannot be nested. Found {0} in struct.")]
-    NestedEvent(String),
+    #[error(
+        "Struct '{0}' is reserved by the Stylus Framework and cannot be defined in module '{1}'."
+    )]
+    FrameworkReservedStruct(String, String),
 
-    #[error("Errors cannot be nested. Found {0} in struct.")]
-    NestedError(String),
+    #[error("Named address '{0}' not found in address_alias_instantiation")]
+    NamedAddressNotFound(String),
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -71,6 +77,7 @@ impl From<&SpecialAttributeError> for Diagnostic {
             SpecialAttributeErrorKind::ExternalStruct(e) => e.into(),
             SpecialAttributeErrorKind::AbiError(e) => e.into(),
             SpecialAttributeErrorKind::FunctionValidation(e) => e.into(),
+            SpecialAttributeErrorKind::StructValidation(e) => e.into(),
             SpecialAttributeErrorKind::TooManyAttributes => custom(
                 "Special attributes error",
                 Severity::BlockingError,
@@ -78,15 +85,15 @@ impl From<&SpecialAttributeError> for Diagnostic {
                 3,
                 Box::leak(value.to_string().into_boxed_str()),
             ),
-            SpecialAttributeErrorKind::NestedEvent(_) => custom(
-                "Struct field validation error",
+            SpecialAttributeErrorKind::FrameworkReservedStruct(_, _) => custom(
+                "Struct validation error",
                 Severity::BlockingError,
                 3,
                 3,
                 Box::leak(value.to_string().into_boxed_str()),
             ),
-            SpecialAttributeErrorKind::NestedError(_) => custom(
-                "Struct field validation error",
+            SpecialAttributeErrorKind::NamedAddressNotFound(_) => custom(
+                "Address resolution error",
                 Severity::BlockingError,
                 3,
                 3,

@@ -229,7 +229,11 @@ entry fun allowance(
             owner
         );
 
-        *owner_allowance.borrow(spender)
+        if (owner_allowance.contains(spender)) {
+            *owner_allowance.borrow(spender)
+        } else {
+            0
+        }
     } else {
         0
     }

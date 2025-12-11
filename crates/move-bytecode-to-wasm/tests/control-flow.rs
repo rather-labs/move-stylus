@@ -23,6 +23,8 @@ mod control_flow_u8 {
         function testLabeledLoops(uint8 x) external returns (uint8);
         function checkEven(uint8 x) external returns (uint8);
         function checkEvenAfterLoop(uint8 x) external returns (uint8);
+        function misc2(bool c1, bool c2) external returns (uint8);
+        function misc3(bool c1, bool c2) external returns (uint8);
     );
 
     #[rstest]
@@ -57,6 +59,14 @@ mod control_flow_u8 {
     #[case(checkEvenAfterLoopCall::new((15u8,)), 55u8)]
     #[case(checkEvenCall::new((10u8,)), 42u8)]
     #[case(checkEvenCall::new((15u8,)), 55u8)]
+    #[case(misc2Call::new((true, true)), 1u8)]
+    #[case(misc2Call::new((true, false)), 0u8)]
+    #[case(misc2Call::new((false, true)), 0u8)]
+    #[case(misc2Call::new((false, false)), 0u8)]
+    #[case(misc3Call::new((true, true)), 1u8)]
+    #[case(misc3Call::new((true, false)), 0u8)]
+    #[case(misc3Call::new((false, true)), 0u8)]
+    #[case(misc3Call::new((false, false)), 0u8)]
     fn test_control_flow_u8<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,

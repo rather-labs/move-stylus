@@ -21,7 +21,10 @@ pub fn new_module_with_host() -> (Module, FunctionId, MemoryId) {
 
     let (allocator_function_id, memory_id) =
         setup_module_memory(&mut module, Some(TOTAL_RESERVED_MEMORY));
-    host_functions::add_pay_for_memory_grow(&mut module);
+    let (memory_grow_id, _) = host_functions::add_pay_for_memory_grow(&mut module);
+
+    // We re-export it so the optimizer does not erases it
+    module.exports.add("pfmg", memory_grow_id);
 
     // Fill data segment
     setup_data_segment(&mut module, memory_id);

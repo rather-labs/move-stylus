@@ -69,6 +69,15 @@ pub fn translate_package(
     module_name: Option<String>,
     verbose: bool,
 ) -> Result<HashMap<String, Module>, CompilationError> {
+    // HashMap of package name to address
+    // This includes all the dependencies of the root package
+    let address_alias_instantiation: HashMap<String, [u8; 32]> = package
+        .compiled_package_info
+        .address_alias_instantiation
+        .iter()
+        .map(|(key, value)| (key.as_str().to_string(), value.into_bytes()))
+        .collect();
+
     let root_compiled_units: Vec<&CompiledUnitWithSource> = if let Some(module_name) = module_name {
         package
             .root_compiled_units
@@ -109,8 +118,11 @@ pub fn translate_package(
         println!("\x1B[1m\x1B[32mCOMPILING\x1B[0m {module_name}");
         let root_compiled_module_unit = &root_compiled_module.unit.module;
 
+        // Extract package address from CompiledPackage
+        let package_address = root_compiled_module_unit.address().into_bytes();
+
         let root_module_id = ModuleId {
-            address: root_compiled_module_unit.address().into_bytes().into(),
+            address: package_address.into(),
             module_name: module_name.clone(),
         };
 
@@ -130,6 +142,7 @@ pub fn translate_package(
             &root_compiled_units,
             &root_compiled_module_unit.immediate_dependencies(),
             &mut function_definitions,
+            &address_alias_instantiation,
             verbose,
         ) {
             match dependencies_errors {
@@ -143,8 +156,16 @@ pub fn translate_package(
             }
         }
 
-        let special_attributes = match process_special_attributes(&root_compiled_module.source_path)
-        {
+        // Build a HashMap of structs by module id from all dependencies.
+        // This allows proper validation of entry function return values, ensuring they do not return imported structs with the key ability.
+        let deps_structs = build_dependency_structs_map(&modules_data);
+
+        let special_attributes = match process_special_attributes(
+            &root_compiled_module.source_path,
+            package_address,
+            &deps_structs,
+            &address_alias_instantiation,
+        ) {
             Ok(sa) => sa,
             Err((_mf, e)) => {
                 errors.extend(e.into_iter().map(CodeError::SpecialAttributesError));
@@ -236,6 +257,14 @@ pub fn package_module_data(
     module_name: Option<String>,
     verbose: bool,
 ) -> Result<PackageModuleData, CompilationError> {
+    // HashMap of package name to address
+    let address_alias_instantiation: HashMap<String, [u8; 32]> = package
+        .compiled_package_info
+        .address_alias_instantiation
+        .iter()
+        .map(|(key, value)| (key.as_str().to_string(), value.into_bytes()))
+        .collect();
+
     let mut modules_data = HashMap::new();
     let mut modules_paths = HashMap::new();
     let mut errors = Vec::new();
@@ -257,8 +286,9 @@ pub fn package_module_data(
         let module_name = root_compiled_module.unit.name.to_string();
         let root_compiled_module_unit = &root_compiled_module.unit.module;
 
+        let package_address = root_compiled_module_unit.address().into_bytes();
         let root_module_id = ModuleId {
-            address: root_compiled_module_unit.address().into_bytes().into(),
+            address: package_address.into(),
             module_name: module_name.clone(),
         };
 
@@ -269,6 +299,7 @@ pub fn package_module_data(
             &root_compiled_units,
             &root_compiled_module_unit.immediate_dependencies(),
             &mut function_definitions,
+            &address_alias_instantiation,
             verbose,
         ) {
             match dependencies_errors {
@@ -282,8 +313,16 @@ pub fn package_module_data(
             }
         }
 
-        let special_attributes = match process_special_attributes(&root_compiled_module.source_path)
-        {
+        // Create a mapping from each dependency's module id to the list of structs obtained via the special attributes crate.
+        // This allows proper validation of entry function return values, ensuring they do not return imported structs with the key ability.
+        let deps_structs = build_dependency_structs_map(&modules_data);
+
+        let special_attributes = match process_special_attributes(
+            &root_compiled_module.source_path,
+            package_address,
+            &deps_structs,
+            &address_alias_instantiation,
+        ) {
             Ok(sa) => sa,
             Err((_mf, e)) => {
                 errors.extend(e.into_iter().map(CodeError::SpecialAttributesError));
@@ -326,13 +365,15 @@ pub fn process_dependency_tree<'move_package>(
     root_compiled_units: &'move_package [&CompiledUnitWithSource],
     dependencies: &[move_core_types::language_storage::ModuleId],
     function_definitions: &mut GlobalFunctionTable<'move_package>,
+    address_alias_instantiation: &HashMap<String, [u8; 32]>,
     verbose: bool,
 ) -> Result<(), DependencyProcessingError> {
     let mut errors = Vec::new();
     for dependency in dependencies {
+        let dependency_address = dependency.address().into_bytes();
         let module_id = ModuleId {
             module_name: dependency.name().to_string(),
-            address: dependency.address().into_bytes().into(),
+            address: dependency_address.into(),
         };
 
         // If the HashMap contains the key, we already processed that dependency
@@ -366,6 +407,7 @@ pub fn process_dependency_tree<'move_package>(
                 root_compiled_units,
                 immediate_dependencies,
                 function_definitions,
+                address_alias_instantiation,
                 verbose,
             )
         } else {
@@ -384,7 +426,16 @@ pub fn process_dependency_tree<'move_package>(
             }
         }
 
-        let special_attributes = match process_special_attributes(&dependency_module.source_path) {
+        // Create a mapping from each dependency's module id to the list of structs obtained via the special attributes crate.
+        // This allows proper validation of entry function return values, ensuring they do not return imported structs with the key ability.
+        let deps_structs = build_dependency_structs_map(dependencies_data);
+
+        let special_attributes = match process_special_attributes(
+            &dependency_module.source_path,
+            dependency_address,
+            &deps_structs,
+            address_alias_instantiation,
+        ) {
             Ok(sa) => sa,
             Err((_mf, e)) => {
                 errors.extend(e.into_iter().map(CodeError::SpecialAttributesError));
@@ -417,4 +468,26 @@ pub fn process_dependency_tree<'move_package>(
     } else {
         Err(DependencyProcessingError::CodeError(errors))
     }
+}
+
+/// Builds a HashMap mapping module IDs to their structs from all dependencies.
+///
+/// This function extracts struct information from `ModuleData` and converts it into
+/// a format compatible with `move_parse_special_attributes::ModuleId`. This mapping
+/// is essential for validating entry function return values, ensuring they do not
+/// return imported structs with the `key` ability.
+fn build_dependency_structs_map(
+    modules_data: &HashMap<ModuleId, ModuleData>,
+) -> HashMap<move_parse_special_attributes::ModuleId, Vec<move_parse_special_attributes::Struct_>> {
+    let mut deps_structs = HashMap::new();
+    for md in modules_data.values() {
+        deps_structs.insert(
+            move_parse_special_attributes::ModuleId {
+                address: <[u8; 32]>::try_from(md.id.address.as_slice()).unwrap(),
+                module_name: md.id.module_name.clone(),
+            },
+            md.special_attributes.structs.clone(),
+        );
+    }
+    deps_structs
 }
