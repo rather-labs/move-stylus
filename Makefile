@@ -62,14 +62,14 @@ deploy-example:
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
 		--wasm-file=./example/build/example/wasm/hello_world.wasm \
-		| ./update_contract_env.sh CONTRACT_ADDRESS
+		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS
 
 deploy-example-2:
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
 		--wasm-file=./example/build/example/wasm/hello_world_2.wasm \
-		| ./update_contract_env.sh CONTRACT_ADDRESS_2
+		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_2
 
 deploy-example-primitives:
 	cargo stylus deploy \
@@ -77,90 +77,90 @@ deploy-example-primitives:
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
 		--wasm-file=./example/build/example/wasm/primitives_and_operations.wasm \
 		--no-verify \
-		| ./update_contract_env.sh CONTRACT_ADDRESS_PRIMITIVES
+		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_PRIMITIVES
 
 deploy-erc20:
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
 		--wasm-file=./example/build/example/wasm/erc20.wasm \
-		| ./update_contract_env.sh CONTRACT_ADDRESS_ERC20
+		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_ERC20
 
 deploy-counter:
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
 		--wasm-file=./example/build/example/wasm/counter.wasm \
-		| ./update_contract_env.sh CONTRACT_ADDRESS_COUNTER
+		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_COUNTER
 
 deploy-counter-named-id:
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
 		--wasm-file=./example/build/example/wasm/counter_named_id.wasm \
-		| ./update_contract_env.sh CONTRACT_ADDRESS_COUNTER_NAMED_ID
+		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_COUNTER_NAMED_ID
 
 deploy-counter-with-init:
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
 		--wasm-file=./example/build/example/wasm/counter_with_init.wasm \
-		| ./update_contract_env.sh CONTRACT_ADDRESS_COUNTER_WITH_INIT
+		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_COUNTER_WITH_INIT
 
 deploy-dog-walker:
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
 		--wasm-file=./example/build/example/wasm/dog_walker.wasm \
-		| ./update_contract_env.sh CONTRACT_ADDRESS_DOG_WALKER
+		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_DOG_WALKER
 
 deploy-cross-contract-call:
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
 		--wasm-file=./example/build/example/wasm/cross_contract_call.wasm \
-		| ./update_contract_env.sh CONTRACT_ADDRESS_CROSS_CALL
+		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_CROSS_CALL
 
 deploy-delegated-counter:
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
 		--wasm-file=./example/build/example/wasm/delegated_counter_logic_1.wasm \
-		| ./update_contract_env.sh CONTRACT_ADDRESS_DELEGATED_COUNTER_LOGIC_1
+		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_DELEGATED_COUNTER_LOGIC_1
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
 		--wasm-file=./example/build/example/wasm/delegated_counter_logic_2.wasm \
-		| ./update_contract_env.sh CONTRACT_ADDRESS_DELEGATED_COUNTER_LOGIC_2
+		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_DELEGATED_COUNTER_LOGIC_2
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
 		--wasm-file=./example/build/example/wasm/delegated_counter.wasm \
-		| ./update_contract_env.sh CONTRACT_ADDRESS_DELEGATED_COUNTER
+		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_DELEGATED_COUNTER
 
 deploy-delegated-counter-named-id:
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
 		--wasm-file=./example/build/example/wasm/delegated_counter_named_id_logic_1.wasm \
-		| ./update_contract_env.sh CONTRACT_ADDRESS_DELEGATED_COUNTER_NAMED_ID_LOGIC_1
+		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_DELEGATED_COUNTER_NAMED_ID_LOGIC_1
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
 		--wasm-file=./example/build/example/wasm/delegated_counter_named_id_logic_2.wasm \
-		| ./update_contract_env.sh CONTRACT_ADDRESS_DELEGATED_COUNTER_NAMED_ID_LOGIC_2
+		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_DELEGATED_COUNTER_NAMED_ID_LOGIC_2
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
 		--wasm-file=./example/build/example/wasm/delegated_counter_named_id.wasm \
-		| ./update_contract_env.sh CONTRACT_ADDRESS_DELEGATED_COUNTER_NAMED_ID
+		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_DELEGATED_COUNTER_NAMED_ID
 
 deploy-revert-errors:
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/wasm/revert_errors.wasm \
-		| ./update_contract_env.sh CONTRACT_ADDRESS_REVERT_ERRORS
+		--wasm-file=./example/build/example/wasm/revert_errors.wasm \
+		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_REVERT_ERRORS
 
 setup-stylus:
 	RUSTFLAGS="-C link-args=-rdynamic" cargo install --force cargo-stylus
