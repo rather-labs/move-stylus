@@ -11,6 +11,7 @@ use crate::{
 // Auxiliary function names
 const F_SHIFT_64BITS_RIGHT: &str = "shift_64bits_right";
 const F_SHIFT_64BITS_LEFT: &str = "shift_64bits_left";
+const F_GET_BIT: &str = "get_bit";
 
 /// Implements the long division algorithm for 128 and 256 bit integers.
 ///
@@ -93,7 +94,8 @@ pub fn heap_integers_div_mod(
 
     let check_if_a_less_than_b_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
     let sub_f = RuntimeFunction::HeapIntSub.get(module, Some(compilation_ctx))?;
-    let right_shift_number = shift_1bit_right(module, compilation_ctx);
+    let left_shift_number = shift_1bit_left(module, compilation_ctx);
+    let get_bit = get_bit(module, compilation_ctx);
 
     // Function arguments
     let dividend_ptr = module.locals.add(ValType::I32);
@@ -191,11 +193,19 @@ pub fn heap_integers_div_mod(
     // Set the counter of the loop to 0 (least significant bit)
     builder.local_get(type_heap_size).local_set(i);
 
-    /*
     builder.loop_(None, |loop_| {
         let loop_id = loop_.id();
+
+        // R := R << 1
+        loop_
+            .local_get(remainder_ptr)
+            .local_get(type_heap_size)
+            .call(left_shift_number);
+
+        // Set the least significant bit of R equal to bit i of the numerator. The least
+        // significant bit is R[0][7]. The last bit of the first byte, since we are in little
+        // endian...
     });
-    */
 
     builder.local_get(quotient_ptr);
 
@@ -395,6 +405,72 @@ fn shift_1bit_left(module: &mut Module, compilation_ctx: &CompilationContext) ->
     function.finish(vec![a_ptr, n], &mut module.funcs)
 }
 
+fn get_bit(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32],
+        &[ValType::I64],
+    );
+
+    let mut builder = function.name(F_GET_BIT.to_owned()).func_body();
+
+    // Function arguments
+    let ptr = module.locals.add(ValType::I32);
+    let n = module.locals.add(ValType::I32);
+
+    let word_idx = module.locals.add(ValType::I32);
+    let bit_idx = module.locals.add(ValType::I32);
+    let addr = module.locals.add(ValType::I32);
+    let word = module.locals.add(ValType::I64);
+
+    // Divide by 64 (>> 6)
+    builder
+        .local_get(n)
+        .i32_const(6)
+        .binop(BinaryOp::I32ShrU)
+        .local_set(word_idx);
+
+    // Bit index (n % 64)
+    builder
+        .local_get(n)
+        .i32_const(63)
+        .binop(BinaryOp::I32And)
+        .local_set(bit_idx);
+
+    // Addr = word_idx * 8
+    builder
+        .local_get(ptr)
+        .local_get(word_idx)
+        .i32_const(3)
+        .binop(BinaryOp::I32Shl)
+        .binop(BinaryOp::I32Add)
+        .local_set(addr);
+
+    // Load the word
+    builder
+        .local_get(addr)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I64 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .local_set(word);
+
+    // bit = (word >> bit_idx) & 1
+    builder
+        .local_get(word)
+        .local_get(bit_idx)
+        .unop(walrus::ir::UnaryOp::I64ExtendUI32)
+        .binop(BinaryOp::I64ShrU)
+        .i64_const(1)
+        .binop(BinaryOp::I64And);
+
+    function.finish(vec![ptr, n], &mut module.funcs)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::test_compilation_context;
@@ -406,6 +482,63 @@ mod tests {
     use walrus::FunctionBuilder;
 
     use super::*;
+
+    #[rstest]
+    #[case(1_u128, 0, 1)]
+    #[case(1_u128, 2, 0)]
+    #[case(1_u128, 8, 0)]
+    #[case(u8::MAX as u128, 8, 0)]
+    #[case(u8::MAX as u128, 6, 1)]
+    #[case(u8::MAX as u128, 7, 1)]
+    #[case(u8::MAX as u128, 3, 1)]
+    #[case(u8::MAX as u128, 1, 1)]
+    #[case(u16::MAX as u128, 8, 1)]
+    #[case(u16::MAX as u128, 15, 1)]
+    #[case(u16::MAX as u128, 16, 0)]
+    #[case(u64::MAX as u128, 127, 0)]
+    #[case(u64::MAX as u128, 65, 0)]
+    #[case(u64::MAX as u128, 33, 1)]
+    #[case(u64::MAX as u128, 100, 0)]
+    #[case(u128::MAX, 127, 1)]
+    #[case(u128::MAX, 65, 1)]
+    #[case(u128::MAX, 33, 1)]
+    #[case(u128::MAX, 100, 1)]
+    fn test_get_bit(#[case] a: u128, #[case] n: i32, #[case] expected: i64) {
+        const TYPE_HEAP_SIZE: i32 = 16;
+        let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE));
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[ValType::I64]);
+
+        let a_ptr = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        func_body.i32_const(0).i32_const(n);
+
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let shift_64bits_right_f = get_bit(&mut raw_module, &compilation_ctx);
+        func_body.call(shift_64bits_right_f);
+
+        let function = function_builder.finish(vec![a_ptr], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let linker = get_linker_with_host_debug_functions();
+
+        let data = a.to_le_bytes();
+        let (_, instance, mut store, entrypoint) = setup_wasmtime_module::<i32, i64>(
+            &mut raw_module,
+            data.to_vec(),
+            "test_function",
+            Some(linker),
+        );
+
+        let bit = entrypoint.call(&mut store, 0).unwrap();
+
+        assert_eq!(expected, bit);
+
+        println!("---------> {bit}");
+    }
 
     #[rstest]
     #[case(1025, 1025 << 1)]
