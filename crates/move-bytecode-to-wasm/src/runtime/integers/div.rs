@@ -9,7 +9,6 @@ use crate::{
 };
 
 // Auxiliary function names
-const F_SHIFT_64BITS_RIGHT: &str = "shift_64bits_right";
 const F_SHIFT_64BITS_LEFT: &str = "shift_64bits_left";
 const F_GET_BIT: &str = "get_bit";
 const F_SET_BIT: &str = "set_bit";
@@ -112,8 +111,6 @@ pub fn heap_integers_div_mod(
     // Number of bytes occupied by the numbers
     let n_bytes = module.locals.add(ValType::I32);
 
-    let tmp = module.locals.add(ValType::I64);
-
     // To check if divisor is 0
     let accumulator = module.locals.add(ValType::I64);
 
@@ -186,18 +183,6 @@ pub fn heap_integers_div_mod(
         .local_set(offset);
 
         */
-
-    let func_ty = module.types.add(&[ValType::I32], &[]);
-    module.add_import_func("", "print_i32", func_ty);
-    let print_i32 = module.imports.get_func("", "print_i32").unwrap();
-
-    let func_ty = module.types.add(&[ValType::I64], &[]);
-    module.add_import_func("", "print_i64", func_ty);
-    let print_i64 = module.imports.get_func("", "print_i64").unwrap();
-
-    let func_ty = module.types.add(&[ValType::I32], &[]);
-    module.add_import_func("", "print_u128", func_ty);
-    let print_u128 = module.imports.get_func("", "print_u128").unwrap();
 
     builder
         .local_get(n)
@@ -291,8 +276,6 @@ pub fn heap_integers_div_mod(
                 .call(check_if_a_less_than_b_f)
                 .br_if(block_id);
 
-            block_.local_get(i).call(print_i32);
-
             // R := R − D
             block_
                 .local_get(remainder_ptr)
@@ -308,9 +291,6 @@ pub fn heap_integers_div_mod(
                 .local_get(i)
                 .local_get(n)
                 .call(set_bit);
-
-            block_.local_get(quotient_ptr).call(print_u128);
-            // block_.local_get(divisor_ptr).call(print_u128);
         });
 
         // i -= 1
@@ -322,9 +302,6 @@ pub fn heap_integers_div_mod(
 
         loop_.i32_const(0).binop(BinaryOp::I32GeS).br_if(loop_id);
     });
-
-    // builder.local_get(remainder_ptr).call(print_u128);
-    // builder.local_get(quotient_ptr).call(print_u128);
 
     builder.local_get(quotient_or_reminder).if_else(
         ValType::I32,
@@ -342,6 +319,8 @@ pub fn heap_integers_div_mod(
     ))
 }
 
+/// ptr - number pointer
+/// n - number of bytes the number occupies in memory
 fn shift_1bit_left(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
 
@@ -356,25 +335,6 @@ fn shift_1bit_left(module: &mut Module, compilation_ctx: &CompilationContext) ->
     let word = module.locals.add(ValType::I64);
     let carry = module.locals.add(ValType::I64);
     let next = module.locals.add(ValType::I64);
-
-    let func_ty = module.types.add(&[ValType::I32], &[]);
-    module.add_import_func("", "print_i32", func_ty);
-    let print_i32 = module.imports.get_func("", "print_i32").unwrap();
-
-    let func_ty = module.types.add(&[], &[]);
-    module.add_import_func("", "print_separator", func_ty);
-    let print_s = module.imports.get_func("", "print_separator").unwrap();
-
-    let func_ty = module.types.add(&[ValType::I32], &[]);
-    module.add_import_func("", "print_u128", func_ty);
-    let print_u128 = module.imports.get_func("", "print_u128").unwrap();
-
-    builder.call(print_s);
-
-    builder.local_get(a_ptr).call(print_i32);
-    builder.local_get(n).call(print_i32);
-    builder.i32_const(48).call(print_u128);
-    builder.call(print_s);
 
     builder.i64_const(0).local_set(carry);
     builder.i32_const(0).local_set(i);
@@ -428,8 +388,6 @@ fn shift_1bit_left(module: &mut Module, compilation_ctx: &CompilationContext) ->
             },
         );
 
-        loop_.local_get(addr).call(print_i32);
-
         // propagate carry upward
         loop_.local_get(next).local_set(carry);
 
@@ -442,16 +400,12 @@ fn shift_1bit_left(module: &mut Module, compilation_ctx: &CompilationContext) ->
 
         loop_
             .local_get(i)
-            .i32_const(8)
-            .binop(BinaryOp::I32Mul)
+            .i32_const(3)
+            .binop(BinaryOp::I32Shl)
             .local_get(n)
             .binop(BinaryOp::I32LtU)
             .br_if(loop_id);
     });
-
-    builder.call(print_s);
-    builder.i32_const(48).call(print_u128);
-    builder.call(print_s);
 
     function.finish(vec![a_ptr, n], &mut module.funcs)
 }
@@ -533,30 +487,11 @@ fn set_bit(module: &mut Module, compilation_ctx: &CompilationContext) -> Functio
     let byte_val = module.locals.add(ValType::I32);
     let mask = module.locals.add(ValType::I32);
 
-    /*
-    let func_ty = module.types.add(&[ValType::I32], &[]);
-    module.add_import_func("", "print_i32", func_ty);
-    let print_i32 = module.imports.get_func("", "print_i32").unwrap();
-
-    let func_ty = module.types.add(&[], &[]);
-    module.add_import_func("", "print_separator", func_ty);
-    let print_s = module.imports.get_func("", "print_separator").unwrap();
-
-    let func_ty = module.types.add(&[ValType::I32], &[]);
-    module.add_import_func("", "print_u128", func_ty);
-    let print_u128 = module.imports.get_func("", "print_u128").unwrap();
-
-    builder.call(print_s);
-    builder.call(print_s);
-    builder.local_get(ptr).call(print_u128);
-    */
     builder
         .local_get(i)
         .i32_const(3)
         .binop(BinaryOp::I32ShrU)
         .local_set(byte_idx);
-
-    //builder.local_get(byte_idx).call(print_i32);
 
     // Bit offset
     builder
@@ -565,7 +500,6 @@ fn set_bit(module: &mut Module, compilation_ctx: &CompilationContext) -> Functio
         .binop(BinaryOp::I32And)
         .local_set(bit_offset);
 
-    // builder.local_get(bit_offset).call(print_i32);
     // Load the byte from memory: *(ptr + byteIndex)
     builder
         .local_get(ptr)
@@ -585,8 +519,6 @@ fn set_bit(module: &mut Module, compilation_ctx: &CompilationContext) -> Functio
             },
         )
         .local_set(byte_val);
-
-    // builder.local_get(byte_val).call(print_i32);
 
     builder
         .i32_const(1)
@@ -608,9 +540,6 @@ fn set_bit(module: &mut Module, compilation_ctx: &CompilationContext) -> Functio
             },
         );
 
-    // builder.local_get(ptr).call(print_u128);
-    // builder.call(print_s);
-    // builder.call(print_s);
     function.finish(vec![ptr, i, n], &mut module.funcs)
 }
 
@@ -829,8 +758,6 @@ mod tests {
     #[case(79228162514264337593543950336, 4294967296, 18446744073709551616)]
     // #[should_panic(expected = "wasm trap: integer divide by zero")]
     // #[case(10, 0, 0)]
-    // Timeouts, the algorithm is slow yet
-    // (2^128 - 1) / 2^64 = [q = 2^64 - 1, r = 2^64 - 1]
     #[case(u128::MAX, u64::MAX as u128 + 1, u64::MAX as u128)]
     #[case(u128::MAX, 79228162514264337593543950336, 4294967295)]
     fn test_div_u128(#[case] n1: u128, #[case] n2: u128, #[case] quotient: u128) {
