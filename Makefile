@@ -45,6 +45,9 @@ example-dog-walker:
 example-erc20:
 	cargo run -p move-hello-world-example --bin erc20
 
+example-erc721:
+	cargo run -p move-hello-world-example --bin erc721
+
 example-cross-contract-call:
 	cargo run -p move-hello-world-example --bin cross_contract_call
 
@@ -85,6 +88,13 @@ deploy-erc20:
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
 		--wasm-file=./example/build/example/wasm/erc20.wasm \
 		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_ERC20
+
+deploy-erc721:
+	cargo stylus deploy \
+		--endpoint='http://localhost:8547' \
+		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
+		--wasm-file=./example/build/example/wasm/erc721.wasm \
+		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_ERC721
 
 deploy-counter:
 	cargo stylus deploy \
