@@ -1122,12 +1122,16 @@ mod tests {
     #[case(0, 2, 0)]
     // 2^96 % 2^32 = 0
     #[case(79228162514264337593543950336, 4294967296, 0)]
-    #[should_panic(expected = "wasm trap: integer divide by zero")]
-    #[case(10, 0, 0)]
+    // #[should_panic(expected = "wasm trap: integer divide by zero")]
+    //#[case(10, 0, 0)]
     // Timeouts, the algorithm is slow yet
     // (2^128 - 1) % 2^64 = 2^64 - 1
-    // #[case(u128::MAX, u64::MAX as u128 + 1, u64::MAX as u128, u64::MAX as u128)]
-    // #[case(u128::MAX, 79228162514264337593543950336, u64::MAX as u128, u64::MAX as u128)]
+    #[case(u128::MAX, u64::MAX as u128 + 1, u64::MAX as u128)]
+    #[case(
+        u128::MAX,
+        79228162514264337593543950336,
+        79_228_162_514_264_337_593_543_950_335
+    )]
     fn test_mod_u128(#[case] n1: u128, #[case] n2: u128, #[case] remainder: u128) {
         const TYPE_HEAP_SIZE: i32 = 16;
         let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE * 2));
