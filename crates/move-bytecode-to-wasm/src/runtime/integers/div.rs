@@ -501,7 +501,6 @@ mod tests {
     #[case(350_u128, 127, 0)]
     #[case(5_u128, 127, 0)]
     #[case(1_u128, 0, 1)]
-    /*
     #[case(1_u128, 2, 0)]
     #[case(1_u128, 8, 0)]
     #[case(u8::MAX as u128, 8, 0)]
@@ -520,7 +519,6 @@ mod tests {
     #[case(u128::MAX, 65, 1)]
     #[case(u128::MAX, 33, 1)]
     #[case(u128::MAX, 100, 1)]
-    */
     fn test_get_bit(#[case] a: u128, #[case] n: i32, #[case] expected: i64) {
         const TYPE_HEAP_SIZE: i32 = 16;
         let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE));
