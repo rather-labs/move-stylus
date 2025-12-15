@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod abi_generate;
+pub mod activate;
 pub mod build;
 pub mod deploy;
 pub mod disassemble;
@@ -16,7 +17,10 @@ use move_bytecode_to_wasm::{
 use move_package::{
     compilation::compiled_package::CompiledPackage, source_package::layout::SourcePackageLayout,
 };
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 pub fn reroot_path(path: Option<&Path>) -> anyhow::Result<PathBuf> {
     let path = path
@@ -91,4 +95,13 @@ pub fn get_build_directory(
             package.compiled_package_info.package_name
         ))
     }
+}
+
+pub fn cargo_stylus_installed() -> bool {
+    Command::new("sh")
+        .arg("-c")
+        .arg("command -v cargo-stylus > /dev/null")
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
 }
