@@ -227,6 +227,14 @@ pub fn heap_integers_div_mod(
 
 /// Shifts left by 1 bit a number stored in memory in little-endian format.
 ///
+/// Given that the number is in little-endian format, the least significant bytes are stored first,
+/// but the least significant bit of each byte is the rightmost one, therefore
+///
+/// LSB 10000000 00000000 MSB << 1 is
+/// LSB 00000000 00000001 MSB
+///
+/// for each byte that composes the number
+///
 /// # Arguments
 ///
 /// ptr - number pointer
@@ -322,6 +330,11 @@ fn shift_1bit_left(module: &mut Module, compilation_ctx: &CompilationContext) ->
 
 /// Gets the bit at index i of a number stored in memory in little-endian format.
 ///
+/// This operation is logical, meaning that 0 is the least significant bit while n-1 is the most
+/// significant bit. For example, to get the least significant bit of a number, i = 0, we get the
+/// firt byte and we extract the 7th bit (from 0 to 7). This conversion is done inside the
+/// function.
+///
 /// # Arguments
 /// - ptr - number pointer
 /// - i - bit index
@@ -386,6 +399,11 @@ fn get_bit(module: &mut Module, compilation_ctx: &CompilationContext) -> Functio
 }
 
 /// Sets the bit at index i of a number stored in memory in little-endian format.
+///
+/// This operation is logical, meaning that 0 is the least significant bit while n-1 is the most
+/// significant bit. For example, to set the least significant bit of a number, i = 0, we get the
+/// firt byte and we set the 7th bit (from 0 to 7). This conversion is done inside the
+/// function.
 ///
 /// # Arguments
 /// - ptr - number pointer
@@ -641,10 +659,10 @@ mod tests {
     #[case(0, 2, 0)]
     // 2^96 / 2^32 = 2^64
     #[case(79228162514264337593543950336, 4294967296, 18446744073709551616)]
-    #[should_panic(expected = "wasm trap: integer divide by zero")]
-    #[case(10, 0, 0)]
     #[case(u128::MAX, u64::MAX as u128 + 1, u64::MAX as u128)]
     #[case(u128::MAX, 79228162514264337593543950336, 4294967295)]
+    #[should_panic(expected = "wasm trap: integer divide by zero")]
+    #[case(10, 0, 0)]
     fn test_div_u128(#[case] n1: u128, #[case] n2: u128, #[case] quotient: u128) {
         const TYPE_HEAP_SIZE: i32 = 16;
         let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE * 2));
@@ -795,6 +813,13 @@ mod tests {
         U256::from(79228162514264337593543950336_u128),
         U256::from(4294967295_u128)
     )]
+    #[case(
+        U256::MAX,
+        U256::from_str_radix(
+            "6277101735386680763835789423207666416102355444464034512896", 10
+        ).unwrap(),
+        U256::from(18446744073709551615_u128),
+    )]
     fn test_div_u256(#[case] n1: U256, #[case] n2: U256, #[case] quotient: U256) {
         const TYPE_HEAP_SIZE: i32 = 32;
         let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE * 2));
@@ -869,6 +894,16 @@ mod tests {
         U256::from(u128::MAX),
         U256::from(79228162514264337593543950336_u128),
         U256::from(79228162514264337593543950335_u128)
+    )]
+    #[case(U256::MAX, U256::from(u128::MAX) + U256::from(1), U256::from(u128::MAX))]
+    #[case(
+        U256::MAX,
+        U256::from_str_radix(
+            "6277101735386680763835789423207666416102355444464034512896", 10
+        ).unwrap(),
+        U256::from_str_radix(
+            "6277101735386680763835789423207666416102355444464034512895", 10
+        ).unwrap()
     )]
     #[should_panic(expected = "wasm trap: integer divide by zero")]
     #[case(U256::from(10), U256::from(0), U256::from(0))]
