@@ -1,5 +1,5 @@
-use alloy::primitives::U256;
 use alloy::primitives::address;
+use alloy::primitives::{FixedBytes, U256};
 use alloy::signers::local::PrivateKeySigner;
 use alloy::sol_types::SolEvent;
 use alloy::{primitives::Address, providers::ProviderBuilder, sol, transports::http::reqwest::Url};
@@ -37,6 +37,7 @@ sol!(
         function name() external view returns (string);
         function symbol() external view returns (string);
         function tokenUri(uint256 tokenId) external view returns (string);
+        function supportsInterface(uint8[] interfaceId) external view returns (bool);
     }
 );
 
@@ -339,7 +340,10 @@ async fn main() -> eyre::Result<()> {
     println!("  Current balance of {sender_2} = {res}");
 
     println!("Safe transferring token {token_id_4} from {sender} to {receiver_address}");
-    let pending_tx = example.safeTransferFrom(sender, receiver_address, token_id_4, vec![].into()).send().await?;
+    let pending_tx = example
+        .safeTransferFrom(sender, receiver_address, token_id_4, vec![])
+        .send()
+        .await?;
     let receipt = pending_tx.get_receipt().await?;
     println!("Safe transfer events");
     for (index, log) in receipt.logs().iter().enumerate() {
@@ -358,6 +362,19 @@ async fn main() -> eyre::Result<()> {
 
     let res = example.tokenUri(token_id_4).call().await?;
     println!("  Token URI of token {token_id_4} = {res}");
+
+    let erc721_interface_id = FixedBytes::<4>::new([0x80, 0xac, 0x58, 0xcd]);
+    let erc721_metadata_interface_id = FixedBytes::<4>::new([0x01, 0xff, 0xc9, 0xa7]);
+    let res = example
+        .supportsInterface(erc721_interface_id.to_vec())
+        .call()
+        .await?;
+    println!("  Supports IERC721 interface = {res}");
+    let res = example
+        .supportsInterface(erc721_metadata_interface_id.to_vec())
+        .call()
+        .await?;
+    println!("  Supports IERC721 metadata interface = {res}");
 
     Ok(())
 }

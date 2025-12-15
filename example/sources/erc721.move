@@ -19,6 +19,9 @@ public struct BALANCES_ has key {}
 public struct TOKEN_APPROVALS has key {}
 public struct OPERATOR_APPROVALS has key {}
 
+const IERC721_INTERFACE_ID: vector<u8> = vector<u8>[0x80, 0xac, 0x58, 0xcd];
+const IERC721_METADATA_INTERFACE_ID: vector<u8> = vector<u8>[0x01, 0xff, 0xc9, 0xa7];
+
 // Structs:
 public struct Info has key {
     id: NamedId<COLLECTION_INFO>,
@@ -115,6 +118,16 @@ fun init(_ctx: &mut TxContext) {
     transfer::share_object(OperatorApprovals {
         id: object::new_named_id<OPERATOR_APPROVALS>(),
     });
+}
+
+entry fun supports_interface(interface_id: vector<u8>): bool {
+    if (interface_id == IERC721_INTERFACE_ID) {
+        return true
+    };
+    if (interface_id == IERC721_METADATA_INTERFACE_ID) {
+        return true
+    };
+    return false
 }
 
 // Returns the number of tokens in `owner`'s account.
