@@ -1,11 +1,11 @@
 [package]
-name = "Erc721ReceiverCall"
+name = "Erc721Utils"
 version = "0.0.1"
 published-at = "0x2"
 edition = "2024.beta"
 
 [addresses]
-erc721ReceiverCall = "0x4"
+erc721Utils = "0x4"
 
 [dependencies]
 StylusFramework = { local = "../stylus-framework/" }

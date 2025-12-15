@@ -7,8 +7,7 @@ use stylus::object as object;
 use stylus::object::NamedId;
 use stylus::dynamic_field_named_id as field;
 use stylus::account as account;
-use stylus::contract_calls as ccc;
-use erc721ReceiverCall::erc721ReceiverCall as erc721ReceiverCall;
+use erc721Utils::utils as erc721_utils;
 use std::ascii as ascii;
 use std::ascii::String;
 
@@ -457,7 +456,7 @@ entry fun safeTransferFrom(
     ctx: &TxContext,
 ) {
         transfer_from(from, to, token_id, owners, balances, token_approvals, operator_approvals, ctx);
-        check_on_erc721_received(ctx.sender(), from, to, token_id, data);
+        erc721_utils::check_on_erc721_received(ctx.sender(), from, to, token_id, data);
     }
 
 // Private methods:
@@ -541,28 +540,4 @@ fun check_authorized_(
     if (!is_authorized_(owner, spender, token_id, token_approvals, operator_approvals)) {
         abort(EInvalidApprover)
     }
-}
-
-entry fun check_on_erc721_received(
-    operator: address,
-    from: address,
-    to: address,
-    token_id: u256,
-    data: vector<u8>,
-) {
-    if (account::get_account_code_size(to) == 0) {
-        // Should we throw an error here?
-        abort(EInvalidReceiver)
-    };
-
-    let erc721_receiver = erc721ReceiverCall::new(ccc::new(to));
-
-    let erc721_receiver_call = erc721_receiver.on_erc721_received(operator, from, token_id, data);
-    if (!erc721_receiver_call.succeded()) {
-        abort(EInvalidReceiver)
-    };
-    
-    if (erc721_receiver_call.get_result() != erc721ReceiverCall::on_erc721_received_selector()) {
-        abort(EInvalidReceiver)
-    };
 }
