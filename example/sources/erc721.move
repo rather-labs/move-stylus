@@ -1,14 +1,16 @@
 module hello_world::erc721;
 
 use stylus::event::emit;
-use std::ascii::String;
-use std::ascii as ascii;
 use stylus::tx_context::TxContext;
 use stylus::transfer as transfer;
 use stylus::object as object;
 use stylus::object::NamedId;
 use stylus::dynamic_field_named_id as field;
 use stylus::account as account;
+use stylus::contract_calls as ccc;
+use erc721ReceiverCall::erc721ReceiverCall as erc721ReceiverCall;
+use std::ascii as ascii;
+use std::ascii::String;
 
 public struct COLLECTION_INFO has key {}
 public struct TOTAL_SUPPLY has key {}
@@ -22,6 +24,7 @@ public struct Info has key {
     id: NamedId<COLLECTION_INFO>,
     name: String,
     symbol: String,
+    base_uri: String,
 }
 
 public struct TotalSupply has key {
@@ -89,6 +92,7 @@ fun init(_ctx: &mut TxContext) {
         id: object::new_named_id<COLLECTION_INFO>(),
         name: ascii::string(b"Moving Stylus"),
         symbol: ascii::string(b"MST"),
+        base_uri: ascii::string(b"https://bafybeihlqsyodyia5webtmflybdskxiu3fanm3gxpxyayjhqfn5pmpevdu.ipfs.dweb.link/"),
     });
 
     transfer::share_object(TotalSupply {
@@ -142,6 +146,10 @@ entry fun symbol(contract_info: &Info): String {
     contract_info.symbol
 }
 
+entry fun token_uri(token_id: u256, contract_info: &Info): String {
+    contract_info.base_uri
+}
+
 entry fun total_supply(t_supply: &TotalSupply): u256 {
     t_supply.total
 }
@@ -159,7 +167,7 @@ entry fun total_supply(t_supply: &TotalSupply): u256 {
 entry fun approve(
     to: address,
     token_id: u256,
-    owners: &mut Owners,
+    owners: &Owners,
     token_approvals: &mut TokenApprovals,
     operator_approvals: &OperatorApprovals,
     ctx: &TxContext,
@@ -428,7 +436,7 @@ entry fun safeTransferFrom(
     from: address,
     to: address,
     token_id: u256,
-    data: &vector<u8>,
+    data: vector<u8>,
     owners: &mut Owners,
     balances: &mut Balances,
     token_approvals: &mut TokenApprovals,
@@ -436,9 +444,9 @@ entry fun safeTransferFrom(
     ctx: &TxContext,
 ) {
         transfer_from(from, to, token_id, owners, balances, token_approvals, operator_approvals, ctx);
-        //TODO: implement cross contract call to checkOnERC721Received
-        // checkOnERC721Received(ctx.sender(), from, to, token_id, data);
+        check_on_erc721_received(ctx.sender(), from, to, token_id, data);
     }
+
 // Private methods:
 
 // Returns the owner of the `token_id`. Does NOT revert if token doesn't exist.
@@ -522,10 +530,26 @@ fun check_authorized_(
     }
 }
 
-entry fun account_code_size(contract_address: address): u32 {
-    account::get_account_code_size(contract_address)
-}
+entry fun check_on_erc721_received(
+    operator: address,
+    from: address,
+    to: address,
+    token_id: u256,
+    data: vector<u8>,
+) {
+    if (account::get_account_code_size(to) == 0) {
+        // Should we throw an error here?
+        abort(EInvalidReceiver)
+    };
 
-entry fun account_balance(contract_address: address): u256 {
-    account::get_account_balance(contract_address)
+    let erc721_receiver = erc721ReceiverCall::new(ccc::new(to));
+
+    let erc721_receiver_call = erc721_receiver.on_erc721_received(operator, from, token_id, data);
+    if (!erc721_receiver_call.succeded()) {
+        abort(EInvalidReceiver)
+    };
+    
+    if (erc721_receiver_call.get_result() != erc721ReceiverCall::on_erc721_received_selector()) {
+        abort(EInvalidReceiver)
+    };
 }

@@ -1,7 +1,5 @@
 use alloy::primitives::U256;
 use alloy::primitives::address;
-use alloy::providers::Provider;
-use alloy::rpc::types::TransactionRequest;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::sol_types::SolEvent;
 use alloy::{primitives::Address, providers::ProviderBuilder, sol, transports::http::reqwest::Url};
@@ -35,10 +33,10 @@ sol!(
         function setApprovalForAll(address operator, bool approved) external;
         function isApprovedForAll(address owner, address operator) external view returns (bool);
         function transferFrom(address from, address to, uint256 tokenId) external;
+        function safeTransferFrom(address from, address to, uint256 tokenId, uint8[] data);
         function name() external view returns (string);
         function symbol() external view returns (string);
-        function accountCodeSize(address account) external view returns (uint32);
-        function accountBalance(address account) external view returns (uint256);
+        function tokenUri(uint256 tokenId) external view returns (string);
     }
 );
 
@@ -82,36 +80,6 @@ async fn main() -> eyre::Result<()> {
     let example_2 = Erc721::new(address, provider_2.clone());
 
     let address_2 = address!("0xcafecafecafecafecafecafecafecafecafecafe");
-
-    println!("====================");
-    println!("  Account Info");
-    println!("====================");
-    let res = example.accountCodeSize(address).call().await?;
-    println!("  Account code size of {address} = {res}");
-
-    let res = example.accountCodeSize(receiver_address).call().await?;
-    println!("  Account code size of {receiver_address} = {res}");
-
-    let res = example.accountBalance(sender_2).call().await?;
-    println!("  Initial account balance in wei of {sender_2} = {res}");
-
-    let res = example.accountBalance(sender).call().await?;
-    println!("  Initial account balance in wei of {sender} = {res}");
-
-    println!("\nFunding {sender_2} with some ETH to pay for the gas");
-    let tx = TransactionRequest::default()
-        .from(sender)
-        .to(sender_2)
-        .value(U256::from(1_000_000_000_000_000_000u128)); // 1 eth in wei
-
-    let pending_tx = provider.send_transaction(tx).await?;
-    pending_tx.get_receipt().await?;
-
-    let res = example.accountBalance(sender_2).call().await?;
-    println!("  Account balance in wei of {sender_2} = {res}");
-
-    let res = example.accountBalance(sender).call().await?;
-    println!("  Account balance in wei of {sender} = {res}");
 
     println!("====================");
     println!("Creating a new erc721");
@@ -369,6 +337,27 @@ async fn main() -> eyre::Result<()> {
     println!("  Current balance of {sender} = {res}");
     let res = example.balanceOf(sender_2).call().await?;
     println!("  Current balance of {sender_2} = {res}");
+
+    println!("Safe transferring token {token_id_4} from {sender} to {receiver_address}");
+    let pending_tx = example.safeTransferFrom(sender, receiver_address, token_id_4, vec![].into()).send().await?;
+    let receipt = pending_tx.get_receipt().await?;
+    println!("Safe transfer events");
+    for (index, log) in receipt.logs().iter().enumerate() {
+        let primitive_log: alloy::primitives::Log = log.clone().into();
+        let decoded_event = Erc721::Transfer::decode_log(&primitive_log)?;
+        println!("Safe transfer event log {} {:#?}", index + 1, decoded_event);
+    }
+
+    let res = example.balanceOf(sender).call().await?;
+    println!("  Current balance of {sender} = {res}");
+    let res = example.balanceOf(receiver_address).call().await?;
+    println!("  Current balance of {receiver_address} = {res}");
+
+    let res = example.ownerOf(token_id_4).call().await?;
+    println!("  Owner of token {token_id_4} after safe transfer = {res}");
+
+    let res = example.tokenUri(token_id_4).call().await?;
+    println!("  Token URI of token {token_id_4} = {res}");
 
     Ok(())
 }
