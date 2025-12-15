@@ -84,9 +84,6 @@ pub fn get_linker_with_host_debug_functions<T>() -> Linker<T> {
             let mut result = [0; 16];
             memory.read(&caller, ptr as usize, &mut result).unwrap();
             println!("Data {result:?}");
-            for byte in result {
-                print!("{byte:08b} ");
-            }
             println!("Decimal data {}", u128::from_le_bytes(result));
             println!("--- end u128 ---\n");
         })
