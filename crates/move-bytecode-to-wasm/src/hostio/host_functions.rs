@@ -320,6 +320,32 @@ pub fn read_return_data(module: &mut Module) -> (FunctionId, ImportId) {
     )
 }
 
+/// Gets the size of the code in bytes at the given address. The semantics are equivalent
+/// to that of the EVM's [`EXT_CODESIZE`].
+///
+/// [`EXT_CODESIZE`]: https://www.evm.codes/#3B
+pub fn account_code_size(module: &mut Module) -> (FunctionId, ImportId) {
+    get_or_insert_import(
+        module,
+        "account_code_size",
+        &[ValType::I32],
+        &[ValType::I32],
+    )
+}
+
+/// Gets the ETH balance in wei of the account at the given address.
+/// The semantics are equivalent to that of the EVM's [`BALANCE`] opcode.
+///
+/// [`BALANCE`]: https://www.evm.codes/#31
+pub fn account_balance(module: &mut Module) -> (FunctionId, ImportId) {
+    get_or_insert_import(
+        module,
+        "account_balance",
+        &[ValType::I32, ValType::I32],
+        &[],
+    )
+}
+
 #[inline]
 fn get_or_insert_import(
     module: &mut walrus::Module,

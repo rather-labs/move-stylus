@@ -13,7 +13,7 @@ use std::sync::Arc;
 sol!(
     #[sol(rpc)]
     #[allow(missing_docs)]
-    contract Example {
+    contract Erc721 {
         #[derive(Debug)]
         event Approval(address indexed owner, address indexed approved, uint256 tokenId);
 
@@ -37,6 +37,8 @@ sol!(
         function transferFrom(address from, address to, uint256 tokenId) external;
         function name() external view returns (string);
         function symbol() external view returns (string);
+        function accountCodeSize(address account) external view returns (uint32);
+        function accountBalance(address account) external view returns (uint256);
     }
 );
 
@@ -51,6 +53,10 @@ async fn main() -> eyre::Result<()> {
     let contract_address = std::env::var("CONTRACT_ADDRESS_ERC721")
         .map_err(|_| eyre!("No {} env var set", "CONTRACT_ADDRESS_ERC721"))?;
 
+    let receiver_contract_address = std::env::var("CONTRACT_ADDRESS_ERC721_RECEIVER")
+        .map_err(|_| eyre!("No {} env var set", "CONTRACT_ADDRESS_ERC721_RECEIVER"))?;
+    let receiver_address = Address::from_str(&receiver_contract_address)?;
+
     let signer = PrivateKeySigner::from_str(&priv_key)?;
     let sender = signer.address();
 
@@ -61,9 +67,9 @@ async fn main() -> eyre::Result<()> {
             .connect_http(Url::from_str(&rpc_url).unwrap()),
     );
     let address = Address::from_str(&contract_address)?;
-    let example = Example::new(address, provider.clone());
+    let example = Erc721::new(address, provider.clone());
 
-    // Testing capability with another user
+    // Second sender
     let signer_2 = PrivateKeySigner::from_str(&priv_key_2)?;
     let sender_2 = signer_2.address();
 
@@ -73,16 +79,39 @@ async fn main() -> eyre::Result<()> {
             .with_chain_id(412346)
             .connect_http(Url::from_str(&rpc_url).unwrap()),
     );
-    let example_2 = Example::new(address, provider_2.clone());
+    let example_2 = Erc721::new(address, provider_2.clone());
 
     let address_2 = address!("0xcafecafecafecafecafecafecafecafecafecafe");
 
+    println!("====================");
+    println!("  Account Info");
+    println!("====================");
+    let res = example.accountCodeSize(address).call().await?;
+    println!("  Account code size of {address} = {res}");
+
+    let res = example.accountCodeSize(receiver_address).call().await?;
+    println!("  Account code size of {receiver_address} = {res}");
+
+    let res = example.accountBalance(sender_2).call().await?;
+    println!("  Initial account balance in wei of {sender_2} = {res}");
+
+    let res = example.accountBalance(sender).call().await?;
+    println!("  Initial account balance in wei of {sender} = {res}");
+
+    println!("\nFunding {sender_2} with some ETH to pay for the gas");
     let tx = TransactionRequest::default()
         .from(sender)
         .to(sender_2)
         .value(U256::from(1_000_000_000_000_000_000u128)); // 1 eth in wei
+
     let pending_tx = provider.send_transaction(tx).await?;
     pending_tx.get_receipt().await?;
+
+    let res = example.accountBalance(sender_2).call().await?;
+    println!("  Account balance in wei of {sender_2} = {res}");
+
+    let res = example.accountBalance(sender).call().await?;
+    println!("  Account balance in wei of {sender} = {res}");
 
     println!("====================");
     println!("Creating a new erc721");
@@ -124,7 +153,7 @@ async fn main() -> eyre::Result<()> {
     println!("Mint events");
     for (index, log) in receipt.logs().iter().enumerate() {
         let primitive_log: alloy::primitives::Log = log.clone().into();
-        let decoded_event = Example::Transfer::decode_log(&primitive_log)?;
+        let decoded_event = Erc721::Transfer::decode_log(&primitive_log)?;
         println!("Mint event log {} {:#?}", index + 1, decoded_event);
     }
 
@@ -133,7 +162,7 @@ async fn main() -> eyre::Result<()> {
     let receipt = pending_tx.get_receipt().await?;
     for (index, log) in receipt.logs().iter().enumerate() {
         let primitive_log: alloy::primitives::Log = log.clone().into();
-        let decoded_event = Example::Transfer::decode_log(&primitive_log)?;
+        let decoded_event = Erc721::Transfer::decode_log(&primitive_log)?;
         println!("Mint event log {} {:#?}", index + 1, decoded_event);
     }
 
@@ -142,7 +171,7 @@ async fn main() -> eyre::Result<()> {
     let receipt = pending_tx.get_receipt().await?;
     for (index, log) in receipt.logs().iter().enumerate() {
         let primitive_log: alloy::primitives::Log = log.clone().into();
-        let decoded_event = Example::Transfer::decode_log(&primitive_log)?;
+        let decoded_event = Erc721::Transfer::decode_log(&primitive_log)?;
         println!("Mint event log {} {:#?}", index + 1, decoded_event);
     }
 
@@ -176,7 +205,7 @@ async fn main() -> eyre::Result<()> {
     println!("Burn events");
     for (index, log) in receipt.logs().iter().enumerate() {
         let primitive_log: alloy::primitives::Log = log.clone().into();
-        let decoded_event = Example::Transfer::decode_log(&primitive_log)?;
+        let decoded_event = Erc721::Transfer::decode_log(&primitive_log)?;
         println!("Burn event log {} {:#?}", index + 1, decoded_event);
     }
 
@@ -199,7 +228,7 @@ async fn main() -> eyre::Result<()> {
     let receipt = pending_tx.get_receipt().await?;
     for (index, log) in receipt.logs().iter().enumerate() {
         let primitive_log: alloy::primitives::Log = log.clone().into();
-        let decoded_event = Example::Transfer::decode_log(&primitive_log)?;
+        let decoded_event = Erc721::Transfer::decode_log(&primitive_log)?;
         println!("Transfer event log {} {:#?}", index + 1, decoded_event);
     }
 
@@ -227,7 +256,7 @@ async fn main() -> eyre::Result<()> {
 
     for (index, log) in receipt.logs().iter().enumerate() {
         let primitive_log: alloy::primitives::Log = log.clone().into();
-        if let Ok(decoded_event) = Example::Approval::decode_log(&primitive_log) {
+        if let Ok(decoded_event) = Erc721::Approval::decode_log(&primitive_log) {
             println!("Approval event log {} {:#?}", index + 1, decoded_event);
         }
     }
@@ -256,7 +285,7 @@ async fn main() -> eyre::Result<()> {
     println!("Transfer events");
     for (index, log) in receipt.logs().iter().enumerate() {
         let primitive_log: alloy::primitives::Log = log.clone().into();
-        let decoded_event = Example::Transfer::decode_log(&primitive_log)?;
+        let decoded_event = Erc721::Transfer::decode_log(&primitive_log)?;
         println!("Transfer event log {} {:#?}", index + 1, decoded_event);
     }
 
@@ -297,7 +326,7 @@ async fn main() -> eyre::Result<()> {
 
     for (index, log) in receipt.logs().iter().enumerate() {
         let primitive_log: alloy::primitives::Log = log.clone().into();
-        if let Ok(decoded_event) = Example::ApprovalForAll::decode_log(&primitive_log) {
+        if let Ok(decoded_event) = Erc721::ApprovalForAll::decode_log(&primitive_log) {
             println!(
                 "ApprovalForAll event log {} {:#?}",
                 index + 1,
@@ -329,7 +358,7 @@ async fn main() -> eyre::Result<()> {
     println!("Transfer events");
     for (index, log) in receipt.logs().iter().enumerate() {
         let primitive_log: alloy::primitives::Log = log.clone().into();
-        let decoded_event = Example::Transfer::decode_log(&primitive_log)?;
+        let decoded_event = Erc721::Transfer::decode_log(&primitive_log)?;
         println!("Transfer event log {} {:#?}", index + 1, decoded_event);
     }
 

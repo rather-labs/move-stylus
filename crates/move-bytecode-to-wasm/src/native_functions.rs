@@ -3,6 +3,7 @@
 //! Native functions in Move are functions directly implemented inside the Move VM. To emulate that
 //! mechanism, we direcly implement them in WASM and limk them into the file.
 mod abi_error;
+mod account;
 mod contract_calls;
 mod dynamic_field;
 pub mod error;
@@ -25,10 +26,11 @@ use crate::{
     compilation_context::{
         ModuleId,
         reserved_modules::{
-            SF_MODULE_NAME_DYNAMIC_FIELD, SF_MODULE_NAME_ERROR, SF_MODULE_NAME_EVENT,
-            SF_MODULE_NAME_FALLBACK, SF_MODULE_NAME_OBJECT, SF_MODULE_NAME_TRANSFER,
-            SF_MODULE_NAME_TX_CONTEXT, SF_MODULE_NAME_TYPES, SF_MODULE_TEST_SCENARIO,
-            STANDARD_LIB_ADDRESS, STDLIB_MODULE_UNIT_TEST, STYLUS_FRAMEWORK_ADDRESS,
+            SF_MODULE_NAME_ACCOUNT, SF_MODULE_NAME_DYNAMIC_FIELD, SF_MODULE_NAME_ERROR,
+            SF_MODULE_NAME_EVENT, SF_MODULE_NAME_FALLBACK, SF_MODULE_NAME_OBJECT,
+            SF_MODULE_NAME_TRANSFER, SF_MODULE_NAME_TX_CONTEXT, SF_MODULE_NAME_TYPES,
+            SF_MODULE_TEST_SCENARIO, STANDARD_LIB_ADDRESS, STDLIB_MODULE_UNIT_TEST,
+            STYLUS_FRAMEWORK_ADDRESS,
         },
     },
     hasher::get_hasher,
@@ -92,6 +94,10 @@ impl NativeFunction {
     // Fallback functions
     const NATIVE_CALLDATA_AS_VECTOR: &str = "calldata_as_vector";
     const NATIVE_CALLDATA_LENGTH: &str = "calldata_length";
+
+    // Account functions
+    const NATIVE_ACCOUNT_CODE_SIZE: &str = "account_code_size";
+    const NATIVE_ACCOUNT_BALANCE: &str = "account_balance";
 
     // Tests
     const NATIVE_POISON: &str = "poison";
@@ -175,7 +181,6 @@ impl NativeFunction {
                         let (function_id, _) = hostio::host_functions::chain_id(module);
                         function_id
                     }
-
                     _ => {
                         return Err(NativeFunctionError::HostFunctionNotSupported(
                             host_fn_name.to_string(),
@@ -327,6 +332,16 @@ impl NativeFunction {
                     STYLUS_FRAMEWORK_ADDRESS,
                     SF_MODULE_NAME_FALLBACK,
                 ) => fallback::add_calldata_length_fn(module, compilation_ctx, module_id),
+                (
+                    Self::NATIVE_ACCOUNT_CODE_SIZE,
+                    STYLUS_FRAMEWORK_ADDRESS,
+                    SF_MODULE_NAME_ACCOUNT,
+                ) => account::add_native_account_code_size_fn(module, compilation_ctx, module_id),
+                (
+                    Self::NATIVE_ACCOUNT_BALANCE,
+                    STYLUS_FRAMEWORK_ADDRESS,
+                    SF_MODULE_NAME_ACCOUNT,
+                ) => account::add_native_account_balance_fn(module, compilation_ctx, module_id)?,
                 _ => {
                     return Err(NativeFunctionError::NativeFunctionNotSupported(
                         module_id.clone(),
@@ -588,6 +603,7 @@ impl NativeFunction {
             Self::NATIVE_BLOCK_GAS_LIMIT => Some(Self::HOST_BLOCK_GAS_LIMIT),
             Self::NATIVE_BLOCK_TIMESTAMP => Some(Self::HOST_BLOCK_TIMESTAMP),
             Self::NATIVE_CHAIN_ID => Some(Self::HOST_CHAIN_ID),
+            // Self::NATIVE_ACCOUNT_CODE_SIZE => Some(Self::HOST_ACCOUNT_CODE_SIZE),
             _ => None,
         }
     }

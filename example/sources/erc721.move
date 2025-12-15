@@ -8,6 +8,7 @@ use stylus::transfer as transfer;
 use stylus::object as object;
 use stylus::object::NamedId;
 use stylus::dynamic_field_named_id as field;
+use stylus::account as account;
 
 public struct COLLECTION_INFO has key {}
 public struct TOTAL_SUPPLY has key {}
@@ -519,4 +520,12 @@ fun check_authorized_(
     if (!is_authorized_(owner, spender, token_id, token_approvals, operator_approvals)) {
         abort(EInvalidApprover)
     }
+}
+
+entry fun account_code_size(contract_address: address): u32 {
+    account::get_account_code_size(contract_address)
+}
+
+entry fun account_balance(contract_address: address): u256 {
+    account::get_account_balance(contract_address)
 }

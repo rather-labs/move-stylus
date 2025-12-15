@@ -95,6 +95,11 @@ deploy-erc721:
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
 		--wasm-file=./example/build/example/wasm/erc721.wasm \
 		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_ERC721
+	cargo stylus deploy \
+		--endpoint='http://localhost:8547' \
+		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
+		--wasm-file=./example/build/example/wasm/erc721_receiver.wasm \
+		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_ERC721_RECEIVER
 
 deploy-counter:
 	cargo stylus deploy \
