@@ -3,7 +3,7 @@ use alloy_sol_types::{SolType, sol_data};
 use crate::{
     CompilationContext,
     translation::intermediate_types::IntermediateType,
-    vm_handled_types::{VmHandledType, string::String_},
+    vm_handled_types::{VmHandledType, bytes::Bytes4, string::String_},
 };
 
 use super::error::AbiError;
@@ -37,6 +37,11 @@ impl SolName for IntermediateType {
                 module_id, index, ..
             } if String_::is_vm_type(module_id, *index, compilation_ctx)? => {
                 Some(sol_data::String::SOL_NAME.to_string())
+            }
+            IntermediateType::IStruct {
+                module_id, index, ..
+            } if Bytes4::is_vm_type(module_id, *index, compilation_ctx)? => {
+                Some("bytes4".to_string())
             }
             // Depening on the contect, structs can be interpreted in different ways (i.e events vs
             // function selector)

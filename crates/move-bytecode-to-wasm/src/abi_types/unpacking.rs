@@ -22,7 +22,7 @@ use crate::{
         vector::IVector,
     },
     vm_handled_types::{
-        VmHandledType, fallback::Calldata, named_id::NamedId, string::String_,
+        VmHandledType, bytes::Bytes4, fallback::Calldata, named_id::NamedId, string::String_,
         tx_context::TxContext, uid::Uid,
     },
 };
@@ -30,6 +30,7 @@ use crate::{
 use super::error::AbiError;
 
 pub(crate) mod error;
+mod unpack_bytes;
 mod unpack_enum;
 mod unpack_heap_int;
 mod unpack_native_int;
@@ -205,6 +206,11 @@ impl Unpackable for IntermediateType {
                 module_id, index, ..
             } if Calldata::is_vm_type(module_id, *index, compilation_ctx)? => {
                 Calldata::inject(function_builder, module, compilation_ctx);
+            }
+            IntermediateType::IStruct {
+                module_id, index, ..
+            } if Bytes4::is_vm_type(module_id, *index, compilation_ctx)? => {
+                Bytes4::add_unpack_instructions(function_builder, reader_pointer)?;
             }
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
                 let struct_ = compilation_ctx.get_struct_by_intermediate_type(self)?;

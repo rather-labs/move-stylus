@@ -40,4 +40,5 @@ pub const SF_RESERVED_STRUCTS: &[&str] = &[
     "NamedId",
     "Table",
     "Calldata",
+    "Bytes",
 ];

@@ -48,6 +48,37 @@ mod bool_type {
     }
 }
 
+mod bytes_type {
+    use super::*;
+    use crate::common::runtime_with_framework as runtime;
+    use alloy_primitives::fixed_bytes;
+
+    sol!(
+        #[allow(missing_docs)]
+        function testBytes4AsVec(bytes4 b) external returns (uint8[]);
+    );
+
+    #[rstest]
+    #[case(testBytes4AsVecCall::new((fixed_bytes!("01020304"),)), vec![0x01, 0x02, 0x03, 0x04])]
+    #[case(testBytes4AsVecCall::new((fixed_bytes!("11223344"),)), vec![0x11, 0x22, 0x33, 0x44])]
+    fn test_bytes4_as_vec<T: SolCall, V: SolValue>(
+        #[by_ref]
+        #[with("bytes", "tests/primitives/bytes.move")]
+        runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: V,
+    ) where
+        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
+    {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            expected_result.abi_encode(),
+        )
+        .unwrap();
+    }
+}
+
 mod address_type {
     use super::*;
 
