@@ -610,7 +610,6 @@ impl NativeFunction {
             Self::NATIVE_BLOCK_GAS_LIMIT => Some(Self::HOST_BLOCK_GAS_LIMIT),
             Self::NATIVE_BLOCK_TIMESTAMP => Some(Self::HOST_BLOCK_TIMESTAMP),
             Self::NATIVE_CHAIN_ID => Some(Self::HOST_CHAIN_ID),
-            // Self::NATIVE_ACCOUNT_CODE_SIZE => Some(Self::HOST_ACCOUNT_CODE_SIZE),
             _ => None,
         }
     }
