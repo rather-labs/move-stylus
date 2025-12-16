@@ -8,7 +8,7 @@ use crate::base::cargo_stylus_installed;
 #[derive(Parser)]
 #[clap(name = "activate")]
 pub struct Activate {
-    /// Activateed Stylus contract address to activate
+    /// Deployed Stylus contract address to activate
     #[clap(long = "address")]
     address: String,
 
