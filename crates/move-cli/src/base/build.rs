@@ -48,6 +48,7 @@ impl Build {
             config.install_dir,
             emit_wat,
             verbose,
+            !config.dev_mode,
         ) {
             print_error_diagnostic(*compilation_error)
         }

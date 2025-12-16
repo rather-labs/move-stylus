@@ -527,26 +527,45 @@ mod tests {
 
         let mut func_body = function_builder.func_body();
 
-        // Load arguments to stack
-        func_body.local_get(param1);
-        func_body.i32_const(1);
-        func_body.binop(BinaryOp::I32Add);
-
-        func_body.local_get(param2);
-        func_body.i32_const(1);
-        func_body.binop(BinaryOp::I32Add);
-
-        func_body.local_get(param3);
-        func_body.i64_const(1);
-        func_body.binop(BinaryOp::I64Add);
-
         let returns = vec![
             IntermediateType::IU32,
             IntermediateType::IU16,
             IntermediateType::IU64,
         ];
-        prepare_function_return(&mut raw_module, &mut func_body, &returns, &compilation_ctx)
+
+        let result_local_id = raw_module.locals.add(ValType::I32);
+        func_body.block(None, |result_block| {
+            let result_block_id = result_block.id();
+
+            // Compute return values inside the block
+            result_block.local_get(param1);
+            result_block.i32_const(1);
+            result_block.binop(BinaryOp::I32Add);
+
+            result_block.local_get(param2);
+            result_block.i32_const(1);
+            result_block.binop(BinaryOp::I32Add);
+
+            result_block.local_get(param3);
+            result_block.i64_const(1);
+            result_block.binop(BinaryOp::I64Add);
+
+            // Now prepare_function_return can consume the return values from the stack
+            prepare_function_return(
+                &mut raw_module,
+                result_block,
+                &returns,
+                &compilation_ctx,
+                result_block_id,
+                result_local_id,
+            )
             .unwrap();
+        });
+
+        // Load the result if there are return values
+        if !returns.is_empty() {
+            func_body.local_get(result_local_id);
+        }
 
         let function = function_builder.finish(vec![param1, param2, param3], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
@@ -605,15 +624,35 @@ mod tests {
 
         let mut func_body = function_builder.func_body();
 
-        func_body.i32_const(1);
-        func_body.local_get(param2);
-        func_body.binop(BinaryOp::I32Add);
-
-        func_body.local_get(param1);
-
         let returns = vec![IntermediateType::IU8, IntermediateType::ISigner];
-        prepare_function_return(&mut raw_module, &mut func_body, &returns, &compilation_ctx)
+
+        let result_local_id = raw_module.locals.add(ValType::I32);
+        func_body.block(None, |result_block| {
+            let result_block_id = result_block.id();
+
+            // Compute return values inside the block
+            result_block.i32_const(1);
+            result_block.local_get(param2);
+            result_block.binop(BinaryOp::I32Add);
+
+            result_block.local_get(param1);
+
+            // Now prepare_function_return can consume the return values from the stack
+            prepare_function_return(
+                &mut raw_module,
+                result_block,
+                &returns,
+                &compilation_ctx,
+                result_block_id,
+                result_local_id,
+            )
             .unwrap();
+        });
+
+        // Load the result if there are return values
+        if !returns.is_empty() {
+            func_body.local_get(result_local_id);
+        }
 
         let function = function_builder.finish(vec![param1, param2], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);

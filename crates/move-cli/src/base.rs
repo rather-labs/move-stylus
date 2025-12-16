@@ -35,6 +35,7 @@ pub fn translate_package_cli(
     install_dir: Option<PathBuf>,
     emit_wat: bool,
     verbose: bool,
+    optimize: bool,
 ) -> Result<(), Box<CompilationError>> {
     let build_directory = get_build_directory(rerooted_path, &package, &install_dir);
 
@@ -45,9 +46,19 @@ pub fn translate_package_cli(
     let mut modules = translate_package(package, None, verbose)?;
 
     for (module_name, module) in modules.iter_mut() {
+        let wasm_file_path = build_directory.join(format!("{module_name}.wasm"));
         module
-            .emit_wasm_file(build_directory.join(format!("{module_name}.wasm")))
+            .emit_wasm_file(&wasm_file_path)
             .map_err(|e| ICEError::new(ICEErrorKind::Unexpected(e.into())))?;
+
+        if optimize {
+            wasm_opt::OptimizationOptions::new_optimize_for_size_aggressively()
+                .enable_feature(wasm_opt::Feature::BulkMemory)
+                .disable_feature(wasm_opt::Feature::Simd)
+                .disable_feature(wasm_opt::Feature::Multivalue)
+                .run(&wasm_file_path, &wasm_file_path)
+                .unwrap();
+        }
 
         if emit_wat {
             // Convert to WAT format
