@@ -7,7 +7,8 @@ pub(crate) mod build_config;
 pub(crate) mod error;
 
 use base::{
-    abi_generate::AbiGenerate, build::Build, deploy::Deploy, info::Info, new::New, test::Test,
+    abi_generate::AbiGenerate, activate::Activate, build::Build, deploy::Deploy, info::Info,
+    new::New, test::Test,
 };
 
 #[cfg(debug_assertions)]
@@ -54,6 +55,7 @@ pub struct MoveCLI {
 
 #[derive(Parser)]
 pub enum Command {
+    Activate(Activate),
     AbiGenerate(AbiGenerate),
     Build(Build),
     #[cfg(debug_assertions)]
@@ -74,6 +76,7 @@ pub fn run_cli(move_args: Move, cmd: Command) -> Result<()> {
             build_config,
             move_args.verbose,
         ),
+        Command::Activate(c) => c.execute(),
         Command::Build(c) => c.execute(
             move_args.package_path.as_deref(),
             build_config,
