@@ -7,7 +7,7 @@ impl Bytes4 {
         builder: &mut InstrSeqBuilder,
         reader_pointer: LocalId,
     ) -> Result<(), AbiError> {
-        // Push the reader pointer to the stack. 
+        // Push the reader pointer to the stack.
         // It already points to the 4 bytes we need to unpack.
         builder.local_get(reader_pointer);
 
@@ -15,7 +15,7 @@ impl Bytes4 {
         // bytes<M> is not a dynamic type, so the first M bytes are left aligned and the rest are padded with 0s til 32
         builder
             .local_get(reader_pointer)
-            .i32_const(32 as i32)
+            .i32_const(32_i32)
             .binop(BinaryOp::I32Add)
             .local_set(reader_pointer);
 
