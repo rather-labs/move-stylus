@@ -37,7 +37,7 @@ sol!(
         function name() external view returns (string);
         function symbol() external view returns (string);
         function tokenUri(uint256 tokenId) external view returns (string);
-        function supportsInterface(uint8[] interfaceId) external view returns (bool);
+        function supportsInterface(bytes4 interfaceId) external view returns (bool);
     }
 );
 
@@ -366,12 +366,12 @@ async fn main() -> eyre::Result<()> {
     let erc721_interface_id = FixedBytes::<4>::new([0x80, 0xac, 0x58, 0xcd]);
     let erc721_metadata_interface_id = FixedBytes::<4>::new([0x01, 0xff, 0xc9, 0xa7]);
     let res = example
-        .supportsInterface(erc721_interface_id.to_vec())
+        .supportsInterface(erc721_interface_id)
         .call()
         .await?;
     println!("  Supports IERC721 interface = {res}");
     let res = example
-        .supportsInterface(erc721_metadata_interface_id.to_vec())
+        .supportsInterface(erc721_metadata_interface_id)
         .call()
         .await?;
     println!("  Supports IERC721 metadata interface = {res}");

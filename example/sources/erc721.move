@@ -10,6 +10,7 @@ use stylus::account as account;
 use erc721Utils::utils as erc721_utils;
 use std::ascii as ascii;
 use std::ascii::String;
+use stylus::bytes::Bytes4;
 
 public struct COLLECTION_INFO has key {}
 public struct TOTAL_SUPPLY has key {}
@@ -119,14 +120,8 @@ fun init(_ctx: &mut TxContext) {
     });
 }
 
-entry fun supports_interface(interface_id: vector<u8>): bool {
-    if (interface_id == IERC721_INTERFACE_ID) {
-        return true
-    };
-    if (interface_id == IERC721_METADATA_INTERFACE_ID) {
-        return true
-    };
-    return false
+entry fun supports_interface(interface_id: Bytes4): bool {
+    (interface_id.as_vec() == IERC721_INTERFACE_ID) || (interface_id.as_vec() == IERC721_METADATA_INTERFACE_ID)
 }
 
 // Returns the number of tokens in `owner`'s account.

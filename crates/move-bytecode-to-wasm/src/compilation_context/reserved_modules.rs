@@ -22,6 +22,7 @@ pub const SF_MODULE_NAME_ERROR: &str = "error";
 pub const SF_MODULE_NAME_FALLBACK: &str = "fallback";
 pub const SF_MODULE_NAME_ACCOUNT: &str = "account";
 pub const SF_MODULE_TEST_SCENARIO: &str = "test_scenario";
+pub const SF_MODULE_NAME_BYTES: &str = "bytes";
 
 // Module names for standard lib
 pub const STDLIB_MODULE_NAME_ASCII: &str = "ascii";
