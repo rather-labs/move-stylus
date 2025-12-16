@@ -54,7 +54,7 @@ public struct OperatorApprovals has key {
 }
 
 // Emitted when `owner` enables `approved` to manage the `token_id` token.
-#[ext(event, indexes = 2)]
+#[ext(event, indexes = 3)]
 public struct Approval has copy, drop {
     owner: address,
     approved: address,
@@ -70,7 +70,7 @@ public struct ApprovalForAll has copy, drop {
 }
 
 // Emitted when `token_id` token is transferred from `from` to `to`.
-#[ext(event, indexes = 2)]
+#[ext(event, indexes = 3)]
 public struct Transfer has copy, drop {
     from: address,
     to: address,
@@ -95,7 +95,7 @@ fun init(_ctx: &mut TxContext) {
         id: object::new_named_id<COLLECTION_INFO>(),
         name: ascii::string(b"Moving Stylus"),
         symbol: ascii::string(b"MST"),
-        base_uri: ascii::string(b"https://bafybeihlqsyodyia5webtmflybdskxiu3fanm3gxpxyayjhqfn5pmpevdu.ipfs.dweb.link/"),
+        base_uri: ascii::string(b"https://ipfs.io/ipfs/bafkreihfxkbqku2h3zazdedexclljtr3zqa7x2zlug6rxnm6asefq3h3hu"),
     });
 
     transfer::share_object(TotalSupply {
@@ -153,7 +153,7 @@ entry fun symbol(contract_info: &Info): String {
     contract_info.symbol
 }
 
-entry fun token_uri(token_id: u256, contract_info: &Info): String {
+entry fun token_URI(token_id: u256, contract_info: &Info): String {
     contract_info.base_uri
 }
 
@@ -161,7 +161,7 @@ entry fun total_supply(t_supply: &TotalSupply): u256 {
     t_supply.total
 }
 
-// Grants permission to `to` transfer `token_id` to another account. 
+// Grants permission to `to` transfer `token_id` to another account.
 // The approval is automatically cleared when the token is transferred.
 //
 // Only a single account can be approved at a time, so approving the zero address clears previous approvals.
@@ -169,7 +169,7 @@ entry fun total_supply(t_supply: &TotalSupply): u256 {
 // Requirements:
 // - The caller must own the token or be an approved operator.
 // - The `token_id` must exist.
-// 
+//
 // Emits an Approval event.
 entry fun approve(
     to: address,
@@ -230,7 +230,7 @@ entry fun get_approved(token_id: u256, owners: &Owners, token_approvals: &TokenA
 //
 // Requirements:
 // - The operator cannot be the address zero.
-// 
+//
 // Emits an ApprovalForAll event.
 entry fun set_approval_for_all(
     operator: address,
@@ -280,7 +280,7 @@ entry fun is_approved_for_all(
 // Requirements:
 // - `to` cannot be the zero address.
 // - `token_id` must not exist.
-// 
+//
 // Emits a Transfer event.
 entry fun mint(
     to: address,
@@ -316,12 +316,12 @@ entry fun mint(
     });
 }
 
-// Destroys `token_id`. The approval is cleared when the token is burned. 
+// Destroys `token_id`. The approval is cleared when the token is burned.
 // This is an internal function that does not check if the sender is authorized to operate on the token.
 //
 // Requirements:
 // - `token_id` must exist.
-// 
+//
 // Emits a Transfer event.
 entry fun burn(
     token_id: u256,
@@ -348,7 +348,7 @@ entry fun burn(
     // Decrement the total supply by 1
     total_supply.total = total_supply.total - 1;
 
-    // Remove the token_id from the token_approvals table 
+    // Remove the token_id from the token_approvals table
     // (TODO: is this the same as setting the zero address as approved?)
     field::remove_if_exists<TOKEN_APPROVALS, u256, address>(&mut token_approvals.id, token_id);
 
@@ -420,7 +420,7 @@ entry fun transfer(
 // - `to` cannot be the zero address.
 // - `token_id` token must be owned by `from`.
 // - If the caller is not `from`, it must be approved to move this token by either approve() or setApprovalForAll().
-// 
+//
 // Emits a Transfer event.
 //
 // Note that the caller is responsible to confirm that the recipient is capable of receiving ERC-721 or else they may be permanently lost.
@@ -475,7 +475,7 @@ fun owner_of_(
 
 // Reverts if the `token_id` doesn't have a current owner (it hasn't been minted, or it has been burned).
 // Returns the owner.
-// 
+//
 // Overrides to ownership logic should be done to {owner_of_}.
 fun require_owned_(
     token_id: u256,

@@ -1,5 +1,7 @@
 use alloy::primitives::address;
 use alloy::primitives::{FixedBytes, U256};
+use alloy::providers::Provider;
+use alloy::rpc::types::TransactionRequest;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::sol_types::SolEvent;
 use alloy::{primitives::Address, providers::ProviderBuilder, sol, transports::http::reqwest::Url};
@@ -13,13 +15,13 @@ sol!(
     #[allow(missing_docs)]
     contract Erc721 {
         #[derive(Debug)]
-        event Approval(address indexed owner, address indexed approved, uint256 tokenId);
+        event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId);
 
         #[derive(Debug)]
         event ApprovalForAll(address indexed owner, address indexed operator, bool approved);
 
         #[derive(Debug)]
-        event Transfer(address indexed from, address indexed to, uint256 tokenId);
+        event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
 
         function constructor() public view;
         function mint(address to, uint256 tokenId) external view;
@@ -36,7 +38,7 @@ sol!(
         function safeTransferFrom(address from, address to, uint256 tokenId, uint8[] data);
         function name() external view returns (string);
         function symbol() external view returns (string);
-        function tokenUri(uint256 tokenId) external view returns (string);
+        function tokenURI(uint256 tokenId) external view returns (string);
         function supportsInterface(bytes4 interfaceId) external view returns (bool);
     }
 );
@@ -79,6 +81,13 @@ async fn main() -> eyre::Result<()> {
             .connect_http(Url::from_str(&rpc_url).unwrap()),
     );
     let example_2 = Erc721::new(address, provider_2.clone());
+
+    let tx = TransactionRequest::default()
+        .from(sender)
+        .to(sender_2)
+        .value(U256::from(1_000_000_000_000_000_000u128)); // 1 eth in wei
+    let pending_tx = provider.send_transaction(tx).await?;
+    pending_tx.get_receipt().await?;
 
     let address_2 = address!("0xcafecafecafecafecafecafecafecafecafecafe");
 
@@ -360,7 +369,7 @@ async fn main() -> eyre::Result<()> {
     let res = example.ownerOf(token_id_4).call().await?;
     println!("  Owner of token {token_id_4} after safe transfer = {res}");
 
-    let res = example.tokenUri(token_id_4).call().await?;
+    let res = example.tokenURI(token_id_4).call().await?;
     println!("  Token URI of token {token_id_4} = {res}");
 
     let erc721_interface_id = FixedBytes::<4>::new([0x80, 0xac, 0x58, 0xcd]);
