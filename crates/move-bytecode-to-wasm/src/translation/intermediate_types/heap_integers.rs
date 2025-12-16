@@ -345,7 +345,7 @@ impl IU128 {
             RuntimeFunction::HeapIntDivMod.get(module, Some(compilation_ctx))?;
 
         builder
-            .i32_const(Self::HEAP_SIZE)
+            .i32_const(128)
             .i32_const(1)
             .call(div_mod_function_id);
 
@@ -361,7 +361,7 @@ impl IU128 {
             RuntimeFunction::HeapIntDivMod.get(module, Some(compilation_ctx))?;
 
         builder
-            .i32_const(Self::HEAP_SIZE)
+            .i32_const(128)
             .i32_const(0)
             .call(div_mod_function_id);
 
@@ -638,7 +638,7 @@ impl IU256 {
             RuntimeFunction::HeapIntDivMod.get(module, Some(compilation_ctx))?;
 
         builder
-            .i32_const(Self::HEAP_SIZE)
+            .i32_const(256)
             .i32_const(1)
             .call(div_mod_function_id);
 
@@ -654,7 +654,7 @@ impl IU256 {
             RuntimeFunction::HeapIntDivMod.get(module, Some(compilation_ctx))?;
 
         builder
-            .i32_const(Self::HEAP_SIZE)
+            .i32_const(256)
             .i32_const(0)
             .call(div_mod_function_id);
 
