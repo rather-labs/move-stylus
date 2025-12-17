@@ -27,6 +27,7 @@ pub const SF_MODULE_NAME_TYPES: &str = "types";
 pub const SF_MODULE_NAME_TABLE: &str = "table";
 pub const SF_MODULE_NAME_ERROR: &str = "error";
 pub const SF_MODULE_NAME_FALLBACK: &str = "fallback";
+pub const SF_MODULE_NAME_SOL_TYPES: &str = "sol_types";
 
 /// All reserved struct names in the Stylus Framework
 pub const SF_RESERVED_STRUCTS: &[&str] = &[
@@ -40,5 +41,4 @@ pub const SF_RESERVED_STRUCTS: &[&str] = &[
     "NamedId",
     "Table",
     "Calldata",
-    "Bytes",
 ];

@@ -2,13 +2,14 @@ use super::{VmHandledType, error::VmHandledTypeError};
 use crate::{
     CompilationContext,
     compilation_context::ModuleId,
-    compilation_context::reserved_modules::{SF_MODULE_NAME_BYTES, STYLUS_FRAMEWORK_ADDRESS},
+    compilation_context::reserved_modules::{SF_MODULE_NAME_SOL_TYPES, STYLUS_FRAMEWORK_ADDRESS},
 };
 use walrus::{InstrSeqBuilder, Module};
 
 pub struct Bytes;
 
 impl VmHandledType for Bytes {
+    // Identifier varies with the size of the bytes struct, so it is not a constant
     const IDENTIFIER: &str = "";
 
     fn inject(
@@ -32,7 +33,7 @@ impl VmHandledType for Bytes {
         // Check if the package is the stylus framework and the module is the bytes module
         if Bytes::validate_identifier(identifier) {
             if module_id.address != STYLUS_FRAMEWORK_ADDRESS
-                || module_id.module_name != SF_MODULE_NAME_BYTES
+                || module_id.module_name != SF_MODULE_NAME_SOL_TYPES
             {
                 return Err(VmHandledTypeError::InvalidFrameworkType(Box::leak(
                     identifier.clone().into_boxed_str(),

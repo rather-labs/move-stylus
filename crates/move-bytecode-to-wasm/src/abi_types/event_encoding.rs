@@ -69,10 +69,7 @@ fn solidity_name(
         IntermediateType::IStruct {
             module_id, index, ..
         } if Bytes::is_vm_type(module_id, *index, compilation_ctx)? => {
-            let identifier = &compilation_ctx
-                .get_struct_by_index(module_id, *index)?
-                .identifier;
-            Some(identifier.to_lowercase())
+            argument.sol_name(compilation_ctx)?
         }
         IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
             let struct_ = compilation_ctx.get_struct_by_intermediate_type(argument)?;

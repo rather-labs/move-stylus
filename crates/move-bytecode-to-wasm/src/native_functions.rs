@@ -26,9 +26,9 @@ use crate::{
     compilation_context::{
         ModuleId,
         reserved_modules::{
-            SF_MODULE_NAME_ACCOUNT, SF_MODULE_NAME_BYTES, SF_MODULE_NAME_DYNAMIC_FIELD,
-            SF_MODULE_NAME_ERROR, SF_MODULE_NAME_EVENT, SF_MODULE_NAME_FALLBACK,
-            SF_MODULE_NAME_OBJECT, SF_MODULE_NAME_TRANSFER, SF_MODULE_NAME_TX_CONTEXT,
+            SF_MODULE_NAME_ACCOUNT, SF_MODULE_NAME_DYNAMIC_FIELD, SF_MODULE_NAME_ERROR,
+            SF_MODULE_NAME_EVENT, SF_MODULE_NAME_FALLBACK, SF_MODULE_NAME_OBJECT,
+            SF_MODULE_NAME_SOL_TYPES, SF_MODULE_NAME_TRANSFER, SF_MODULE_NAME_TX_CONTEXT,
             SF_MODULE_NAME_TYPES, SF_MODULE_TEST_SCENARIO, STANDARD_LIB_ADDRESS,
             STDLIB_MODULE_UNIT_TEST, STYLUS_FRAMEWORK_ADDRESS,
         },
@@ -553,7 +553,7 @@ impl NativeFunction {
             //
             // Bytes
             //
-            (Self::NATIVE_AS_VEC_BYTES_N, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_BYTES) => {
+            (Self::NATIVE_AS_VEC_BYTES_N, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_SOL_TYPES) => {
                 RuntimeFunction::BytesToVec.get(module, Some(compilation_ctx))?
             }
 

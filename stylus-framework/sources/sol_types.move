@@ -1,4 +1,4 @@
-module stylus::bytes;
+module stylus::sol_types;
 
 public(package) native fun as_vec_bytes_n<T: copy + drop>(value: &T, n: u8): vector<u8>;
 
