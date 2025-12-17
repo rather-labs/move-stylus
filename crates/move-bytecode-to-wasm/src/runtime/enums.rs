@@ -11,11 +11,11 @@ const SLOT_SIZE: u32 = 32;
 
 /// Returns the storage size for an enum at a given slot offset (0-31).
 ///
-/// Arguments:
-/// - `slot_offset` (i32): byte offset (0-31) where the enum starts in the slot.
+/// # WASM Function Arguments
+/// * `slot_offset` - (i32): byte offset (0-31) where the enum starts in the slot.
 ///
-/// Returns:
-/// - (i32): storage size in bytes for this enum at the given offset.
+/// # WASM Function Returns
+/// * (i32): storage size in bytes for this enum at the given offset.
 pub fn get_storage_size_by_offset(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -76,17 +76,17 @@ pub fn get_storage_size_by_offset(
 
 /// Compute where an enum's storage ends as a tuple (tail_slot_ptr, tail_slot_offset)
 ///
-/// Arguments:
-/// - `head_slot_ptr` (i32): pointer to the start slot (U256 big-endian)
-/// - `head_slot_offset` (i32): byte offset (0-31) where the enum starts in the slot
-///
-/// Returns:
-/// - `tail_slot_ptr` (i32): pointer to the end slot (U256 big-endian)
-/// - `tail_slot_offset` (i32): byte offset (0-31) where the enum ends
-///
 /// Behavior:
-/// - If enum fits in current slot: (head_slot_ptr, head_slot_offset + enum_size)
-/// - If not: advances slots as needed so offset wraps to final position.
+/// * If enum fits in current slot: (head_slot_ptr, head_slot_offset + enum_size)
+/// * If not: advances slots as needed so offset wraps to final position.
+///
+/// # WASM Function Arguments
+/// * `head_slot_ptr` - (i32): pointer to the start slot (U256 big-endian)
+/// * `head_slot_offset` - (i32): byte offset (0-31) where the enum starts in the slot
+///
+/// # WASM Function Returns
+/// * `tail_slot_ptr` - (i32): pointer to the end slot (U256 big-endian)
+/// * `tail_slot_offset` - (i32): byte offset (0-31) where the enum ends
 pub fn compute_enum_storage_tail_position(
     module: &mut Module,
     compilation_ctx: &CompilationContext,

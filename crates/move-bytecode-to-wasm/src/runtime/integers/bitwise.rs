@@ -9,12 +9,13 @@ use super::RuntimeFunction;
 
 /// This function implements the shift left for u128 and u256
 ///
-/// # Arguments:
-///    - pointer to the number to shift
-///    - shift amount (i32) max 127 and 255 for u128 and u256 respectively, aborts otherwise
-///    - how many bytes the number occupies in heap
-/// # Returns:
-///    - pointer to the result
+/// # WASM Function Arguments:
+/// * `ptr` (i32) - pointer to the number to shift
+/// * `shift_amount` (i32) - shift amount max 127 and 255 for u128 and u256 respectively, aborts otherwise
+/// * `size` (i32) - how many bytes the number occupies in heap
+///
+/// # WASM Function Returns:
+/// * pointer to the result
 pub fn heap_int_shift_left(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -260,12 +261,13 @@ pub fn heap_int_shift_left(
 
 /// This function implements the shift right for u128 and u256
 ///
-/// # Arguments:
-///    - pointer to the number to shift
-///    - shift amount (i32) max 127 and 255 for u128 and u256 respectively, aborts otherwise
-///    - how many bytes the number occupies in heap
-/// # Returns:
-///    - pointer to the result
+/// # WASM Function Arguments:
+/// * `ptr` (i32) - pointer to the number to shift
+/// * `shift_amount` (i32) - shift amount max 127 and 255 for u128 and u256 respectively, aborts otherwise
+/// * `size` (i32) - how many bytes the number occupies in heap
+///
+/// # WASM Function Returns:
+/// * pointer to the result
 pub fn heap_int_shift_right(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
