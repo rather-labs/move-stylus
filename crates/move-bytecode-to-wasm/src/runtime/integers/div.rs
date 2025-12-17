@@ -30,14 +30,14 @@ const F_SET_BIT: &str = "set_bit";
 /// **Note:** In the implementation, indices and operations are changed because we work in
 /// little-endian format. This description and the example assume big-endian for clarity.
 ///
-/// # Arguments
-/// - Pointer to the dividend
-/// - Pointer to the divisor
-/// - Number of bits the values occupy in memory
-/// - Whether return remainder or quotient. 1 for quotient, 0 for remainder.
+/// # WASM Function Arguments
+/// * `dividend_ptr` (i32) - Pointer to the dividend
+/// * `divisor_ptr` (i32) - Pointer to the divisor
+/// * `num_bits` (i32) - Number of bits the values occupy in memory
+/// * `return_quotient` (i32) - Whether return remainder or quotient. 1 for quotient, 0 for remainder.
 ///
-/// # Returns
-/// - Pointer to the result
+/// # WASM Function Returns
+/// * Pointer to the result
 pub fn heap_integers_div_mod(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -235,10 +235,9 @@ pub fn heap_integers_div_mod(
 ///
 /// for each byte that composes the number
 ///
-/// # Arguments
-///
-/// ptr - number pointer
-/// n - number of bytes the number occupies in memory
+/// # WASM Function Arguments
+/// * `ptr` (i32) - number pointer
+/// * `n` (i32) - number of bytes the number occupies in memory
 fn shift_1bit_left(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
 
@@ -335,12 +334,13 @@ fn shift_1bit_left(module: &mut Module, compilation_ctx: &CompilationContext) ->
 /// firt byte and we extract the 7th bit (from 0 to 7). This conversion is done inside the
 /// function.
 ///
-/// # Arguments
-/// - ptr - number pointer
-/// - i - bit index
-/// - n - number of bits the number occupies in memory
-/// # Returns
-/// - bit value (0 or 1)
+/// # WASM Function Arguments
+/// * `ptr` (i32) - number pointer
+/// * `i` (i32) - bit index
+/// * `n` (i32) - number of bits the number occupies in memory
+///
+/// # WASM Function Returns
+/// * bit value (0 or 1)
 fn get_bit(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,
@@ -405,10 +405,10 @@ fn get_bit(module: &mut Module, compilation_ctx: &CompilationContext) -> Functio
 /// firt byte and we set the 7th bit (from 0 to 7). This conversion is done inside the
 /// function.
 ///
-/// # Arguments
-/// - ptr - number pointer
-/// - i - bit index
-/// - n - number of bits the number occupies in memory
+/// # WASM Function Arguments
+/// * `ptr` (i32) - number pointer
+/// * `i` (i32) - bit index
+/// * `n` (i32) - number of bits the number occupies in memory
 fn set_bit(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,

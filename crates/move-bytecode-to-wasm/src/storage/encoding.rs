@@ -24,20 +24,18 @@ use super::{
     error::{EncodeError, StorageError},
 };
 
-/// Emits WASM instructions that encode a struct and write it into storage.
+/// Emits WASM instructions that encode a struct and write it into storage. Writes encoded bytes to
+/// storage via the builder.
 ///
-/// Arguments:
-/// - `module`: Walrus module being built.
-/// - `builder`: Instruction sequence builder to append to.
-/// - `compilation_ctx`: Shared compilation context (types, memory, helpers).
-/// - `struct_ptr`: Local holding the heap pointer to the struct in memory.
-/// - `slot_ptr`: Local pointing to the base storage slot where the struct is saved.
-/// - `slot_offset`: Local used as a running counter of bytes already written in the current slot.
-/// - `owner_ptr`: Optional local to the owner struct UID. If the struct has `key`, this will be `None`.
-/// - `itype`: Intermediate type of the struct to encode.
-///
-/// Returns:
-/// - None. Writes encoded bytes to storage via the builder.
+/// # Arguments
+/// * `module` - Walrus module being built.
+/// * `builder` - Instruction sequence builder to append to.
+/// * `compilation_ctx` - Shared compilation context (types, memory, helpers).
+/// * `struct_ptr` - Local holding the heap pointer to the struct in memory.
+/// * `slot_ptr` - Local pointing to the base storage slot where the struct is saved.
+/// * `slot_offset` - Local used as a running counter of bytes already written in the current slot.
+/// * `owner_ptr` - Optional local to the owner struct UID. If the struct has `key`, this will be `None`.
+/// * `itype` - Intermediate type of the struct to encode.
 #[allow(clippy::too_many_arguments)]
 pub fn add_encode_and_save_into_storage_struct_instructions(
     module: &mut Module,
@@ -146,20 +144,17 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
 }
 
 /// Emits WASM instructions that encode a tagged enum and write the active
-/// variant into storage.
+/// variant into storage. Writes encoded bytes to storage via the builder.
 ///
-/// Arguments:
-/// - `module`: Walrus module being built.
-/// - `builder`: Instruction sequence builder to append to.
-/// - `compilation_ctx`: Shared compilation context (types, memory, helpers).
-/// - `enum_ptr`: Local holding the heap pointer to the enum in memory.
-/// - `slot_ptr`: Local pointing to the base storage slot where the enum is saved.
-/// - `slot_offset`: Local used as a running counter of bytes already written in the current slot.
-/// - `owner_ptr`: Local to the owner struct UID (for nested keyed objects).
-/// - `itype`: Intermediate type of the enum to encode.
-///
-/// Returns:
-/// - None. Writes encoded bytes to storage via the builder.
+/// # Arguments:
+/// * `module` - Walrus module being built.
+/// * `builder` - Instruction sequence builder to append to.
+/// * `compilation_ctx` - Shared compilation context (types, memory, helpers).
+/// * `enum_ptr` - Local holding the heap pointer to the enum in memory.
+/// * `slot_ptr` - Local pointing to the base storage slot where the enum is saved.
+/// * `slot_offset` - Local used as a running counter of bytes already written in the current slot.
+/// * `owner_ptr` - Local to the owner struct UID (for nested keyed objects).
+/// * `itype` - Intermediate type of the enum to encode.
 #[allow(clippy::too_many_arguments)]
 pub fn add_encode_and_save_into_storage_enum_instructions(
     module: &mut Module,
@@ -381,18 +376,15 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
 
 /// Emits WASM instructions to encode a vector and write it into storage,
 /// including truncation of any stale elements that existed previously in storage.
-///
-/// Arguments:
-/// - `module`: Walrus module being built.
-/// - `builder`: Instruction sequence builder to append to.
-/// - `compilation_ctx`: Shared compilation context (types, memory, helpers).
-/// - `vector_ptr`: Local holding the heap pointer to the vector in memory.
-/// - `slot_ptr`: Local pointing to the vector header slot in storage.
-/// - `owner_ptr`: Local to the owner struct UID (for nested keyed objects).
-/// - `inner`: Intermediate type of the vector elements.
-///
-/// Returns:
-/// - None. Writes encoded bytes to storage via the builder.
+/// Writes encoded bytes to storage via the builder.
+/// # Arguments
+/// * `module` - Walrus module being built.
+/// * `builder` - Instruction sequence builder to append to.
+/// * `compilation_ctx` - Shared compilation context (types, memory, helpers).
+/// * `vector_ptr` - Local holding the heap pointer to the vector in memory.
+/// * `slot_ptr` - Local pointing to the vector header slot in storage.
+/// * `owner_ptr` - Local to the owner struct UID (for nested keyed objects).
+/// * `inner` - Intermediate type of the vector elements.
 pub fn add_encode_and_save_into_storage_vector_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
@@ -674,18 +666,18 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
 /// Emits WASM instructions to encode an intermediate type and write it into a
 /// storage slot.
 ///
-/// Arguments:
-/// - `module`: Walrus module being built.
-/// - `builder`: Instruction sequence builder to append to.
-/// - `compilation_ctx`: Shared compilation context (types, memory, helpers).
-/// - `slot_ptr`: Local pointing to the base storage slot to write to.
-/// - `slot_offset`: Local used as a running counter of bytes already written in the current slot.
-/// - `owner_ptr`: Local to the owner struct UID (relevant for keyed objects).
-/// - `itype`: Intermediate type to encode.
-/// - `is_field`: Whether the source value is a struct/enum field (affects extra loads for stack types).
-///
 /// Stack expectations:
-/// - The pointer/value to encode must be on the stack when this function is called.
+/// * The pointer/value to encode must be on the stack when this function is called.
+///
+/// # Arguments
+/// * `module` - Walrus module being built.
+/// * `builder` - Instruction sequence builder to append to.
+/// * `compilation_ctx` - Shared compilation context (types, memory, helpers).
+/// * `slot_ptr` - Local pointing to the base storage slot to write to.
+/// * `slot_offset` - Local used as a running counter of bytes already written in the current slot.
+/// * `owner_ptr` - Local to the owner struct UID (relevant for keyed objects).
+/// * `itype` - Intermediate type to encode.
+/// * `is_field` - Whether the source value is a struct/enum field (affects extra loads for stack types).
 #[allow(clippy::too_many_arguments)]
 pub fn add_encode_intermediate_type_instructions(
     module: &mut Module,

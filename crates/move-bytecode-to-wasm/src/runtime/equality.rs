@@ -8,12 +8,13 @@ use crate::{CompilationContext, wasm_builder_extensions::WasmBuilderExtension};
 
 /// Verifies if two elements a and b are equal
 ///
-/// # Arguments
-///    - pointer to a
-///    - pointer to b
-///    - How many bytes occupies in memory
-/// # Returns:
-///    - a == b
+/// # WASM Function Arguments
+/// * `a_ptr` (i32) - pointer to a
+/// * `b_ptr` (i32) - pointer to b
+/// * `size` (i32) - How many bytes occupies in memory
+///
+/// # WASM Function Returns
+/// * a == b
 pub fn a_equals_b(module: &mut Module, compilation_ctx: &crate::CompilationContext) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,
@@ -106,12 +107,13 @@ pub fn a_equals_b(module: &mut Module, compilation_ctx: &crate::CompilationConte
 /// by equality each pair of data
 ///
 /// # Arguments
-///    - pointer to v1
-///    - pointer to v2
-///    - length of both vectors (must be the same)
-///    - How many bytes the inner vector type occupies in memory
+/// * `v1_ptr` - pointer to v1
+/// * `v2_ptr` - pointer to v2
+/// * `length` - length of both vectors (must be the same)
+/// * `elem_size` - How many bytes the inner vector type occupies in memory
+///
 /// # Returns:
-///    - v1 == v2
+/// * v1 == v2
 pub fn vec_equality_heap_type(
     module: &mut Module,
     compilation_ctx: &crate::CompilationContext,
@@ -228,11 +230,12 @@ pub fn vec_equality_heap_type(
 
 /// Determines if all bytes at a specified address are zero
 ///
-/// # Arguments
-///    - pointer to the data
-///    - length of the data
-/// # Returns:
-///    - 1 if all the bytes are zero, 0 otherwise
+/// # WASM Function Arguments
+/// * `data_ptr` (i32) - pointer to the data
+/// * `length` (i32) - length of the data
+///
+/// # WASM Function Returns
+/// * 1 if all the bytes are zero, 0 otherwise
 pub fn is_zero(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,

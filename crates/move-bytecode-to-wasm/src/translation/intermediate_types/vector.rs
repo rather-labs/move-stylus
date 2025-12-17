@@ -12,8 +12,8 @@ use crate::{CompilationContext, compilation_context::ModuleData};
 pub struct IVector;
 
 impl IVector {
-    // Allocates memory for a vector with a header of 8 bytes.
-    // First 4 bytes are the length, next 4 bytes are the capacity.
+    /// Allocates memory for a vector with a header of 8 bytes.
+    /// First 4 bytes are the length, next 4 bytes are the capacity.
     pub fn allocate_vector_with_header(
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,

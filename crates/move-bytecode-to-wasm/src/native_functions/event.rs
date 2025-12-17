@@ -26,9 +26,9 @@ use super::{NativeFunction, error::NativeFunctionError};
 /// https://docs.soliditylang.org/en/latest/abi-spec.html#events
 ///
 /// Dynamic structures are first ABI-encoded in memory. Then:
-/// - If a dynamic structure is part of a topic, its Keccak-256 hash is computed over the encoded
+/// * If a dynamic structure is part of a topic, its Keccak-256 hash is computed over the encoded
 ///   memory region and placed in the corresponding topic.
-/// - Otherwise, if it is part of the event data, the encoded memory is copied into the data section
+/// * Otherwise, if it is part of the event data, the encoded memory is copied into the data section
 ///   of the event
 pub fn add_emit_log_fn(
     module: &mut Module,

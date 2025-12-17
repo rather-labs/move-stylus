@@ -2908,8 +2908,8 @@ pub fn box_args(
 /// This function saves into the storage cache all the changes made to the storage objects of the
 /// executing function.
 /// This is used in two situations:
-/// - at the end of a an entry function.
-/// - right before a delegate call.
+/// * at the end of a an entry function.
+/// * right before a delegate call.
 ///
 /// This function does not flush the cache. That must be done manually depending on the context.
 fn add_cache_storage_object_instructions(
