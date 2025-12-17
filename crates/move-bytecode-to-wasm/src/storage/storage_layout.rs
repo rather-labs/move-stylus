@@ -19,13 +19,12 @@ enum FieldsErrorContext {
 ///  Note: The storage size depends on the starting offset within the storage slot.
 ///
 /// # Arguments
-/// - `enum_`: The enum type whose storage size we want to compute.
-/// - `slot_offset`: The byte offset (within a slot) where the enum starts.
-/// - `compilation_ctx`: Context with type and layout information.
+/// * `enum_` - The enum type whose storage size we want to compute.
+/// * `slot_offset` - The byte offset (within a slot) where the enum starts.
+/// * `compilation_ctx` - Context with type and layout information.
 ///
 /// # Returns
-/// - `Ok(size)`: The total size in bytes needed to store the enum (including one byte for the tag/discriminant).
-/// - `Err(e)`: Returns an error if the calculation failed (e.g., due to a type parameter).
+/// * `size` - The total size in bytes needed to store the enum (including one byte for the tag/discriminant).
 ///
 /// The returned size is the space for the tag plus enough bytes to store the largest variant of the enum.
 pub fn compute_enum_storage_size(
@@ -62,13 +61,13 @@ pub fn compute_enum_storage_size(
 ///  Note: The storage size depends on the starting offset within the slot.
 ///
 /// # Arguments:
-/// - `fields`: the fields to compute the size for
-/// - `slot_offset`: the offset within the slot where the fields start
-/// - `compilation_ctx`: the compilation context
-/// - `error_context`: the error context
+/// * `fields` - the fields to compute the size for
+/// * `slot_offset` - the offset within the slot where the fields start
+/// * `compilation_ctx` - the compilation context
+/// * `error_context` - the error context
 ///
 /// # Returns
-/// - `Ok(size)`: the size in bytes needed to store the fields
+/// * `size` - the size in bytes needed to store the fields
 fn compute_fields_storage_size(
     fields: &[IntermediateType],
     slot_offset: u32,
@@ -186,9 +185,9 @@ fn compute_fields_storage_size(
 /// Returns the storage-encoded size in bytes for a given intermediate type.
 ///
 /// Note:
-/// - For structs without `key`, size is 0 because their inline size depends on fields;
+/// * For structs without `key`, size is 0 because their inline size depends on fields;
 ///   callers compute layout using field-by-field accumulation.
-/// - For structs with `key`, at least 32 bytes are used to store the UID reference.
+/// * For structs with `key`, at least 32 bytes are used to store the UID reference.
 pub fn field_size(
     field: &IntermediateType,
     compilation_ctx: &CompilationContext,

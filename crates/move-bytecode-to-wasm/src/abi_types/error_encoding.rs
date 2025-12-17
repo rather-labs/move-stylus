@@ -14,7 +14,7 @@ use crate::{
 
 use super::error::AbiError;
 
-// Error(string) abi encoded selector
+/// Error(string) abi encoded selector
 pub const ERROR_SELECTOR: [u8; 4] = [0x08, 0xc3, 0x79, 0xa0];
 const LENGTH_HEADER_SIZE: i32 = 4;
 
@@ -40,14 +40,14 @@ pub fn move_signature_to_abi_selector(
 /// prepends the error selector to create a complete Solidity custom error message.
 ///
 /// # Arguments
-/// - `builder`: WASM instruction sequence builder
-/// - `module`: WASM module being built
-/// - `compilation_ctx`: Compilation context with memory and allocator info
-/// - `error_struct`: Error struct to be encoded
-/// - `error_struct_ptr`: Pointer to the error struct in memory
+/// * `builder` - WASM instruction sequence builder
+/// * `module` - WASM module being built
+/// * `compilation_ctx` - Compilation context with memory and allocator info
+/// * `error_struct` - Error struct to be encoded
+/// * `error_struct_ptr` - Pointer to the error struct in memory
 ///
 /// # Returns
-/// - Result<LocalId, AbiError>
+/// * A local id variable containing the pointer to the allocated error message blob
 pub fn build_custom_error_message(
     builder: &mut InstrSeqBuilder,
     module: &mut Module,
@@ -148,23 +148,23 @@ pub fn build_custom_error_message(
 /// where the message contains only the decimal representation of the error code.
 ///
 /// # Arguments
-/// - `builder`: WASM instruction sequence builder
-/// - `module`: WASM module being built
-/// - `compilation_ctx`: Compilation context with memory and allocator info
-///
-/// # Stack Input
-/// - Expects a u64 (error code) on the top of the stack
+/// * `builder` - WASM instruction sequence builder
+/// * `module` - WASM module being built
+/// * `compilation_ctx` - Compilation context with memory and allocator info
 ///
 /// # Returns
-/// - `LocalId`: Pointer to the allocated error message blob
+/// * A local id variable containing the pointer to the allocated error message blob
+///
+/// # Stack Input
+/// * Expects a u64 (error code) on the top of the stack
 ///
 /// # Memory Layout
 /// The returned blob has the following structure:
-/// - Bytes 0-3: Total message length (little-endian u32)
-/// - Bytes 4-7: Error selector (4 bytes)
-/// - Bytes 8-39: Head word (32 bytes, with 0x20 at offset 39)
-/// - Bytes 40-71: Length word (32 bytes, big-endian message length at offset 68)
-/// - Bytes 72+: Error message text (e.g., "123")
+/// * Bytes 0-3: Total message length (little-endian u32)
+/// * Bytes 4-7: Error selector (4 bytes)
+/// * Bytes 8-39: Head word (32 bytes, with 0x20 at offset 39)
+/// * Bytes 40-71: Length word (32 bytes, big-endian message length at offset 68)
+/// * Bytes 72+: Error message text (e.g., "123")
 pub fn build_abort_error_message(
     builder: &mut InstrSeqBuilder,
     module: &mut Module,

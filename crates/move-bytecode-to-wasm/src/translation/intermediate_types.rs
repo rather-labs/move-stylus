@@ -1142,7 +1142,7 @@ impl IntermediateType {
         Ok(name)
     }
 
-    // Returns the hash of the type
+    /// Returns the hash of the type
     pub fn get_hash(
         &self,
         compilation_ctx: &CompilationContext,

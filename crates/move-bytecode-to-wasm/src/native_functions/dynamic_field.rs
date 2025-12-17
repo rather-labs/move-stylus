@@ -26,7 +26,7 @@ use walrus::{
 
 /// Adds a dynamic field for a given parent and child ID
 ///
-/// Arguments
+/// # Arguments
 /// * `parent_address` - i32 pointer to the parent object's address in memory
 /// * `child_ptr` - i32 pointer to the child object's data in memory
 pub fn add_child_object_fn(
@@ -93,7 +93,7 @@ pub fn add_child_object_fn(
 /// the underlying implementation is the same. The mutability is handled at a higher level in the
 /// using the type system and does not affect the WebAssembly code generation.
 ///
-/// Arguments
+/// # Arguments
 /// * `parent_uid` - i32 pointer to the parent object's UID in memory
 /// * `child_id` - i32 pointer to the child ID in memory
 ///
@@ -258,7 +258,7 @@ pub fn add_remove_child_object_fn(
 
 /// Checks if a child object exists for a given parent and child ID
 ///
-/// Arguments
+/// # Arguments
 /// * `parent_uid` - i32 pointer to the parent object's UID in memory
 /// * `child_id` - i32 pointer to the child ID in memory
 ///
@@ -312,15 +312,15 @@ pub fn add_has_child_object_fn(
 }
 
 /// Computes a keccak256 hash from:
-/// - parent address (32 bytes)
-/// - key (variable size)
-/// - Key type name
+/// * parent address (32 bytes)
+/// * key (variable size)
+/// * Key type name
 ///
-/// Arguments
+/// # Arguments
 /// * `parent_address` - i32 pointer to the parent address in memory
 /// * `key` - i32 pointer to the key in memory
 ///
-/// Returns
+/// # Returns
 /// * i32 pointer to the resulting hash in memory
 pub fn add_hash_type_and_key_fn(
     module: &mut Module,

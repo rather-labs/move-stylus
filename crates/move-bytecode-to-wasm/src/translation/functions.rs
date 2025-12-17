@@ -31,9 +31,9 @@ pub enum MappedFunctionError {
 
 #[derive(Debug, Clone)]
 pub struct JumpTableData {
-    // The enum associated with this jump table
+    /// The enum associated with this jump table
     pub enum_index: usize,
-    // The target offsets for each variant of the enum
+    /// The target offsets for each variant of the enum
     pub offsets: Vec<CodeOffset>,
 }
 

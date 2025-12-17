@@ -18,11 +18,12 @@ use super::RuntimeFunction;
 ///
 /// If the number overflowed it traps, otherwise it leaves the number in the stack
 ///
-/// # Arguments:
-///    - number to be checked
-///    - the max number admitted by the number to check's type
-/// # Returns:
-///    - the numeber passed as argument
+/// # WASM Function Arguments
+/// * `number` (i32) - number to be checked
+/// * `max` (i32) - the max number admitted by the number to check's type
+///
+/// # WASM Function Returns
+/// * the numeber passed as argument
 pub fn check_overflow_u8_u16(module: &mut Module) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,
@@ -57,10 +58,11 @@ pub fn check_overflow_u8_u16(module: &mut Module) -> FunctionId {
 ///
 /// If the number is greater than u32::MAX it traps
 ///
-/// # Arguments:
-///    - u64 number
-/// # Returns:
-///    - u64 number casted as u32
+/// # WASM Function Arguments
+/// * `n` (i64) - u64 number
+///
+/// # WASM Function Returns
+/// * u64 number casted as u32
 pub fn downcast_u64_to_u32(module: &mut walrus::Module) -> FunctionId {
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I64], &[ValType::I32]);
     let mut builder = function
@@ -90,11 +92,12 @@ pub fn downcast_u64_to_u32(module: &mut walrus::Module) -> FunctionId {
 ///
 /// If the number is greater than u32::MAX it traps
 ///
-/// # Arguments:
-///    - pointer to the number to downcast
-///    - the number of bytes that the number occupies in heap
-/// # Returns:
-///    - downcasted u128 or u256 number to u32
+/// # WASM Function Arguments
+/// * `ptr` (i32) - pointer to the number to downcast
+/// * `size` (i32) - the number of bytes that the number occupies in heap
+///
+/// # WASM Function Returns
+/// * downcasted u128 or u256 number to u32
 pub fn downcast_u128_u256_to_u32(
     module: &mut walrus::Module,
     compilation_ctx: &CompilationContext,
@@ -177,11 +180,12 @@ pub fn downcast_u128_u256_to_u32(
 ///
 /// If the number is greater than u64::MAX it traps
 ///
-/// # Arguments:
-///    - pointer to the number to downcast
-///    - the number of bytes that the number occupies in heap
-/// # Returns:
-///    - downcasted u128 or u256 number to u64
+/// # WASM Function Arguments
+/// * `ptr` (i32) - pointer to the number to downcast
+/// * `size` (i32) - the number of bytes that the number occupies in heap
+///
+/// # WASM Function Returns
+/// * downcasted u128 or u256 number to u64
 pub fn downcast_u128_u256_to_u64(
     module: &mut walrus::Module,
     compilation_ctx: &CompilationContext,
@@ -271,12 +275,13 @@ pub fn downcast_u128_u256_to_u64(
 /// Else if a1 > b1 -> false
 /// Else check next
 ///
-/// # Arguments
-///    - pointer to a
-///    - pointer to b
-///    - how many double words (64bits) occupies in memory
-/// # Returns:
-///    - 1 if a < b, otherwise 0
+/// # WASM Function Arguments
+/// * `a_ptr` (i32) - pointer to a
+/// * `b_ptr` (i32) - pointer to b
+/// * `size` (i32) - how many double words (64bits) occupies in memory
+///
+/// # WASM Function Returns
+/// * 1 if a < b, otherwise 0
 pub fn check_if_a_less_than_b(
     module: &mut Module,
     compilation_ctx: &CompilationContext,

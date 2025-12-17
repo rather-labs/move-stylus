@@ -11,6 +11,12 @@ use super::{RuntimeFunction, error::RuntimeFunctionError};
 /// Useful for converting between Big-endian and Little-endian
 ///
 /// The function will only be added if it doesn't exist yet in the module
+///
+/// # WASM Function Arguments
+/// * `input_param` (i32) - number to be swapped
+///
+/// # WASM Function Returns
+/// * swapped number (i32)
 pub fn swap_i32_bytes_function(module: &mut Module) -> FunctionId {
     let mut function_builder =
         FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
@@ -70,6 +76,12 @@ pub fn swap_i32_bytes_function(module: &mut Module) -> FunctionId {
 /// Useful for converting between Big-endian and Little-endian
 ///
 /// The function will only be added if it doesn't exist yet in the module
+///
+/// # WASM Function Arguments
+/// * `input_param` (i64) - number to be swapped
+///
+/// # WASM Function Returns
+/// * swapped number (i64)
 pub fn swap_i64_bytes_function(
     module: &mut Module,
     swap_i32_bytes_function: FunctionId,
@@ -113,9 +125,9 @@ pub fn swap_i64_bytes_function(
 /// Adds a function that swaps the bytes of a heap integer
 /// Useful for converting between Big-endian and Little-endian
 ///
-/// Arguments
-/// - ptr to the region
-/// - how many bytes occupies (must be multiple of 8)
+/// # WASM Function Arguments
+/// * `ptr` (i32) - ptr to the region
+/// * `size` (i32) - how many bytes occupies (must be multiple of 8)
 pub fn swap_bytes_function<const N: u32>(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
