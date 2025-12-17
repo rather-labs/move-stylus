@@ -1,4 +1,3 @@
-use alloy::hex;
 use alloy::primitives::{FixedBytes, U256};
 use alloy::providers::Provider;
 use alloy::rpc::types::TransactionRequest;
@@ -63,109 +62,115 @@ async fn main() -> eyre::Result<()> {
     let address_logic_2 = Address::from_str(&contract_address_logic_2)?;
     let example = Example::new(address, provider.clone());
 
+    println!("==============================================================================");
+    println!(" Creating a new counter with logic contract 1");
+    println!("==============================================================================");
     let pending_tx = example.create(address_logic_1).send().await?;
     let receipt = pending_tx.get_receipt().await?;
 
-    println!("Creating a new counter and capturing its id");
     let counter_id =
         FixedBytes::<32>::new(receipt.logs()[0].topics()[1].to_vec().try_into().unwrap());
-
-    println!("Captured counter_id {counter_id:?}");
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("create tx 0x{}", hex::encode(&raw));
-    }
+    println!("✓ Counter created with ID: {counter_id:?}");
 
     println!("\nReading contract logic address");
     let res = example.logicAddress(counter_id).call().await?;
-    println!("counter = {res}");
+    println!("  Logic address: {res}");
+    assert_eq!(
+        res, address_logic_1,
+        "Logic address should match logic contract 1"
+    );
 
-    println!("==============================================================================");
-    println!(" Executing increment and setValue on logic contract:");
-    println!(" {address_logic_1}");
+    println!("\n==============================================================================");
+    println!(" Testing basic operations with logic contract 1");
     println!("==============================================================================");
 
-    println!("\nReading value before increment");
+    println!("\nReading initial counter value");
     let res = example.read(counter_id).call().await?;
-    println!("counter = {res}");
+    let mut counter_value = res;
+    println!("  Counter value: {counter_value}");
+    assert_eq!(counter_value, 25u64, "Initial counter value should be 25");
 
-    println!("\nSending increment tx");
-
+    println!("\nIncrementing counter");
     let pending_tx = example.increment(counter_id).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("increment logs 0: 0x{}", hex::encode(raw));
-    }
+    let _receipt = pending_tx.get_receipt().await?;
 
-    println!("\nReading value after increment");
+    println!("Reading counter value after increment");
     let res = example.read(counter_id).call().await?;
-    println!("counter = {res}");
+    counter_value = res;
+    println!("  Counter value: {counter_value}");
+    assert_eq!(
+        counter_value, 26u64,
+        "Counter should be 26 after first increment"
+    );
 
-    println!("\nSetting counter to number 42");
+    println!("\nSetting counter value to 42");
     let pending_tx = example.setValue(counter_id, 42).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("increment logs 0: 0x{}", hex::encode(raw));
-    }
+    let _receipt = pending_tx.get_receipt().await?;
 
-    println!("\nReading counter after set");
+    println!("Reading counter value after set");
     let res = example.read(counter_id).call().await?;
-    println!("counter = {res}");
+    counter_value = res;
+    println!("  Counter value: {counter_value}");
+    assert_eq!(counter_value, 42u64, "Counter should be 42 after setValue");
 
-    println!("\nSending increment tx");
+    println!("\nIncrementing counter again");
     let pending_tx = example.increment(counter_id).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("increment logs 0: 0x{}", hex::encode(raw));
-    }
+    let _receipt = pending_tx.get_receipt().await?;
 
-    println!("\nReading value after increment");
+    println!("Reading counter value after second increment");
     let res = example.read(counter_id).call().await?;
-    println!("counter = {res}");
+    counter_value = res;
+    println!("  Counter value: {counter_value}");
+    assert_eq!(
+        counter_value, 43u64,
+        "Counter should be 43 after second increment"
+    );
 
-    println!("\nSending increment BEFORE tx (shuld increment by 10 and 1)");
+    println!("\nTesting incrementModifyBefore (should increment by 10 and 1)");
     let pending_tx = example.incrementModifyBefore(counter_id).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("increment logs 0: 0x{}", hex::encode(raw));
-    }
+    let _receipt = pending_tx.get_receipt().await?;
 
-    println!("\nReading value after increment");
+    println!("Reading counter value after incrementModifyBefore");
     let res = example.read(counter_id).call().await?;
-    println!("counter = {res}");
+    counter_value = res;
+    println!("  Counter value: {counter_value}");
+    assert_eq!(
+        counter_value, 54u64,
+        "Counter should be 54 (43 + 10 + 1) after incrementModifyBefore"
+    );
 
-    println!("\nSending increment AFTER tx (shuld increment by 20 and 1)");
+    println!("\nTesting incrementModifyAfter (should increment by 20 and 1)");
     let pending_tx = example.incrementModifyAfter(counter_id).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("increment logs 0: 0x{}", hex::encode(raw));
-    }
+    let _receipt = pending_tx.get_receipt().await?;
 
-    println!("\nReading value after increment");
+    println!("Reading counter value after incrementModifyAfter");
     let res = example.read(counter_id).call().await?;
-    println!("counter = {res}");
+    counter_value = res;
+    println!("  Counter value: {counter_value}");
+    assert_eq!(
+        counter_value, 75u64,
+        "Counter should be 75 (54 + 20 + 1) after incrementModifyAfter"
+    );
 
-    println!("\nSending increment BEFORE And AFTER tx (shuld increment by 10, 1, and 20)");
+    println!("\nTesting incrementModifyBeforeAfter (should increment by 10, 1, and 20)");
     let pending_tx = example
         .incrementModifyBeforeAfter(counter_id)
         .send()
         .await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("increment logs 0: 0x{}", hex::encode(raw));
-    }
+    let _receipt = pending_tx.get_receipt().await?;
 
-    println!("\nReading value after increment");
+    println!("Reading counter value after incrementModifyBeforeAfter");
     let res = example.read(counter_id).call().await?;
-    println!("counter = {res}");
+    counter_value = res;
+    println!("  Counter value: {counter_value}");
+    assert_eq!(
+        counter_value, 106u64,
+        "Counter should be 106 (75 + 10 + 1 + 20) after incrementModifyBeforeAfter"
+    );
 
-    // Add a new sender and try to set the value
+    println!("\n==============================================================================");
+    println!(" Testing access control: non-owner cannot modify counter");
+    println!("==============================================================================");
     let priv_key_2 =
         std::env::var("PRIV_KEY_2").map_err(|_| eyre!("No {} env var set", "PRIV_KEY_2"))?;
     let signer_2 = PrivateKeySigner::from_str(&priv_key_2)?;
@@ -179,119 +184,144 @@ async fn main() -> eyre::Result<()> {
     );
     let example_2 = Example::new(address, provider_2.clone());
 
-    println!("\nFunding {sender_2} with some ETH to pay for the gas");
+    println!("Funding {sender_2} with 1 ETH to pay for gas");
     let tx = TransactionRequest::default()
         .from(sender)
         .to(sender_2)
-        .value(U256::from(1_000_000_000_000_000_000u128)); // 5 eth in wei
+        .value(U256::from(1_000_000_000_000_000_000u128)); // 1 ETH in wei
     let pending_tx = provider.send_transaction(tx).await?;
     pending_tx.get_receipt().await?;
+    println!("✓ Account funded");
 
-    println!("\nSending set value to 100 tx with the account that is not the owner");
+    println!("\nAttempting to set counter value to 100 with non-owner account");
     let pending_tx = example_2.setValue(counter_id, 100).send().await;
-    println!("Tx failed?: {:?}", pending_tx.is_err());
+    let tx_failed = pending_tx.is_err();
+    println!("  Transaction failed: {tx_failed}");
+    assert!(tx_failed, "Non-owner should not be able to modify counter");
 
-    // Value did not change as the sender is not the owner
-    println!("\nReading value after set value");
+    println!("\nReading counter value to verify it was not changed");
     let res = example_2.read(counter_id).call().await?;
-    println!("counter = {res}");
+    println!("  Counter value: {res}");
+    assert_eq!(
+        res, counter_value,
+        "Counter should remain unchanged after failed non-owner setValue attempt"
+    );
+    println!("✓ Access control verified: counter value unchanged");
 
-    println!("==============================================================================");
+    println!("\n==============================================================================");
     println!(" Changing contract logic from {address_logic_1}");
     println!(" to {address_logic_2}");
-    println!("==============================================================================\n");
+    println!("==============================================================================");
     let pending_tx = example
         .changeLogic(counter_id, address_logic_2)
         .send()
         .await?;
     let _receipt = pending_tx.get_receipt().await?;
+    println!("✓ Logic contract changed");
 
-    println!("==============================================================================");
-    println!(" Executing increment and setValue on logic contract:");
-    println!(" {address_logic_2}");
+    println!("\nVerifying logic address");
+    let res = example.logicAddress(counter_id).call().await?;
+    println!("  Logic address: {res}");
+    assert_eq!(
+        res, address_logic_2,
+        "Logic address should match logic contract 2"
+    );
+
+    println!("\n==============================================================================");
+    println!(" Testing operations with logic contract 2 (different behavior)");
     println!("==============================================================================");
 
-    println!("\nReading value before increment");
+    println!("\nReading counter value before operations");
     let res = example.read(counter_id).call().await?;
-    println!("counter = {res}");
+    counter_value = res;
+    println!("  Counter value: {counter_value}");
 
-    println!("\nSending increment tx");
-
+    println!("\nIncrementing counter (logic 2 increments by 2)");
     let pending_tx = example.increment(counter_id).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("increment logs 0: 0x{}", hex::encode(raw));
-    }
+    let _receipt = pending_tx.get_receipt().await?;
 
-    println!("\nReading value after increment");
+    println!("Reading counter value after increment");
     let res = example.read(counter_id).call().await?;
-    println!("counter = {res}");
+    counter_value = res;
+    println!("  Counter value: {counter_value}");
+    assert_eq!(
+        counter_value, 108u64,
+        "Counter should be 108 (106 + 2) after increment with logic 2"
+    );
 
-    println!("\nSetting counter to number 42 (should set 42*2)");
+    println!("\nSetting counter value to 42 (logic 2 doubles it, so should set to 84)");
     let pending_tx = example.setValue(counter_id, 42).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("increment logs 0: 0x{}", hex::encode(raw));
-    }
+    let _receipt = pending_tx.get_receipt().await?;
 
-    println!("\nReading counter after set");
+    println!("Reading counter value after set");
     let res = example.read(counter_id).call().await?;
-    println!("counter = {res}");
+    counter_value = res;
+    println!("  Counter value: {counter_value}");
+    assert_eq!(
+        counter_value, 84u64,
+        "Counter should be 84 (42 * 2) after setValue with logic 2"
+    );
 
-    println!("\nSending increment tx");
+    println!("\nIncrementing counter again");
     let pending_tx = example.increment(counter_id).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("increment logs 0: 0x{}", hex::encode(raw));
-    }
+    let _receipt = pending_tx.get_receipt().await?;
 
-    println!("\nReading value after increment");
+    println!("Reading counter value after second increment");
     let res = example.read(counter_id).call().await?;
-    println!("counter = {res}");
+    counter_value = res;
+    println!("  Counter value: {counter_value}");
+    assert_eq!(
+        counter_value, 86u64,
+        "Counter should be 86 (84 + 2) after second increment with logic 2"
+    );
 
-    println!("\nSending increment BEFORE tx (shuld increment by 10 and 2)");
+    println!("\nTesting incrementModifyBefore with logic 2 (should increment by 10 and 2)");
     let pending_tx = example.incrementModifyBefore(counter_id).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("increment logs 0: 0x{}", hex::encode(raw));
-    }
+    let _receipt = pending_tx.get_receipt().await?;
 
-    println!("\nReading value after increment");
+    println!("Reading counter value after incrementModifyBefore");
     let res = example.read(counter_id).call().await?;
-    println!("counter = {res}");
+    counter_value = res;
+    println!("  Counter value: {counter_value}");
+    assert_eq!(
+        counter_value, 98u64,
+        "Counter should be 98 (86 + 10 + 2) after incrementModifyBefore with logic 2"
+    );
 
-    println!("\nSending increment AFTER tx (shuld increment by 20 and 2)");
+    println!("\nTesting incrementModifyAfter with logic 2 (should increment by 20 and 2)");
     let pending_tx = example.incrementModifyAfter(counter_id).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("increment logs 0: 0x{}", hex::encode(raw));
-    }
+    let _receipt = pending_tx.get_receipt().await?;
 
-    println!("\nReading value after increment");
+    println!("Reading counter value after incrementModifyAfter");
     let res = example.read(counter_id).call().await?;
-    println!("counter = {res}");
+    counter_value = res;
+    println!("  Counter value: {counter_value}");
+    assert_eq!(
+        counter_value, 120u64,
+        "Counter should be 120 (98 + 20 + 2) after incrementModifyAfter with logic 2"
+    );
 
-    println!("\nSending increment BEFORE And AFTER tx (shuld increment by 10, 2, and 20)");
+    println!(
+        "\nTesting incrementModifyBeforeAfter with logic 2 (should increment by 10, 2, and 20)"
+    );
     let pending_tx = example
         .incrementModifyBeforeAfter(counter_id)
         .send()
         .await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("increment logs 0: 0x{}", hex::encode(raw));
-    }
+    let _receipt = pending_tx.get_receipt().await?;
 
-    println!("\nReading value after increment");
+    println!("Reading counter value after incrementModifyBeforeAfter");
     let res = example.read(counter_id).call().await?;
-    println!("counter = {res}");
+    counter_value = res;
+    println!("  Counter value: {counter_value}");
+    assert_eq!(
+        counter_value, 152u64,
+        "Counter should be 152 (120 + 10 + 2 + 20) after incrementModifyBeforeAfter with logic 2"
+    );
 
-    // Add a new sender and try to set the value
+    println!("\n==============================================================================");
+    println!(" Testing access control again: non-owner cannot modify counter");
+    println!("==============================================================================");
     let priv_key_2 =
         std::env::var("PRIV_KEY_2").map_err(|_| eyre!("No {} env var set", "PRIV_KEY_2"))?;
     let signer_2 = PrivateKeySigner::from_str(&priv_key_2)?;
@@ -305,22 +335,29 @@ async fn main() -> eyre::Result<()> {
     );
     let example_2 = Example::new(address, provider_2.clone());
 
-    println!("\nFunding {sender_2} with some ETH to pay for the gas");
+    println!("Funding {sender_2} with 1 ETH to pay for gas");
     let tx = TransactionRequest::default()
         .from(sender)
         .to(sender_2)
-        .value(U256::from(1_000_000_000_000_000_000u128)); // 5 eth in wei
+        .value(U256::from(1_000_000_000_000_000_000u128)); // 1 ETH in wei
     let pending_tx = provider.send_transaction(tx).await?;
     pending_tx.get_receipt().await?;
+    println!("✓ Account funded");
 
-    println!("\nSending set value to 100 tx with the account that is not the owner");
+    println!("\nAttempting to set counter value to 100 with non-owner account");
     let pending_tx = example_2.setValue(counter_id, 100).send().await;
-    println!("Tx failed?: {:?}", pending_tx.is_err());
+    let tx_failed = pending_tx.is_err();
+    println!("  Transaction failed: {tx_failed}");
+    assert!(tx_failed, "Non-owner should not be able to modify counter");
 
-    // Value did not change as the sender is not the owner
-    println!("\nReading value after set value");
+    println!("\nReading counter value to verify it was not changed");
     let res = example_2.read(counter_id).call().await?;
-    println!("counter = {res}");
+    println!("  Counter value: {res}");
+    assert_eq!(
+        res, counter_value,
+        "Counter should remain unchanged after failed non-owner setValue attempt"
+    );
+    println!("✓ Access control verified: counter value unchanged");
 
     Ok(())
 }

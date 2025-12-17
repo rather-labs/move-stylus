@@ -1,4 +1,3 @@
-use alloy::hex;
 use alloy::primitives::U256;
 use alloy::providers::Provider;
 use alloy::rpc::types::TransactionRequest;
@@ -40,51 +39,48 @@ async fn main() -> eyre::Result<()> {
     let address = Address::from_str(&contract_address)?;
     let example = Example::new(address, provider.clone());
 
-    println!("Creating a new counter");
+    println!("==============================================================================");
+    println!(" Creating a new counter");
+    println!("==============================================================================");
     let pending_tx = example.create().send().await?;
     let _receipt = pending_tx.get_receipt().await?;
+    println!("✓ Counter created");
 
-    println!("\nReading value before increment");
+    println!("\nReading initial counter value");
     let res = example.read().call().await?;
-    println!("counter = {res}");
+    println!("  Counter value: {res}");
+    assert_eq!(res, 25u64, "Initial counter value should be 25");
 
-    println!("\nSending increment tx");
+    println!("\nIncrementing counter");
     let pending_tx = example.increment().send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("increment logs 0: 0x{}", hex::encode(raw));
-    }
+    let _receipt = pending_tx.get_receipt().await?;
 
-    println!("\nReading value after increment");
+    println!("Reading counter value after increment");
     let res = example.read().call().await?;
-    println!("counter = {res}");
+    println!("  Counter value: {res}");
+    assert_eq!(res, 26u64, "Counter should be 26 after first increment");
 
-    println!("\nSetting counter to number 42");
+    println!("\nSetting counter value to 42");
     let pending_tx = example.setValue(42).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("increment logs 0: 0x{}", hex::encode(raw));
-    }
+    let _receipt = pending_tx.get_receipt().await?;
 
-    println!("\nReading counter after set");
+    println!("Reading counter value after set");
     let res = example.read().call().await?;
-    println!("counter = {res}");
+    println!("  Counter value: {res}");
+    assert_eq!(res, 42u64, "Counter should be 42 after setValue");
 
-    println!("\nSending increment tx");
+    println!("\nIncrementing counter again");
     let pending_tx = example.increment().send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("increment logs 0: 0x{}", hex::encode(raw));
-    }
+    let _receipt = pending_tx.get_receipt().await?;
 
-    println!("\nReading value after increment");
+    println!("Reading counter value after second increment");
     let res = example.read().call().await?;
-    println!("counter = {res}");
+    println!("  Counter value: {res}");
+    assert_eq!(res, 43u64, "Counter should be 43 after second increment");
 
-    // Add a new sender and try to set the value
+    println!("\n==============================================================================");
+    println!(" Testing access control: non-owner cannot modify counter");
+    println!("==============================================================================");
     let priv_key_2 =
         std::env::var("PRIV_KEY_2").map_err(|_| eyre!("No {} env var set", "PRIV_KEY_2"))?;
     let signer_2 = PrivateKeySigner::from_str(&priv_key_2)?;
@@ -98,22 +94,32 @@ async fn main() -> eyre::Result<()> {
     );
     let example_2 = Example::new(address, provider_2.clone());
 
-    println!("\nFunding {sender_2} with some ETH to pay for the gas");
+    println!("Funding {sender_2} with 5 ETH to pay for gas");
     let tx = TransactionRequest::default()
         .from(sender)
         .to(sender_2)
-        .value(U256::from(5_000_000_000_000_000_000u128)); // 5 eth in wei
+        .value(U256::from(5_000_000_000_000_000_000u128)); // 5 ETH in wei
     let pending_tx = provider.send_transaction(tx).await?;
     pending_tx.get_receipt().await?;
+    println!("✓ Account funded");
 
-    println!("\nSending set value to 100 tx with the account that is not the owner");
-    let pending_tx = example_2.setValue(100).send().await.err();
-    println!("\nNot owner's tx error: {pending_tx:?}");
+    println!("\nAttempting to set counter value to 100 with non-owner account");
+    let pending_tx = example_2.setValue(100).send().await;
+    let tx_failed = pending_tx.is_err();
+    println!("  Transaction failed: {tx_failed}");
+    if let Err(e) = &pending_tx {
+        println!("  Error: {e:?}");
+    }
+    assert!(tx_failed, "Non-owner should not be able to modify counter");
 
-    // Value did not change as the sender is not the owner
-    println!("\nReading value after set value");
+    println!("\nReading counter value to verify it was not changed");
     let res = example_2.read().call().await?;
-    println!("counter = {res}");
+    println!("  Counter value: {res}");
+    assert_eq!(
+        res, 43u64,
+        "Counter should remain 43 after failed non-owner setValue attempt"
+    );
+    println!("✓ Access control verified: counter value unchanged");
 
     Ok(())
 }

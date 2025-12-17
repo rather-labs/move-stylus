@@ -3,7 +3,6 @@ use alloy::primitives::address;
 use alloy::providers::Provider;
 use alloy::rpc::types::TransactionRequest;
 use alloy::signers::local::PrivateKeySigner;
-use alloy::sol_types::SolEvent;
 use alloy::{primitives::Address, providers::ProviderBuilder, sol, transports::http::reqwest::Url};
 use dotenv::dotenv;
 use eyre::eyre;
@@ -61,9 +60,9 @@ async fn main() -> eyre::Result<()> {
     let address = Address::from_str(&contract_address)?;
     let example = Example::new(address, provider.clone());
 
-    // Testing capability with another user
+    // Second sender
     let signer_2 = PrivateKeySigner::from_str(&priv_key_2)?;
-    let address_1 = signer_2.address();
+    let sender_2 = signer_2.address();
 
     let provider_2 = Arc::new(
         ProviderBuilder::new()
@@ -73,171 +72,193 @@ async fn main() -> eyre::Result<()> {
     );
     let example_2 = Example::new(address, provider_2.clone());
 
-    let address_2 = address!("0xcafecafecafecafecafecafecafecafecafecafe");
-
+    // Fund sender_2 with some ETH for gas
     let tx = TransactionRequest::default()
         .from(sender)
-        .to(address_1)
+        .to(sender_2)
         .value(U256::from(1_000_000_000_000_000_000u128)); // 1 eth in wei
     let pending_tx = provider.send_transaction(tx).await?;
     pending_tx.get_receipt().await?;
 
-    println!("====================");
-    println!("Creating a new erc20");
-    println!("====================");
-    let _pending_tx_ = example.constructor().send().await?;
-    println!("Created!");
+    let address_3 = address!("0xcafecafecafecafecafecafecafecafecafecafe");
 
-    println!("\n====================");
-    println!("  Contract Info");
-    println!("====================");
+    // Helper to get last 8 hex chars of an address (0x + last 4 bytes)
+    let short_addr = |addr: &Address| -> String {
+        let s = format!("{addr}");
+        format!("0x..{}", &s[s.len() - 8..])
+    };
+
+    let sender_short = short_addr(&sender);
+    let sender_2_short = short_addr(&sender_2);
+    let address_3_short = short_addr(&address_3);
+
+    // ==================== Constructor ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║         Creating ERC20 Token         ║");
+    println!("╚══════════════════════════════════════╝");
+
+    let _pending_tx_ = example.constructor().send().await?;
+    println!("✓ Contract initialized");
+
+    // ==================== Contract Info ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║           Contract Info              ║");
+    println!("╚══════════════════════════════════════╝");
 
     let res = example.totalSupply().call().await?;
-    println!("Total Supply = {res}");
+    assert_eq!(res, U256::from(0));
+    println!("  Total Supply:      {res}");
 
     let res = example.decimals().call().await?;
-    println!("decimals = {res}");
+    assert_eq!(res, 18);
+    println!("  Decimals:          {res}");
 
     let res = example.name().call().await?;
-    println!("name = {res}");
+    println!("  Name:              {res}");
 
     let res = example.symbol().call().await?;
-    println!("symbol = {res}");
+    println!("  Symbol:            {res}");
 
-    println!("\n====================");
-    println!("  Mint");
-    println!("====================");
+    // ==================== Mint ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║              Minting                 ║");
+    println!("╚══════════════════════════════════════╝");
 
+    println!("\n  Initial balances:");
     let res = example.balanceOf(sender).call().await?;
-    println!("Balance of target address = {res}");
+    assert_eq!(res, U256::from(0));
+    println!("    {sender_short}: {res} TST");
 
-    println!("Minting 555555 coins to target address");
+    let res = example.balanceOf(sender_2).call().await?;
+    assert_eq!(res, U256::from(0));
+    println!("    {sender_2_short}: {res} TST");
 
+    println!("\n  Minting 555555 TST to {sender_short}...");
     let pending_tx = example.mint(sender, U256::from(555555)).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
+    pending_tx.get_receipt().await?;
+    println!("  ✓ Mint complete");
 
-    println!("Mint events");
-    for (index, log) in receipt.logs().iter().enumerate() {
-        let primitive_log: alloy::primitives::Log = log.clone().into();
-        let decoded_event = Example::Transfer::decode_log(&primitive_log)?;
-        println!("Mint event log {} {:#?}", index + 1, decoded_event);
-    }
     let res = example.totalSupply().call().await?;
-    println!("Total Supply after mint = {res}");
+    assert_eq!(res, U256::from(555555));
+    println!("    Total Supply: {res}");
 
+    println!("\n  Balances after minting:");
     let res = example.balanceOf(sender).call().await?;
-    println!("Balance of target address = {res}");
+    assert_eq!(res, U256::from(555555));
+    println!("    {sender_short}: {res} TST");
 
-    println!("\n====================");
-    println!("  Transfer");
-    println!("====================");
+    // ==================== Transfer ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║             Transfer                 ║");
+    println!("╚══════════════════════════════════════╝");
 
-    println!("Transfering 1000 TST to {address_1}");
+    println!("\n  Transferring 1000 TST: {sender_short} → {sender_2_short}");
 
+    println!("\n  Balances before transfer:");
     let res = example.balanceOf(sender).call().await?;
-    println!("  Balance of origin address {sender} before transaction = {res}");
-    let res = example.balanceOf(address_1).call().await?;
-    println!("  Balance of target address {address_1} before transaction = {res}");
+    assert_eq!(res, U256::from(555555));
+    println!("    {sender_short}: {res} TST");
 
-    let pending_tx = example.transfer(address_1, U256::from(1000)).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for (index, log) in receipt.logs().iter().enumerate() {
-        let primitive_log: alloy::primitives::Log = log.clone().into();
-        let decoded_event = Example::Transfer::decode_log(&primitive_log)?;
-        println!("Transfer event log {} {:#?}", index + 1, decoded_event);
-    }
+    let res = example.balanceOf(sender_2).call().await?;
+    assert_eq!(res, U256::from(0));
+    println!("    {sender_2_short}: {res} TST");
 
+    let pending_tx = example.transfer(sender_2, U256::from(1000)).send().await?;
+    pending_tx.get_receipt().await?;
+    println!("  ✓ Transfer complete");
+
+    println!("\n  Balances after transfer:");
     let res = example.balanceOf(sender).call().await?;
-    println!("  Balance of origin address {sender} after transaction = {res}");
-    let res = example.balanceOf(address_1).call().await?;
-    println!("  Balance of target address {address_1} after transaction = {res}");
+    assert_eq!(res, U256::from(554555));
+    println!("    {sender_short}: {res} TST");
 
-    println!("\n====================");
-    println!("  Burn");
-    println!("====================");
+    let res = example.balanceOf(sender_2).call().await?;
+    assert_eq!(res, U256::from(1000));
+    println!("    {sender_2_short}: {res} TST");
 
-    println!("Burning 11111 coins to from {sender}");
+    // ==================== Burn ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║              Burning                 ║");
+    println!("╚══════════════════════════════════════╝");
 
+    println!("\n  Burning 11111 TST from {sender_short}...");
     let pending_tx = example.burn(sender, U256::from(11111)).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-
-    println!("Burn events");
-    for (index, log) in receipt.logs().iter().enumerate() {
-        let primitive_log: alloy::primitives::Log = log.clone().into();
-        let decoded_event = Example::Transfer::decode_log(&primitive_log)?;
-        println!("Burn event log {} {:#?}", index + 1, decoded_event);
-    }
+    pending_tx.get_receipt().await?;
+    println!("  ✓ Burn complete");
 
     let res = example.totalSupply().call().await?;
-    println!("Total Supply after burn= {res}");
+    assert_eq!(res, U256::from(544444));
+    println!("    Total Supply: {res}");
 
+    println!("\n  Balances after burning:");
     let res = example.balanceOf(sender).call().await?;
-    println!("Balance of target address = {res}");
+    assert_eq!(res, U256::from(543444));
+    println!("    {sender_short}: {res} TST");
 
-    println!("\n==============================");
-    println!("  Allowance and transfer from");
-    println!("================================");
+    // ==================== Allowance & TransferFrom ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║      Allowance & TransferFrom        ║");
+    println!("╚══════════════════════════════════════╝");
 
-    println!("Allow {sender} to spend 100 TST from {address_1}");
-    let res = example.allowance(address_1, sender).call().await?;
-    println!("  Current allowance = {res}");
+    println!("\n  Before approval:");
+    let res = example.allowance(sender_2, sender).call().await?;
+    assert_eq!(res, U256::from(0));
+    println!("    Allowance ({sender_2_short} → {sender_short}): {res} TST");
 
-    println!();
-
-    println!("Executing allow...");
+    println!("\n  Approving {sender_short} to spend 100 TST from {sender_2_short}...");
     let pending_tx = example_2.approve(sender, U256::from(100)).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    println!("Approval events");
+    pending_tx.get_receipt().await?;
+    println!("  ✓ Approval granted");
 
-    let primitive_log: alloy::primitives::Log = receipt.logs()[0].clone().into();
-    let decoded_event = Example::NewUID::decode_log(&primitive_log)?;
-    println!("Approval event log {decoded_event:#?}");
+    println!("\n  After approval:");
+    let res = example.allowance(sender_2, sender).call().await?;
+    assert_eq!(res, U256::from(100));
+    println!("    Allowance ({sender_2_short} → {sender_short}): {res} TST");
 
-    let primitive_log: alloy::primitives::Log = receipt.logs()[1].clone().into();
-    let decoded_event = Example::Approval::decode_log(&primitive_log)?;
-    println!("Approval event log {decoded_event:#?}");
-
-    println!();
-
-    println!("Checking balances and allowance");
-    let res = example.allowance(address_1, sender).call().await?;
-    println!("  Current allowance = {res} TST");
+    println!("\n  Balances before transferFrom:");
     let res = example.balanceOf(sender).call().await?;
-    println!("  Current balance of {sender}= {res} TST");
-    let res = example.balanceOf(address_1).call().await?;
-    println!("  Current balance of {address_1}= {res} TST");
-    let res = example.balanceOf(address_2).call().await?;
-    println!("  Current balance of {address_2}= {res} TST");
+    assert_eq!(res, U256::from(543444));
+    println!("    {sender_short}: {res} TST");
 
-    println!();
+    let res = example.balanceOf(sender_2).call().await?;
+    assert_eq!(res, U256::from(1000));
+    println!("    {sender_2_short}: {res} TST");
 
-    println!("Using transfer from:");
-    println!(" sender: {sender}");
-    println!(" spender: {address_1}");
-    println!(" receiver: {address_2}");
+    let res = example.balanceOf(address_3).call().await?;
+    assert_eq!(res, U256::from(0));
+    println!("    {address_3_short}: {res} TST");
+
+    println!("\n  Using transferFrom: {sender_2_short} → {address_3_short} (100 TST)");
+    println!("    (spender: {sender_short})");
     let pending_tx = example
-        .transferFrom(address_1, address_2, U256::from(100))
+        .transferFrom(sender_2, address_3, U256::from(100))
         .send()
         .await?;
-    let receipt = pending_tx.get_receipt().await?;
-    println!("Transfer events");
-    for (index, log) in receipt.logs().iter().enumerate() {
-        let primitive_log: alloy::primitives::Log = log.clone().into();
-        let decoded_event = Example::Transfer::decode_log(&primitive_log)?;
-        println!("Transfer event log {} {:#?}", index + 1, decoded_event);
-    }
+    pending_tx.get_receipt().await?;
+    println!("  ✓ TransferFrom complete");
 
-    println!();
+    println!("\n  After transferFrom:");
+    let res = example.allowance(sender_2, sender).call().await?;
+    assert_eq!(res, U256::from(0));
+    println!("    Allowance ({sender_2_short} → {sender_short}): {res} TST (depleted)");
 
-    println!("Checking balances and allowance");
-    let res = example.allowance(address_1, sender).call().await?;
-    println!("  Current allowance = {res} TST");
+    println!("\n  Balances after transferFrom:");
     let res = example.balanceOf(sender).call().await?;
-    println!("  Current balance of {sender}= {res} TST");
-    let res = example.balanceOf(address_1).call().await?;
-    println!("  Current balance of {address_1}= {res} TST");
-    let res = example.balanceOf(address_2).call().await?;
-    println!("  Current balance of {address_2}= {res} TST");
+    assert_eq!(res, U256::from(543444));
+    println!("    {sender_short}: {res} TST");
+
+    let res = example.balanceOf(sender_2).call().await?;
+    assert_eq!(res, U256::from(900));
+    println!("    {sender_2_short}: {res} TST");
+
+    let res = example.balanceOf(address_3).call().await?;
+    assert_eq!(res, U256::from(100));
+    println!("    {address_3_short}: {res} TST");
+
+    // ==================== Done ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║        ✓ All tests passed!           ║");
+    println!("╚══════════════════════════════════════╝\n");
 
     Ok(())
 }
