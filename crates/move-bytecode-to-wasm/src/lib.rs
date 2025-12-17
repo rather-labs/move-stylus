@@ -16,11 +16,9 @@ mod vm_handled_types;
 mod wasm_builder_extensions;
 mod wasm_validation;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "inject-host-debug-fns"))]
 mod test_tools;
 
-#[cfg(feature = "inject-host-debug-fns")]
-mod test_tools;
 use abi_types::public_function::PublicFunction;
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
 use compilation_context::{ModuleData, ModuleId};
@@ -46,9 +44,6 @@ use walrus::{GlobalId, Module, RefType};
 use wasm_validation::validate_stylus_wasm;
 
 pub use translation::functions::MappedFunction;
-
-#[cfg(feature = "inject-host-debug-fns")]
-use walrus::ValType;
 
 pub type GlobalFunctionTable<'move_package> =
     HashMap<FunctionId, &'move_package FunctionDefinition>;
@@ -129,7 +124,7 @@ pub fn translate_package(
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
 
         #[cfg(feature = "inject-host-debug-fns")]
-        inject_debug_fns(&mut module);
+        crate::test_tools::inject_debug_fns(&mut module);
 
         // Function table
         let function_table_id = module.tables.add_local(false, 0, None, RefType::Funcref);

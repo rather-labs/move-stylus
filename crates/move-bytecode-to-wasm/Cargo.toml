@@ -10,7 +10,7 @@ move-abstract-interpreter.workspace = true
 move-core-types.workspace = true
 move-parse-special-attributes.workspace = true
 move-compiler.workspace = true
-
+wasmtime = { version = "31.0.0", optional = true }
 alloy-primitives = "1.0.0"
 alloy-sol-types = "1.0.0"
 walrus = "0.23"
@@ -25,10 +25,10 @@ move-packages-build.workspace = true
 wasmprinter.workspace = true
 move-test-runner.workspace = true
 rstest = "0.25.0"
-wasmtime = "31.0.0"
+wasmtime = { version = "31.0.0" }
 
 [features]
-inject-host-debug-fns = []
+inject-host-debug-fns = ["wasmtime"]
 
 # TODO: Remove this after finishing error handling
 [lints.clippy]
