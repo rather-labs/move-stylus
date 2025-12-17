@@ -169,23 +169,23 @@ async fn main() -> eyre::Result<()> {
 
     let res = example.notTrue().call().await?;
     println!("notTrue(): {res}");
-    assert_eq!(res, false, "notTrue() should return false");
+    assert!(!res, "notTrue() should return false");
 
     let res = example.not(true).call().await?;
     println!("not(true): {res}");
-    assert_eq!(res, false, "not(true) should return false");
+    assert!(!res, "not(true) should return false");
 
     let res = example.not(false).call().await?;
     println!("not(false): {res}");
-    assert_eq!(res, true, "not(false) should return true");
+    assert!(res, "not(false) should return true");
 
     let res = example.and(true, false).call().await?;
     println!("and(true, false): {res}");
-    assert_eq!(res, false, "and(true, false) should return false");
+    assert!(!res, "and(true, false) should return false");
 
     let res = example.or(true, false).call().await?;
     println!("or(true, false): {res}");
-    assert_eq!(res, true, "or(true, false) should return true");
+    assert!(res, "or(true, false) should return true");
 
     println!("\n==============================================================================");
     println!(" Testing comparison operations");
@@ -196,29 +196,26 @@ async fn main() -> eyre::Result<()> {
         .call()
         .await?;
     println!("lessThanU256(10, 20): {res}");
-    assert_eq!(res, true, "10 should be less than 20");
+    assert!(res, "10 should be less than 20");
 
     let res = example
         .lessThanU256(U256::from(20), U256::from(10))
         .call()
         .await?;
     println!("lessThanU256(20, 10): {res}");
-    assert_eq!(res, false, "20 should not be less than 10");
+    assert!(!res, "20 should not be less than 10");
 
     let res = example.lessThanEqU128(u128::MAX, u128::MAX).call().await?;
     println!("lessThanEqU128(u128::MAX, u128::MAX): {res}");
-    assert_eq!(
-        res, true,
-        "u128::MAX should be less than or equal to itself"
-    );
+    assert!(res, "u128::MAX should be less than or equal to itself");
 
     let res = example
         .lessThanEqU128(u128::MAX - 1, u128::MAX)
         .call()
         .await?;
     println!("lessThanEqU128(u128::MAX - 1, u128::MAX): {res}");
-    assert_eq!(
-        res, true,
+    assert!(
+        res,
         "u128::MAX - 1 should be less than or equal to u128::MAX"
     );
 
@@ -227,30 +224,30 @@ async fn main() -> eyre::Result<()> {
         .call()
         .await?;
     println!("lessThanEqU128(u128::MAX, u128::MAX - 1): {res}");
-    assert_eq!(
-        res, false,
+    assert!(
+        !res,
         "u128::MAX should not be less than or equal to u128::MAX - 1"
     );
 
     let res = example.greaterThanU64(100, 50).call().await?;
     println!("greaterThanU64(100, 50): {res}");
-    assert_eq!(res, true, "100 should be greater than 50");
+    assert!(res, "100 should be greater than 50");
 
     let res = example.greaterThanU64(50, 100).call().await?;
     println!("greaterThanU64(50, 100): {res}");
-    assert_eq!(res, false, "50 should not be greater than 100");
+    assert!(!res, "50 should not be greater than 100");
 
     let res = example.greaterThanEqU32(200, 200).call().await?;
     println!("greaterThanEqU32(200, 200): {res}");
-    assert_eq!(res, true, "200 should be greater than or equal to itself");
+    assert!(res, "200 should be greater than or equal to itself");
 
     let res = example.greaterThanEqU32(200 - 1, 200).call().await?;
     println!("greaterThanEqU32(199, 200): {res}");
-    assert_eq!(res, false, "199 should not be greater than or equal to 200");
+    assert!(!res, "199 should not be greater than or equal to 200");
 
     let res = example.greaterThanEqU32(200, 200 - 1).call().await?;
     println!("greaterThanEqU32(200, 199): {res}");
-    assert_eq!(res, true, "200 should be greater than or equal to 199");
+    assert!(res, "200 should be greater than or equal to 199");
 
     println!("\n==============================================================================");
     println!(" Testing vector operations");
