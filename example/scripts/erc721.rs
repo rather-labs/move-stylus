@@ -3,7 +3,6 @@ use alloy::primitives::{FixedBytes, U256};
 use alloy::providers::Provider;
 use alloy::rpc::types::TransactionRequest;
 use alloy::signers::local::PrivateKeySigner;
-use alloy::sol_types::SolEvent;
 use alloy::{primitives::Address, providers::ProviderBuilder, sol, transports::http::reqwest::Url};
 use dotenv::dotenv;
 use eyre::eyre;
@@ -91,299 +90,305 @@ async fn main() -> eyre::Result<()> {
 
     let address_2 = address!("0xcafecafecafecafecafecafecafecafecafecafe");
 
-    println!("====================");
-    println!("Creating a new erc721");
-    println!("====================");
-    let _pending_tx_ = example.constructor().send().await?;
-    println!("Created!");
+    // Helper to get last 8 hex chars of an address (0x + last 4 bytes)
+    let short_addr = |addr: &Address| -> String {
+        let s = format!("{addr}");
+        format!("0x..{}", &s[s.len() - 8..])
+    };
 
-    println!("\n====================");
-    println!("  Contract Info");
-    println!("====================");
+    let sender_short = short_addr(&sender);
+    let sender_2_short = short_addr(&sender_2);
+    let address_2_short = short_addr(&address_2);
+    let receiver_short = short_addr(&receiver_address);
+
+    // ==================== Constructor ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║         Creating ERC721 Token        ║");
+    println!("╚══════════════════════════════════════╝");
+
+    let _pending_tx_ = example.constructor().send().await?;
+    println!("✓ Contract initialized");
+
+    // ==================== Contract Info ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║           Contract Info              ║");
+    println!("╚══════════════════════════════════════╝");
 
     let res = example.totalSupply().call().await?;
-    println!("Total Supply = {res}");
+    assert_eq!(res, U256::from(0));
+    println!("  Total Supply:      {res}");
 
     let res = example.name().call().await?;
-    println!("name = {res}");
+    println!("  Name:              {res}");
 
     let res = example.symbol().call().await?;
-    println!("symbol = {res}");
+    println!("  Symbol:            {res}");
 
-    println!("\n====================");
-    println!("  Mint");
-    println!("====================");
+    let erc721_interface_id = FixedBytes::<4>::new([0x80, 0xac, 0x58, 0xcd]);
+    let erc721_metadata_interface_id = FixedBytes::<4>::new([0x01, 0xff, 0xc9, 0xa7]);
 
-    let res = example.balanceOf(sender).call().await?;
-    println!("Balance of sender = {res}");
+    let res = example
+        .supportsInterface(erc721_interface_id)
+        .call()
+        .await?;
+    assert!(res);
+    println!(" IERC721 supported: {res}");
 
-    let res = example.balanceOf(sender_2).call().await?;
-    println!("Balance of sender_2 = {res}");
+    let res = example
+        .supportsInterface(erc721_metadata_interface_id)
+        .call()
+        .await?;
+    assert!(res);
+    println!(" IERC721Metadata supported: {res}");
+
+    // ==================== Mint ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║              Minting                 ║");
+    println!("╚══════════════════════════════════════╝");
 
     let token_id_1 = U256::from(1);
     let token_id_2 = U256::from(2);
     let token_id_3 = U256::from(3);
 
-    println!("Minting token {token_id_1} to target address");
-    let pending_tx = example.mint(sender, token_id_1).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-
-    println!("Mint events");
-    for (index, log) in receipt.logs().iter().enumerate() {
-        let primitive_log: alloy::primitives::Log = log.clone().into();
-        let decoded_event = Erc721::Transfer::decode_log(&primitive_log)?;
-        println!("Mint event log {} {:#?}", index + 1, decoded_event);
-    }
-
-    println!("Minting token {token_id_2} to target address");
-    let pending_tx = example.mint(sender, token_id_2).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for (index, log) in receipt.logs().iter().enumerate() {
-        let primitive_log: alloy::primitives::Log = log.clone().into();
-        let decoded_event = Erc721::Transfer::decode_log(&primitive_log)?;
-        println!("Mint event log {} {:#?}", index + 1, decoded_event);
-    }
-
-    println!("Minting token {token_id_3} to address_1");
-    let pending_tx = example.mint(sender_2, token_id_3).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for (index, log) in receipt.logs().iter().enumerate() {
-        let primitive_log: alloy::primitives::Log = log.clone().into();
-        let decoded_event = Erc721::Transfer::decode_log(&primitive_log)?;
-        println!("Mint event log {} {:#?}", index + 1, decoded_event);
-    }
-
-    let res = example.totalSupply().call().await?;
-    println!("Total Supply after mint = {res}");
-
+    println!("\n  Initial balances:");
     let res = example.balanceOf(sender).call().await?;
-    println!("Balance of sender = {res}");
+    assert_eq!(res, U256::from(0));
+    println!("    {sender_short}: {res}");
 
     let res = example.balanceOf(sender_2).call().await?;
-    println!("Balance of sender_2 = {res}");
+    assert_eq!(res, U256::from(0));
+    println!("    {sender_2_short}: {res}");
 
-    let res = example.ownerOf(token_id_1).call().await?;
-    println!("Owner of token {token_id_1} = {res}");
+    println!("\n  Minting tokens...");
+    println!("    → Token #{token_id_1} to {sender_short}");
+    let pending_tx = example.mint(sender, token_id_1).send().await?;
+    pending_tx.get_receipt().await?;
 
-    let res = example.ownerOf(token_id_2).call().await?;
-    println!("Owner of token {token_id_2} = {res}");
+    println!("    → Token #{token_id_2} to {sender_short}");
+    let pending_tx = example.mint(sender, token_id_2).send().await?;
+    pending_tx.get_receipt().await?;
 
-    let res = example.ownerOf(token_id_3).call().await?;
-    println!("Owner of token {token_id_3} = {res}");
-
-    println!("\n====================");
-    println!("  Burn");
-    println!("====================");
-
-    println!("Burning token {token_id_2} from {sender}");
-
-    let pending_tx = example.burn(token_id_2).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-
-    println!("Burn events");
-    for (index, log) in receipt.logs().iter().enumerate() {
-        let primitive_log: alloy::primitives::Log = log.clone().into();
-        let decoded_event = Erc721::Transfer::decode_log(&primitive_log)?;
-        println!("Burn event log {} {:#?}", index + 1, decoded_event);
-    }
+    println!("    → Token #{token_id_3} to {sender_2_short}");
+    let pending_tx = example.mint(sender_2, token_id_3).send().await?;
+    pending_tx.get_receipt().await?;
 
     let res = example.totalSupply().call().await?;
-    println!("Total Supply after burn = {res}");
+    assert_eq!(res, U256::from(3));
+    println!("    Total Supply: {res}");
+
+    println!("\n  Balances after minting:");
 
     let res = example.balanceOf(sender).call().await?;
-    println!("Balance of sender = {res}");
+    assert_eq!(res, U256::from(2));
+    println!("    {sender_short}: {res}");
 
-    println!("\n====================");
-    println!("  Transfer");
-    println!("====================");
+    let res = example.balanceOf(sender_2).call().await?;
+    assert_eq!(res, U256::from(1));
+    println!("    {sender_2_short}: {res}");
 
-    println!("Transfering token {token_id_1} from {sender} to {sender_2}");
+    println!("\n  Ownership:");
+    let res = example.ownerOf(token_id_1).call().await?;
+    assert_eq!(res, sender);
+    println!("    Token #{token_id_1}: {sender_short}");
 
+    let res = example.ownerOf(token_id_2).call().await?;
+    assert_eq!(res, sender);
+    println!("    Token #{token_id_2}: {sender_short}");
+
+    let res = example.ownerOf(token_id_3).call().await?;
+    assert_eq!(res, sender_2);
+    println!("    Token #{token_id_3}: {sender_2_short}");
+
+    // ==================== Burn ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║              Burning                 ║");
+    println!("╚══════════════════════════════════════╝");
+
+    println!("\n  Burning token #{token_id_2}...");
+    let pending_tx = example.burn(token_id_2).send().await?;
+    pending_tx.get_receipt().await?;
+    println!("  ✓ Token burned");
+    let res = example.totalSupply().call().await?;
+    assert_eq!(res, U256::from(2));
+    println!("    Total Supply: {res}");
+
+    println!("\n  Balances after burning:");
+
+    let res = example.balanceOf(sender).call().await?;
+    assert_eq!(res, U256::from(1));
+    println!("    {sender_short}: {res}");
+
+    let res = example.balanceOf(sender_2).call().await?;
+    assert_eq!(res, U256::from(1));
+    println!("    {sender_2_short}: {res}");
+
+    // ==================== Transfer ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║             Transfer                 ║");
+    println!("╚══════════════════════════════════════╝");
+
+    println!("\n  Transferring token #{token_id_1}: {sender_short} → {sender_2_short}");
     let pending_tx = example
         .transfer(sender, sender_2, token_id_1)
         .send()
         .await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for (index, log) in receipt.logs().iter().enumerate() {
-        let primitive_log: alloy::primitives::Log = log.clone().into();
-        let decoded_event = Erc721::Transfer::decode_log(&primitive_log)?;
-        println!("Transfer event log {} {:#?}", index + 1, decoded_event);
-    }
-
-    let res = example.balanceOf(sender).call().await?;
-    println!("  Balance of origin address {sender} after transaction = {res}");
-    let res = example.balanceOf(sender_2).call().await?;
-    println!("  Balance of target address {sender_2} after transaction = {res}");
+    pending_tx.get_receipt().await?;
+    println!("  ✓ Transfer complete");
     let res = example.ownerOf(token_id_1).call().await?;
-    println!("  Owner of token {token_id_1} after transaction = {res}");
+    assert_eq!(res, sender_2);
+    println!("    Token #{token_id_1} new owner: {sender_2_short}");
 
-    println!("\n==============================");
-    println!("  Approval and transfer from");
-    println!("================================");
-
-    println!("Allow {sender} to transfer token {token_id_3} from {sender_2}");
-    let res = example.getApproved(token_id_3).call().await?;
-    println!("  Current approved address for token {token_id_3} = {res}");
-
-    println!();
-
-    println!("Executing approve...");
-    let pending_tx = example_2.approve(sender, token_id_3).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    println!("Approval events");
-
-    for (index, log) in receipt.logs().iter().enumerate() {
-        let primitive_log: alloy::primitives::Log = log.clone().into();
-        if let Ok(decoded_event) = Erc721::Approval::decode_log(&primitive_log) {
-            println!("Approval event log {} {:#?}", index + 1, decoded_event);
-        }
-    }
-
-    println!();
-
-    println!("Checking approvals and balances");
-    let res = example.getApproved(token_id_3).call().await?;
-    println!("  Current approved address for token {token_id_3} = {res}");
+    println!("\n  Balances after transfer:");
     let res = example.balanceOf(sender).call().await?;
-    println!("  Current balance of {sender} = {res}");
+    assert_eq!(res, U256::from(0));
+    println!("    {sender_short}: {res}");
+
     let res = example.balanceOf(sender_2).call().await?;
-    println!("  Current balance of {sender_2} = {res}");
+    assert_eq!(res, U256::from(2));
+    println!("    {sender_2_short}: {res}");
 
-    println!();
+    // ==================== Approval ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║        Approval & TransferFrom       ║");
+    println!("╚══════════════════════════════════════╝");
 
-    println!("Using transferFrom:");
-    println!(" from: {sender_2}");
-    println!(" to: {address_2}");
-    println!(" token_id: {token_id_3}");
+    println!("\n  Before approval:");
+    let res = example.getApproved(token_id_3).call().await?;
+    assert_eq!(res, Address::ZERO);
+    println!("    Approved for #{token_id_3}: (none)");
+
+    println!("\n  Approving {sender_short} to transfer #{token_id_3}...");
+    let pending_tx = example_2.approve(sender, token_id_3).send().await?;
+    pending_tx.get_receipt().await?;
+    println!("  ✓ Approval granted");
+
+    println!("\n  After approval:");
+    let res = example.getApproved(token_id_3).call().await?;
+    assert_eq!(res, sender);
+    println!("    Approved for #{token_id_3}: {sender_short}");
+
+    let res = example.balanceOf(sender).call().await?;
+    assert_eq!(res, U256::from(0));
+    println!("    {sender_short}: {res}");
+
+    let res = example.balanceOf(sender_2).call().await?;
+    assert_eq!(res, U256::from(2));
+    println!("    {sender_2_short}: {res}");
+
+    println!("\n  Using transferFrom: {sender_2_short} → {address_2_short} (token #{token_id_3})");
     let pending_tx = example
         .transferFrom(sender_2, address_2, token_id_3)
         .send()
         .await?;
-    let receipt = pending_tx.get_receipt().await?;
-    println!("Transfer events");
-    for (index, log) in receipt.logs().iter().enumerate() {
-        let primitive_log: alloy::primitives::Log = log.clone().into();
-        let decoded_event = Erc721::Transfer::decode_log(&primitive_log)?;
-        println!("Transfer event log {} {:#?}", index + 1, decoded_event);
-    }
-
-    println!();
-
-    println!("Checking approvals and balances after transfer");
+    pending_tx.get_receipt().await?;
+    println!("  ✓ TransferFrom complete");
     let res = example.getApproved(token_id_3).call().await?;
-    println!("  Current approved address for token {token_id_3} = {res}");
-    let res = example.balanceOf(sender).call().await?;
-    println!("  Current balance of {sender} = {res}");
-    let res = example.balanceOf(sender_2).call().await?;
-    println!("  Current balance of {sender_2} = {res}");
-    let res = example.balanceOf(address_2).call().await?;
-    println!("  Current balance of {address_2} = {res}");
+    assert_eq!(res, Address::ZERO);
+    println!("    Approved for #{token_id_3}: (cleared)");
     let res = example.ownerOf(token_id_3).call().await?;
-    println!("  Owner of token {token_id_3} = {res}");
+    assert_eq!(res, address_2);
+    println!("    Token #{token_id_3} owner: {address_2_short}");
 
-    println!("\n==============================");
-    println!("  ApprovalForAll");
-    println!("================================");
+    println!("\n  Balances after transferFrom:");
 
-    // Mint another token to address_1 for testing
+    let res = example.balanceOf(sender).call().await?;
+    assert_eq!(res, U256::from(0));
+    println!("    {sender_short}: {res}");
+
+    let res = example.balanceOf(sender_2).call().await?;
+    assert_eq!(res, U256::from(1));
+    println!("    {sender_2_short}: {res}");
+
+    let res = example.balanceOf(address_2).call().await?;
+    assert_eq!(res, U256::from(1));
+    println!("    {address_2_short}: {res}");
+
+    // ==================== ApprovalForAll ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║           ApprovalForAll             ║");
+    println!("╚══════════════════════════════════════╝");
+
     let token_id_4 = U256::from(4);
-    println!("Minting token {token_id_4} to {sender_2} for ApprovalForAll test");
+    println!("\n  Minting token #{token_id_4} to {sender_2_short}...");
     let pending_tx = example.mint(sender_2, token_id_4).send().await?;
     pending_tx.get_receipt().await?;
 
-    println!("Setting approval for all tokens from {sender_2} to {sender}");
+    println!("\n  Before setApprovalForAll:");
     let res = example.isApprovedForAll(sender_2, sender).call().await?;
-    println!("{sender} approved for all tokens of {sender_2}: {res}");
+    assert!(!res);
+    println!("    {sender_short} is operator for {sender_2_short}: {res}");
 
-    println!();
-
-    println!("Executing setApprovalForAll...");
+    println!("\n  Setting {sender_short} as operator for {sender_2_short}...");
     let pending_tx = example_2.setApprovalForAll(sender, true).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    println!("ApprovalForAll events");
+    pending_tx.get_receipt().await?;
+    println!("  ✓ Operator approval granted");
 
-    for (index, log) in receipt.logs().iter().enumerate() {
-        let primitive_log: alloy::primitives::Log = log.clone().into();
-        if let Ok(decoded_event) = Erc721::ApprovalForAll::decode_log(&primitive_log) {
-            println!(
-                "ApprovalForAll event log {} {:#?}",
-                index + 1,
-                decoded_event
-            );
-        }
-    }
-
-    println!();
-
+    println!("\n  After setApprovalForAll:");
     let res = example.isApprovedForAll(sender_2, sender).call().await?;
-    println!(" {sender} approved for all tokens of {sender_2}: {res}");
+    assert!(res);
+    println!("    {sender_short} is operator for {sender_2_short}: {res}");
 
-    println!();
-
-    println!("Testing transferFrom using ApprovalForAll:");
+    println!("\n  Balances before operator transfer:");
     let res = example.balanceOf(sender).call().await?;
-    println!("  Current balance of {sender} = {res}");
+    assert_eq!(res, U256::from(0));
+    println!("    {sender_short}: {res}");
+
     let res = example.balanceOf(sender_2).call().await?;
-    println!("  Current balance of {sender_2} = {res}");
+    assert_eq!(res, U256::from(2));
+    println!("    {sender_2_short}: {res}");
+
     println!(
-        "  Transferring token {token_id_4} from {sender_2} to {sender} using operator approval"
+        "\n  Using transferFrom (operator): {sender_2_short} → {sender_short} (token #{token_id_4})"
     );
     let pending_tx = example
         .transferFrom(sender_2, sender, token_id_4)
         .send()
         .await?;
-    let receipt = pending_tx.get_receipt().await?;
-    println!("Transfer events");
-    for (index, log) in receipt.logs().iter().enumerate() {
-        let primitive_log: alloy::primitives::Log = log.clone().into();
-        let decoded_event = Erc721::Transfer::decode_log(&primitive_log)?;
-        println!("Transfer event log {} {:#?}", index + 1, decoded_event);
-    }
-
+    pending_tx.get_receipt().await?;
+    println!("  ✓ Operator transfer complete");
     let res = example.ownerOf(token_id_4).call().await?;
-    println!("  Owner of token {token_id_4} after transfer = {res}");
+    assert_eq!(res, sender);
+    println!("    Token #{token_id_4} owner: {sender_short}");
+
+    println!("\n  Balances after operator transfer:");
 
     let res = example.balanceOf(sender).call().await?;
-    println!("  Current balance of {sender} = {res}");
-    let res = example.balanceOf(sender_2).call().await?;
-    println!("  Current balance of {sender_2} = {res}");
+    assert_eq!(res, U256::from(1));
+    println!("    {sender_short}: {res}");
 
-    println!("Safe transferring token {token_id_4} from {sender} to {receiver_address}");
+    let res = example.balanceOf(sender_2).call().await?;
+    assert_eq!(res, U256::from(1));
+    println!("    {sender_2_short}: {res}");
+
+    // ==================== Safe Transfer ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║           Safe Transfer              ║");
+    println!("╚══════════════════════════════════════╝");
+
+    println!("\n  Safe transferring token #{token_id_4}: {sender_short} → {receiver_short}");
     let pending_tx = example
         .safeTransferFrom(sender, receiver_address, token_id_4, vec![])
         .send()
         .await?;
-    let receipt = pending_tx.get_receipt().await?;
-    println!("Safe transfer events");
-    for (index, log) in receipt.logs().iter().enumerate() {
-        let primitive_log: alloy::primitives::Log = log.clone().into();
-        let decoded_event = Erc721::Transfer::decode_log(&primitive_log)?;
-        println!("Safe transfer event log {} {:#?}", index + 1, decoded_event);
-    }
-
-    let res = example.balanceOf(sender).call().await?;
-    println!("  Current balance of {sender} = {res}");
-    let res = example.balanceOf(receiver_address).call().await?;
-    println!("  Current balance of {receiver_address} = {res}");
-
+    pending_tx.get_receipt().await?;
+    println!("  ✓ Safe transfer complete");
     let res = example.ownerOf(token_id_4).call().await?;
-    println!("  Owner of token {token_id_4} after safe transfer = {res}");
+    assert_eq!(res, receiver_address);
+    println!("    Token #{token_id_4} owner: {receiver_short}");
 
-    let res = example.tokenURI(token_id_4).call().await?;
-    println!("  Token URI of token {token_id_4} = {res}");
+    println!("\n  Balances after safe transfer:");
+    let res = example.balanceOf(sender).call().await?;
+    assert_eq!(res, U256::from(0));
+    println!("    {sender_short}: {res}");
 
-    let erc721_interface_id = FixedBytes::<4>::new([0x80, 0xac, 0x58, 0xcd]);
-    let erc721_metadata_interface_id = FixedBytes::<4>::new([0x01, 0xff, 0xc9, 0xa7]);
-    let res = example
-        .supportsInterface(erc721_interface_id)
-        .call()
-        .await?;
-    println!("  Supports IERC721 interface = {res}");
-    let res = example
-        .supportsInterface(erc721_metadata_interface_id)
-        .call()
-        .await?;
-    println!("  Supports IERC721 metadata interface = {res}");
+    let res = example.balanceOf(receiver_address).call().await?;
+    assert_eq!(res, U256::from(1));
+    println!("    {receiver_short}: {res}");
+
+    // ==================== Done ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║        ✓ All tests passed!           ║");
+    println!("╚══════════════════════════════════════╝\n");
 
     Ok(())
 }

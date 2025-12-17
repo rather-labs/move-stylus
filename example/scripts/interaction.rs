@@ -3,6 +3,7 @@
 //! Then, it attempts to check the current counter value, increment it via a tx,
 //! and check the value again. The deployed contract is fully written in Rust and compiled to WASM
 //! but with Stylus, it is accessible just as a normal Solidity smart contract is via an ABI.
+use alloy::primitives::{U256, address};
 use alloy::signers::local::PrivateKeySigner;
 use alloy::{primitives::Address, providers::ProviderBuilder, sol, transports::http::reqwest::Url};
 use dotenv::dotenv;
@@ -15,13 +16,13 @@ sol!(
     #[allow(missing_docs)]
     contract Example {
 
-        #[derive(Debug)]
+        #[derive(Debug, PartialEq)]
         struct Bar {
             uint32 a;
             uint128 b;
         }
 
-        #[derive(Debug)]
+        #[derive(Debug, PartialEq)]
         struct Foo {
             uint16 c;
             Bar d;
@@ -32,7 +33,7 @@ sol!(
             uint32[] i;
         }
 
-        #[derive(Debug)]
+        #[derive(Debug, PartialEq)]
         struct Baz {
             uint16 c;
             Bar d;
@@ -42,7 +43,7 @@ sol!(
             uint256 h;
         }
 
-        #[derive(Debug)]
+        #[derive(Debug, PartialEq)]
         enum TestEnum {
             FirstVariant,
             SecondVariant,
@@ -98,96 +99,178 @@ async fn main() -> eyre::Result<()> {
     let address = Address::from_str(&contract_address)?;
     let example = Example::new(address, provider.clone());
 
-    let num = example.echo(123).call().await?;
-    println!("echo(123) = {num}");
+    // ==================== Basic Echo & Locals ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║         Basic Echo & Locals          ║");
+    println!("╚══════════════════════════════════════╝");
 
-    let num = example.getConstant().call().await?;
-    println!("getConstant = {num}");
+    let res = example.echo(123).call().await?;
+    assert_eq!(res, 123u128);
+    println!("  ✓ echo(123) = {res}");
 
-    let num = example.getConstantLocal().call().await?;
-    println!("getConstantLocal = {num}");
+    let res = example.getConstant().call().await?;
+    assert_eq!(res, 128128128u128);
+    println!("  ✓ getConstant() = {res}");
 
-    let num = example.getCopiedLocal().call().await?;
-    println!("getCopiedLocal = {num}");
+    let res = example.getConstantLocal().call().await?;
+    assert_eq!(res, 128128128u128);
+    println!("  ✓ getConstantLocal() = {res}");
 
-    let num = example.getLocal(456).call().await?;
-    println!("getLocal = {num}");
+    let res = example.getCopiedLocal().call().await?;
+    assert_eq!(res, 100u128);
+    println!("  ✓ getCopiedLocal() = {res}");
+
+    let res = example.getLocal(456).call().await?;
+    assert_eq!(res, 50u128);
+    println!("  ✓ getLocal(456) = {res}");
+
+    // ==================== Transaction Context ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║        Transaction Context           ║");
+    println!("╚══════════════════════════════════════╝");
 
     let tx_context = example.txContextProperties().call().await?;
-    println!("txContextProperties:");
-    println!("  - msg.sender: {:?}", tx_context._0);
-    println!("  - msg.value: {}", tx_context._1);
-    println!("  - block.number: {}", tx_context._2);
-    println!("  - block.basefee: {}", tx_context._3);
-    println!("  - block.gas_limit: {}", tx_context._4);
-    println!("  - block.timestamp: {}", tx_context._5);
-    println!("  - chainid: {}", tx_context._6);
-    println!("  - tx.gas_price: {}", tx_context._7);
+    println!("  msg.sender:      {:?}", tx_context._0);
+    println!("  msg.value:       {}", tx_context._1);
+    println!("  block.number:    {}", tx_context._2);
+    println!("  block.basefee:   {}", tx_context._3);
+    println!("  block.gas_limit: {}", tx_context._4);
+    println!("  block.timestamp: {}", tx_context._5);
+    println!("  chainid:         {}", tx_context._6);
+    println!("  tx.gas_price:    {}", tx_context._7);
 
-    let fib10 = example.fibonacci(10).call().await?;
-    println!("fibonacci(10) = {fib10}");
+    // ==================== Fibonacci ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║             Fibonacci                ║");
+    println!("╚══════════════════════════════════════╝");
 
-    let fib20 = example.fibonacci(20).call().await?;
-    println!("fibonacci(20) = {fib20}");
+    let res = example.fibonacci(10).call().await?;
+    assert_eq!(res, 55u64);
+    println!("  ✓ fibonacci(10) = {res}");
 
-    let sum_special_2 = example.sumSpecial(2).call().await?;
-    println!("sumSpecial(2) = {sum_special_2}");
+    let res = example.fibonacci(20).call().await?;
+    assert_eq!(res, 6765u64);
+    println!("  ✓ fibonacci(20) = {res}");
 
-    let sum_special_4 = example.sumSpecial(4).call().await?;
-    println!("sumSpecial(4) = {sum_special_4}");
+    // ==================== Sum Special ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║            Sum Special               ║");
+    println!("╚══════════════════════════════════════╝");
 
-    let create_foo = example.createFooU16(55, 66).call().await?;
-    println!("createFooU16(55, 66) = {create_foo:#?}");
+    let res = example.sumSpecial(2).call().await?;
+    assert_eq!(res, 7u64);
+    println!("  ✓ sumSpecial(2) = {res}");
 
-    let create_baz = example.createBazU16(55, 66).call().await?;
-    println!("createBazU16(55, 66) = {create_baz:#?}");
+    let res = example.sumSpecial(4).call().await?;
+    assert_eq!(res, 14u64);
+    println!("  ✓ sumSpecial(4) = {res}");
 
-    let create_foo = example.createFoo2U16(55, 66).call().await?;
+    // ==================== Struct Creation ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║          Struct Creation             ║");
+    println!("╚══════════════════════════════════════╝");
+
+    let expected_bar = Example::Bar { a: 42, b: 4242 };
+    let expected_addr = address!("0000000000000000000000000000000000007357");
+
+    let expected_foo = Example::Foo {
+        c: 66,
+        d: expected_bar.clone(),
+        e: expected_addr,
+        f: true,
+        g: 1,
+        h: U256::from(2),
+        i: vec![0xFFFFFFFF],
+    };
+
+    let expected_baz = Example::Baz {
+        c: 55,
+        d: expected_bar.clone(),
+        e: expected_addr,
+        f: true,
+        g: 1,
+        h: U256::from(2),
+    };
+
+    let res = example.createFooU16(55, 66).call().await?;
+    assert_eq!(res, expected_foo);
+    println!("  ✓ createFooU16(55, 66)");
+
+    let res = example.createBazU16(55, 66).call().await?;
+    assert_eq!(res, expected_baz);
+    println!("  ✓ createBazU16(55, 66)");
+
+    let res = example.createFoo2U16(55, 66).call().await?;
+    assert_eq!(res._0, expected_foo);
+    assert_eq!(res._1, expected_foo);
+    println!("  ✓ createFoo2U16(55, 66)");
+
+    let res = example.createBaz2U16(55, 66).call().await?;
+    assert_eq!(res._0, expected_baz);
+    assert_eq!(res._1, expected_baz);
+    println!("  ✓ createBaz2U16(55, 66)");
+
+    // ==================== Multiple Return Values ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║       Multiple Return Values         ║");
+    println!("╚══════════════════════════════════════╝");
+
+    let res = example.multiValues1().call().await?;
+    assert_eq!(res._0, vec![0xFFFFFFFF, 0xFFFFFFFF]);
+    assert_eq!(res._1, vec![0xFFFFFFFFFF_u128]);
+    assert!(res._2);
+    assert_eq!(res._3, 42u64);
     println!(
-        "createFoo2U16(55, 66) = {:#?} {:#?}",
-        create_foo._0, create_foo._1
+        "  ✓ multiValues1(): (uint32[], uint128[], bool, uint64) = ({:?}, {:?}, {}, {})",
+        res._0, res._1, res._2, res._3
     );
 
-    let create_baz = example.createBaz2U16(55, 66).call().await?;
+    let res = example.multiValues2().call().await?;
+    assert_eq!(res._0, 84u8);
+    assert!(res._1);
+    assert_eq!(res._2, 42u64);
     println!(
-        "createBaz2U16(55, 66) = {:#?} {:#?}",
-        create_baz._0, create_baz._1
+        "  ✓ multiValues2(): (u8, bool, uint64) = ({}, {}, {})",
+        res._0, res._1, res._2
     );
 
-    let multi_values = example.multiValues1().call().await?;
-    println!(
-        "multiValues1 = ({:?}, {:?}, {}, {})",
-        multi_values._0, multi_values._1, multi_values._2, multi_values._3
-    );
+    // ==================== Enum & Nested Struct ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║       Enum & Nested Struct           ║");
+    println!("╚══════════════════════════════════════╝");
 
-    let multi_values = example.multiValues2().call().await?;
-    println!(
-        "multiValues2 = ({}, {}, {})",
-        multi_values._0, multi_values._1, multi_values._2
-    );
-
-    let num = example.echo(123).call().await;
-    println!("Example echo = {num:?}");
-    let echo_variant = example
+    let res = example
         .echoVariant(Example::TestEnum::FirstVariant)
         .call()
         .await?;
-    println!("echoVariant(FirstVariant) = {echo_variant:?}");
+    assert_eq!(res, Example::TestEnum::FirstVariant);
+    println!("  ✓ echoVariant(FirstVariant) = {res:?}");
 
-    let echo_variant = example
+    let res = example
         .echoVariant(Example::TestEnum::SecondVariant)
         .call()
         .await?;
-    println!("echoVariant(SecondVariant) = {echo_variant:?}");
+    assert_eq!(res, Example::TestEnum::SecondVariant);
+    println!("  ✓ echoVariant(SecondVariant) = {res:?}");
 
-    let test_values = example
+    let res = example
         .testValues(Example::Test {
             pos0: 55,
             pos1: Example::AnotherTest { pos0: 66 },
         })
         .call()
         .await?;
-    println!("testValues = ({}, {})", test_values._0, test_values._1);
+    assert_eq!(res._0, 55);
+    assert_eq!(res._1, 66);
+    println!(
+        "  ✓ testValues({{pos0: 55, pos1: {{pos0: 66}}}}) = ({}, {})",
+        res._0, res._1
+    );
+
+    // ==================== Done ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║        ✓ All tests passed!           ║");
+    println!("╚══════════════════════════════════════╝\n");
 
     Ok(())
 }

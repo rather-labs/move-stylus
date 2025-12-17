@@ -69,82 +69,115 @@ async fn main() -> eyre::Result<()> {
 
     let address_2 = address!("0xcafecafecafecafecafecafecafecafecafecafe");
 
-    println!("====================");
-    println!("Querying balances of ERC20 from other contract..");
-    println!("====================");
+    println!("==============================================================================");
+    println!(" Querying ERC20 balances via cross-contract call");
+    println!("==============================================================================");
     let res = example.totalSupply(contract_address_erc20).call().await?;
-    println!("Total Supply = {res}");
+    println!("Total Supply: {res}");
 
     let res = example
         .balanceOfErc20(contract_address_erc20, sender)
         .call()
         .await?;
-    println!("Balance of {sender} = {res:?}");
+    let sender_balance_initial = res;
+    println!("Balance of {sender}: {sender_balance_initial}");
 
     let res = example
         .balanceOfErc20(contract_address_erc20, address_2)
         .call()
         .await?;
-    println!("Balance of {address_2} = {res:?}");
+    let address_2_balance_initial = res;
+    println!("Balance of {address_2}: {address_2_balance_initial}");
 
-    println!("====================");
-    println!("Allow this contract ({address}) to spend 1000 TST from {sender}");
-    println!("====================\n");
+    println!("\n==============================================================================");
+    println!(" Approving cross-contract call: allow contract to spend 1000 tokens");
+    println!("==============================================================================");
     let res = erc20.allowance(sender, address).call().await?;
-    println!("  Current allowance = {res}");
+    let allowance_before = res;
+    println!("Current allowance: {allowance_before}");
 
-    println!();
-
-    println!("Executing allow...");
+    println!("\nExecuting approve transaction...");
     let pending_tx = erc20.approve(address, U256::from(1000)).send().await?;
-    let receipt = pending_tx.get_receipt().await;
-    println!("Approval succeded {}", receipt.is_ok());
+    let _receipt = pending_tx.get_receipt().await?;
+    println!("✓ Approval succeeded");
 
     let res = erc20.allowance(sender, address).call().await?;
-    println!("  Current allowance = {res}");
+    let allowance_after = res;
+    println!("Current allowance: {allowance_after}");
+    assert_eq!(
+        allowance_after,
+        U256::from(1000),
+        "Allowance should be set to 1000"
+    );
 
-    println!("====================");
-    println!("Using transferFrom function from this contract ({address})");
-    println!("====================\n");
+    println!("\n==============================================================================");
+    println!(" Executing cross-contract transferFrom");
+    println!("==============================================================================");
 
-    println!("Balances and allowance BEFORE corss call to transferFrom:");
+    println!("\nBalances and allowance BEFORE cross-contract call to transferFrom:");
     let res = example
         .balanceOfErc20(contract_address_erc20, sender)
         .call()
         .await?;
-    println!("\tBalance of {sender} = {res:?}");
+    let sender_balance_before = res;
+    println!("  Balance of {sender}: {sender_balance_before}");
 
     let res = example
         .balanceOfErc20(contract_address_erc20, address_2)
         .call()
         .await?;
-    println!("\tBalance of {address_2} = {res:?}");
+    let address_2_balance_before = res;
+    println!("  Balance of {address_2}: {address_2_balance_before}");
 
     let res = erc20.allowance(sender, address).call().await?;
-    println!("\tCurrent allowance = {res}");
+    let allowance_before_transfer = res;
+    println!("  Current allowance: {allowance_before_transfer}");
 
+    println!("\nExecuting transferFrom transaction (1000 tokens)...");
+    let transfer_amount = U256::from(1000);
     let pending_tx = example
-        .transferFromErc20(contract_address_erc20, sender, address_2, U256::from(1000))
+        .transferFromErc20(contract_address_erc20, sender, address_2, transfer_amount)
         .send()
         .await?;
     let _receipt = pending_tx.get_receipt().await?;
-    println!("Transfer From succeded");
+    println!("✓ TransferFrom succeeded");
 
-    println!("Balances and allowance AFTER corss call to transferFrom:");
+    println!("\nBalances and allowance AFTER cross-contract call to transferFrom:");
     let res = example
         .balanceOfErc20(contract_address_erc20, sender)
         .call()
         .await?;
-    println!("\tBalance of {sender} = {res:?}");
+    let sender_balance_after = res;
+    println!("  Balance of {sender}: {sender_balance_after}");
 
     let res = example
         .balanceOfErc20(contract_address_erc20, address_2)
         .call()
         .await?;
-    println!("\tBalance of {address_2} = {res:?}");
+    let address_2_balance_after = res;
+    println!("  Balance of {address_2}: {address_2_balance_after}");
 
     let res = erc20.allowance(sender, address).call().await?;
-    println!("\tCurrent allowance = {res}");
+    let allowance_after_transfer = res;
+    println!("  Current allowance: {allowance_after_transfer}");
+
+    // Verify the transfer worked correctly
+    assert_eq!(
+        sender_balance_after,
+        sender_balance_before - transfer_amount,
+        "Sender balance should decrease by transfer amount"
+    );
+    assert_eq!(
+        address_2_balance_after,
+        address_2_balance_before + transfer_amount,
+        "Recipient balance should increase by transfer amount"
+    );
+    assert_eq!(
+        allowance_after_transfer,
+        allowance_before_transfer - transfer_amount,
+        "Allowance should decrease by transfer amount"
+    );
+    println!("\n✓ Cross-contract transfer verified: balances and allowance updated correctly");
 
     Ok(())
 }
