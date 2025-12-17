@@ -62,6 +62,7 @@ pub enum RuntimeFunction {
     VecIncrementLen,
     VecDecrementLen,
     VecUpdateMutRef,
+    BytesToVec,
     // Storage
     StorageNextSlot,
     DeriveMappingSlot,
@@ -131,6 +132,7 @@ impl RuntimeFunction {
             Self::VecIncrementLen => "vec_increment_len",
             Self::VecDecrementLen => "vec_decrement_len",
             Self::VecUpdateMutRef => "vec_update_mut_ref",
+            Self::BytesToVec => "bytes_to_vec",
             // Storage
             Self::StorageNextSlot => "storage_next_slot",
             Self::DeriveMappingSlot => "derive_mapping_slot",
@@ -251,6 +253,7 @@ impl RuntimeFunction {
                 (Self::VecUpdateMutRef, Some(ctx)) => {
                     vector::vec_update_mut_ref_function(module, ctx)
                 }
+                (Self::BytesToVec, Some(ctx)) => vector::bytes_to_vec_function(module, ctx),
                 // Storage
                 (Self::StorageNextSlot, Some(ctx)) => {
                     storage::storage_next_slot_function(module, ctx)?

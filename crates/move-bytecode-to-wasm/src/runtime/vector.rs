@@ -1,10 +1,11 @@
 use walrus::{
     FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
+    ir::{BinaryOp, ExtendedLoad, LoadKind, MemArg, StoreKind, UnaryOp},
 };
 
 use super::{RuntimeFunction, error::RuntimeFunctionError};
 use crate::CompilationContext;
+use crate::translation::intermediate_types::vector::IVector;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 
 // Increments vector length by 1
@@ -707,4 +708,88 @@ pub fn vec_update_mut_ref_function(
     });
 
     function.finish(vec![vec_ref_ptr], &mut module.funcs)
+}
+
+/// Converts raw bytes (bytesN) into a vector<u8>.
+///
+/// # Arguments:
+///    - bytes_ptr: (i32) pointer to the raw bytes in memory
+///    - bytes_n: (i32) number of bytes to convert
+/// # Returns:
+///    - i32 pointer to the newly created vector
+pub fn bytes_to_vec_function(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32],
+        &[ValType::I32],
+    );
+    let mut builder = function
+        .name(RuntimeFunction::BytesToVec.name().to_owned())
+        .func_body();
+
+    let bytes_ptr = module.locals.add(ValType::I32);
+    let bytes_n = module.locals.add(ValType::I32);
+
+    let vector_ptr = module.locals.add(ValType::I32);
+    IVector::allocate_vector_with_header(
+        &mut builder,
+        compilation_ctx,
+        vector_ptr,
+        bytes_n,
+        bytes_n,
+        4,
+    );
+
+    let i = module.locals.add(ValType::I32);
+    builder.i32_const(0).local_set(i);
+    builder.loop_(None, |loop_block| {
+        let loop_block_id = loop_block.id();
+
+        // address: vector_ptr + 8 (header) + i * 4
+        loop_block.vec_elem_ptr(vector_ptr, i, 4);
+
+        // value: bytesN[i]
+        loop_block
+            .local_get(bytes_ptr)
+            .local_get(i)
+            .binop(BinaryOp::I32Add)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32_8 {
+                    kind: ExtendedLoad::ZeroExtend,
+                },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+
+        // Store the i-th value at the i-th position of the vector
+        loop_block.store(
+            compilation_ctx.memory_id,
+            StoreKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
+
+        // increment i
+        loop_block
+            .local_get(i)
+            .i32_const(1)
+            .binop(BinaryOp::I32Add)
+            .local_set(i);
+
+        // continue the loop if i < bytes_n
+        loop_block
+            .local_get(i)
+            .local_get(bytes_n)
+            .binop(BinaryOp::I32LtU)
+            .br_if(loop_block_id);
+    });
+
+    builder.local_get(vector_ptr);
+
+    function.finish(vec![bytes_ptr, bytes_n], &mut module.funcs)
 }

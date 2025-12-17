@@ -4,7 +4,6 @@
 //! mechanism, we direcly implement them in WASM and limk them into the file.
 mod abi_error;
 mod account;
-pub mod bytes;
 mod contract_calls;
 mod dynamic_field;
 pub mod error;
@@ -555,8 +554,7 @@ impl NativeFunction {
             // Bytes
             //
             (Self::NATIVE_AS_VEC_BYTES_N, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_BYTES) => {
-                Self::assert_generics_length(generics.len(), 1, name, module_id)?;
-                bytes::add_as_vector_bytes_n_fn(module, compilation_ctx, &generics[0], module_id)?
+                RuntimeFunction::BytesToVec.get(module, Some(compilation_ctx))?
             }
 
             // This native function is only available in debug mode to help with testing. It should
