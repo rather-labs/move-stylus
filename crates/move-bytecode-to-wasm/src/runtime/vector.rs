@@ -717,7 +717,10 @@ pub fn vec_update_mut_ref_function(
 ///    - bytes_n: (i32) number of bytes to convert
 /// # Returns:
 ///    - i32 pointer to the newly created vector
-pub fn bytes_to_vec_function(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
+pub fn bytes_to_vec_function(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32],
