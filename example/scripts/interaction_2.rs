@@ -1,24 +1,17 @@
-//! Example on how to interact with a deployed `stylus-hello-world` contract using defaults.
-//! This example uses ethers-rs to instantiate the contract using a Solidity ABI.
-//! Then, it attempts to check the current counter value, increment it via a tx,
-//! and check the value again. The deployed contract is fully written in Rust and compiled to WASM
-//! but with Stylus, it is accessible just as a normal Solidity smart contract is via an ABI.
-
-use std::str::FromStr;
-use std::sync::Arc;
-
-use dotenv::dotenv;
-use eyre::eyre;
-
+use alloy::primitives::{Address, U256, address, keccak256};
+use alloy::providers::Provider;
+use alloy::rpc::types::TransactionRequest;
+use alloy::signers::local::PrivateKeySigner;
 use alloy::{
-    primitives::{Address, U256, address, keccak256},
-    providers::{Provider, ProviderBuilder},
-    rpc::types::TransactionRequest,
-    signers::local::PrivateKeySigner,
+    providers::ProviderBuilder,
     sol,
     sol_types::{SolEvent, SolValue},
     transports::http::reqwest::Url,
 };
+use dotenv::dotenv;
+use eyre::eyre;
+use std::str::FromStr;
+use std::sync::Arc;
 
 sol!(
     #[sol(rpc)]
@@ -109,7 +102,6 @@ async fn main() -> eyre::Result<()> {
     dotenv().ok();
     let priv_key = std::env::var("PRIV_KEY").map_err(|_| eyre!("No {} env var set", "PRIV_KEY"))?;
     let rpc_url = std::env::var("RPC_URL").map_err(|_| eyre!("No {} env var set", "RPC_URL"))?;
-
     let contract_address = std::env::var("CONTRACT_ADDRESS_2")
         .map_err(|_| eyre!("No {} env var set", "CONTRACT_ADDRESS_2"))?;
 
@@ -125,124 +117,158 @@ async fn main() -> eyre::Result<()> {
     let address = Address::from_str(&contract_address)?;
     let example = Example::new(address, provider.clone());
 
-    let ret = example.echoWithGenericFunctionU16(42).call().await?;
-    println!("echoWithGenericFunctionU16 {ret}");
+    // Helper to get last 8 hex chars of an address (0x + last 4 bytes)
+    let short_addr = |addr: &Address| -> String {
+        let s = format!("{addr}");
+        format!("0x..{}", &s[s.len() - 8..])
+    };
 
-    let ret = example
+    let sender_short = short_addr(&sender);
+
+    // ==================== Generic Functions ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║         Generic Functions            ║");
+    println!("╚══════════════════════════════════════╝");
+
+    let res = example.echoWithGenericFunctionU16(42).call().await?;
+    assert_eq!(res, 42u16);
+    println!("  ✓ echoWithGenericFunctionU16(42) = {res}");
+
+    let res = example
         .echoWithGenericFunctionVec32(vec![1, 2, 3])
         .call()
         .await?;
-    println!("echoWithGenericFunctionVec32 {ret:?}");
+    assert_eq!(res, vec![1, 2, 3]);
+    println!("  ✓ echoWithGenericFunctionVec32([1,2,3]) = {res:?}");
 
-    let ret = example
+    let res = example
         .echoWithGenericFunctionU16Vec32(42, vec![4, 5, 6])
         .call()
         .await?;
-    println!("echoWithGenericFunctionU16Vec32 ({}, {:?})", ret._0, ret._1);
-
-    let ret = example
-        .echoWithGenericFunctionAddressVec128(
-            address!("0x1234567890abcdef1234567890abcdef12345678"),
-            vec![7, 8, 9],
-        )
-        .call()
-        .await?;
+    assert_eq!(res._0, 42u16);
+    assert_eq!(res._1, vec![4, 5, 6]);
     println!(
-        "echoWithGenericFunctionAddressVec256 ({}, {:?})",
-        ret._0, ret._1
+        "  ✓ echoWithGenericFunctionU16Vec32(42, [4,5,6]) = ({}, {:?})",
+        res._0, res._1
     );
 
-    // If the constructor is called, the storage value at init_key is should be different from 0
-    let init_key = alloy::primitives::U256::from_be_bytes(keccak256(b"init_key").into());
+    let test_addr = address!("0x1234567890abcdef1234567890abcdef12345678");
+    let res = example
+        .echoWithGenericFunctionAddressVec128(test_addr, vec![7, 8, 9])
+        .call()
+        .await?;
+    assert_eq!(res._0, test_addr);
+    assert_eq!(res._1, vec![7, 8, 9]);
+    println!(
+        "  ✓ echoWithGenericFunctionAddressVec128({}, [7,8,9]) = ({}, {:?})",
+        short_addr(&test_addr),
+        short_addr(&res._0),
+        res._1
+    );
+
+    // ==================== Storage & Constructor ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║       Storage & Constructor          ║");
+    println!("╚══════════════════════════════════════╝");
+
+    let init_key = U256::from_be_bytes(keccak256(b"init_key").into());
     let init_value_le = storage_value_to_le(&provider, address, init_key).await?;
-    println!("Storage value at init_key: {init_value_le:?}");
+    println!("  init_key storage value: {init_value_le}");
 
-    // Storage key for the counter
-    let counter_key =
-        alloy::primitives::U256::from_be_bytes(keccak256(b"global_counter_key").into());
+    let counter_key = U256::from_be_bytes(keccak256(b"global_counter_key").into());
+    let storage_value_le = storage_value_to_le(&provider, address, counter_key).await?;
+    println!("  global_counter_key: {storage_value_le}");
 
+    // ==================== Unique IDs ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║            Unique IDs                ║");
+    println!("╚══════════════════════════════════════╝");
+
+    println!("\n  Calling getUniqueIds() (generates 3 UIDs)...");
     let pending_tx = example.getUniqueIds().send().await?;
     let receipt = pending_tx.get_receipt().await?;
     for log in receipt.logs() {
         let log: alloy::primitives::Log = log.clone().into();
         let decoded_uid = Example::NewUID::decode_log(&log).unwrap();
-        println!("getUniqueIds - Emitted UID: 0x{}", decoded_uid.data.uid);
+        println!("    ✓ Emitted UID: 0x{}", decoded_uid.data.uid);
     }
 
     let storage_value_le = storage_value_to_le(&provider, address, counter_key).await?;
-    println!("Counter value: {storage_value_le:?}");
+    println!("  Counter value: {storage_value_le}");
 
+    println!("\n  Calling getUniqueId() (generates 1 UID)...");
     let pending_tx = example.getUniqueId().send().await?;
     let receipt = pending_tx.get_receipt().await?;
     for log in receipt.logs() {
         let log: alloy::primitives::Log = log.clone().into();
         let decoded_uid = Example::NewUID::decode_log(&log).unwrap();
-        println!("getUniqueIds - Emitted UID: 0x{}", decoded_uid.data.uid);
+        println!("    ✓ Emitted UID: 0x{}", decoded_uid.data.uid);
     }
-    let storage_value_le = storage_value_to_le(&provider, address, counter_key).await?;
-    println!("Counter value: {storage_value_le:?}");
 
+    let storage_value_le = storage_value_to_le(&provider, address, counter_key).await?;
+    println!("  Counter value: {storage_value_le}");
+
+    println!("\n  Calling getUniqueId() again...");
     let pending_tx = example.getUniqueId().send().await?;
     let receipt = pending_tx.get_receipt().await?;
     for log in receipt.logs() {
         let log: alloy::primitives::Log = log.clone().into();
         let decoded_uid = Example::NewUID::decode_log(&log).unwrap();
-        println!("getUniqueIds - Emitted UID: 0x{}", decoded_uid.data.uid);
+        println!("    ✓ Emitted UID: 0x{}", decoded_uid.data.uid);
     }
 
     let storage_value_le = storage_value_to_le(&provider, address, counter_key).await?;
-    println!("Counter value: {storage_value_le:?}");
+    println!("  Counter value: {storage_value_le}");
 
-    let ret = example.getFreshObjectAddress().call().await?;
-    println!("fresh new id {ret:?}");
+    println!("\n  Calling getFreshObjectAddress()...");
+    let res = example.getFreshObjectAddress().call().await?;
+    println!("    ✓ Fresh address: {}", short_addr(&res));
 
     let storage_value_le = storage_value_to_le(&provider, address, counter_key).await?;
-    println!("Counter value: {storage_value_le:?}");
+    println!("  Counter value: {storage_value_le}");
 
-    // Events
-    // Emit test event 1
-    println!("Emitting test event 1");
+    // ==================== Event Emission ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║          Event Emission              ║");
+    println!("╚══════════════════════════════════════╝");
+
+    println!("\n  TestEvent1 (indexed uint32):");
     let pending_tx = example.emitTestEvent1(43).send().await?;
     let receipt = pending_tx.get_receipt().await?;
-    let event = Example::TestEvent1 { n: 43 };
-
-    // Decode event 1 from logs
-    let logs = receipt.logs();
-    for log in logs {
+    let expected = Example::TestEvent1 { n: 43 };
+    for log in receipt.logs() {
         let primitive_log: alloy::primitives::Log = log.clone().into();
-        let decoded_event = Example::TestEvent1::decode_log(&primitive_log)?;
-        assert_eq!(event, decoded_event.data);
+        let decoded = Example::TestEvent1::decode_log(&primitive_log)?;
+        assert_eq!(expected, decoded.data);
     }
+    println!("    ✓ emitTestEvent1(43) decoded correctly");
 
-    // Emit test event 2
-    println!("Emitting test event 2");
+    println!("\n  TestEvent2 (indexed uint32, indexed uint8[], uint128):");
     let pending_tx = example
-        .emitTestEvent2(42, vec![43, 44, 45], 46)
+        .emitTestEvent2(42, vec![43u8, 44, 45], 46)
         .send()
         .await?;
     let receipt = pending_tx.get_receipt().await?;
-    let event = Example::TestEvent2 {
+    let expected = Example::TestEvent2 {
         a: 42,
         b: keccak256(&vec![43, 44, 45].abi_encode()[64..]),
         c: 46,
     };
 
-    // Decode event 2 from logs
-    let logs = receipt.logs();
-    for log in logs {
+    for log in receipt.logs() {
         let primitive_log: alloy::primitives::Log = log.clone().into();
-        let decoded_event = Example::TestEvent2::decode_log(&primitive_log)?;
-        assert_eq!(event, decoded_event.data);
+        let decoded = Example::TestEvent2::decode_log(&primitive_log)?;
+        assert_eq!(expected, decoded.data);
     }
+    println!("    ✓ emitTestEvent2(42, [43,44,45], 46) decoded correctly");
 
-    // Emit test event 3
-    println!("Emitting test event 3");
+    println!("\n  TestEvent3 (indexed struct, struct):");
     let pending_tx = example
         .emitTestEvent3(42, 43, vec![44, 45, 46], 47)
         .send()
         .await?;
     let receipt = pending_tx.get_receipt().await?;
-    let event = Example::TestEvent3 {
+    let expected = Example::TestEvent3 {
         a: keccak256(Example::NestedStruct1 { n: 42 }.abi_encode()),
         b: Example::NestedStruct2 {
             a: 43,
@@ -250,68 +276,73 @@ async fn main() -> eyre::Result<()> {
             c: 47,
         },
     };
-    // Decode event 3 from logs
-    let logs = receipt.logs();
-    for log in logs {
+    for log in receipt.logs() {
         let primitive_log: alloy::primitives::Log = log.clone().into();
-        let decoded_event = Example::TestEvent3::decode_log(&primitive_log)?;
-        assert_eq!(event, decoded_event.data);
+        let decoded = Example::TestEvent3::decode_log(&primitive_log)?;
+        assert_eq!(expected, decoded.data);
     }
+    println!("    ✓ emitTestEvent3(42, 43, [44,45,46], 47) decoded correctly");
 
-    // Emit test event 4
-    println!("Emitting test event 4");
+    println!("\n  TestEvent4 (indexed uint32, uint16[], uint8[], uint32[]):");
     let pending_tx = example
         .emitTestEvent4(42, vec![43, 44, 45], vec![46, 47, 48], vec![49, 50, 51])
         .send()
         .await?;
     let receipt = pending_tx.get_receipt().await?;
-    let event = Example::TestEvent4 {
+    let expected = Example::TestEvent4 {
         a: 42,
         b: vec![43, 44, 45],
         c: vec![46, 47, 48],
         d: vec![49, 50, 51],
     };
-    let logs = receipt.logs();
-    for log in logs {
+    for log in receipt.logs() {
         let primitive_log: alloy::primitives::Log = log.clone().into();
-        let decoded_event = Example::TestEvent4::decode_log(&primitive_log)?;
-        assert_eq!(event, decoded_event.data);
+        let decoded = Example::TestEvent4::decode_log(&primitive_log)?;
+        assert_eq!(expected, decoded.data);
     }
+    println!("    ✓ emitTestEvent4(42, [43,44,45], [46,47,48], [49,50,51]) decoded correctly");
+
+    // ==================== Stack Operations ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║         Stack Operations             ║");
+    println!("╚══════════════════════════════════════╝");
 
     let s = example.testStack1().call().await?;
-    println!("testStack1\nelements: {:?} len: {}", s._0.pos0, s._1);
+    println!("  ✓ testStack1(): elements={:?}, len={}", s._0.pos0, s._1);
 
     let s = example.testStack2().call().await?;
-    println!("testStack2\nelements: {:?} len: {}", s._0.pos0, s._1);
+    println!("  ✓ testStack2(): elements={:?}, len={}", s._0.pos0, s._1);
 
     let s = example.testStack3().call().await?;
-    println!("testStack3\nelements: {:?} len: {}", s._0.pos0, s._1);
+    println!("  ✓ testStack3(): elements={:?}, len={}", s._0.pos0, s._1);
 
-    println!("\nSending plain ETH transfer to the contract (empty calldata)");
-    println!("This should trigger the receive() function if it exists");
+    // ==================== Receive & Fallback ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║        Receive & Fallback            ║");
+    println!("╚══════════════════════════════════════╝");
+
+    println!("\n  Plain ETH transfer (triggers receive):");
     let tx = TransactionRequest::default()
         .from(sender)
         .to(address)
         .value(U256::from(1_000_000_000_000_000_000u128));
     let pending_tx = provider.send_transaction(tx).await?;
     let receipt = pending_tx.get_receipt().await?;
-    println!("Successfully sent 1 ETH to the contract (plain transfer)");
 
-    // Decode ReceiveEvent from the receipt logs
     for log in receipt.logs() {
         let primitive_log: alloy::primitives::Log = log.clone().into();
-        let decoded_event = Example::ReceiveEvent::decode_log(&primitive_log)?;
-        let event = Example::ReceiveEvent {
+        let decoded = Example::ReceiveEvent::decode_log(&primitive_log)?;
+        let expected = Example::ReceiveEvent {
             sender,
             data_length: 0,
             data: vec![],
         };
-        assert_eq!(decoded_event.data, event);
+        assert_eq!(decoded.data, expected);
     }
+    println!("    ✓ Sent 1 ETH, ReceiveEvent decoded (sender={sender_short}, data_length=0)");
 
-    println!("\nSending ETH with calldata");
-    println!("This should trigger the fallback function");
-    let calldata = vec![43, 44, 45].abi_encode();
+    println!("\n  ETH with calldata [43,44,45] (triggers fallback):");
+    let calldata = vec![43u8, 44, 45].abi_encode();
     let calldata_len = calldata.len() as u32;
     let tx = TransactionRequest::default()
         .from(sender)
@@ -320,18 +351,20 @@ async fn main() -> eyre::Result<()> {
         .input(calldata.clone().into());
     let pending_tx = provider.send_transaction(tx).await?;
     let receipt = pending_tx.get_receipt().await?;
+
     for log in receipt.logs() {
         let primitive_log: alloy::primitives::Log = log.clone().into();
-        let decoded_event = Example::ReceiveEvent::decode_log(&primitive_log)?;
-        let event = Example::ReceiveEvent {
+        let decoded = Example::ReceiveEvent::decode_log(&primitive_log)?;
+        let expected = Example::ReceiveEvent {
             sender,
             data_length: calldata_len,
             data: calldata.clone(),
         };
-        assert_eq!(decoded_event.data, event);
+        assert_eq!(decoded.data, expected);
     }
+    println!("    ✓ Sent 1 ETH + calldata, ReceiveEvent decoded (data_length={calldata_len})");
 
-    println!("\nSending ETH with a string as calldata");
+    println!("\n  ETH with string calldata (triggers fallback):");
     let calldata = String::from("hola como estas").abi_encode();
     let calldata_len = calldata.len() as u32;
     let tx = TransactionRequest::default()
@@ -339,21 +372,24 @@ async fn main() -> eyre::Result<()> {
         .to(address)
         .value(U256::from(1_000_000_000_000_000_000u128))
         .input(calldata.clone().into());
-
     let pending_tx = provider.send_transaction(tx).await?;
     let receipt = pending_tx.get_receipt().await?;
+
     for log in receipt.logs() {
         let primitive_log: alloy::primitives::Log = log.clone().into();
-        let decoded_event = Example::ReceiveEvent::decode_log(&primitive_log)?;
-        let event = Example::ReceiveEvent {
+        let decoded = Example::ReceiveEvent::decode_log(&primitive_log)?;
+        let expected = Example::ReceiveEvent {
             sender,
             data_length: calldata_len,
             data: calldata.clone(),
         };
-        assert_eq!(decoded_event.data, event);
+        assert_eq!(decoded.data, expected);
     }
+    println!(
+        "    ✓ Sent 1 ETH + \"hola como estas\", ReceiveEvent decoded (data_length={calldata_len})"
+    );
 
-    println!("\nSending ETH with a u256 as calldata");
+    println!("\n  ETH with U256::MAX calldata (triggers fallback):");
     let calldata = U256::MAX.abi_encode();
     let calldata_len = calldata.len() as u32;
     let tx = TransactionRequest::default()
@@ -361,19 +397,25 @@ async fn main() -> eyre::Result<()> {
         .to(address)
         .value(U256::from(1_000_000_000_000_000_000u128))
         .input(calldata.clone().into());
-
     let pending_tx = provider.send_transaction(tx).await?;
     let receipt = pending_tx.get_receipt().await?;
+
     for log in receipt.logs() {
         let primitive_log: alloy::primitives::Log = log.clone().into();
-        let decoded_event = Example::ReceiveEvent::decode_log(&primitive_log)?;
-        let event = Example::ReceiveEvent {
+        let decoded = Example::ReceiveEvent::decode_log(&primitive_log)?;
+        let expected = Example::ReceiveEvent {
             sender,
             data_length: calldata_len,
             data: calldata.clone(),
         };
-        assert_eq!(decoded_event.data, event);
+        assert_eq!(decoded.data, expected);
     }
+    println!("    ✓ Sent 1 ETH + U256::MAX, ReceiveEvent decoded (data_length={calldata_len})");
+
+    // ==================== Done ====================
+    println!("\n╔══════════════════════════════════════╗");
+    println!("║        ✓ All tests passed!           ║");
+    println!("╚══════════════════════════════════════╝\n");
 
     Ok(())
 }
@@ -382,10 +424,8 @@ async fn main() -> eyre::Result<()> {
 async fn storage_value_to_le<T: Provider>(
     provider: &T,
     address: Address,
-    key: alloy::primitives::U256,
-) -> eyre::Result<alloy::primitives::U256> {
+    key: U256,
+) -> eyre::Result<U256> {
     let value = provider.get_storage_at(address, key).await?;
-    Ok(alloy::primitives::U256::from_le_bytes(
-        value.to_be_bytes::<32>(),
-    ))
+    Ok(U256::from_le_bytes(value.to_be_bytes::<32>()))
 }
