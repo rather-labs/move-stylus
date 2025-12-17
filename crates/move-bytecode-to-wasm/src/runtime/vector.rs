@@ -50,8 +50,8 @@ pub fn increment_vec_len_function(
 
 /// Decrements vector length by 1
 ///
-/// # Arguments
-/// * `vec_ptr` - (i32) reference to the vector
+/// # WASM Function Arguments
+/// * `ptr` (i32) - pointer to the vector
 pub fn decrement_vec_len_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -731,11 +731,12 @@ pub fn vec_update_mut_ref_function(
 
 /// Converts raw bytes (bytesN) into a vector<u8>.
 ///
-/// # Arguments:
-///    - bytes_ptr: (i32) pointer to the raw bytes in memory
-///    - bytes_n: (i32) number of bytes to convert
-/// # Returns:
-///    - i32 pointer to the newly created vector
+/// # WASM Function Arguments
+/// * `bytes_ptr` (i32) - pointer to the raw bytes in memory
+/// * `bytes_n` (i32) - number of bytes to convert
+///
+/// # WASM Function Returns
+/// * i32 pointer to the newly created vector
 pub fn bytes_to_vec_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
