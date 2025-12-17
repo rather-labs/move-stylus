@@ -111,7 +111,7 @@ entry fun get_foo(foo: &Foo): &Foo {
 
 entry fun delete_obj(foo: Foo) {
     let Foo { id, value: _ } = foo;
-    id.remove();
+    id.delete();
 }
 
 entry fun freeze_obj(foo: Foo) {
@@ -145,7 +145,7 @@ entry fun get_bar(bar: &Bar): &Bar {
 
 entry fun delete_bar(bar: Bar) {
     let Bar { id, a: _, c: _ } = bar;
-    id.remove();
+    id.delete();
 }
 
 // ============================================================================
@@ -172,7 +172,7 @@ entry fun get_baz(baz: &Baz): &Baz {
 
 entry fun delete_baz(baz: Baz) {
     let Baz { id, a: _, c: _ } = baz;
-    id.remove();
+    id.delete();
 }
 
 // ============================================================================
@@ -205,7 +205,7 @@ entry fun get_bez(bez: &Bez): &Bez {
 
 entry fun delete_bez(bez: Bez) {
     let Bez { id, a: _, c: _, d: _, e: _ } = bez;
-    id.remove();
+    id.delete();
 }
 
 // ============================================================================
@@ -232,5 +232,5 @@ entry fun get_biz(biz: &Biz<u64>): &Biz<u64> {
 
 entry fun delete_biz(biz: Biz<u64>) {
     let Biz { id, a: _, b: _, c: _ } = biz;
-    id.remove();
+    id.delete();
 }
