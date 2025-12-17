@@ -1,18 +1,18 @@
 use walrus::{InstrSeqBuilder, LocalId, ir::BinaryOp};
 
-use crate::{abi_types::error::AbiError, vm_handled_types::bytes::Bytes4};
+use crate::{abi_types::error::AbiError, vm_handled_types::bytes::Bytes};
 
-impl Bytes4 {
+impl Bytes {
     pub fn add_unpack_instructions(
         builder: &mut InstrSeqBuilder,
         reader_pointer: LocalId,
     ) -> Result<(), AbiError> {
         // Push the reader pointer to the stack.
-        // It already points to the 4 bytes we need to unpack.
+        // It already points to the bytes we need to unpack.
         builder.local_get(reader_pointer);
 
         // Advance the reader pointer by 32
-        // bytes<M> is not a dynamic type, so the first M bytes are left aligned and the rest are padded with 0s til 32
+        // Bytes<M> is not a dynamic type, so the M bytes are left aligned and the rest are padded with 0s til 32
         builder
             .local_get(reader_pointer)
             .i32_const(32_i32)

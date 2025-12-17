@@ -10,7 +10,7 @@ use stylus::account as account;
 use erc721Utils::utils as erc721_utils;
 use std::ascii as ascii;
 use std::ascii::String;
-use stylus::bytes::Bytes4;
+use stylus::sol_types::Bytes4;
 
 public struct COLLECTION_INFO has key {}
 public struct TOTAL_SUPPLY has key {}

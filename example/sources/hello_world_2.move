@@ -135,7 +135,7 @@ entry fun receive(ctx: &TxContext) {
 entry fun fallback(data: &fallback::Calldata, ctx: &TxContext) {
     emit(ReceiveEvent { 
         sender: ctx.sender(), 
-        data_length: fallback::calldata_length(data), 
-        data: fallback::calldata_as_vector(data) 
+        data_length: data.len(), 
+        data: data.as_vec() 
     });
 }
