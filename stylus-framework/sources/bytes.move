@@ -1,6 +1,5 @@
 module stylus::bytes;
 
-// TODO: maybe rename this?
 public(package) native fun as_vec_bytes_n<T: copy + drop>(value: &T, n: u8): vector<u8>;
 
 public struct Bytes1 has copy, drop {}

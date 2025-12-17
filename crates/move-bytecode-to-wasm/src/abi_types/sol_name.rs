@@ -44,10 +44,7 @@ impl SolName for IntermediateType {
                 let identifier = &compilation_ctx
                     .get_struct_by_index(module_id, *index)?
                     .identifier;
-                Some(format!(
-                    "bytes{}",
-                    Bytes::get_size_from_identifier(identifier)?
-                ))
+                Some(identifier.to_lowercase())
             }
             // Depening on the contect, structs can be interpreted in different ways (i.e events vs
             // function selector)

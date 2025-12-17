@@ -1,7 +1,6 @@
 use super::{VmHandledType, error::VmHandledTypeError};
 use crate::{
     CompilationContext,
-    compilation_context::CompilationContextError,
     compilation_context::ModuleId,
     compilation_context::reserved_modules::{SF_MODULE_NAME_BYTES, STYLUS_FRAMEWORK_ADDRESS},
 };
@@ -30,34 +29,31 @@ impl VmHandledType for Bytes {
             .identifier;
 
         // Check if identifier matches "Bytes" followed by a number 1-32
-        if let Some(num_str) = identifier.strip_prefix("Bytes") {
-            if let Ok(n) = num_str.parse::<u8>() {
-                if (1..=32).contains(&n) {
-                    if module_id.address != STYLUS_FRAMEWORK_ADDRESS
-                        || module_id.module_name != SF_MODULE_NAME_BYTES
-                    {
-                        return Err(VmHandledTypeError::InvalidFrameworkType(Box::leak(
-                            identifier.clone().into_boxed_str(),
-                        )));
-                    }
-                    return Ok(true);
-                }
+        // Check if the package is the stylus framework and the module is the bytes module
+        if Bytes::validate_identifier(identifier) {
+            if module_id.address != STYLUS_FRAMEWORK_ADDRESS
+                || module_id.module_name != SF_MODULE_NAME_BYTES
+            {
+                return Err(VmHandledTypeError::InvalidFrameworkType(Box::leak(
+                    identifier.clone().into_boxed_str(),
+                )));
             }
+            return Ok(true);
         }
         Ok(false)
     }
 }
 
 impl Bytes {
-    // This should return an error if the identifier is not a valid BytesN type
-    pub fn get_size_from_identifier(identifier: &str) -> Result<u8, CompilationContextError> {
+    // Returns true if the identifier matches BytesN with N in 1..=32
+    pub fn validate_identifier(identifier: &str) -> bool {
         if let Some(num_str) = identifier.strip_prefix("Bytes") {
             if let Ok(n) = num_str.parse::<u8>() {
-                return Ok(n);
+                if (1..=32).contains(&n) {
+                    return true;
+                }
             }
         }
-        Err(CompilationContextError::InvalidBytesNIdentifier(
-            identifier.to_string(),
-        ))
+        false
     }
 }

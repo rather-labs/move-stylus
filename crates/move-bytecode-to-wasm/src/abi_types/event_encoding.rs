@@ -72,10 +72,7 @@ fn solidity_name(
             let identifier = &compilation_ctx
                 .get_struct_by_index(module_id, *index)?
                 .identifier;
-            Some(format!(
-                "bytes{}",
-                Bytes::get_size_from_identifier(identifier)?
-            ))
+            Some(identifier.to_lowercase())
         }
         IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
             let struct_ = compilation_ctx.get_struct_by_intermediate_type(argument)?;
