@@ -1,5 +1,5 @@
 /// Storage Encoding Test Module
-/// 
+///
 /// This module provides comprehensive test cases for storage encoding functionality
 /// in the Stylus framework. It includes various data structures and operations
 /// to test different encoding scenarios including static fields, dynamic fields,
@@ -24,6 +24,7 @@ native fun read_slot<T: key>(slot: u256, uid: u256): T;
 // ============================================================================
 
 /// Test structure with various primitive static fields
+#[allow(unused_field)]
 public struct StaticFields has key {
     id: UID,
     a: u256,
@@ -35,6 +36,7 @@ public struct StaticFields has key {
     g: address,
 }
 
+#[allow(unused_field)]
 public struct StaticFields_ {
     id: address,
     a: u256,
@@ -47,6 +49,7 @@ public struct StaticFields_ {
 }
 
 /// Test structure with mixed primitive types
+#[allow(unused_field)]
 public struct StaticFields2 has key {
     id: UID,
     a: u8,
@@ -57,6 +60,7 @@ public struct StaticFields2 has key {
 }
 
 /// Test structure with mixed primitive types
+#[allow(unused_field)]
 public struct StaticFields2_ {
     id: address,
     a: u8,
@@ -67,6 +71,7 @@ public struct StaticFields2_ {
 }
 
 /// Test structure with address fields
+#[allow(unused_field)]
 public struct StaticFields3 has key {
     id: UID,
     a: u8,
@@ -75,6 +80,7 @@ public struct StaticFields3 has key {
     d: address,
 }
 
+#[allow(unused_field)]
 public struct StaticFields3_ {
     id: address,
     a: u8,
@@ -84,6 +90,7 @@ public struct StaticFields3_ {
 }
 
 /// Test structure with nested static child
+#[allow(unused_field)]
 public struct StaticNestedStruct has key {
     id: UID,
     a: u64,
@@ -93,6 +100,7 @@ public struct StaticNestedStruct has key {
     g: u32,
 }
 
+#[allow(unused_field)]
 public struct StaticNestedStruct_ {
     id: address,
     a: u64,
@@ -103,6 +111,7 @@ public struct StaticNestedStruct_ {
 }
 
 /// Child structure for static nested testing
+#[allow(unused_field)]
 public struct StaticNestedStructChild has store {
     d: u64,
     e: address,
@@ -113,6 +122,7 @@ public struct StaticNestedStructChild has store {
 // ============================================================================
 
 /// Test structure with mixed static and dynamic fields
+#[allow(unused_field)]
 public struct DynamicStruct has key {
     id: UID,
     a: u32,
@@ -124,6 +134,7 @@ public struct DynamicStruct has key {
     g: u256,
 }
 
+#[allow(unused_field)]
 public struct DynamicStruct_ {
     id: address,
     a: u32,
@@ -136,6 +147,7 @@ public struct DynamicStruct_ {
 }
 
 /// Test structure with various vector types
+#[allow(unused_field)]
 public struct DynamicStruct2 has key {
     id: UID,
     a: vector<bool>,
@@ -148,6 +160,7 @@ public struct DynamicStruct2 has key {
     h: vector<address>,
 }
 
+#[allow(unused_field)]
 public struct DynamicStruct2_ {
     id: address,
     a: vector<bool>,
@@ -161,6 +174,7 @@ public struct DynamicStruct2_ {
 }
 
 /// Test structure with nested vectors
+#[allow(unused_field)]
 public struct DynamicStruct3 has key {
     id: UID,
     a: vector<vector<u8>>,
@@ -169,6 +183,7 @@ public struct DynamicStruct3 has key {
     d: vector<vector<u128>>,
 }
 
+#[allow(unused_field)]
 public struct DynamicStruct3_ {
     id: address,
     a: vector<vector<u8>>,
@@ -178,12 +193,14 @@ public struct DynamicStruct3_ {
 }
 
 /// Test structure with nested struct vectors
+#[allow(unused_field)]
 public struct DynamicStruct4 has key {
     id: UID,
     a: vector<DynamicNestedStructChild>,
     b: vector<StaticNestedStructChild>,
 }
 
+#[allow(unused_field)]
 public struct DynamicStruct4_ {
     id: address,
     a: vector<DynamicNestedStructChild>,
@@ -191,23 +208,27 @@ public struct DynamicStruct4_ {
 }
 
 /// Test structure with complex nested wrappers
+#[allow(unused_field)]
 public struct DynamicStruct5 has key {
     id: UID,
     a: vector<NestedStructChildWrapper>,
 }
 
+#[allow(unused_field)]
 public struct DynamicStruct5_ {
     id: address,
     a: vector<NestedStructChildWrapper>,
 }
 
 /// Generic test structure
+#[allow(unused_field)]
 public struct GenericStruct<T> has key, store {
     id: UID,
     a: vector<T>,
     b: T,
 }
 
+#[allow(unused_field)]
 public struct GenericStruct_<T> {
     id: address,
     a: vector<T>,
@@ -215,12 +236,14 @@ public struct GenericStruct_<T> {
 }
 
 /// Child structure for dynamic nested testing
+#[allow(unused_field)]
 public struct DynamicNestedStructChild has store {
     a: vector<u32>,
     b: u128,
 }
 
 /// Wrapper for nested struct children
+#[allow(unused_field)]
 public struct NestedStructChildWrapper has store {
     a: vector<DynamicNestedStructChild>,
     b: vector<StaticNestedStructChild>,
@@ -231,17 +254,20 @@ public struct NestedStructChildWrapper has store {
 // ============================================================================
 
 /// Simple wrapped object for testing
+#[allow(unused_field)]
 public struct Bar has key, store {
     id: UID,
     a: u64,
 }
 
+#[allow(unused_field)]
 public struct Bar_ {
     id: address,
     a: u64,
 }
 
 /// Struct containing a wrapped object
+#[allow(unused_field)]
 public struct Foo has key, store {
     id: UID,
     a: u64,
@@ -249,6 +275,7 @@ public struct Foo has key, store {
     c: u32,
 }
 
+#[allow(unused_field)]
 public struct Foo_ {
     id: address,
     a: u64,
@@ -257,6 +284,7 @@ public struct Foo_ {
 }
 
 /// Struct with nested wrapped objects
+#[allow(unused_field)]
 public struct MegaFoo has key {
     id: UID,
     a: u64,
@@ -264,6 +292,7 @@ public struct MegaFoo has key {
     c: u32,
 }
 
+#[allow(unused_field)]
 public struct MegaFoo_ {
     id: address,
     a: u64,
@@ -272,6 +301,7 @@ public struct MegaFoo_ {
 }
 
 /// Complex struct with multiple wrapped objects and vectors
+#[allow(unused_field)]
 public struct Var has key {
     id: UID,
     a: Bar,
@@ -279,6 +309,7 @@ public struct Var has key {
     c: vector<Bar>,
 }
 
+#[allow(unused_field)]
 public struct Var_ {
     id: address,
     a: Bar,
@@ -286,6 +317,7 @@ public struct Var_ {
     c: vector<Bar>,
 }
 
+#[allow(unused_field)]
 public struct GenericWrapper<T> has key {
     id: UID,
     a: T,
@@ -293,6 +325,7 @@ public struct GenericWrapper<T> has key {
     c: T
 }
 
+#[allow(unused_field)]
 public struct GenericWrapper_<T> {
     id: address,
     a: T,
@@ -315,9 +348,9 @@ entry fun save_static_fields(
     g: address,
     ctx: &mut TxContext,
 ) {
-    let struct_ = StaticFields { 
-        id: object::new(ctx), 
-        a, b, c, d, e, f, g 
+    let struct_ = StaticFields {
+        id: object::new(ctx),
+        a, b, c, d, e, f, g
     };
     save_in_slot(struct_, 0);
 }
@@ -342,9 +375,9 @@ entry fun save_static_fields_2(
     e: u8,
     ctx: &mut TxContext,
 ) {
-    let struct_ = StaticFields2 { 
-        id: object::new(ctx), 
-        a, b, c, d, e 
+    let struct_ = StaticFields2 {
+        id: object::new(ctx),
+        a, b, c, d, e
     };
     save_in_slot(struct_, 0);
 }
@@ -368,9 +401,9 @@ entry fun save_static_fields_3(
     d: address,
     ctx: &mut TxContext,
 ) {
-    let struct_ = StaticFields3 { 
-        id: object::new(ctx), 
-        a, b, c, d 
+    let struct_ = StaticFields3 {
+        id: object::new(ctx),
+        a, b, c, d
     };
     save_in_slot(struct_, 0);
 }
@@ -397,9 +430,9 @@ entry fun save_static_nested_struct(
     ctx: &mut TxContext,
 ) {
     let child = StaticNestedStructChild { d, e };
-    let struct_ = StaticNestedStruct { 
-        id: object::new(ctx), 
-        a, b, c: child, f, g 
+    let struct_ = StaticNestedStruct {
+        id: object::new(ctx),
+        a, b, c: child, f, g
     };
     save_in_slot(struct_, 0);
 }
@@ -430,9 +463,9 @@ entry fun save_dynamic_struct(
     g: u256,
     ctx: &mut TxContext,
 ) {
-    let struct_ = DynamicStruct { 
-        id: object::new(ctx), 
-        a, b, c, d, e, f, g 
+    let struct_ = DynamicStruct {
+        id: object::new(ctx),
+        a, b, c, d, e, f, g
     };
     save_in_slot(struct_, 0);
 }
@@ -460,9 +493,9 @@ entry fun save_dynamic_struct_2(
     h: vector<address>,
     ctx: &mut TxContext,
 ) {
-    let struct_ = DynamicStruct2 { 
-        id: object::new(ctx), 
-        a, b, c, d, e, f, g, h 
+    let struct_ = DynamicStruct2 {
+        id: object::new(ctx),
+        a, b, c, d, e, f, g, h
     };
     save_in_slot(struct_, 0);
 }
@@ -486,9 +519,9 @@ entry fun save_dynamic_struct_3(
     d: vector<vector<u128>>,
     ctx: &mut TxContext,
 ) {
-    let struct_ = DynamicStruct3 { 
-        id: object::new(ctx), 
-        a, b, c, d 
+    let struct_ = DynamicStruct3 {
+        id: object::new(ctx),
+        a, b, c, d
     };
     save_in_slot(struct_, 0);
 }
@@ -513,17 +546,17 @@ entry fun save_dynamic_struct_4(
     ctx: &mut TxContext,
 ) {
     let a = vector[
-        DynamicNestedStructChild { a: x, b: z }, 
+        DynamicNestedStructChild { a: x, b: z },
         DynamicNestedStructChild { a: x, b: z + 1 }
     ];
     let b = vector[
-        StaticNestedStructChild { d: y, e: w }, 
-        StaticNestedStructChild { d: y + 1, e: w }, 
+        StaticNestedStructChild { d: y, e: w },
+        StaticNestedStructChild { d: y + 1, e: w },
         StaticNestedStructChild { d: y + 2, e: w }
     ];
-    let struct_ = DynamicStruct4 { 
-        id: object::new(ctx), 
-        a, b 
+    let struct_ = DynamicStruct4 {
+        id: object::new(ctx),
+        a, b
     };
     save_in_slot(struct_, 0);
 }
@@ -549,30 +582,30 @@ entry fun save_dynamic_struct_5(
 ) {
     let v = vector[x, x + 1, x + 2];
     let a1 = vector[
-        DynamicNestedStructChild { a: v, b: z }, 
+        DynamicNestedStructChild { a: v, b: z },
         DynamicNestedStructChild { a: v, b: z + 1 }
     ];
     let a2 = vector[
-        DynamicNestedStructChild { a: v, b: z + 2 }, 
-        DynamicNestedStructChild { a: v, b: z + 3 }, 
+        DynamicNestedStructChild { a: v, b: z + 2 },
+        DynamicNestedStructChild { a: v, b: z + 3 },
         DynamicNestedStructChild { a: v, b: z + 4 }
     ];
     let b1 = vector[
-        StaticNestedStructChild { d: y, e: w }, 
-        StaticNestedStructChild { d: y + 1, e: w }, 
+        StaticNestedStructChild { d: y, e: w },
+        StaticNestedStructChild { d: y + 1, e: w },
         StaticNestedStructChild { d: y + 2, e: w }
     ];
     let b2 = vector[
-        StaticNestedStructChild { d: y + 3, e: w }, 
+        StaticNestedStructChild { d: y + 3, e: w },
         StaticNestedStructChild { d: y + 4, e: w }
     ];
     let a = vector[
-        NestedStructChildWrapper { a: a1, b: b1 }, 
+        NestedStructChildWrapper { a: a1, b: b1 },
         NestedStructChildWrapper { a: a2, b: b2 }
     ];
-    let struct_ = DynamicStruct5 { 
-        id: object::new(ctx), 
-        a 
+    let struct_ = DynamicStruct5 {
+        id: object::new(ctx),
+        a
     };
     save_in_slot(struct_, 0);
 }
@@ -594,9 +627,9 @@ entry fun save_generic_struct_32(
     ctx: &mut TxContext,
 ) {
     let a = vector[x, x + 1, x + 2];
-    let struct_ = GenericStruct<u32> { 
-        id: object::new(ctx), 
-        a, b: x 
+    let struct_ = GenericStruct<u32> {
+        id: object::new(ctx),
+        a, b: x
     };
     save_in_slot(struct_, 0);
 }
@@ -690,7 +723,7 @@ entry fun save_var(ctx: &mut TxContext) {
         id: object::new(ctx),
         a: 42,
     };
-    
+
     let bar_3 = Bar {
         id: object::new(ctx),
         a: 43,
@@ -705,21 +738,21 @@ entry fun save_var(ctx: &mut TxContext) {
         id: object::new(ctx),
         a: 45,
     };
-    
+
     let foo = Foo {
         id: object::new(ctx),
         a: 101,
         b: bar_1,
         c: 102,
     };
-    
+
     let var = Var {
         id: object::new(ctx),
         a: bar_2,
         b: foo,
         c: vector[bar_3, bar_4, bar_5],
     };
-    
+
     save_in_slot(var, 0);
 }
 
@@ -776,7 +809,7 @@ public struct StructWithSimpleEnums has key, store {
 
 public enum FooEnum has store, drop {
     A { x: u16, y: u32 },
-    B(u64, u128, bool), 
+    B(u64, u128, bool),
     C{n: Numbers, c: Colors}
 }
 

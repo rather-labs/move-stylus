@@ -4,7 +4,6 @@ use stylus::tx_context::TxContext;
 use stylus::object as object;
 use stylus::object::UID;
 use stylus::transfer as transfer;
-use stylus::types as types;
 
 public struct Foo has key {
     id: UID,
@@ -16,7 +15,7 @@ public struct CONSTRUCTOR_BAD_ARGS_5 has drop {}
 
 // An init function can only take an OTW as first argument and a TxContext as last argument,
 // To be considered a constructor.
-fun init(ctx: &mut TxContext, otw: CONSTRUCTOR_BAD_ARGS_5) {
+fun init(ctx: &mut TxContext, _otw: CONSTRUCTOR_BAD_ARGS_5) {
 
   let foo = Foo {
     id: object::new(ctx),
