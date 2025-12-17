@@ -1,12 +1,11 @@
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
-    ir::{BinaryOp, ExtendedLoad, LoadKind, MemArg, StoreKind},
+    ir::{LoadKind, MemArg},
 };
 
 use crate::{
     CompilationContext, compilation_context::ModuleId, data::DATA_CALLDATA_OFFSET,
-    translation::intermediate_types::vector::IVector,
-    wasm_builder_extensions::WasmBuilderExtension,
+    runtime::RuntimeFunction,
 };
 
 use super::NativeFunction;
@@ -17,6 +16,10 @@ pub fn add_calldata_as_vector_fn(
     compilation_ctx: &CompilationContext,
     module_id: &ModuleId,
 ) -> FunctionId {
+    let bytes_to_vec_fn = RuntimeFunction::BytesToVec
+        .get(module, Some(compilation_ctx))
+        .expect("BytesToVec runtime function should be available");
+
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
 
     let calldata_ptr = module.locals.add(ValType::I32);
@@ -28,82 +31,21 @@ pub fn add_calldata_as_vector_fn(
         ))
         .func_body();
 
-    // We need to convert the calldata to a vector<u8>, i.e. each byte takes 4 bytes (due to the current internal impl of vectors)
-    let calldata_len = module.locals.add(ValType::I32);
+    // Push calldata_ptr (first argument)
+    builder.local_get(calldata_ptr);
 
-    // Load the calldata length, which prepends the calldata
-    builder
-        .i32_const(DATA_CALLDATA_OFFSET)
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
-        .local_set(calldata_len);
-
-    let vector_ptr = module.locals.add(ValType::I32);
-    IVector::allocate_vector_with_header(
-        &mut builder,
-        compilation_ctx,
-        vector_ptr,
-        calldata_len,
-        calldata_len,
-        4,
+    // Load and push the calldata length from DATA_CALLDATA_OFFSET (second argument)
+    builder.i32_const(DATA_CALLDATA_OFFSET).load(
+        compilation_ctx.memory_id,
+        LoadKind::I32 { atomic: false },
+        MemArg {
+            align: 0,
+            offset: 0,
+        },
     );
 
-    let i = module.locals.add(ValType::I32);
-    builder.i32_const(0).local_set(i);
-    builder.loop_(None, |loop_block| {
-        let loop_block_id = loop_block.id();
-
-        // address: vector_ptr + 8 (header) + i * 4
-        loop_block.vec_elem_ptr(vector_ptr, i, 4);
-
-        // value: calldata[i]
-        loop_block
-            .local_get(calldata_ptr)
-            .local_get(i)
-            .binop(BinaryOp::I32Add)
-            .load(
-                compilation_ctx.memory_id,
-                LoadKind::I32_8 {
-                    kind: ExtendedLoad::ZeroExtend,
-                },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
-
-        // Store the i-th value at the i-th position of the vector
-        loop_block.store(
-            compilation_ctx.memory_id,
-            StoreKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        );
-
-        // increment i
-        loop_block
-            .local_get(i)
-            .i32_const(1)
-            .binop(BinaryOp::I32Add)
-            .local_set(i);
-
-        // continue the loop if i < calldata_len
-        loop_block
-            .local_get(i)
-            .local_get(calldata_len)
-            .binop(BinaryOp::I32LtU)
-            .br_if(loop_block_id);
-    });
-
-    builder.local_get(vector_ptr);
+    // Call the runtime function to convert bytes to vector
+    builder.call(bytes_to_vec_fn);
 
     function.finish(vec![calldata_ptr], &mut module.funcs)
 }
