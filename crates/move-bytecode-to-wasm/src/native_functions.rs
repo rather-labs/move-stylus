@@ -101,7 +101,7 @@ impl NativeFunction {
     const NATIVE_ACCOUNT_BALANCE: &str = "account_balance";
 
     // Bytes functions
-    const NATIVE_AS_VEC_BYTES4: &str = "as_vec_bytes4";
+    const NATIVE_AS_VEC_BYTES_N: &str = "as_vec_bytes_n";
 
     // Tests
     const NATIVE_POISON: &str = "poison";
@@ -336,9 +336,6 @@ impl NativeFunction {
                     STYLUS_FRAMEWORK_ADDRESS,
                     SF_MODULE_NAME_FALLBACK,
                 ) => fallback::add_calldata_length_fn(module, compilation_ctx, module_id),
-                (Self::NATIVE_AS_VEC_BYTES4, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_BYTES) => {
-                    bytes::add_as_vector_bytes4_fn(module, compilation_ctx, module_id)
-                }
                 (
                     Self::NATIVE_ACCOUNT_CODE_SIZE,
                     STYLUS_FRAMEWORK_ADDRESS,
@@ -552,6 +549,14 @@ impl NativeFunction {
                     &generics[0],
                     module_id,
                 )?
+            }
+
+            //
+            // Bytes
+            //
+            (Self::NATIVE_AS_VEC_BYTES_N, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_BYTES) => {
+                Self::assert_generics_length(generics.len(), 1, name, module_id)?;
+                bytes::add_as_vector_bytes_n_fn(module, compilation_ctx, &generics[0], module_id)?
             }
 
             // This native function is only available in debug mode to help with testing. It should

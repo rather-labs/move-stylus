@@ -123,6 +123,9 @@ pub enum CompilationContextError {
 
     #[error("expected private visibility for init function")]
     InitFunctionBadPrivacy,
+
+    #[error("invalid BytesN identifier: {0}")]
+    InvalidBytesNIdentifier(String),
 }
 
 impl From<CompilationContextError> for CompilationError {

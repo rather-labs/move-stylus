@@ -3,7 +3,7 @@ use alloy_primitives::keccak256;
 use crate::{
     CompilationContext,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
-    vm_handled_types::{VmHandledType, bytes::Bytes4, string::String_, tx_context::TxContext},
+    vm_handled_types::{VmHandledType, bytes::Bytes, string::String_, tx_context::TxContext},
 };
 
 use super::error::AbiError;
@@ -68,7 +68,15 @@ fn solidity_name(
         }
         IntermediateType::IStruct {
             module_id, index, ..
-        } if Bytes4::is_vm_type(module_id, *index, compilation_ctx)? => Some("bytes4".to_string()),
+        } if Bytes::is_vm_type(module_id, *index, compilation_ctx)? => {
+            let identifier = &compilation_ctx
+                .get_struct_by_index(module_id, *index)?
+                .identifier;
+            Some(format!(
+                "bytes{}",
+                Bytes::get_size_from_identifier(identifier)?
+            ))
+        }
         IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
             let struct_ = compilation_ctx.get_struct_by_intermediate_type(argument)?;
 
