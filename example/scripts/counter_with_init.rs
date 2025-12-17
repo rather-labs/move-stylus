@@ -51,7 +51,10 @@ async fn main() -> eyre::Result<()> {
     println!("\nReading initial counter value (should be initialized to 25)");
     let res = example.read(counter_id).call().await?;
     println!("  Counter value: {res}");
-    assert_eq!(res, 25u64, "Initial counter value should be 25 (from constructor)");
+    assert_eq!(
+        res, 25u64,
+        "Initial counter value should be 25 (from constructor)"
+    );
 
     println!("\nIncrementing counter");
     let pending_tx = example.increment(counter_id).send().await?;
@@ -70,13 +73,20 @@ async fn main() -> eyre::Result<()> {
     let receipt = pending_tx.get_receipt().await?;
 
     // Check no log is emitted, meaning the constructor logic is not executed again
-    assert_eq!(receipt.logs().len(), 0, "Constructor should not emit logs when called again");
+    assert_eq!(
+        receipt.logs().len(),
+        0,
+        "Constructor should not emit logs when called again"
+    );
     println!("✓ No logs emitted - constructor logic not executed again");
 
     // Read again and check the value has not changed
     let res = example.read(counter_id).call().await?;
     println!("  Counter value: {res}");
-    assert_eq!(res, 26u64, "Counter value should remain 26 after redundant constructor call");
+    assert_eq!(
+        res, 26u64,
+        "Counter value should remain 26 after redundant constructor call"
+    );
 
     println!("\nIncrementing counter again");
     let pending_tx = example.increment(counter_id).send().await?;
