@@ -12,10 +12,10 @@ public enum MyEnum has drop, copy {
 // Standard error type
 #[ext(abi_error)]
 #[allow(unused_field)]
-public struct Error_(String) has copy, drop;
+public struct BasicError(String) has copy, drop;
 
 entry fun revert_standard_error(s: String) {
-    let error = Error_(s);
+    let error = BasicError(s);
     revert(error);
 }
 
