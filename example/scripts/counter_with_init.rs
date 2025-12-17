@@ -1,4 +1,3 @@
-use alloy::hex;
 use alloy::primitives::FixedBytes;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::{primitives::Address, providers::ProviderBuilder, sol, transports::http::reqwest::Url};
@@ -37,74 +36,74 @@ async fn main() -> eyre::Result<()> {
     let address = Address::from_str(&contract_address)?;
     let example = Example::new(address, provider.clone());
 
+    println!("==============================================================================");
+    println!(" Calling constructor to create a new counter");
+    println!("==============================================================================");
     // Call the constructor
     // The idea is that the constructor will be called upon deployment of the contract
     let pending_tx = example.constructor().send().await?;
     let receipt = pending_tx.get_receipt().await?;
 
-    println!("Creating a new counter and capturing its id");
     let counter_id =
         FixedBytes::<32>::new(receipt.logs()[0].topics()[1].to_vec().try_into().unwrap());
-    println!("Captured counter_id {counter_id:?}");
+    println!("✓ Counter created with ID: {counter_id:?}");
 
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("create tx 0x{}", hex::encode(&raw));
-    }
-
-    println!("\nReading value before increment");
+    println!("\nReading initial counter value (should be initialized to 25)");
     let res = example.read(counter_id).call().await?;
-    println!("counter = {res}");
+    println!("  Counter value: {res}");
+    assert_eq!(res, 25u64, "Initial counter value should be 25 (from constructor)");
 
-    println!("\nSending increment tx");
+    println!("\nIncrementing counter");
     let pending_tx = example.increment(counter_id).send().await?;
-    let _ = pending_tx.get_receipt().await?;
+    let _receipt = pending_tx.get_receipt().await?;
 
-    println!("\nReading value after increment");
+    println!("Reading counter value after increment");
     let res = example.read(counter_id).call().await?;
-    println!("counter = {res}");
+    println!("  Counter value: {res}");
+    assert_eq!(res, 26u64, "Counter should be 26 after first increment");
 
+    println!("\n==============================================================================");
+    println!(" Testing constructor idempotency: calling constructor again");
+    println!("==============================================================================");
     // Call it a second time to make sure the constructor is not called again
     let pending_tx = example.constructor().send().await?;
     let receipt = pending_tx.get_receipt().await?;
 
     // Check no log is emitted, meaning the constructor logic is not executed again
-    assert_eq!(receipt.logs().len(), 0);
+    assert_eq!(receipt.logs().len(), 0, "Constructor should not emit logs when called again");
+    println!("✓ No logs emitted - constructor logic not executed again");
+
     // Read again and check the value has not changed
     let res = example.read(counter_id).call().await?;
-    assert_eq!(res, 26);
+    println!("  Counter value: {res}");
+    assert_eq!(res, 26u64, "Counter value should remain 26 after redundant constructor call");
 
-    println!("\nSending increment tx");
+    println!("\nIncrementing counter again");
     let pending_tx = example.increment(counter_id).send().await?;
-    let _ = pending_tx.get_receipt().await?;
+    let _receipt = pending_tx.get_receipt().await?;
 
-    println!("\nReading value after increment");
+    println!("Reading counter value after second increment");
     let res = example.read(counter_id).call().await?;
-    println!("counter = {res}");
+    println!("  Counter value: {res}");
+    assert_eq!(res, 27u64, "Counter should be 27 after second increment");
 
-    println!("\nSetting counter to number 42");
+    println!("\nSetting counter value to 42");
     let pending_tx = example.setValue(counter_id, 42).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("increment logs 0: 0x{}", hex::encode(raw));
-    }
+    let _receipt = pending_tx.get_receipt().await?;
 
-    println!("\nReading counter after set");
+    println!("Reading counter value after set");
     let res = example.read(counter_id).call().await?;
-    println!("counter = {res}");
+    println!("  Counter value: {res}");
+    assert_eq!(res, 42u64, "Counter should be 42 after setValue");
 
-    println!("\nSending increment tx");
+    println!("\nIncrementing counter again");
     let pending_tx = example.increment(counter_id).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("increment logs 0: 0x{}", hex::encode(raw));
-    }
+    let _receipt = pending_tx.get_receipt().await?;
 
-    println!("\nReading value after increment");
+    println!("Reading counter value after third increment");
     let res = example.read(counter_id).call().await?;
-    println!("counter = {res}");
+    println!("  Counter value: {res}");
+    assert_eq!(res, 43u64, "Counter should be 43 after third increment");
 
     Ok(())
 }
