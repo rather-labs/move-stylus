@@ -14,6 +14,7 @@ public struct NestedStruct has copy, drop {
     c: u128,
 }
 
+#[allow(unused_field)]
 public struct NestedStructWithEnum has copy, drop {
     a: EventEnum,
     b: vector<EventEnum>,

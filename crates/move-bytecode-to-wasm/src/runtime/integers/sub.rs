@@ -9,13 +9,14 @@ use super::RuntimeFunction;
 
 /// This function implements the substraction with borrow check for heap integers (u128 and u256)
 ///
-/// # Arguments:
-///    - pointer to the first number
-///    - pointer to the second argument
-///    - pointer where the res is saved
-///    - how many bytes the number occupies in heap
-/// # Returns:
-///    - pointer to the result
+/// # WASM Function Arguments
+/// * `a_ptr` (i32) - pointer to the first number
+/// * `b_ptr` (i32) - pointer to the second argument
+/// * `res_ptr` (i32) - pointer where the res is saved
+/// * `size` (i32) - how many bytes the number occupies in heap
+///
+/// # WASM Function Returns
+/// * pointer to the result
 pub fn heap_integers_sub(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,
@@ -180,11 +181,12 @@ pub fn heap_integers_sub(module: &mut Module, compilation_ctx: &CompilationConte
 
 /// Substracts two u8, u16 or u32 numbers.
 ///
-/// # Arguments:
-///    - first number to substract
-///    - second number to substract
-/// # Returns:
-///    - substracted number
+/// # WASM Function Arguments
+/// * `a` (i32) - first number to substract
+/// * `b` (i32) - second number to substract
+///
+/// # WASM Function Returns
+/// * substracted number
 pub fn sub_u32(module: &mut Module) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,
@@ -219,11 +221,12 @@ pub fn sub_u32(module: &mut Module) -> FunctionId {
 
 /// Substracts two u64 numbers.
 ///
-/// # Arguments:
-///    - first number to substract
-///    - second number to substract
-/// # Returns:
-///    - substracted number
+/// # WASM Function Arguments
+/// * `a` (i64) - first number to substract
+/// * `b` (i64) - second number to substract
+///
+/// # WASM Function Returns
+/// * substracted number
 pub fn sub_u64(module: &mut Module) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,

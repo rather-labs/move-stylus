@@ -1,7 +1,7 @@
 module test::equality_external_structs;
 
 use test::equality_external_structs_def::{
-    Bar, Foo, create_foo_bool, create_foo_u8, create_foo_u16, create_foo_u32,
+    create_foo_bool, create_foo_u8, create_foo_u16, create_foo_u32,
     create_foo_u64, create_foo_u128, create_foo_u256, create_foo_vec_stack_type,
     create_foo_vec_heap_type, create_foo_address, create_foo_struct
 };

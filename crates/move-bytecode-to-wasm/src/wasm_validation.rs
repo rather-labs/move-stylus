@@ -83,11 +83,11 @@ fn validate_entrypoint_function(module: &mut Module) -> Result<(), WasmValidatio
 }
 
 /// The module should create a local memory with the following characteristics:
-/// - shared: false
-/// - memory64: false
-/// - page_size_log2: None
-/// - initial: 1
-/// - maximum: None
+/// * shared: false
+/// * memory64: false
+/// * page_size_log2: None
+/// * initial: 1
+/// * maximum: None
 ///
 /// And export it as `memory`
 fn validate_memory_export(module: &mut Module) -> Result<(), WasmValidationError> {

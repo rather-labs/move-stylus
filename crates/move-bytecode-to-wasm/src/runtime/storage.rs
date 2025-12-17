@@ -25,22 +25,23 @@ use walrus::{
 /// mapping(bytes32 => mapping(bytes32 => T)) public moveObjects;
 ///
 /// Where:
-/// - The outer mapping key is the id of the owner (could be an address or object id).
-/// - The inner mapping key is the object id itself.
-/// - The value is the encoded structure.
+/// * The outer mapping key is the id of the owner (could be an address or object id).
+/// * The inner mapping key is the object id itself.
+/// * The value is the encoded structure.
 ///
 /// The lookup is done in the following order:
-/// - In the signer's owned objects (key is the signer's address).
-/// - In the shared objects key (1)
-/// - In the frozen objects key (2)
+/// * In the signer's owned objects (key is the signer's address).
+/// * In the shared objects key (1)
+/// * In the frozen objects key (2)
 ///
 /// If no data is found an unrechable error is thrown. Otherwise the slot number to reconstruct the
 /// struct is written in DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET.
 ///
 /// When the data is found, the owner's ID is written in DATA_STORAGE_OBJECT_OWNER_OFFSET
 ///
-/// # Arguments
-/// - object id
+/// # WASM Function Arguments
+/// * `uid_ptr` - (i32): pointer to the 32 bytes object id
+/// * `search_frozen` - (i32): if non-zero, search in frozen objects as well
 pub fn locate_storage_data(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -184,8 +185,8 @@ pub fn locate_storage_data(
 ///
 /// The slot number is written in DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET.
 ///
-/// # Arguments
-/// - struct_ptr - pointer to the struct
+/// # WASM Function Arguments
+/// * `struct_ptr` - (i32): pointer to the struct
 pub fn locate_struct_slot(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -284,7 +285,7 @@ pub fn storage_next_slot_function(
     Ok(function.finish(vec![slot_ptr], &mut module.funcs))
 }
 
-// This function returns a pointer to the 32 bytes holding the data of the id, given a struct pointer as input
+/// This function returns a pointer to the 32 bytes holding the data of the id, given a struct pointer as input
 pub fn get_id_bytes_ptr(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
     let mut builder = function
@@ -338,13 +339,13 @@ pub fn get_id_bytes_ptr(module: &mut Module, compilation_ctx: &CompilationContex
 
 /// The value corresponding to a mapping key k is located at keccak256(h(k) . p) where . is concatenation
 /// and h is a function that is applied to the key depending on its type:
-/// - for value types, h pads the value to 32 bytes in the same way as when storing the value in memory.
-/// - for strings and byte arrays, h(k) is just the unpadded data.
+/// * for value types, h pads the value to 32 bytes in the same way as when storing the value in memory.
+/// * for strings and byte arrays, h(k) is just the unpadded data.
 ///
-/// Arguments:
-/// - `mapping_slot_ptr`: pointer to the mapping slot (32 bytes)
-/// - `key_ptr`: pointer to the key (32 bytes)
-/// - `derived_slot_ptr`: pointer to the derived slot (32 bytes)
+/// # WASM Function Arguments
+/// * `mapping_slot_ptr` - (i32): pointer to the mapping slot (32 bytes)
+/// * `key_ptr` - (i32): pointer to the key (32 bytes)
+/// * `derived_slot_ptr` - (i32): pointer to the derived slot (32 bytes)
 pub fn derive_mapping_slot(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -406,12 +407,14 @@ pub fn derive_mapping_slot(
 ///   base = keccak256(p)
 ///   element_slot = base + index * element_size_in_slots
 ///
-/// Parameters:
-/// - `array_slot_ptr`: A pointer to the u256 slot `p`, which is the header slot of the array.
-/// - `elem_index`: u32 value representing the element's index in the array (little-endian).
-/// - `elem_size`: u32 value representing the size of each element in bytes (little-endian).
+/// # WASM Function Arguments
+/// * `array_slot_ptr` - (i32): pointer to the u256 slot `p`, which is the header slot of the array.
+/// * `elem_index` - (i32): u32 value representing the element's index in the array (little-endian).
+/// * `elem_size` - (i32): u32 value representing the size of each element in bytes (little-endian).
+/// * `derived_elem_slot_ptr` - (i32): pointer to the resulting u256 slot where the element is stored.
 ///
-/// The computed u256 slot value for the element, in big-endian format, is stored at `derived_elem_slot_ptr`.
+/// NOTE: The computed u256 slot value for the element, in big-endian format, is stored at
+/// `derived_elem_slot_ptr`.
 pub fn derive_dyn_array_slot(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -564,9 +567,9 @@ pub fn derive_dyn_array_slot(
 
 /// Generates a function that encodes and saves an specific struct into the storage.
 ///
-/// Arguments:
-/// - struct_ptr
-/// - slot_ptr
+/// WASM Function Arguments:
+/// * `struct_ptr` - (i32): pointer to the struct
+/// * `slot_ptr` - (i32): pointer to the storage slot
 pub fn add_encode_and_save_into_storage_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -610,12 +613,12 @@ pub fn add_encode_and_save_into_storage_fn(
 /// 2. Reads and decodes the struct from storage.
 /// 3. Returns a pointer to the in-memory representation of the struct.
 ///
-/// Arguments:
-/// - slot_ptr
-/// - uid_ptr
+/// # WASM Function Arguments
+/// * `slot_ptr` - (i32): pointer to the storage slot
+/// * `uid_ptr` - (i32): pointer to the UID
 ///
-/// Returns:
-/// - struct_ptr
+/// # WASM Function Returns
+/// * `struct_ptr` - (i32): pointer to the struct
 pub fn add_read_and_decode_from_storage_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -675,8 +678,8 @@ pub fn add_read_and_decode_from_storage_fn(
 /// 3. Clears the storage slot and any additional slots occupied by the struct fields.
 /// 4. Flushes the cache to finalize the deletion.
 ///
-/// Arguments:
-/// - struct_ptr
+/// # WASM Function Arguments
+/// * `struct_ptr` - (i32): pointer to the struct
 pub fn add_delete_struct_from_storage_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -786,8 +789,8 @@ pub fn add_delete_struct_from_storage_fn(
 ///    transfer::transfer(request, service)
 /// }
 ///```
-/// Arguments:
-/// - parent_struct_ptr
+/// # WASM Function Arguments
+/// * `parent_struct_ptr` - (i32): pointer to the parent struct
 pub fn add_check_and_delete_struct_tto_fields_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -961,9 +964,9 @@ pub fn add_check_and_delete_struct_tto_fields_fn(
 
 /// This function deletes a recently transferred wrapped object from the original owner's storage.
 ///
-/// Arguments:
-/// - parent_struct_ptr
-/// - child_struct_ptr
+/// # WASM Function Arguments
+/// * `parent_struct_ptr` - (i32): pointer to the parent struct
+/// * `child_struct_ptr` - (i32): pointer to the child struct
 pub fn add_delete_tto_object_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -1141,18 +1144,18 @@ pub fn add_commit_changes_to_storage_fn(
 /// Emits a WASM function that maintains a 32-byte storage slot accumulator for DELETE flows.
 ///
 /// Behavior:
-/// - If `slot_offset + field_size` exceeds 32, it performs the delete-specific transition:
+/// * If `slot_offset + field_size` exceeds 32, it performs the delete-specific transition:
 ///   wipes the current slot data to zero and advances to the next slot.
 ///   Then sets `slot_offset = field_size`.
-/// - Otherwise, it simply accumulates: `slot_offset += field_size`.
+/// * Otherwise, it simply accumulates: `slot_offset += field_size`.
 ///
-/// Arguments:
-/// - `slot_ptr: i32`: Pointer to the slot.
-/// - `slot_offset: i32`: Offset in the current slot.
-/// - `field_size: i32`: Size of the field in bytes.
+/// # WASM Function Arguments
+/// * `slot_ptr` - (i32): Pointer to the slot.
+/// * `slot_offset` - (i32): Offset in the current slot.
+/// * `field_size` - (i32): Size of the field in bytes.
 ///
-/// Returns:
-/// - `i32`: The new slot offset after advancing or accumulating.
+/// # WASM Function Returns
+/// * (i32): The new slot offset after advancing or accumulating.
 pub fn accumulate_or_advance_slot_delete(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -1180,17 +1183,17 @@ pub fn accumulate_or_advance_slot_delete(
 /// Emits a WASM function that maintains a 32-byte storage slot accumulator for READ flows.
 ///
 /// Behavior:
-/// - If `slot_offset + field_size` exceeds 32, it advances to the next slot and loads the slot
+/// * If `slot_offset + field_size` exceeds 32, it advances to the next slot and loads the slot
 ///   data from storage (into the standard data buffer), then sets `slot_offset = field_size`.
-/// - Otherwise, it accumulates: `slot_offset += field_size`.
+/// * Otherwise, it accumulates: `slot_offset += field_size`.
 ///
-/// Arguments:
-/// - `slot_ptr: i32`: Pointer to the slot.
-/// - `slot_offset: i32`: Offset in the current slot.
-/// - `field_size: i32`: Size of the field in bytes.
+/// # Arguments
+/// * `slot_ptr` - i32: Pointer to the slot.
+/// * `slot_offset` - i32: Offset in the current slot.
+/// * `field_size` - i32: Size of the field in bytes.
 ///
-/// Returns:
-/// - `i32`: The new slot offset after advancing or accumulating.
+/// # Returns
+/// * i32: The new slot offset after advancing or accumulating.
 pub fn accumulate_or_advance_slot_read(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -1216,17 +1219,17 @@ pub fn accumulate_or_advance_slot_read(
 /// Emits a WASM function that maintains a 32-byte storage slot accumulator for WRITE flows.
 ///
 /// Behavior:
-/// - If `slot_offset + field_size` exceeds 32, it caches the current slot to storage,
+/// * If `slot_offset + field_size` exceeds 32, it caches the current slot to storage,
 ///   clears the data buffer, advances to the next slot, and sets `slot_offset = field_size`.
-/// - Otherwise, it accumulates: `slot_offset += field_size`.
+/// * Otherwise, it accumulates: `slot_offset += field_size`.
 ///
-/// Arguments:
-/// - `slot_ptr: i32`: Pointer to the slot.
-/// - `slot_offset: i32`: Offset in the current slot.
-/// - `field_size: i32`: Size of the field in bytes.
+/// # WASM Function Arguments
+/// * `slot_ptr` - (i32): Pointer to the slot.
+/// * `slot_offset` - (i32): Offset in the current slot.
+/// * `field_size` - (i32): Size of the field in bytes.
 ///
-/// Returns:
-/// - `i32`: The new slot offset after advancing or accumulating.
+/// # WASM Function Returns
+/// * (i32): The new slot offset after advancing or accumulating.
 pub fn accumulate_or_advance_slot_write(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -1264,11 +1267,11 @@ pub fn accumulate_or_advance_slot_write(
 /// the mode-specific instructions executed when an advance is required (the "then" arm).
 ///
 /// Template behavior:
-/// - If `slot_offset + field_size > 32`:
-///   - Executes the `mode_builder` closure to perform mode-specific actions (e.g., cache/clear/advance).
-///   - Sets `slot_offset = field_size`.
-/// - Else:
-///   - Sets `slot_offset = slot_offset + field_size`.
+/// * If `slot_offset + field_size > 32`:
+///   * Executes the `mode_builder` closure to perform mode-specific actions (e.g., cache/clear/advance).
+///   * Sets `slot_offset = field_size`.
+/// * Else:
+///   * Sets `slot_offset = slot_offset + field_size`.
 ///
 /// The generated function has signature:
 ///   (slot_ptr: i32, slot_offset: i32, field_size: i32) -> i32 (new slot_offset)
@@ -1321,8 +1324,8 @@ where
 }
 /// Commits changes of storage objests into the storage cache.
 ///
-/// # Arguments
-/// - struct_ptr_ref - pointer to a mutable reference of a storage struct
+/// # WASM Function Arguments
+/// * `struct_ptr_ref` - (i32): pointer to a mutable reference of a storage struct
 pub fn cache_storage_object_changes(
     module: &mut Module,
     compilation_ctx: &CompilationContext,

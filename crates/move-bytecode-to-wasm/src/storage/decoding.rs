@@ -22,18 +22,18 @@ use super::error::{DecodeError, StorageError};
 /// Emits WASM instructions that read a struct from storage and decode it into
 /// its in-memory representation.
 ///
-/// Arguments:
-/// - `module`: Walrus module being built.
-/// - `builder`: Instruction sequence builder to append to.
-/// - `compilation_ctx`: Shared compilation context (types, memory, helpers).
-/// - `slot_ptr`: Local pointing to the base storage slot of the struct.
-/// - `slot_offset`: Local used as a running counter of bytes already read in the current slot.
-/// - `owner_ptr`: Local pointing to the owner struct UID (used for nested keyed objects).
-/// - `struct_id_ptr`: Optional local to the struct UID (required if the struct has `key`).
-/// - `itype`: Intermediate type of the struct to decode.
+/// # Arguments
+/// * `module` - Walrus module being built.
+/// * `builder` - Instruction sequence builder to append to.
+/// * `compilation_ctx` - Shared compilation context (types, memory, helpers).
+/// * `slot_ptr` - Local pointing to the base storage slot of the struct.
+/// * `slot_offset` - Local used as a running counter of bytes already read in the current slot.
+/// * `owner_ptr` - Local pointing to the owner struct UID (used for nested keyed objects).
+/// * `struct_id_ptr` - Optional local to the struct UID (required if the struct has `key`).
+/// * `itype` - Intermediate type of the struct to decode.
 ///
-/// Returns:
-/// - LocalId to the heap pointer of the decoded struct in linear memory.
+/// # Returns
+/// * LocalId to the heap pointer of the decoded struct in linear memory.
 #[allow(clippy::too_many_arguments)]
 pub fn add_read_and_decode_storage_struct_instructions(
     module: &mut Module,
@@ -225,17 +225,17 @@ pub fn add_read_and_decode_storage_struct_instructions(
 /// Emits WASM instructions that read a tagged enum from storage and decode the
 /// active variant into its in-memory representation.
 ///
-/// Arguments:
-/// - `module`: Walrus module being built.
-/// - `builder`: Instruction sequence builder to append to.
-/// - `compilation_ctx`: Shared compilation context (types, memory, helpers).
-/// - `slot_ptr`: Local pointing to the base storage slot of the enum.
-/// - `slot_offset`: Local used as a running counter of bytes already read in the current slot.
-/// - `owner_ptr`: Local pointing to the owner struct UID (for nested keyed objects).
-/// - `itype`: Intermediate type of the enum to decode.
+/// # Arguments
+/// * `module` - Walrus module being built.
+/// * `builder` - Instruction sequence builder to append to.
+/// * `compilation_ctx` - Shared compilation context (types, memory, helpers).
+/// * `slot_ptr` - Local pointing to the base storage slot of the enum.
+/// * `slot_offset` - Local used as a running counter of bytes already read in the current slot.
+/// * `owner_ptr` - Local pointing to the owner struct UID (for nested keyed objects).
+/// * `itype` - Intermediate type of the enum to decode.
 ///
-/// Returns:
-/// - LocalId to the heap pointer of the decoded enum in linear memory.
+/// # Returns
+/// * LocalId to the heap pointer of the decoded enum in linear memory.
 #[allow(clippy::too_many_arguments)]
 pub fn add_read_and_decode_storage_enum_instructions(
     module: &mut Module,
@@ -384,17 +384,16 @@ pub fn add_read_and_decode_storage_enum_instructions(
 /// Emits WASM instructions to read a vector from storage and decode its
 /// elements into a contiguous in-memory vector representation.
 ///
-/// Arguments:
-/// - `module`: Walrus module being built.
-/// - `builder`: Instruction sequence builder to append to.
-/// - `compilation_ctx`: Shared compilation context (types, memory, helpers).
-/// - `data_ptr`: Local that will receive the heap pointer to the resulting vector.
-/// - `slot_ptr`: Local pointing to the vector header slot in storage.
-/// - `owner_ptr`: Local pointing to the owner struct UID (for nested keyed objects).
-/// - `inner`: Intermediate type of the vector elements.
+/// Writes the allocated vector pointer into `data_ptr` and fills its contents.
 ///
-/// Returns:
-/// - None. Writes the allocated vector pointer into `data_ptr` and fills its contents.
+/// # Arguments
+/// * `module` - Walrus module being built.
+/// * `builder` - Instruction sequence builder to append to.
+/// * `compilation_ctx` - Shared compilation context (types, memory, helpers).
+/// * `data_ptr` - Local that will receive the heap pointer to the resulting vector.
+/// * `slot_ptr` - Local pointing to the vector header slot in storage.
+/// * `owner_ptr` - Local pointing to the owner struct UID (for nested keyed objects).
+/// * `inner` - Intermediate type of the vector elements.
 #[allow(clippy::too_many_arguments)]
 pub fn add_read_and_decode_storage_vector_instructions(
     module: &mut Module,
@@ -587,18 +586,16 @@ pub fn add_read_and_decode_storage_vector_instructions(
 /// Emits WASM instructions to read a value of an intermediate type from a storage
 /// slot and decode it into its in-memory representation.
 ///
-/// Arguments:
-/// - `module`: Walrus module being built.
-/// - `builder`: Instruction sequence builder to append to.
-/// - `compilation_ctx`: Shared compilation context (types, memory, helpers).
-/// - `data_ptr`: Local that will receive the heap pointer (or stack cell) with the decoded value.
-/// - `slot_ptr`: Local pointing to the base storage slot to read from.
-/// - `slot_offset`: Local used as a running counter of bytes already read in the current slot.
-/// - `owner_ptr`: Local pointing to the owner struct UID (relevant for keyed objects).
-/// - `itype`: Intermediate type to decode.
-///
-/// Returns:
-/// - None. Writes the resulting pointer/value location into `data_ptr`.
+/// Writes the resulting pointer/value location into `data_ptr`.
+/// # Arguments
+/// * `module` - Walrus module being built.
+/// * `builder` - Instruction sequence builder to append to.
+/// * `compilation_ctx` - Shared compilation context (types, memory, helpers).
+/// * `data_ptr` - Local that will receive the heap pointer (or stack cell) with the decoded value.
+/// * `slot_ptr` - Local pointing to the base storage slot to read from.
+/// * `slot_offset` - Local used as a running counter of bytes already read in the current slot.
+/// * `owner_ptr` - Local pointing to the owner struct UID (relevant for keyed objects).
+/// * `itype` - Intermediate type to decode.
 #[allow(clippy::too_many_arguments)]
 pub fn add_decode_intermediate_type_instructions(
     module: &mut Module,
