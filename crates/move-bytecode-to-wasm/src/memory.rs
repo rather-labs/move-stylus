@@ -7,18 +7,18 @@ const MEMORY_PAGE_SIZE: i32 = 65536;
 
 /// Setup the module memory
 /// This function adds the following components to the module:
-/// - memory export
-/// - global variables
-/// - memory allocator function
+/// * memory export
+/// * global variables
+/// * memory allocator function
 ///
 /// This simple implementation assumes that memory is never freed,
 /// As contract execution is short lived and we can afford memory leaks, as runtime will be restarted
 ///
 /// Notes:
-///     - Alignment is assumed to be 1 byte (no alignment)
-///     - Alignment is not implemented in the current function
-///     - Memory is allocated in pages of 64KiB
-///     - Memory starts at offset 0
+///     * Alignment is assumed to be 1 byte (no alignment)
+///     * Alignment is not implemented in the current function
+///     * Memory is allocated in pages of 64KiB
+///     * Memory starts at offset 0
 pub fn setup_module_memory(
     module: &mut Module,
     initial_offset: Option<i32>,

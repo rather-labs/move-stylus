@@ -9,13 +9,14 @@ use super::RuntimeFunction;
 
 /// This function implements the addition with overflow check for heap integers (u128 and u256)
 ///
-/// # Arguments:
-///    - pointer to the first number
-///    - pointer to the second argument
-///    - pointer where the res is saved
-///    - how many bytes the number occupies in heap
-/// # Returns:
-///    - pointer to the result
+/// # WASM Function Arguments:
+/// * `a_ptr` (i32) - pointer to the first number
+/// * `b_ptr` (i32) - pointer to the second argument
+/// * `res_ptr` (i32) - pointer where the res is saved
+/// * `size` (i32) - how many bytes the number occupies in heap
+///
+/// # WASM Function Returns:
+/// * pointer to the result
 pub fn heap_integers_add(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,
@@ -185,11 +186,12 @@ pub fn heap_integers_add(module: &mut Module, compilation_ctx: &CompilationConte
 /// is strictly greater than the two operands. Because we are using i32 integer, if the
 /// addition overflow, WASM wraps around the result.
 ///
-/// # Arguments:
-///    - first u32 number to add
-///    - second u32 number to add
-/// # Returns:
-///    - addition of the arguments
+/// # WASM Function Arguments
+/// * `a` (i32) - first u32 number to add
+/// * `b` (i32) - second u32 number to add
+///
+/// # WASM Function Returns
+/// * addition of the arguments
 pub fn add_u32(module: &mut Module) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,
@@ -240,11 +242,12 @@ pub fn add_u32(module: &mut Module) -> FunctionId {
 /// that the result is strictly greater than the two operands. Because we are using i64
 /// integer, if the addition overflow, WASM wraps around the result.
 ///
-/// # Arguments:
-///    - first u64 number to add
-///    - second u64 number to add
-/// # Returns:
-///    - addition of the arguments
+/// # WASM Function Arguments
+/// * `a` (i64) - first u64 number to add
+/// * `b` (i64) - second u64 number to add
+///
+/// # WASM Function Returns
+/// * addition of the arguments
 pub fn add_u64(module: &mut Module) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,

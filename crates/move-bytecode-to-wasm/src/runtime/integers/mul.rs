@@ -47,6 +47,14 @@ use super::RuntimeFunction;
 /// This approach allows us to optimize both carry detection and performance.
 /// In terms of memory, we only need to allocate space for the final result, as intermediate
 /// computations are performed in place within the result buffer.
+///
+/// # WASM Function Arguments
+/// * `a_ptr` (i32) - Pointer to the first operand
+/// * `b_ptr` (i32) - Pointer to the second operand
+/// * `type_heap_size` (i32) - Number of bytes the operands occupy in heap (16 for u128, 32 for u256)
+///
+/// # WASM Function Returns
+/// * `pointer` (i32) - Pointer to the result
 pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,
@@ -294,11 +302,12 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
 ///
 /// So there will be an overflow if n2 != 0 && n1 > 32::MAX / n2
 ///
-/// # Arguments:
-///    - first u32 number to multiply
-///    - second u32 number to multiply
-/// # Returns:
-///    - multiplication of the arguments
+/// # WASM Function Arguments
+/// * `n1` (i32) - first u32 number to multiply
+/// * `n2` (i32) - second u32 number to multiply
+///
+/// # WASM Function Returns
+/// * multiplication of the arguments
 pub fn mul_u32(module: &mut Module) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,
@@ -354,11 +363,12 @@ pub fn mul_u32(module: &mut Module) -> FunctionId {
 ///
 /// So there will be an overflow if n2 != 0 && n1 > u64::MAX / n2
 ///
-/// # Arguments:
-///    - first u64 number to multiply
-///    - second u64 number to multiply
-/// # Returns:
-///    - multiplication of the arguments
+/// # WASM Function Arguments
+/// * `n1` (i64) - first u64 number to multiply
+/// * `n2` (i64) - second u64 number to multiply
+///
+/// # WASM Function Returns
+/// * multiplication of the arguments
 pub fn mul_u64(module: &mut Module) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,

@@ -1,5 +1,6 @@
 module test::misc_structs;
 
+#[allow(unused_field)]
 public struct NestedStruct<phantom T, phantom U> has copy, drop {
     a: bool,
     b: vector<bool>,

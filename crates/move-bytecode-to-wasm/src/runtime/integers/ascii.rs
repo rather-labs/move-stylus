@@ -8,23 +8,24 @@ use super::RuntimeFunction;
 ///
 /// Produces a blob: `[len: u32 LE][ASCII decimal bytes...]`.
 ///
-/// # Arguments
-/// - `val`: The value to convert. Passed as WASM `i64` but must be ≥ 0; traps if negative.
-///
-/// # Returns
-/// - `ptr`: Pointer to the allocated blob `[len: u32 LE][ASCII bytes...]`.
-///
 /// # Memory Layout
-/// - Byte 0: Little-endian `u8` length of the ASCII string
-/// - Bytes 1..  : ASCII digits (e.g., "123" for value 123)
+/// * Byte 0: Little-endian `u8` length of the ASCII string
+/// * Bytes 1..  : ASCII digits (e.g., "123" for value 123)
 ///
 /// # Examples
-/// - Input: 0          → `[1, '0']`                       // len=1, data="0"
-/// - Input: 123        → `[3, '1','2','3']`               // len=3, data="123"
-/// - Input: 999_999    → `[6, '9','9','9','9','9','9']`   // len=6, data="999999"
+/// * Input: 0          → `[1, '0']`                       // len=1, data="0"
+/// * Input: 123        → `[3, '1','2','3']`               // len=3, data="123"
+/// * Input: 999_999    → `[6, '9','9','9','9','9','9']`   // len=6, data="999999"
+///
+/// # WASM Function Arguments
+/// * `val` (i64) - The value to convert. Passed as WASM `i64` but must be ≥ 0; traps if negative.
+///
+/// # WASM Function Returns
+/// * `ptr` (i32) - Pointer to the allocated blob `[len: u32 LE][ASCII bytes...]`.
+///
 ///
 /// Notes:
-/// - Each decimal digit `d` (0..9) is encoded as the ASCII byte `'0' + d` (0x30..0x39).
+/// * Each decimal digit `d` (0..9) is encoded as the ASCII byte `'0' + d` (0x30..0x39).
 pub fn u64_to_ascii_base_10(
     module: &mut Module,
     compilation_ctx: &CompilationContext,

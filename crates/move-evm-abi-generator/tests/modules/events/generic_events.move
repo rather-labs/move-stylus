@@ -2,6 +2,7 @@ module test::generic_events;
 
 use stylus::event::emit;
 
+#[allow(unused_field)]
 public struct NestedStruct<T,U> has copy, drop {
     a: T,
     b: U,

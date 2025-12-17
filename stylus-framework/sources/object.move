@@ -6,6 +6,7 @@ use stylus::event::emit;
 /// Allows calling `.to_address` on a `UID` to get an `address`.
 public use fun uid_to_address as UID.to_address;
 public use fun uid_to_inner as UID.to_inner;
+public use fun remove as NamedId.delete;
 
 /// References a object ID
 public struct ID has copy, drop, store {
@@ -82,7 +83,6 @@ public fun new_named_id<T: key>(): NamedId<T> {
 
 /// Deletes the object with a `NamedId` from the storage.
 public native fun remove<T: key>(id: NamedId<T>);
-
 
 public(package) native fun as_uid<T: key>(named_id: &NamedId<T>): &UID;
 public(package) native fun as_uid_mut<T: key>(named_id: &mut NamedId<T>): &mut UID;

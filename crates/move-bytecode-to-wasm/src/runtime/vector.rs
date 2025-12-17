@@ -8,9 +8,10 @@ use crate::CompilationContext;
 use crate::translation::intermediate_types::vector::IVector;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 
-// Increments vector length by 1
-// # Arguments:
-//    - vec ptr: (i32) reference to the vector
+/// Increments vector length by 1
+///
+/// # WASM Function Arguments
+/// * `vec_ptr` (i32) - reference to the vector
 pub fn increment_vec_len_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -47,9 +48,10 @@ pub fn increment_vec_len_function(
     function.finish(vec![ptr], &mut module.funcs)
 }
 
-// Decrements vector length by 1
-// # Arguments:
-//    - vec ptr: (i32) reference to the vector
+/// Decrements vector length by 1
+///
+/// # WASM Function Arguments
+/// * `ptr` (i32) - pointer to the vector
 pub fn decrement_vec_len_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -247,7 +249,13 @@ pub fn vec_swap_32_function(
 /// Swaps the elements at two indices in the vector. Abort the execution if any of the indice
 /// is out of bounds.
 ///
+/// Stack transition:
 /// ```..., vector_reference, u64_value(1), u64_value(2) -> ...```
+///
+/// # WASM Function Arguments
+/// * `ptr` (i32) - pointer to the vector
+/// * `idx1_i64` (i64) - first index
+/// * `idx2_i64` (i64) - second index
 pub fn vec_swap_64_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -385,8 +393,13 @@ pub fn vec_swap_64_function(
 /// Pop an element from the end of vector. Aborts if the vector is empty.
 ///
 /// Stack transition:
-///
 /// ```..., vector_reference -> ..., element```
+///
+/// # WASM Function Arguments
+/// * `ptr` (i32) - reference to the vector
+///
+/// # WASM Function Returns
+/// * element (i32)
 pub fn vec_pop_back_32_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -457,8 +470,13 @@ pub fn vec_pop_back_32_function(
 /// Pop an element from the end of vector. Aborts if the vector is empty.
 ///
 /// Stack transition:
-///
 /// ```..., vector_reference -> ..., element```
+///
+/// # WASM Function Arguments
+/// * `ptr` (i32) - reference to the vector
+///
+/// # WASM Function Returns
+/// * element (i64)
 pub fn vec_pop_back_64_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -528,13 +546,14 @@ pub fn vec_pop_back_64_function(
 
 /// Pushes a pointer to a non-heap element in a vector.
 ///
-/// # Arguments:
-///    - vector_reference: (i32) reference to the vector
-///    - index: (i64) index of the element to borrow
-///    - is_heap: (i32) boolean indicating if the element is heap or not
-///    - size: (i32) stack size of the vector inner type
-/// # Returns:
-///    - i32 reference to the borrowed element
+/// # WASM Function Arguments
+/// * `vector_reference` - (i32) reference to the vector
+/// * `index` - (i64) index of the element to borrow
+/// * `is_heap` - (i32) boolean indicating if the element is heap or not
+/// * `size` - (i32) stack size of the vector inner type
+///
+/// # WASM Function Returns
+/// * i32 reference to the borrowed element
 pub fn vec_borrow_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -630,8 +649,8 @@ pub fn vec_borrow_function(
 // flag. If so, it follows the chain by reading the new pointer from offset 4 and updating
 // the reference. This process repeats until a valid vector (without the DEADBEEF flag) is found.
 //
-// # Arguments:
-//    - vec_ref_ptr: (i32) pointer to the reference structure that contains the vector pointer
+/// # WASM Function Arguments
+/// * `vec_ref_ptr` - (i32) pointer to the reference structure that contains the vector pointer
 pub fn vec_update_mut_ref_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -712,11 +731,12 @@ pub fn vec_update_mut_ref_function(
 
 /// Converts raw bytes (bytesN) into a vector<u8>.
 ///
-/// # Arguments:
-///    - bytes_ptr: (i32) pointer to the raw bytes in memory
-///    - bytes_n: (i32) number of bytes to convert
-/// # Returns:
-///    - i32 pointer to the newly created vector
+/// # WASM Function Arguments
+/// * `bytes_ptr` (i32) - pointer to the raw bytes in memory
+/// * `bytes_n` (i32) - number of bytes to convert
+///
+/// # WASM Function Returns
+/// * i32 pointer to the newly created vector
 pub fn bytes_to_vec_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
