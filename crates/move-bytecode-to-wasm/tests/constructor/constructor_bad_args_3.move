@@ -15,7 +15,7 @@ public struct CONSTRUCTOR_BAD_ARGS has drop {}
 
 // An init function can only take an OTW as first argument and a TxContext as last argument,
 // To be considered a constructor.
-fun init(_otw: CONSTRUCTOR_BAD_ARGS, ctx: &mut TxContext) {
+entry fun init(_otw: CONSTRUCTOR_BAD_ARGS, ctx: &mut TxContext) {
   let foo = Foo {
     id: object::new(ctx),
     value: 101,

@@ -10,7 +10,7 @@ public struct Foo has key {
     value: u64
 }
 
-fun init(ctx: &mut TxContext) {
+entry fun init(ctx: &mut TxContext) {
   let foo = Foo {
     id: object::new(ctx),
     value: 101,

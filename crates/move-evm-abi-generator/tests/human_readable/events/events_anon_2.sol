@@ -1,4 +1,12 @@
-contract EventsAnon2 {
+/**
+ * This file was automatically generated and represents a Move program.
+ * For more information, please see [The Move to Stylus compiler](https://github.com/rather-labs/move-stylus-poc).
+ */
+
+// SPDX-License-Identifier: MIT-OR-APACHE-2.0
+pragma solidity ^0.8.23;
+
+interface EventsAnon2 {
 
     event Anonymous(NestedStruct indexed a, NestedStructWithEnum indexed b) anonymous;
     event Anonymous2(EventEnum indexed a, EventEnum[] indexed b, NestedStructWithEnum[] indexed c) anonymous;

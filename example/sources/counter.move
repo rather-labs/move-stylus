@@ -4,6 +4,8 @@ use stylus::tx_context::TxContext;
 use stylus::object as object;
 use stylus::object::UID;
 use stylus::transfer as transfer;
+
+#[test_only]
 use stylus::test_scenario;
 
 public struct Counter has key {

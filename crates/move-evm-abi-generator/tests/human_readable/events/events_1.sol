@@ -1,4 +1,12 @@
-contract Events1 {
+/**
+ * This file was automatically generated and represents a Move program.
+ * For more information, please see [The Move to Stylus compiler](https://github.com/rather-labs/move-stylus-poc).
+ */
+
+// SPDX-License-Identifier: MIT-OR-APACHE-2.0
+pragma solidity ^0.8.23;
+
+interface Events1 {
 
     event TestEvent1(uint32 indexed n);
     event TestEvent2(uint32 indexed a, address indexed b, uint128 indexed c);
