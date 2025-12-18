@@ -70,57 +70,57 @@ fn test_json_abi(#[case] module_name: &str, #[case] module_path: &str, #[case] j
 #[case(
     "abi_error_1",
     "modules/abi_errors/abi_error_1.move",
-    "human_readable/abi_errors/abi_error_1.abi"
+    "human_readable/abi_errors/abi_error_1.sol"
 )]
 #[case(
     "abi_error_2",
     "modules/abi_errors/abi_error_2.move",
-    "human_readable/abi_errors/abi_error_2.abi"
+    "human_readable/abi_errors/abi_error_2.sol"
 )]
 #[case(
     "abi_error_3",
     "modules/abi_errors/abi_error_3.move",
-    "human_readable/abi_errors/abi_error_3.abi"
+    "human_readable/abi_errors/abi_error_3.sol"
 )]
 #[case(
     "events_1",
     "modules/events/events_1.move",
-    "human_readable/events/events_1.abi"
+    "human_readable/events/events_1.sol"
 )]
 #[case(
     "events_2",
     "modules/events/events_2.move",
-    "human_readable/events/events_2.abi"
+    "human_readable/events/events_2.sol"
 )]
 #[case(
     "events_anon_1",
     "modules/events/events_anon_1.move",
-    "human_readable/events/events_anon_1.abi"
+    "human_readable/events/events_anon_1.sol"
 )]
 #[case(
     "events_anon_2",
     "modules/events/events_anon_2.move",
-    "human_readable/events/events_anon_2.abi"
+    "human_readable/events/events_anon_2.sol"
 )]
 #[case(
     "generic_events",
     "modules/events/generic_events.move",
-    "human_readable/events/generic_events.abi"
+    "human_readable/events/generic_events.sol"
 )]
 #[case(
     "generics_1",
     "modules/structs/generics_1.move",
-    "human_readable/structs/generics_1.abi"
+    "human_readable/structs/generics_1.sol"
 )]
 #[case(
     "generics_2",
     "modules/structs/generics_2.move",
-    "human_readable/structs/generics_2.abi"
+    "human_readable/structs/generics_2.sol"
 )]
 #[case(
     "misc_structs",
     "modules/structs/misc_structs.move",
-    "human_readable/structs/misc_structs.abi"
+    "human_readable/structs/misc_structs.sol"
 )]
 fn test_human_readable_abi(
     #[case] module_name: &str,

@@ -1,8 +1,6 @@
 [package]
 name = "StylusFramework"
-version = "0.0.1"
-published-at = "0x2"
-edition = "2024.beta"
+edition = "2024"
 
 [addresses]
 stylus = "0x2"

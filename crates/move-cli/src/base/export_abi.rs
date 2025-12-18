@@ -11,8 +11,8 @@ use super::reroot_path;
 
 /// Generate the package ABI at `path`. If no path is provided defaults to current directory.
 #[derive(Parser)]
-#[clap(name = "abi-generate")]
-pub struct AbiGenerate {
+#[clap(name = "export-abi")]
+pub struct ExportAbi {
     /// Generate JSON format ABI files
     #[clap(long = "json", short = 'j')]
     pub json: bool,
@@ -22,7 +22,7 @@ pub struct AbiGenerate {
     pub human_readable: bool,
 }
 
-impl AbiGenerate {
+impl ExportAbi {
     pub fn execute(
         self,
         path: Option<&Path>,

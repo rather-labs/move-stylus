@@ -53,7 +53,7 @@ public struct Allowance has key {
     id: NamedId<ALLOWANCE_>,
 }
 
-fun init(_ctx: &mut TxContext) {
+entry fun init(_ctx: &mut TxContext) {
     transfer::freeze_object(Info {
         id: object::new_named_id<CONTRACT_INFO>(),
         name: ascii::string(b"Test Coin"),

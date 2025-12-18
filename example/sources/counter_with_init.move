@@ -14,7 +14,7 @@ public struct Counter has key {
 
 public struct COUNTER_WITH_INIT has drop {}
 
-fun init(otw: COUNTER_WITH_INIT, ctx: &mut TxContext) {
+entry fun init(otw: COUNTER_WITH_INIT, ctx: &mut TxContext) {
 
   assert!(types::is_one_time_witness(&otw), 0);
 
