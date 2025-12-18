@@ -1,6 +1,7 @@
 [package]
 name = "example"
 edition = "2024"
+flavor = "core"
 
 [dependencies]
 StylusFramework = { local = "../stylus-framework/" }

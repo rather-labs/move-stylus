@@ -4,10 +4,20 @@ use crate::{
     types::Type,
 };
 
-pub fn process_abi(abi: &Abi) -> String {
-    let mut result = String::new();
+const HEADER: &str = r#"/**
+ * This file was automatically generated and represents a Move program.
+ * For more information, please see [The Move to Stylus compiler](https://github.com/rather-labs/move-stylus-poc).
+ */
 
-    result.push_str("contract ");
+// SPDX-License-Identifier: MIT-OR-APACHE-2.0
+pragma solidity ^0.8.23;
+
+"#;
+
+pub fn process_abi(abi: &Abi) -> String {
+    let mut result = HEADER.to_string();
+
+    result.push_str("interface ");
     result.push_str(&snake_to_upper_camel(&abi.contract_name));
     result.push_str(" {\n\n");
 

@@ -913,8 +913,8 @@ impl ModuleData {
     // 3. It must have &TxContext or &mut TxContext as its last argument, with an optional One Time Witness (OTW) as its first argument.
     // 4. It must not return any values.
     //
-    // fun init(ctx: &TxContext) { /* ... */}
-    // fun init(otw: OTW, ctx: &mut TxContext) { /* ... */ }
+    // entry fun init(ctx: &TxContext) { /* ... */}
+    // entry fun init(otw: OTW, ctx: &mut TxContext) { /* ... */ }
     //
 
     /// Checks if the given function (by index) is a valid `init` function.

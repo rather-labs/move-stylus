@@ -253,9 +253,9 @@ pub fn compare_human_readable_abi(
     let expected_human_readable = fs::read_to_string(human_readable_path)
         .map_err(|e| format!("Failed to read expected human readable file: {e}"))?;
 
-    if actual_human_readable != expected_human_readable {
-        println!("Actual human readable: {actual_human_readable}");
-        println!("Expected human readable: {expected_human_readable}");
+    if actual_human_readable != expected_human_readable[..expected_human_readable.len() - 1] {
+        println!("Actual human readable:\n{actual_human_readable}");
+        println!("Expected human readable:\n{expected_human_readable}");
 
         return Err("Human readable does not match".into());
     }

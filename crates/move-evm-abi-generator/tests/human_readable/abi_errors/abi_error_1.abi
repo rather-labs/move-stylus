@@ -1,7 +1,0 @@
-contract AbiError1 {
-
-    error SimpleError(string);
-
-    function revertSimpleError(string s) pure external;
-
-}

@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, path::PathBuf};
 
 use clap::Parser;
-use move_compiler::editions::{Edition, Flavor};
+use move_compiler::editions::Flavor;
 use move_package::{LintFlag, source_package::parsed_manifest::Dependencies};
 use move_packages_build::implicit_dependencies;
 
@@ -33,14 +33,6 @@ pub struct BuildConfig {
     /// Skip fetching latest git dependencies
     #[clap(long = "skip-fetch-latest-git-deps", global = true)]
     pub skip_fetch_latest_git_deps: bool,
-
-    /// Default flavor for move compilation, if not specified in the package's config
-    #[clap(long = "default-move-flavor", global = true)]
-    pub default_flavor: Option<Flavor>,
-
-    /// Default edition for move compilation, if not specified in the package's config
-    #[clap(long = "default-move-edition", global = true)]
-    pub default_edition: Option<Edition>,
 
     /// If set, ignore any compiler warnings
     #[clap(long = move_compiler::command_line::SILENCE_WARNINGS, global = true)]
@@ -74,8 +66,8 @@ impl From<BuildConfig> for move_package::BuildConfig {
             lock_file: value.lock_file,
             fetch_deps_only: value.fetch_deps_only,
             skip_fetch_latest_git_deps: value.skip_fetch_latest_git_deps,
-            default_flavor: value.default_flavor,
-            default_edition: value.default_edition,
+            default_flavor: Some(Flavor::Core),
+            default_edition: None,
             deps_as_root: false,
             silence_warnings: value.silence_warnings,
             warnings_are_errors: value.warnings_are_errors,
