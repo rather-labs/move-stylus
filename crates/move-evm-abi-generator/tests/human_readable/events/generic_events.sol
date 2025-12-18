@@ -1,4 +1,12 @@
-contract GenericEvents {
+/**
+ * This file was automatically generated and represents a Move program.
+ * For more information, please see [The Move to Stylus compiler](https://github.com/rather-labs/move-stylus-poc).
+ */
+
+// SPDX-License-Identifier: MIT-OR-APACHE-2.0
+pragma solidity ^0.8.23;
+
+interface GenericEvents {
 
     event TestEvent1(address indexed a, NestedStructBoolUint256 indexed b);
     event TestEvent1(uint16 indexed a, NestedStructUint32Uint64 indexed b);

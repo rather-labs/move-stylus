@@ -11,7 +11,7 @@ public struct Foo has key {
 
 // An init function with returns is not a proper constructor.
 // Sui move allows this but we don't.
-fun init(ctx: &mut TxContext): Foo {
+entry fun init(ctx: &mut TxContext): Foo {
   let foo = Foo {
     id: object::new(ctx),
     value: 101,

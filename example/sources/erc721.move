@@ -6,7 +6,6 @@ use stylus::transfer as transfer;
 use stylus::object as object;
 use stylus::object::NamedId;
 use stylus::dynamic_field_named_id as field;
-use stylus::account as account;
 use erc721Utils::utils as erc721_utils;
 use std::ascii as ascii;
 use std::ascii::String;
@@ -81,16 +80,14 @@ public struct Transfer has copy, drop {
 const EInvalidOwner: u64 = 1;
 const ENonExistentToken: u64 = 2;
 const EIncorrectOwner: u64 = 3;
-const EInvalidSender: u64 = 4;
-const EInvalidReceiver: u64 = 5;
-const EInsufficientApproval: u64 = 6;
-const EInvalidApprover: u64 = 7;
-const EInvalidOperator: u64 = 8;
+const EInvalidReceiver: u64 = 4;
+const EInvalidApprover: u64 = 5;
+const EInvalidOperator: u64 = 6;
 
 // Methods:
 
 // Constructor
-fun init(_ctx: &mut TxContext) {
+entry fun init(_ctx: &mut TxContext) {
     transfer::freeze_object(Info {
         id: object::new_named_id<COLLECTION_INFO>(),
         name: ascii::string(b"Moving Stylus"),
@@ -153,7 +150,7 @@ entry fun symbol(contract_info: &Info): String {
     contract_info.symbol
 }
 
-entry fun token_URI(token_id: u256, contract_info: &Info): String {
+entry fun token_URI(_token_id: u256, contract_info: &Info): String {
     contract_info.base_uri
 }
 
@@ -329,7 +326,6 @@ entry fun burn(
     balances: &mut Balances,
     token_approvals: &mut TokenApprovals,
     total_supply: &mut TotalSupply,
-    ctx: &TxContext,
 ) {
     // Check if the token has been minted
     if (!field::exists_(&owners.id, token_id)) {
