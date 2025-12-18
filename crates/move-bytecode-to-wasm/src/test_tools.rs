@@ -155,7 +155,7 @@ macro_rules! test_compilation_context {
 }
 
 #[cfg(feature = "inject-host-debug-fns")]
-fn inject_debug_fns(module: &mut walrus::Module) {
+pub fn inject_debug_fns(module: &mut walrus::Module) {
     if cfg!(feature = "inject-host-debug-fns") {
         let func_ty = module.types.add(&[ValType::I32], &[]);
         module.add_import_func("", "print_i32", func_ty);
