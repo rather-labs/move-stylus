@@ -293,13 +293,13 @@ pub fn unpack_fields(
                         module_id: parent_module_id,
                         index: parent_index,
                         ..
-                    } => (None, parent_module_id.clone(), *parent_index),
+                    } => (None, *parent_module_id, *parent_index),
                     IntermediateType::IGenericStructInstance {
                         module_id: parent_module_id,
                         index: parent_index,
                         types,
                         ..
-                    } => (Some(types.clone()), parent_module_id.clone(), *parent_index),
+                    } => (Some(types.clone()), *parent_module_id, *parent_index),
                     _ => {
                         return Err(TranslationError::InvalidTypeInUnpackFunction(
                             parent_type.clone(),
@@ -308,7 +308,7 @@ pub fn unpack_fields(
                 };
 
                 types_stack.push(IntermediateType::IStruct {
-                    module_id: module_id.clone(),
+                    module_id: *module_id,
                     index: *index,
                     vm_handled_struct: VmHandledStruct::StorageId {
                         parent_module_id,
@@ -329,13 +329,13 @@ pub fn unpack_fields(
                         module_id: parent_module_id,
                         index: parent_index,
                         ..
-                    } => (None, parent_module_id.clone(), *parent_index),
+                    } => (None, *parent_module_id, *parent_index),
                     IntermediateType::IGenericStructInstance {
                         module_id: parent_module_id,
                         index: parent_index,
                         types,
                         ..
-                    } => (Some(types.clone()), parent_module_id.clone(), *parent_index),
+                    } => (Some(types.clone()), *parent_module_id, *parent_index),
                     _ => {
                         return Err(TranslationError::InvalidTypeInUnpackFunction(
                             parent_type.clone(),
@@ -344,7 +344,7 @@ pub fn unpack_fields(
                 };
 
                 types_stack.push(IntermediateType::IGenericStructInstance {
-                    module_id: module_id.clone(),
+                    module_id: *module_id,
                     index: *index,
                     types: types.clone(),
                     vm_handled_struct: VmHandledStruct::StorageId {

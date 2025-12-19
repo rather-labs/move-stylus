@@ -1,3 +1,4 @@
+use move_symbol_pool::Symbol;
 use walrus::{
     FunctionId, GlobalId, InstrSeqBuilder, LocalId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg},
@@ -39,7 +40,7 @@ pub enum PublicFunctionValidationError {
 /// injecting these arguments in the functions and packing the return values using `write_result` host function.
 pub struct PublicFunction<'a> {
     function_id: FunctionId,
-    pub(crate) function_name: String,
+    pub(crate) function_name: Symbol,
     pub(crate) function_selector: AbiFunctionSelector,
     signature: &'a ISignature,
 }
@@ -58,7 +59,7 @@ impl<'a> PublicFunction<'a> {
 
         Ok(Self {
             function_id,
-            function_name: function_name.to_string(),
+            function_name: Symbol::from(function_name),
             function_selector,
             signature,
         })

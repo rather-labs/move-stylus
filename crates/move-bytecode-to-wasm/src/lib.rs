@@ -166,7 +166,7 @@ pub fn translate_package(
         };
 
         let root_module_data = ModuleData::build_module_data(
-            root_module_id.clone(),
+            root_module_id,
             root_compiled_module,
             &package.deps_compiled_units,
             &root_compiled_units,
@@ -225,7 +225,7 @@ pub fn translate_package(
         validate_stylus_wasm(&mut module)?;
 
         modules.insert(module_name, module);
-        modules_data.insert(root_module_id.clone(), root_module_data);
+        modules_data.insert(root_module_id, root_module_data);
     }
 
     if errors.is_empty() {
@@ -320,7 +320,7 @@ pub fn package_module_data(
         };
 
         let root_module_data = ModuleData::build_module_data(
-            root_module_id.clone(),
+            root_module_id,
             root_compiled_module,
             &package.deps_compiled_units,
             &root_compiled_units,
@@ -328,7 +328,7 @@ pub fn package_module_data(
             special_attributes,
         )?;
 
-        modules_data.insert(root_module_id.clone(), root_module_data);
+        modules_data.insert(root_module_id, root_module_data);
         modules_paths.insert(root_compiled_module.source_path.clone(), root_module_id);
     }
 
@@ -430,7 +430,7 @@ pub fn process_dependency_tree<'move_package>(
         };
 
         let dependency_module_data = ModuleData::build_module_data(
-            module_id.clone(),
+            module_id,
             dependency_module,
             deps_compiled_units,
             root_compiled_units,
@@ -442,7 +442,7 @@ pub fn process_dependency_tree<'move_package>(
         })?;
 
         let processed_dependency =
-            dependencies_data.insert(module_id.clone(), dependency_module_data);
+            dependencies_data.insert(module_id, dependency_module_data);
 
         if processed_dependency.is_some() {
             Err(DependencyError::DependencyProcessedMoreThanOnce(module_id))?;

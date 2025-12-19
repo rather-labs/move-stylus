@@ -49,7 +49,7 @@ impl CompilationContext<'_> {
         } else if &self.root_module_data.id == module_id {
             Ok(self.root_module_data)
         } else {
-            Err(CompilationContextError::ModuleNotFound(module_id.clone()))
+            Err(CompilationContextError::ModuleNotFound(*module_id))
         }
     }
 

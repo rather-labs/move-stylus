@@ -347,7 +347,7 @@ impl NativeFunction {
                 ) => account::add_native_account_balance_fn(module, compilation_ctx, module_id)?,
                 _ => {
                     return Err(NativeFunctionError::NativeFunctionNotSupported(
-                        module_id.clone(),
+                        *module_id,
                         name.to_string(),
                     ));
                 }
@@ -390,7 +390,7 @@ impl NativeFunction {
                 )
             } else {
                 Err(NativeFunctionError::NotExternalCall(
-                    module_id.clone(),
+                    *module_id,
                     name.to_owned(),
                 ))
             }
@@ -597,7 +597,7 @@ impl NativeFunction {
 
             _ => {
                 return Err(NativeFunctionError::GenericdNativeFunctionNotSupported(
-                    module_id.clone(),
+                    *module_id,
                     name.to_owned(),
                 ));
             }
@@ -640,7 +640,7 @@ impl NativeFunction {
     ) -> Result<(), NativeFunctionError> {
         if expected != len {
             return Err(NativeFunctionError::WrongNumberOfTypeParameters {
-                module_id: module_id.clone(),
+                module_id: *module_id,
                 function_name: name.to_owned(),
                 expected,
                 found: len,
@@ -662,7 +662,7 @@ impl NativeFunction {
     ) -> Result<String, NativeFunctionError> {
         if generics.is_empty() {
             return Err(NativeFunctionError::GetGenericFunctionNameNoGenerics(
-                module_id.clone(),
+                *module_id,
                 name.to_owned(),
             ));
         }

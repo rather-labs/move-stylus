@@ -37,8 +37,12 @@ pub fn build_entrypoint_router(
     let mut router_builder = router.func_body();
 
     // Find receive and fallback functions if they exist
-    let receive_function = functions.iter().find(|f| f.function_name == "receive");
-    let fallback_function = functions.iter().find(|f| f.function_name == "fallback");
+    let receive_function = functions
+        .iter()
+        .find(|f| f.function_name.as_str() == "receive");
+    let fallback_function = functions
+        .iter()
+        .find(|f| f.function_name.as_str() == "fallback");
 
     // Load function args to memory
     router_builder

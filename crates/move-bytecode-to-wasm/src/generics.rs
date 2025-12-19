@@ -41,7 +41,7 @@ pub fn replace_type_parameters(
             types,
             vm_handled_struct,
         } => IntermediateType::IGenericStructInstance {
-            module_id: module_id.clone(),
+            module_id: *module_id,
             index: *index,
             types: types
                 .iter()
@@ -54,7 +54,7 @@ pub fn replace_type_parameters(
             index,
             types,
         } => IntermediateType::IGenericEnumInstance {
-            module_id: module_id.clone(),
+            module_id: *module_id,
             index: *index,
             types: types
                 .iter()

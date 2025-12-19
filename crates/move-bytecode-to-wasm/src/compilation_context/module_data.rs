@@ -227,7 +227,7 @@ impl ModuleData {
         };
 
         let functions = Self::process_function_definitions(
-            module_id.clone(),
+            module_id,
             move_module_unit,
             &datatype_handles_map,
             function_definitions,
@@ -283,7 +283,7 @@ impl ModuleData {
                     datatype_handles_map.insert(
                         idx,
                         UserDefinedType::Struct {
-                            module_id: module_id.clone(), // TODO: clone
+                            module_id: *module_id, // TODO: clone
                             index: position as u16,
                         },
                     );
@@ -293,7 +293,7 @@ impl ModuleData {
                     datatype_handles_map.insert(
                         idx,
                         UserDefinedType::Enum {
-                            module_id: module_id.clone(),
+                            module_id: *module_id,
                             index: position as u16,
                         },
                     );
@@ -357,7 +357,7 @@ impl ModuleData {
                     datatype_handles_map.insert(
                         idx,
                         UserDefinedType::Enum {
-                            module_id: module_id.clone(),
+                            module_id,
                             index: position as u16,
                         },
                     );

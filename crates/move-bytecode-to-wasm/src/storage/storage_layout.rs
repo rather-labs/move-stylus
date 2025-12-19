@@ -657,7 +657,7 @@ mod tests {
                     0,
                     2,
                     vec![IntermediateType::IEnum {
-                        module_id: module_id.clone(),
+                        module_id,
                         index: 0,
                     }],
                 ),
@@ -665,7 +665,7 @@ mod tests {
                     1,
                     2,
                     vec![IntermediateType::IEnum {
-                        module_id: module_id.clone(),
+                        module_id,
                         index: 1,
                     }],
                 ),
@@ -791,7 +791,7 @@ mod tests {
                 (
                     None,
                     IntermediateType::IStruct {
-                        module_id: module_id.clone(),
+                        module_id,
                         index: 0,
                         vm_handled_struct: VmHandledStruct::None,
                     },
@@ -814,7 +814,7 @@ mod tests {
                     0,
                     0,
                     vec![IntermediateType::IStruct {
-                        module_id: module_id.clone(),
+                        module_id,
                         index: 0,
                         vm_handled_struct: VmHandledStruct::None,
                     }],
@@ -823,7 +823,7 @@ mod tests {
                     1,
                     0,
                     vec![IntermediateType::IStruct {
-                        module_id: module_id.clone(),
+                        module_id,
                         index: 1,
                         vm_handled_struct: VmHandledStruct::None,
                     }],
@@ -832,7 +832,7 @@ mod tests {
                     2,
                     0,
                     vec![IntermediateType::IStruct {
-                        module_id: module_id.clone(),
+                        module_id,
                         index: 2,
                         vm_handled_struct: VmHandledStruct::None,
                     }],

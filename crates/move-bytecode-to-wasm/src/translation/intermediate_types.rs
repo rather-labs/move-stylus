@@ -172,12 +172,12 @@ impl IntermediateType {
                 if let Some(udt) = handles_map.get(datatype_index) {
                     Ok(match udt {
                         UserDefinedType::Struct { module_id, index } => IntermediateType::IStruct {
-                            module_id: module_id.clone(),
+                            module_id: *module_id,
                             index: *index,
                             vm_handled_struct: VmHandledStruct::None,
                         },
                         UserDefinedType::Enum { module_id, index } => IntermediateType::IEnum {
-                            module_id: module_id.clone(),
+                            module_id: *module_id,
                             index: *index,
                         },
                     })
@@ -198,7 +198,7 @@ impl IntermediateType {
                     Ok(match udt {
                         UserDefinedType::Struct { module_id, index } => {
                             IntermediateType::IGenericStructInstance {
-                                module_id: module_id.clone(),
+                                module_id: *module_id,
                                 index: *index,
                                 types,
                                 vm_handled_struct: VmHandledStruct::None,
@@ -206,7 +206,7 @@ impl IntermediateType {
                         }
                         UserDefinedType::Enum { module_id, index } => {
                             IntermediateType::IGenericEnumInstance {
-                                module_id: module_id.clone(),
+                                module_id: *module_id,
                                 index: *index,
                                 types: types.clone(),
                             }
