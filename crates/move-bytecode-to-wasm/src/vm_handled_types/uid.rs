@@ -32,7 +32,7 @@ impl VmHandledType for Uid {
 
         if identifier == Self::IDENTIFIER {
             if module_id.address != STYLUS_FRAMEWORK_ADDRESS
-                || module_id.module_name != SF_MODULE_NAME_OBJECT
+                || module_id.module_name.as_str() != SF_MODULE_NAME_OBJECT
             {
                 return Err(VmHandledTypeError::InvalidFrameworkType(Self::IDENTIFIER));
             }
@@ -48,6 +48,6 @@ impl Uid {
     pub fn is_delete_function(module_id: &ModuleId, identifier: &str) -> bool {
         identifier == Self::DELETE_FN_IDENTIFIER
             && module_id.address == STYLUS_FRAMEWORK_ADDRESS
-            && module_id.module_name == SF_MODULE_NAME_OBJECT
+            && module_id.module_name.as_str() == SF_MODULE_NAME_OBJECT
     }
 }

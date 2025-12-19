@@ -34,8 +34,8 @@ impl VmHandledType for String_ {
 
         if identifier == Self::IDENTIFIER {
             if module_id.address != STANDARD_LIB_ADDRESS
-                || (module_id.module_name != STDLIB_MODULE_NAME_ASCII
-                    && module_id.module_name != STDLIB_MODULE_NAME_STRING)
+                || (module_id.module_name.as_str() != STDLIB_MODULE_NAME_ASCII
+                    && module_id.module_name.as_str() != STDLIB_MODULE_NAME_STRING)
             {
                 return Err(VmHandledTypeError::InvalidStdLibType(Self::IDENTIFIER));
             }

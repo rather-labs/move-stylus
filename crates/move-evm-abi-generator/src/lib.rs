@@ -176,13 +176,10 @@ fn process_events_and_errors(
                                             module.module_handle_at(struct_handle.module),
                                         );
                                         let event_module = modules_data
-                                            .get(&ctx::ModuleId {
-                                                address: event_module_id
-                                                    .address()
-                                                    .into_bytes()
-                                                    .into(),
-                                                module_name: event_module_id.name().to_string(),
-                                            })
+                                            .get(&ctx::ModuleId::new(
+                                                event_module_id.address().into_bytes().into(),
+                                                event_module_id.name().as_str(),
+                                            ))
                                             .unwrap();
 
                                         let event_type_parameters = type_parameters

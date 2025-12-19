@@ -25,7 +25,7 @@ pub fn run_tests(
 
     let mut compiled_wasm = compiled_modules_path
         .to_path_buf()
-        .join(&module_id.module_name);
+        .join(module_id.module_name.as_str());
     compiled_wasm.set_extension("wasm");
 
     let mut failures = Vec::new();

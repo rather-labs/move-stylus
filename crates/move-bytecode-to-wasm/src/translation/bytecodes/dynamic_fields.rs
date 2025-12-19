@@ -49,7 +49,7 @@ pub fn add_field_borrow_mut_global_var_instructions(
         .ok_or(TranslationError::DynamicFieldBorrowMutNoTypeInstantiations)?;
 
     let field_types_instances =
-        if function_id.module_id.module_name == SF_MODULE_NAME_DYNAMIC_FIELD_NAMED_ID {
+        if function_id.module_id.module_name.as_str() == SF_MODULE_NAME_DYNAMIC_FIELD_NAMED_ID {
             vec![
                 borrow_mut_type_instantiations[1].clone(),
                 borrow_mut_type_instantiations[2].clone(),
@@ -61,10 +61,8 @@ pub fn add_field_borrow_mut_global_var_instructions(
             ]
         };
 
-    let dynamic_fields_module_id = ModuleId {
-        address: STYLUS_FRAMEWORK_ADDRESS,
-        module_name: SF_MODULE_NAME_DYNAMIC_FIELD.to_owned(),
-    };
+    let dynamic_fields_module_id =
+        ModuleId::new(STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_DYNAMIC_FIELD);
 
     let dynamic_fields_module = compilation_ctx.get_module_data_by_id(&dynamic_fields_module_id)?;
 

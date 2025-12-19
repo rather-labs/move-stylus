@@ -43,7 +43,7 @@ impl VmHandledType for Calldata {
 
         if identifier == Self::IDENTIFIER {
             if module_id.address != STYLUS_FRAMEWORK_ADDRESS
-                || module_id.module_name != SF_MODULE_NAME_FALLBACK
+                || module_id.module_name.as_str() != SF_MODULE_NAME_FALLBACK
             {
                 return Err(VmHandledTypeError::InvalidFrameworkType(Self::IDENTIFIER));
             }

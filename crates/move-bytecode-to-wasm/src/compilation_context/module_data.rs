@@ -40,6 +40,7 @@ use move_parse_special_attributes::{
     SpecialAttributes,
     function_modifiers::{Function, FunctionModifier},
 };
+use move_symbol_pool::Symbol;
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
@@ -47,7 +48,7 @@ use std::{
 };
 use struct_data::StructData;
 
-use super::{CompilationContextError, Result};
+use super::{CompilationContextError, Result, reserved_modules::SF_MODULE_NAME_TX_CONTEXT};
 
 #[derive(Debug)]
 pub enum UserDefinedType {
@@ -98,17 +99,31 @@ impl From<[u8; 32]> for Address {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct ModuleId {
     pub address: Address,
-    pub module_name: String,
+    pub module_name: Symbol,
 }
 
 impl ModuleId {
+    pub fn new(address: Address, module_name: &str) -> Self {
+        Self {
+            address,
+            module_name: Symbol::from(module_name),
+        }
+    }
+
     pub fn hash(&self) -> u64 {
         let mut hasher = get_hasher();
         Hash::hash(self, &mut hasher);
         hasher.finish()
+    }
+}
+
+impl Hash for ModuleId {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.address.as_slice().hash(state);
+        self.module_name.as_str().hash(state);
     }
 }
 
@@ -118,17 +133,18 @@ impl Display for ModuleId {
     }
 }
 
-// TODO: This just makes sense for testing
+#[cfg(test)]
 impl Default for ModuleId {
     fn default() -> Self {
         Self {
             address: Address::from([0; 32]),
-            module_name: "default".to_owned(),
+            module_name: Symbol::from("default"),
         }
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
+#[cfg_attr(test, derive(Default))]
 pub struct ModuleData {
     /// Module's ID
     pub id: ModuleId,
@@ -289,10 +305,8 @@ impl ModuleData {
                 let module_address = module.address_identifier_at(datatype_module.address);
                 let module_name = module.identifier_at(datatype_module.name);
 
-                let module_id = ModuleId {
-                    address: module_address.into_bytes().into(),
-                    module_name: module_name.to_string(),
-                };
+                let module_id =
+                    ModuleId::new(module_address.into_bytes().into(), module_name.as_str());
 
                 // Find the module where the external data is defined, we first look for it in the
                 // external packages and if we dont't find it, we look for it in the compile units
@@ -734,10 +748,7 @@ impl ModuleData {
             // TODO: clones and to_string()....
             let function_id = FunctionId {
                 identifier: function_name.to_string(),
-                module_id: ModuleId {
-                    address: function_module_address,
-                    module_name: function_module_name.to_string(),
-                },
+                module_id: ModuleId::new(function_module_address, function_module_name),
                 type_instantiations: None,
             };
 
@@ -767,7 +778,7 @@ impl ModuleData {
             // it.
             // If the function is not defined here, it will be processed when processing the
             // dependency
-            if function_module_name == module_id.module_name
+            if *function_module_name == *module_id.module_name
                 && function_module_address == module_id.address
             {
                 let function_def =
@@ -869,10 +880,7 @@ impl ModuleData {
 
             let function_id = FunctionId {
                 identifier: function_name.to_string(),
-                module_id: ModuleId {
-                    address: function_module_address,
-                    module_name: function_module_name.to_string(),
-                },
+                module_id: ModuleId::new(function_module_address, function_module_name),
                 type_instantiations: Some(type_instantiations),
             };
 
@@ -1219,7 +1227,7 @@ fn is_fallback_calldata(
             match inner.as_ref() {
                 IntermediateType::IStruct {
                     module_id, index, ..
-                } if module_id.module_name == "fallback"
+                } if module_id.module_name.as_str() == "fallback"
                     && module_id.address == STYLUS_FRAMEWORK_ADDRESS =>
                 {
                     // TODO: Look for this external module one time and pass it down to this
@@ -1260,7 +1268,7 @@ fn is_tx_context_ref(
             match inner.as_ref() {
                 IntermediateType::IStruct {
                     module_id, index, ..
-                } if module_id.module_name == "tx_context"
+                } if module_id.module_name.as_str() == SF_MODULE_NAME_TX_CONTEXT
                     && module_id.address == STYLUS_FRAMEWORK_ADDRESS =>
                 {
                     // TODO: Look for this external module one time and pass it down to this

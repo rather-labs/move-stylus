@@ -307,10 +307,7 @@ fn load_struct_storage_id(
                 NativeFunction::NATIVE_COMPUTE_NAMED_ID,
                 module,
                 compilation_ctx,
-                &ModuleId {
-                    address: STYLUS_FRAMEWORK_ADDRESS,
-                    module_name: SF_MODULE_NAME_OBJECT.to_owned(),
-                },
+                &ModuleId::new(STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT),
                 types,
             )
             .map_err(AbiUnpackError::NativeFunction)?;

@@ -226,10 +226,7 @@ pub fn add_remove_child_object_fn(
         NativeFunction::NATIVE_BORROW_CHILD_OBJECT,
         module,
         compilation_ctx,
-        &ModuleId {
-            address: STYLUS_FRAMEWORK_ADDRESS,
-            module_name: SF_MODULE_NAME_DYNAMIC_FIELD.to_owned(),
-        },
+        &ModuleId::new(STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_DYNAMIC_FIELD),
         &[itype.clone()],
     )?;
 

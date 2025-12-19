@@ -32,7 +32,7 @@ impl VmHandledType for TxContext {
 
         if identifier == Self::IDENTIFIER {
             if module_id.address != STYLUS_FRAMEWORK_ADDRESS
-                || module_id.module_name != SF_MODULE_NAME_TX_CONTEXT
+                || module_id.module_name.as_str() != SF_MODULE_NAME_TX_CONTEXT
             {
                 return Err(VmHandledTypeError::InvalidFrameworkType(Self::IDENTIFIER));
             }

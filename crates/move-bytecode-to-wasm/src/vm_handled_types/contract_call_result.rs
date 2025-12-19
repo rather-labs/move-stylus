@@ -32,7 +32,7 @@ impl VmHandledType for ContractCallResult {
 
         if identifier == Self::IDENTIFIER {
             if module_id.address != STYLUS_FRAMEWORK_ADDRESS
-                || module_id.module_name != SF_MODULE_NAME_CONTRACT_CALLS
+                || module_id.module_name.as_str() != SF_MODULE_NAME_CONTRACT_CALLS
             {
                 return Err(VmHandledTypeError::InvalidFrameworkType(Self::IDENTIFIER));
             }
@@ -66,7 +66,7 @@ impl VmHandledType for ContractCallEmptyResult {
 
         if identifier == Self::IDENTIFIER {
             if module_id.address != STYLUS_FRAMEWORK_ADDRESS
-                || module_id.module_name != SF_MODULE_NAME_CONTRACT_CALLS
+                || module_id.module_name.as_str() != SF_MODULE_NAME_CONTRACT_CALLS
             {
                 return Err(VmHandledTypeError::InvalidFrameworkType(Self::IDENTIFIER));
             }

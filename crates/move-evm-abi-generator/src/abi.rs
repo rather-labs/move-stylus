@@ -520,10 +520,10 @@ impl Abi {
 
         for event in events {
             let event_module = modules_data
-                .get(&ModuleId {
-                    address: event.module_id.address().into_bytes().into(),
-                    module_name: event.module_id.name().to_string(),
-                })
+                .get(&ModuleId::new(
+                    event.module_id.address().into_bytes().into(),
+                    event.module_id.name().as_str(),
+                ))
                 .unwrap();
 
             let mut event_struct = event_module
@@ -588,10 +588,10 @@ impl Abi {
 
         for error_struct in error_structs {
             let error_module = modules_data
-                .get(&ModuleId {
-                    address: error_struct.module_id.address().into_bytes().into(),
-                    module_name: error_struct.module_id.name().to_string(),
-                })
+                .get(&ModuleId::new(
+                    error_struct.module_id.address().into_bytes().into(),
+                    error_struct.module_id.name().as_str(),
+                ))
                 .unwrap();
 
             let error_struct = error_module

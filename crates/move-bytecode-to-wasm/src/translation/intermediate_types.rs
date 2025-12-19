@@ -29,6 +29,7 @@ use move_binary_format::file_format::{DatatypeHandleIndex, Signature, SignatureT
 use address::IAddress;
 use boolean::IBool;
 use heap_integers::{IU128, IU256};
+use move_symbol_pool::Symbol;
 use simple_integers::{IU8, IU16, IU32, IU64};
 use vector::IVector;
 
@@ -1168,10 +1169,10 @@ impl IntermediateType {
                     .external_struct
                     .get(struct_.identifier.as_str())
                 {
-                    let foreign_module_id = ModuleId {
-                        address: Address::from_bytes(external_struct.address),
-                        module_name: external_struct.module_name.clone(),
-                    };
+                    let foreign_module_id = ModuleId::new(
+                        Address::from_bytes(external_struct.address),
+                        external_struct.module_name.as_str(),
+                    );
 
                     Hash::hash(&foreign_module_id, &mut hasher);
                 } else {
@@ -1194,7 +1195,7 @@ impl IntermediateType {
                 {
                     let foreign_module_id = ModuleId {
                         address: Address::from_bytes(external_struct.address),
-                        module_name: external_struct.module_name.clone(),
+                        module_name: Symbol::from(external_struct.module_name.as_str()),
                     };
 
                     Hash::hash(&foreign_module_id, &mut hasher);

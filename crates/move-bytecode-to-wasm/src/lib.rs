@@ -116,10 +116,7 @@ pub fn translate_package(
         // Extract package address from CompiledPackage
         let package_address = root_compiled_module_unit.address().into_bytes();
 
-        let root_module_id = ModuleId {
-            address: package_address.into(),
-            module_name: module_name.clone(),
-        };
+        let root_module_id = ModuleId::new(package_address.into(), module_name.as_str());
 
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
 
@@ -282,10 +279,7 @@ pub fn package_module_data(
         let root_compiled_module_unit = &root_compiled_module.unit.module;
 
         let package_address = root_compiled_module_unit.address().into_bytes();
-        let root_module_id = ModuleId {
-            address: package_address.into(),
-            module_name: module_name.clone(),
-        };
+        let root_module_id = ModuleId::new(package_address.into(), module_name.as_str());
 
         // Process the dependency tree
         if let Err(dependencies_errors) = process_dependency_tree(
@@ -366,10 +360,7 @@ pub fn process_dependency_tree<'move_package>(
     let mut errors = Vec::new();
     for dependency in dependencies {
         let dependency_address = dependency.address().into_bytes();
-        let module_id = ModuleId {
-            module_name: dependency.name().to_string(),
-            address: dependency_address.into(),
-        };
+        let module_id = ModuleId::new(dependency_address.into(), dependency.name().as_str());
 
         // If the HashMap contains the key, we already processed that dependency
         if !dependencies_data.contains_key(&module_id) {
@@ -479,7 +470,7 @@ fn build_dependency_structs_map(
         deps_structs.insert(
             move_parse_special_attributes::ModuleId {
                 address: <[u8; 32]>::try_from(md.id.address.as_slice()).unwrap(),
-                module_name: md.id.module_name.clone(),
+                module_name: md.id.module_name.to_string(),
             },
             md.special_attributes.structs.clone(),
         );

@@ -3342,6 +3342,7 @@ dependencies = [
  "move-package",
  "move-packages-build",
  "move-parse-special-attributes",
+ "move-symbol-pool",
  "move-test-runner",
  "relooper",
  "rstest",
