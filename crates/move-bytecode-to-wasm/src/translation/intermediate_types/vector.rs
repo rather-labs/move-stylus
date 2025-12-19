@@ -97,7 +97,7 @@ impl IVector {
             .ok_or(IntermediateTypeError::EmptyBytesInVector)?;
         builder.i32_const(len as i32).local_set(len_local);
 
-        let data_size: usize = inner.stack_data_size()? as usize;
+        let data_size: usize = inner.wasm_memory_data_size()? as usize;
 
         // len + capacity + data_size * len
         let needed_bytes = 4 + 4 + data_size * (len as usize);
@@ -118,33 +118,16 @@ impl IVector {
             // Load the inner type
             inner.load_constant_instructions(module, builder, bytes, compilation_ctx)?;
 
-            if data_size == 4 {
-                // Store i32
-                builder.store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: store_offset,
-                    },
-                );
+            builder.store(
+                compilation_ctx.memory_id,
+                inner.store_kind()?,
+                MemArg {
+                    align: 0,
+                    offset: store_offset,
+                },
+            );
 
-                store_offset += 4;
-            } else if data_size == 8 {
-                // Store i64
-                builder.store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I64 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: store_offset,
-                    },
-                );
-
-                store_offset += 8;
-            } else {
-                return Err(IntermediateTypeError::VectorInvalidDataSize(data_size));
-            }
+            store_offset += data_size as u32;
 
             builder.local_get(ptr_local);
         }
@@ -183,7 +166,7 @@ impl IVector {
         let len = module.locals.add(ValType::I32); // length of the original vector
         let multiplier = module.locals.add(ValType::I32); // multiplier for capacity calculation
         let capacity = module.locals.add(ValType::I32); // capacity of the new vector
-        let data_size = inner.stack_data_size()? as i32; // size of the inner type data in the vector
+        let data_size = inner.wasm_memory_data_size()? as i32; // size of the inner type data in the vector
 
         builder.local_set(multiplier);
 
@@ -257,20 +240,11 @@ impl IVector {
                         IntermediateType::IBool
                         | IntermediateType::IU8
                         | IntermediateType::IU16
-                        | IntermediateType::IU32 => {
+                        | IntermediateType::IU32
+                        | IntermediateType::IU64 => {
                             loop_block.load(
                                 compilation_ctx.memory_id,
-                                LoadKind::I32 { atomic: false },
-                                MemArg {
-                                    align: 0,
-                                    offset: 0,
-                                },
-                            );
-                        }
-                        IntermediateType::IU64 => {
-                            loop_block.load(
-                                compilation_ctx.memory_id,
-                                LoadKind::I64 { atomic: false },
+                                inner.load_kind()?,
                                 MemArg {
                                     align: 0,
                                     offset: 0,
@@ -511,7 +485,7 @@ impl IVector {
                             then.skip_vec_header(v1_ptr)
                                 .skip_vec_header(v2_ptr)
                                 .local_get(len)
-                                .i32_const(inner.stack_data_size()? as i32)
+                                .i32_const(inner.wasm_memory_data_size()? as i32)
                                 .binop(BinaryOp::I32Mul)
                                 .call(equality_f)
                                 .local_set(result);
@@ -528,10 +502,10 @@ impl IVector {
                             then.loop_(None, |loop_| {
                                 loop_result = (|| {
                                     //  Get the i-th element of both vectors and compare them
-                                    let data_size = inner.stack_data_size()? as i32;
+                                    let data_size = inner.wasm_memory_data_size()? as i32;
                                     loop_.vec_elem_ptr(v1_ptr, i, data_size).load(
                                         compilation_ctx.memory_id,
-                                        LoadKind::I32 { atomic: false },
+                                        inner.load_kind()?,
                                         MemArg {
                                             align: 0,
                                             offset: 0,
@@ -539,7 +513,7 @@ impl IVector {
                                     );
                                     loop_.vec_elem_ptr(v2_ptr, i, data_size).load(
                                         compilation_ctx.memory_id,
-                                        LoadKind::I32 { atomic: false },
+                                        inner.load_kind()?,
                                         MemArg {
                                             align: 0,
                                             offset: 0,
@@ -614,7 +588,7 @@ impl IVector {
         // Local declarations
         let ptr_local = module.locals.add(ValType::I32);
         let len_local = module.locals.add(ValType::I32);
-        let data_size = inner.stack_data_size()? as i32;
+        let data_size = inner.wasm_memory_data_size()? as i32;
 
         if num_elements == 0 {
             // Set length
@@ -649,11 +623,7 @@ impl IVector {
                 // Store at computed address
                 builder.store(
                     compilation_ctx.memory_id,
-                    match inner.try_into()? {
-                        ValType::I64 => StoreKind::I64 { atomic: false },
-                        ValType::I32 => StoreKind::I32 { atomic: false },
-                        t => return Err(IntermediateTypeError::UnsupportedValType(t)),
-                    },
+                    inner.store_kind()?,
                     MemArg {
                         align: 0,
                         offset: (8 + (num_elements - 1 - i) * data_size) as u32,
@@ -699,6 +669,7 @@ impl IVector {
                         | IntermediateType::IU8
                         | IntermediateType::IU16
                         | IntermediateType::IU32
+                        | IntermediateType::IU64
                         | IntermediateType::IU128
                         | IntermediateType::IU256
                         | IntermediateType::IAddress
@@ -707,24 +678,16 @@ impl IVector {
                         | IntermediateType::IGenericStructInstance { .. }
                         | IntermediateType::IEnum { .. }
                         | IntermediateType::IGenericEnumInstance { .. } => {
-                            loop_.vec_elem_ptr(vec_ptr, i, 4).load(
-                                compilation_ctx.memory_id,
-                                LoadKind::I32 { atomic: false },
-                                MemArg {
-                                    align: 0,
-                                    offset: 0,
-                                },
-                            );
-                        }
-                        IntermediateType::IU64 => {
-                            loop_.vec_elem_ptr(vec_ptr, i, 8).load(
-                                compilation_ctx.memory_id,
-                                LoadKind::I64 { atomic: false },
-                                MemArg {
-                                    align: 0,
-                                    offset: 0,
-                                },
-                            );
+                            loop_
+                                .vec_elem_ptr(vec_ptr, i, inner.wasm_memory_data_size()? as i32)
+                                .load(
+                                    compilation_ctx.memory_id,
+                                    inner.load_kind()?,
+                                    MemArg {
+                                        align: 0,
+                                        offset: 0,
+                                    },
+                                );
                         }
                         IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                             return Err(IntermediateTypeError::FoundVectorOfReferences);
@@ -793,7 +756,7 @@ impl IVector {
             }
         }
 
-        builder.i32_const(inner.stack_data_size()? as i32);
+        builder.i32_const(inner.wasm_memory_data_size()? as i32);
 
         let borrow_f = RuntimeFunction::VecBorrow.get(module, Some(compilation_ctx))?;
         builder.call(borrow_f);
@@ -818,7 +781,7 @@ impl IVector {
         module_data: &ModuleData,
     ) -> Result<(), IntermediateTypeError> {
         let valtype = inner.try_into()?;
-        let size = inner.stack_data_size()? as i32;
+        let size = inner.wasm_memory_data_size()? as i32;
         let vec_ref = module.locals.add(ValType::I32);
         let vec_ptr = module.locals.add(ValType::I32);
         let len = module.locals.add(ValType::I32);
@@ -934,11 +897,7 @@ impl IVector {
             .local_get(elem)
             .store(
                 compilation_ctx.memory_id,
-                match valtype {
-                    ValType::I64 => StoreKind::I64 { atomic: false },
-                    ValType::I32 => StoreKind::I32 { atomic: false },
-                    _ => return Err(IntermediateTypeError::UnsupportedValType(valtype)),
-                },
+                inner.store_kind()?,
                 MemArg {
                     align: 0,
                     offset: 0,
@@ -1142,35 +1101,10 @@ mod tests {
         // pop back
         builder.local_get(ptr); // this would be the mutable reference to the vector
 
-        match inner_type {
-            IntermediateType::IBool
-            | IntermediateType::IU8
-            | IntermediateType::IU16
-            | IntermediateType::IU32
-            | IntermediateType::IU128
-            | IntermediateType::IU256
-            | IntermediateType::IAddress
-            | IntermediateType::ISigner
-            | IntermediateType::IVector(_)
-            | IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IEnum { .. }
-            | IntermediateType::IGenericEnumInstance { .. } => {
-                let swap_f = RuntimeFunction::VecPopBack32
-                    .get(&mut raw_module, Some(&compilation_ctx))
-                    .unwrap();
-                builder.call(swap_f);
-            }
-            IntermediateType::IU64 => {
-                let swap_f = RuntimeFunction::VecPopBack64
-                    .get(&mut raw_module, Some(&compilation_ctx))
-                    .unwrap();
-                builder.call(swap_f);
-            }
-            _ => {
-                unreachable!("unreacable condition")
-            }
-        }
+        let pop_back_f = RuntimeFunction::VecPopBack
+            .get_generic(&mut raw_module, &compilation_ctx, &[&inner_type])
+            .unwrap();
+        builder.call(pop_back_f);
 
         if inner_type == IntermediateType::IU64 {
             builder.unop(UnaryOp::I32WrapI64);
@@ -1356,20 +1290,10 @@ mod tests {
         builder.i64_const(idx1); // idx1
         builder.i64_const(idx2); // idx2
 
-        match inner_type {
-            IntermediateType::IU64 => {
-                let swap_f = RuntimeFunction::VecSwap64
-                    .get(&mut raw_module, Some(&compilation_ctx))
-                    .unwrap();
-                builder.call(swap_f);
-            }
-            _ => {
-                let swap_f = RuntimeFunction::VecSwap32
-                    .get(&mut raw_module, Some(&compilation_ctx))
-                    .unwrap();
-                builder.call(swap_f);
-            }
-        }
+        let swap_f = RuntimeFunction::VecSwap
+            .get_generic(&mut raw_module, &compilation_ctx, &[&inner_type])
+            .unwrap();
+        builder.call(swap_f);
 
         builder.i32_const(0);
 
@@ -1394,34 +1318,34 @@ mod tests {
         let expected_bytes = [
             4u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
-            1u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            1u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
+            1u8.to_le_bytes().as_slice(),
+            0u8.to_le_bytes().as_slice(),
+            1u8.to_le_bytes().as_slice(),
+            0u8.to_le_bytes().as_slice(),
         ]
         .concat();
 
         let expected_pop_bytes = [
             3u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
-            1u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            1u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
+            1u8.to_le_bytes().as_slice(),
+            0u8.to_le_bytes().as_slice(),
+            1u8.to_le_bytes().as_slice(),
+            0u8.to_le_bytes().as_slice(),
         ]
         .concat();
 
         let expected_push_bytes = [
             6u32.to_le_bytes().as_slice(),
             8u32.to_le_bytes().as_slice(),
-            1u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            1u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            1u32.to_le_bytes().as_slice(),
-            1u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
+            1u8.to_le_bytes().as_slice(),
+            0u8.to_le_bytes().as_slice(),
+            1u8.to_le_bytes().as_slice(),
+            0u8.to_le_bytes().as_slice(),
+            1u8.to_le_bytes().as_slice(),
+            1u8.to_le_bytes().as_slice(),
+            0u8.to_le_bytes().as_slice(),
+            0u8.to_le_bytes().as_slice(),
         ]
         .concat();
         let element_bytes = [1u8];
@@ -1429,10 +1353,10 @@ mod tests {
         let expected_swap_bytes = [
             4u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            1u32.to_le_bytes().as_slice(),
-            1u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
+            0u8.to_le_bytes().as_slice(),
+            1u8.to_le_bytes().as_slice(),
+            1u8.to_le_bytes().as_slice(),
+            0u8.to_le_bytes().as_slice(),
         ]
         .concat();
 
@@ -1455,30 +1379,30 @@ mod tests {
         let expected_bytes = [
             3u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
-            1u32.to_le_bytes().as_slice(),
-            2u32.to_le_bytes().as_slice(),
-            3u32.to_le_bytes().as_slice(),
+            1u8.to_le_bytes().as_slice(),
+            2u8.to_le_bytes().as_slice(),
+            3u8.to_le_bytes().as_slice(),
         ]
         .concat();
 
         let expected_pop_bytes = [
             2u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
-            1u32.to_le_bytes().as_slice(),
-            2u32.to_le_bytes().as_slice(),
-            3u32.to_le_bytes().as_slice(),
+            1u8.to_le_bytes().as_slice(),
+            2u8.to_le_bytes().as_slice(),
+            3u8.to_le_bytes().as_slice(),
         ]
         .concat();
 
         let expected_push_bytes = [
             5u32.to_le_bytes().as_slice(),
             6u32.to_le_bytes().as_slice(),
-            1u32.to_le_bytes().as_slice(),
-            2u32.to_le_bytes().as_slice(),
-            3u32.to_le_bytes().as_slice(),
-            4u32.to_le_bytes().as_slice(),
-            4u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
+            1u8.to_le_bytes().as_slice(),
+            2u8.to_le_bytes().as_slice(),
+            3u8.to_le_bytes().as_slice(),
+            4u8.to_le_bytes().as_slice(),
+            4u8.to_le_bytes().as_slice(),
+            0u8.to_le_bytes().as_slice(),
         ]
         .concat();
 
@@ -1487,9 +1411,9 @@ mod tests {
         let expected_swap_bytes = [
             3u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
-            3u32.to_le_bytes().as_slice(),
-            2u32.to_le_bytes().as_slice(),
-            1u32.to_le_bytes().as_slice(),
+            3u8.to_le_bytes().as_slice(),
+            2u8.to_le_bytes().as_slice(),
+            1u8.to_le_bytes().as_slice(),
         ]
         .concat();
 
@@ -1518,20 +1442,20 @@ mod tests {
         let expected_bytes = [
             4u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
-            1u32.to_le_bytes().as_slice(),
-            2u32.to_le_bytes().as_slice(),
-            3u32.to_le_bytes().as_slice(),
-            4u32.to_le_bytes().as_slice(),
+            1u16.to_le_bytes().as_slice(),
+            2u16.to_le_bytes().as_slice(),
+            3u16.to_le_bytes().as_slice(),
+            4u16.to_le_bytes().as_slice(),
         ]
         .concat();
 
         let expected_pop_bytes = [
             3u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
-            1u32.to_le_bytes().as_slice(),
-            2u32.to_le_bytes().as_slice(),
-            3u32.to_le_bytes().as_slice(),
-            4u32.to_le_bytes().as_slice(),
+            1u16.to_le_bytes().as_slice(),
+            2u16.to_le_bytes().as_slice(),
+            3u16.to_le_bytes().as_slice(),
+            4u16.to_le_bytes().as_slice(),
         ]
         .concat();
 
@@ -1540,24 +1464,24 @@ mod tests {
         let expected_push_bytes = [
             6u32.to_le_bytes().as_slice(),
             8u32.to_le_bytes().as_slice(),
-            1u32.to_le_bytes().as_slice(),
-            2u32.to_le_bytes().as_slice(),
-            3u32.to_le_bytes().as_slice(),
-            4u32.to_le_bytes().as_slice(),
-            5u32.to_le_bytes().as_slice(),
-            5u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
+            1u16.to_le_bytes().as_slice(),
+            2u16.to_le_bytes().as_slice(),
+            3u16.to_le_bytes().as_slice(),
+            4u16.to_le_bytes().as_slice(),
+            5u16.to_le_bytes().as_slice(),
+            5u16.to_le_bytes().as_slice(),
+            0u16.to_le_bytes().as_slice(),
+            0u16.to_le_bytes().as_slice(),
         ]
         .concat();
 
         let expected_swap_bytes = [
             4u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
-            3u32.to_le_bytes().as_slice(),
-            2u32.to_le_bytes().as_slice(),
-            1u32.to_le_bytes().as_slice(),
-            4u32.to_le_bytes().as_slice(),
+            3u16.to_le_bytes().as_slice(),
+            2u16.to_le_bytes().as_slice(),
+            1u16.to_le_bytes().as_slice(),
+            4u16.to_le_bytes().as_slice(),
         ]
         .concat();
 
@@ -2438,13 +2362,24 @@ mod tests {
     fn test_vec_pack_u8() {
         let element_bytes = vec![vec![10], vec![20], vec![30]];
 
-        let expected_result_bytes = vec![
-            3, 0, 0, 0, 3, 0, 0, 0, 10, 0, 0, 0, 20, 0, 0, 0, 30, 0, 0, 0,
-        ];
+        let expected_result_bytes = vec![3, 0, 0, 0, 3, 0, 0, 0, 10, 20, 30];
 
         test_vector_pack(
             &element_bytes,
             IntermediateType::IU8,
+            &expected_result_bytes,
+        );
+    }
+
+    #[test]
+    fn test_vec_pack_u16() {
+        let element_bytes = vec![vec![10], vec![20], vec![30]];
+
+        let expected_result_bytes = vec![3, 0, 0, 0, 3, 0, 0, 0, 10, 0, 20, 0, 30, 0];
+
+        test_vector_pack(
+            &element_bytes,
+            IntermediateType::IU16,
             &expected_result_bytes,
         );
     }
