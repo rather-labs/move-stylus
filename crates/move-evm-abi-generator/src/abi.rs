@@ -148,7 +148,7 @@ impl Abi {
                 .special_attributes
                 .functions
                 .iter()
-                .find(|f| f.name == function.function_id.identifier)
+                .find(|f| *f.name == *function.function_id.identifier)
                 .expect("function not found");
 
             // Determine the function type based on the function ID

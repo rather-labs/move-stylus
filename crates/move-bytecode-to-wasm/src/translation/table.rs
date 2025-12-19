@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use move_symbol_pool::Symbol;
 use walrus::{
     ConstExpr, ElementKind, FunctionId as WasmFunctionId, Module, TableId, TypeId, ValType,
     ir::Value,
@@ -19,7 +20,7 @@ use super::{
 /// Identifies a function inside a module
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub struct FunctionId {
-    pub identifier: String,
+    pub identifier: Symbol,
 
     pub module_id: ModuleId,
 

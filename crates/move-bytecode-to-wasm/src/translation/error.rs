@@ -1,6 +1,7 @@
 use std::rc::Rc;
 
 use move_binary_format::file_format::{Bytecode, SignatureIndex};
+use move_symbol_pool::Symbol;
 use relooper::BranchMode;
 use walrus::{LocalId, ValType};
 
@@ -224,7 +225,7 @@ pub enum TranslationError {
     MultipleWasmReturnValues(usize),
 
     #[error("generic function {0}::{1} has no type instantiations")]
-    GenericFunctionNoTypeInstantiations(ModuleId, String),
+    GenericFunctionNoTypeInstantiations(ModuleId, Symbol),
 }
 
 impl From<TranslationError> for CompilationError {

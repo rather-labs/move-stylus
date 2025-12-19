@@ -198,7 +198,7 @@ pub fn translate_function(
     let mut function = FunctionBuilder::new(&mut module.types, &params, &results);
 
     #[cfg(debug_assertions)]
-    function.name(function_information.function_id.identifier.clone());
+    function.name(function_information.function_id.identifier.to_string());
 
     let mut builder = function.func_body();
 
@@ -274,7 +274,7 @@ pub fn translate_function(
         .special_attributes
         .test_functions
         .iter()
-        .any(|f| f.name == function_information.function_id.identifier)
+        .any(|f| *f.name == *function_information.function_id.identifier)
     {
         module
             .exports
@@ -3145,7 +3145,7 @@ pub(crate) fn translate_and_link_functions(
         &function_information.instantiate(function_id.type_instantiations.as_ref().ok_or(
             TranslationError::GenericFunctionNoTypeInstantiations(
                 function_id.module_id.clone(),
-                function_id.identifier.clone(),
+                function_id.identifier,
             ),
         )?)
     } else {

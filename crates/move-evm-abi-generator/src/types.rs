@@ -129,7 +129,7 @@ impl Type {
                     _ => Self::Struct {
                         identifier: struct_.identifier.clone(),
                         type_instances: None,
-                        module_id: module_id.clone(),
+                        module_id: *module_id,
                     },
                 }
             }
@@ -157,7 +157,7 @@ impl Type {
                     _ => Self::Struct {
                         identifier: struct_.identifier.clone(),
                         type_instances: Some(types),
-                        module_id: module_id.clone(),
+                        module_id: *module_id,
                     },
                 }
             }
@@ -167,7 +167,7 @@ impl Type {
                 if enum_.is_simple {
                     Type::Enum {
                         identifier: enum_.identifier.clone(),
-                        module_id: module_id.clone(),
+                        module_id: *module_id,
                     }
                 } else {
                     Type::None
@@ -188,7 +188,7 @@ impl Type {
                 if enum_.is_simple {
                     Type::Enum {
                         identifier: enum_.identifier.clone(),
-                        module_id: module_id.clone(),
+                        module_id: *module_id,
                     }
                 } else {
                     Type::None

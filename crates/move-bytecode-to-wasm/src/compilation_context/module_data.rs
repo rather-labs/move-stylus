@@ -99,7 +99,7 @@ impl From<[u8; 32]> for Address {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub struct ModuleId {
     pub address: Address,
     pub module_name: Symbol,
@@ -745,9 +745,8 @@ impl ModuleData {
                 .into_bytes()
                 .into();
 
-            // TODO: clones and to_string()....
             let function_id = FunctionId {
-                identifier: function_name.to_string(),
+                identifier: Symbol::from(function_name),
                 module_id: ModuleId::new(function_module_address, function_module_name),
                 type_instantiations: None,
             };
@@ -879,7 +878,7 @@ impl ModuleData {
                 .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>()?;
 
             let function_id = FunctionId {
-                identifier: function_name.to_string(),
+                identifier: Symbol::from(function_name),
                 module_id: ModuleId::new(function_module_address, function_module_name),
                 type_instantiations: Some(type_instantiations),
             };
@@ -940,7 +939,7 @@ impl ModuleData {
         const INIT_FUNCTION_NAME: &str = "init";
 
         // Must be named `init`
-        if function_id.identifier != INIT_FUNCTION_NAME {
+        if *function_id.identifier != *INIT_FUNCTION_NAME {
             return Ok(false);
         }
 
@@ -1062,7 +1061,7 @@ impl ModuleData {
         const RECEIVE_FUNCTION_NAME: &str = "receive";
 
         // Must be named `receive`. Otherwise, it is not a receive function.
-        if function_id.identifier != RECEIVE_FUNCTION_NAME {
+        if *function_id.identifier != *RECEIVE_FUNCTION_NAME {
             return Ok(false);
         }
 
@@ -1121,7 +1120,7 @@ impl ModuleData {
         const FALLBACK_FUNCTION_NAME: &str = "fallback";
 
         // Must be named `fallback`. Otherwise, it is not a fallback function.
-        if function_id.identifier != FALLBACK_FUNCTION_NAME {
+        if *function_id.identifier != *FALLBACK_FUNCTION_NAME {
             return Ok(false);
         }
 
