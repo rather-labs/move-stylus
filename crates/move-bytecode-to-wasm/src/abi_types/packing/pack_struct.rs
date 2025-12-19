@@ -107,8 +107,7 @@ impl IStruct {
         compilation_ctx: &CompilationContext,
         base_calldata_reference_pointer: Option<LocalId>,
     ) -> Result<(), AbiError> {
-        let val_32 = module.locals.add(ValType::I32);
-        let val_64 = module.locals.add(ValType::I64);
+        let val = module.locals.add(ValType::I32);
         let struct_ptr = local;
         let reference_value = module.locals.add(ValType::I32);
 
@@ -171,16 +170,15 @@ impl IStruct {
                 | IntermediateType::IU16
                 | IntermediateType::IU32
                 | IntermediateType::IU64 => {
-                    let (val, load_kind) = if field.stack_data_size()? == 8 {
-                        (val_64, LoadKind::I64 { atomic: false })
-                    } else {
-                        (val_32, LoadKind::I32 { atomic: false })
+                    let val = match field {
+                        IntermediateType::IU64 => module.locals.add(ValType::I64),
+                        _ => val,
                     };
 
                     block
                         .load(
                             compilation_ctx.memory_id,
-                            load_kind,
+                            field.load_kind()?,
                             MemArg {
                                 align: 0,
                                 offset: 0,
@@ -191,8 +189,8 @@ impl IStruct {
                     val
                 }
                 _ => {
-                    block.local_set(val_32);
-                    val_32
+                    block.local_set(val);
+                    val
                 }
             };
 

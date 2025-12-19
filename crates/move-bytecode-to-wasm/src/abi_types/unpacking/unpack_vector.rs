@@ -1,12 +1,13 @@
 use walrus::{
     InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
+    ir::{BinaryOp, LoadKind, MemArg},
 };
 
 use crate::{
     abi_types::error::AbiError,
     runtime::RuntimeFunction,
     translation::intermediate_types::{IntermediateType, vector::IVector},
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 
 use crate::CompilationContext;
@@ -122,31 +123,29 @@ impl IVector {
         let vector_pointer = module.locals.add(ValType::I32);
         let writer_pointer = module.locals.add(ValType::I32);
 
+        let data_size = inner.wasm_memory_data_size()? as i32;
         IVector::allocate_vector_with_header(
             block,
             compilation_ctx,
             vector_pointer,
             length,
             length,
-            inner.stack_data_size()? as i32,
+            data_size,
         );
-        block.local_get(vector_pointer);
-        block.local_set(writer_pointer);
 
-        // increment pointer
-        block.local_get(writer_pointer);
-        block.i32_const(8); // The size of the length + capacity written above
-        block.binop(BinaryOp::I32Add);
-        block.local_set(writer_pointer);
+        // Set the writer pointer to the start of the vector data
+        block
+            .skip_vec_header(vector_pointer)
+            .local_set(writer_pointer);
 
         // Copy elements
         let i = module.locals.add(ValType::I32);
-        block.i32_const(0);
-        block.local_set(i);
+        block.i32_const(0).local_set(i);
 
         let calldata_reader_pointer = module.locals.add(ValType::I32);
-        block.local_get(data_reader_pointer);
-        block.local_set(calldata_reader_pointer);
+        block
+            .local_get(data_reader_pointer)
+            .local_set(calldata_reader_pointer);
 
         block.loop_(None, |loop_block| {
             inner_result = (|| {
@@ -162,32 +161,19 @@ impl IVector {
                     compilation_ctx,
                 )?;
 
-                // store the value
-                if inner.stack_data_size()? == 4 {
-                    loop_block.store(
-                        compilation_ctx.memory_id,
-                        StoreKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
-                } else if inner.stack_data_size()? == 8 {
-                    loop_block.store(
-                        compilation_ctx.memory_id,
-                        StoreKind::I64 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
-                } else {
-                    unreachable!("Unsupported type size");
-                }
+                // Store the value
+                loop_block.store(
+                    compilation_ctx.memory_id,
+                    inner.store_kind()?,
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
 
                 // increment writer pointer
                 loop_block.local_get(writer_pointer);
-                loop_block.i32_const(inner.stack_data_size()? as i32);
+                loop_block.i32_const(data_size);
                 loop_block.binop(BinaryOp::I32Add);
                 loop_block.local_set(writer_pointer);
 
@@ -300,9 +286,9 @@ mod tests {
         let expected_result_bytes = [
             3u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
-            1u32.to_le_bytes().as_slice(),
-            2u32.to_le_bytes().as_slice(),
-            3u32.to_le_bytes().as_slice(),
+            1u8.to_le_bytes().as_slice(),
+            2u8.to_le_bytes().as_slice(),
+            3u8.to_le_bytes().as_slice(),
         ]
         .concat();
         test_vec_unpacking(&data, int_type, &expected_result_bytes);
@@ -317,8 +303,8 @@ mod tests {
         let expected_result_bytes = [
             2u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
-            1u32.to_le_bytes().as_slice(),
-            2u32.to_le_bytes().as_slice(),
+            1u16.to_le_bytes().as_slice(),
+            2u16.to_le_bytes().as_slice(),
         ]
         .concat();
         test_vec_unpacking(&data, int_type, &expected_result_bytes);

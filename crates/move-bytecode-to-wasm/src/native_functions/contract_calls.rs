@@ -1,7 +1,7 @@
 use move_parse_special_attributes::function_modifiers::FunctionModifier;
 use walrus::{
     FunctionBuilder, FunctionId, LocalId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
+    ir::{BinaryOp, ExtendedLoad, LoadKind, MemArg, StoreKind},
 };
 
 use crate::{
@@ -127,7 +127,9 @@ pub fn add_external_contract_call_fn(
         )
         .load(
             compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
+            LoadKind::I32_8 {
+                kind: ExtendedLoad::ZeroExtend,
+            },
             MemArg {
                 align: 0,
                 offset: 0,

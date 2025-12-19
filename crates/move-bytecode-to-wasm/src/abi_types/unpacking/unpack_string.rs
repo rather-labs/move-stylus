@@ -6,6 +6,7 @@ use walrus::{
 use crate::{
     abi_types::error::AbiError, runtime::RuntimeFunction,
     translation::intermediate_types::vector::IVector, vm_handled_types::string::String_,
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 
 use crate::CompilationContext;
@@ -116,7 +117,7 @@ impl String_ {
             .call(swap_i32_bytes_function)
             .local_set(length);
 
-        // increment data reader pointer
+        // Increment data reader pointer
         block
             .local_get(data_reader_pointer)
             .i32_const(32)
@@ -126,21 +127,21 @@ impl String_ {
         let vector_pointer = module.locals.add(ValType::I32);
         let writer_pointer = module.locals.add(ValType::I32);
 
+        // Allocate space for the vector
+        // Each u8 element takes 1 byte
         IVector::allocate_vector_with_header(
             block,
             compilation_ctx,
             vector_pointer,
             length,
             length,
-            4,
+            1,
         );
         block.local_get(vector_pointer).local_set(writer_pointer);
 
-        // increment pointer
+        // Set writer pointer to the start of the vector data
         block
-            .local_get(writer_pointer)
-            .i32_const(8) // The size of the length + capacity written above
-            .binop(BinaryOp::I32Add)
+            .skip_vec_header(writer_pointer)
             .local_set(writer_pointer);
 
         // Copy elements
@@ -177,21 +178,21 @@ impl String_ {
                 },
             );
 
-            // increment reader pointer
+            // Increment data reader pointer by 1 byte to point to the next u8 element
             loop_block
                 .local_get(data_reader_pointer)
                 .i32_const(1)
                 .binop(BinaryOp::I32Add)
                 .local_set(data_reader_pointer);
 
-            // increment writer pointer
+            // Increment writer pointer by 1 byte to point to the next u8 element
             loop_block
                 .local_get(writer_pointer)
-                .i32_const(4)
+                .i32_const(1)
                 .binop(BinaryOp::I32Add)
                 .local_set(writer_pointer);
 
-            // increment i
+            // Increment i
             loop_block
                 .local_get(i)
                 .i32_const(1)

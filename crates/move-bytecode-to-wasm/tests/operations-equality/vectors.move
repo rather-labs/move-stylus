@@ -1,5 +1,9 @@
 module 0x01::equality_vectors;
 
+entry fun eq_vec_u8(x: vector<u8>, y: vector<u8>): bool {
+    x == y
+}
+
 entry fun eq_vec_stack_type(x: vector<u16>, y: vector<u16>): bool {
     x == y
 }

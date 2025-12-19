@@ -5,6 +5,7 @@ use crate::{
     CompilationContext,
     abi_types::error::AbiError,
     translation::intermediate_types::{IntermediateType, vector::IVector},
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 
 impl IVector {
@@ -12,7 +13,7 @@ impl IVector {
         inner: &IntermediateType,
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
-        local: LocalId,
+        vector_pointer: LocalId,
         writer_pointer: LocalId,
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
@@ -23,7 +24,7 @@ impl IVector {
         let len = IntermediateType::IU32.add_load_memory_to_local_instructions(
             module,
             builder,
-            local,
+            vector_pointer,
             compilation_ctx.memory_id,
         )?;
 
@@ -34,22 +35,25 @@ impl IVector {
         };
 
         // Allocate memory for the packed value, this will be allocate at the end of calldata
-        builder.local_get(len);
-        builder.i32_const(inner_encoded_size); // The size of each element
-        builder.binop(BinaryOp::I32Mul);
-        builder.i32_const(32); // The size of the length value itself
-        builder.binop(BinaryOp::I32Add);
-
-        builder.call(compilation_ctx.allocator);
-        builder.local_tee(data_pointer);
+        // len * inner_encoded_size + 32 (length header)
+        builder
+            .local_get(len)
+            .i32_const(inner_encoded_size)
+            .binop(BinaryOp::I32Mul)
+            .i32_const(32)
+            .binop(BinaryOp::I32Add)
+            .call(compilation_ctx.allocator)
+            .local_tee(data_pointer);
 
         // The value stored at this param position should be the distance from the start of this
         // calldata portion to the pointer
         let reference_value = module.locals.add(ValType::I32);
 
-        builder.local_get(calldata_reference_pointer);
-        builder.binop(BinaryOp::I32Sub);
-        builder.local_set(reference_value);
+        builder
+            .local_get(calldata_reference_pointer)
+            .binop(BinaryOp::I32Sub)
+            .local_set(reference_value);
+
         pack_i32_type_instructions(
             builder,
             module,
@@ -58,12 +62,10 @@ impl IVector {
             writer_pointer,
         )?;
 
-        // Set the local to point to the first element
+        // Set the vector pointer to point to the first element
         builder
-            .local_get(local)
-            .i32_const(8)
-            .binop(BinaryOp::I32Add)
-            .local_set(local);
+            .skip_vec_header(vector_pointer)
+            .local_set(vector_pointer);
 
         /*
          *  Store the values at allocated memory at the end of calldata
@@ -108,7 +110,7 @@ impl IVector {
                     let inner_local = inner.add_load_memory_to_local_instructions(
                         module,
                         loop_block,
-                        local,
+                        vector_pointer,
                         compilation_ctx.memory_id,
                     )?;
 
@@ -132,12 +134,12 @@ impl IVector {
                         )?;
                     }
 
-                    // increment the local to point to next first value
+                    // Increment the vector pointer to point to next value
                     loop_block
-                        .local_get(local)
-                        .i32_const(inner.stack_data_size()? as i32)
+                        .local_get(vector_pointer)
+                        .i32_const(inner.wasm_memory_data_size()? as i32)
                         .binop(BinaryOp::I32Add)
-                        .local_set(local);
+                        .local_set(vector_pointer);
 
                     // increment data pointer
                     loop_block
@@ -245,12 +247,11 @@ mod tests {
             &[
                 3u32.to_le_bytes().as_slice(),
                 6u32.to_le_bytes().as_slice(),
-                1u32.to_le_bytes().as_slice(),
-                2u32.to_le_bytes().as_slice(),
-                3u32.to_le_bytes().as_slice(),
-                0u32.to_le_bytes().as_slice(),
-                0u32.to_le_bytes().as_slice(),
-                0u32.to_le_bytes().as_slice(),
+                1u8.to_le_bytes().as_slice(),
+                2u8.to_le_bytes().as_slice(),
+                3u8.to_le_bytes().as_slice(),
+                0u8.to_le_bytes().as_slice(),
+                0u8.to_le_bytes().as_slice(),
             ]
             .concat(),
             &expected_result,
@@ -268,11 +269,11 @@ mod tests {
             &[
                 3u32.to_le_bytes().as_slice(),
                 6u32.to_le_bytes().as_slice(),
-                1u32.to_le_bytes().as_slice(),
-                2u32.to_le_bytes().as_slice(),
-                3u32.to_le_bytes().as_slice(),
-                0u32.to_le_bytes().as_slice(),
-                0u32.to_le_bytes().as_slice(),
+                1u16.to_le_bytes().as_slice(),
+                2u16.to_le_bytes().as_slice(),
+                3u16.to_le_bytes().as_slice(),
+                0u16.to_le_bytes().as_slice(),
+                0u16.to_le_bytes().as_slice(),
                 0u32.to_le_bytes().as_slice(),
             ]
             .concat(),

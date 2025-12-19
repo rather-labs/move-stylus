@@ -32,9 +32,6 @@ pub fn pack_variant(
     // Pointer for simple types
     let ptr_to_data = module.locals.add(ValType::I32);
 
-    let val_32 = module.locals.add(ValType::I32);
-    let val_64 = module.locals.add(ValType::I64);
-
     // This accounts for the variant that occupies most space in memory (plus the 4 bytes for the variant index)
     let heap_size = enum_
         .heap_size()?
@@ -77,12 +74,9 @@ pub fn pack_variant(
                     | IntermediateType::IU16
                     | IntermediateType::IU32
                     | IntermediateType::IU64 => {
-                        let data_size = pack_type.stack_data_size()?;
-                        let (val, store_kind) = if data_size == 8 {
-                            (val_64, StoreKind::I64 { atomic: false })
-                        } else {
-                            (val_32, StoreKind::I32 { atomic: false })
-                        };
+                        let data_size = pack_type.wasm_memory_data_size()?;
+                        let val = module.locals.add(ValType::try_from(pack_type)?);
+                        let store_kind = pack_type.store_kind()?;
 
                         // Save the actual value
                         builder.local_set(val);
@@ -162,7 +156,7 @@ pub fn unpack_variant(
 ) -> Result<(), TranslationError> {
     let pointer = module.locals.add(ValType::I32);
 
-    // Skit the first 4 bytes which is the variant index, and unpack the fields
+    // Skip the first 4 bytes which is the variant index, and unpack the fields
     builder
         .i32_const(4)
         .binop(BinaryOp::I32Add)

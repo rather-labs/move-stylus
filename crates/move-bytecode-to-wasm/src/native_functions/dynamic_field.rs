@@ -342,11 +342,8 @@ pub fn add_hash_type_and_key_fn(
 
     // Arguments
     let parent_address = module.locals.add(ValType::I32);
-    let (key, valtype) = if itype == &IntermediateType::IU64 {
-        (module.locals.add(ValType::I64), ValType::I64)
-    } else {
-        (module.locals.add(ValType::I32), ValType::I32)
-    };
+    let valtype = ValType::try_from(itype)?;
+    let key = module.locals.add(valtype);
 
     let mut function =
         FunctionBuilder::new(&mut module.types, &[ValType::I32, valtype], &[ValType::I32]);
@@ -414,11 +411,11 @@ fn copy_data_to_memory(
     data: LocalId,
 ) -> Result<(), NativeFunctionError> {
     let load_value_to_stack = |field: &IntermediateType, builder: &mut InstrSeqBuilder<'_>| {
-        match field.stack_data_size() {
-            Ok(8) => {
+        match field.load_kind() {
+            Ok(load_kind) => {
                 builder.load(
                     compilation_ctx.memory_id,
-                    LoadKind::I64 { atomic: false },
+                    load_kind,
                     MemArg {
                         align: 0,
                         offset: 0,
@@ -426,16 +423,6 @@ fn copy_data_to_memory(
                 );
             }
             Err(e) => return Err(e),
-            _ => {
-                builder.load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-            }
         }
 
         Ok(())
@@ -454,48 +441,18 @@ fn copy_data_to_memory(
                 .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
         }
         // 4 bytes numbers should be in the stack
-        IntermediateType::IBool | IntermediateType::IU8 => {
-            builder.i32_const(1).call(compilation_ctx.allocator);
+        IntermediateType::IBool
+        | IntermediateType::IU8
+        | IntermediateType::IU16
+        | IntermediateType::IU32
+        | IntermediateType::IU64 => {
+            builder
+                .i32_const(itype.wasm_memory_data_size()? as i32)
+                .call(compilation_ctx.allocator);
 
             builder.local_get(data).store(
                 compilation_ctx.memory_id,
-                StoreKind::I32_8 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
-        }
-        IntermediateType::IU16 => {
-            builder.i32_const(2).call(compilation_ctx.allocator);
-
-            builder.local_get(data).store(
-                compilation_ctx.memory_id,
-                StoreKind::I32_16 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
-        }
-        IntermediateType::IU32 => {
-            builder.i32_const(4).call(compilation_ctx.allocator);
-
-            builder.local_get(data).store(
-                compilation_ctx.memory_id,
-                StoreKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
-        }
-        IntermediateType::IU64 => {
-            builder.i32_const(8).call(compilation_ctx.allocator);
-
-            builder.local_get(data).store(
-                compilation_ctx.memory_id,
-                StoreKind::I64 { atomic: false },
+                itype.store_kind()?,
                 MemArg {
                     align: 0,
                     offset: 0,
@@ -580,19 +537,9 @@ fn copy_data_to_memory(
                 )
                 .local_set(len);
 
-            let (field_data, load_kind, element_multiplier) = if **inner == IntermediateType::IU64 {
-                (
-                    module.locals.add(ValType::I64),
-                    LoadKind::I64 { atomic: false },
-                    8,
-                )
-            } else {
-                (
-                    module.locals.add(ValType::I32),
-                    LoadKind::I32 { atomic: false },
-                    4,
-                )
-            };
+            let load_kind = inner.load_kind()?;
+            let field_data = module.locals.add(ValType::try_from(&**inner)?);
+            let element_multiplier = inner.wasm_memory_data_size()? as i32;
 
             builder.i32_const(0).local_set(i);
             builder.skip_vec_header(data).local_set(data);

@@ -5,10 +5,7 @@ use crate::abi_types::error::AbiError;
 use crate::abi_types::unpacking::add_unpack_from_storage_instructions;
 use crate::translation::intermediate_types::IntermediateType;
 use crate::translation::intermediate_types::reference::{IMutRef, IRef};
-use walrus::{
-    InstrSeqBuilder, LocalId, Module,
-    ir::{MemArg, StoreKind},
-};
+use walrus::{InstrSeqBuilder, LocalId, Module, ir::MemArg};
 
 impl IRef {
     pub fn add_unpack_instructions(
@@ -77,7 +74,8 @@ impl IRef {
             | IntermediateType::IBool => {
                 let ptr_local = module.locals.add(walrus::ValType::I32);
 
-                builder.i32_const(inner.stack_data_size()? as i32);
+                let data_size = inner.wasm_memory_data_size()? as i32;
+                builder.i32_const(data_size);
                 builder.call(compilation_ctx.allocator);
                 builder.local_tee(ptr_local);
 
@@ -91,11 +89,7 @@ impl IRef {
 
                 builder.store(
                     compilation_ctx.memory_id,
-                    match inner.stack_data_size()? {
-                        4 => StoreKind::I32 { atomic: false },
-                        8 => StoreKind::I64 { atomic: false },
-                        s => return Err(AbiUnpackError::RefInvalidStackDataSize(s))?,
-                    },
+                    inner.store_kind()?,
                     MemArg {
                         align: 0,
                         offset: 0,
@@ -152,7 +146,8 @@ impl IMutRef {
             | IntermediateType::IBool => {
                 let ptr_local = module.locals.add(walrus::ValType::I32);
 
-                builder.i32_const(inner.stack_data_size()? as i32);
+                let data_size = inner.wasm_memory_data_size()? as i32;
+                builder.i32_const(data_size);
                 builder.call(compilation_ctx.allocator);
                 builder.local_tee(ptr_local);
 
@@ -166,11 +161,7 @@ impl IMutRef {
 
                 builder.store(
                     compilation_ctx.memory_id,
-                    match inner.stack_data_size()? {
-                        4 => StoreKind::I32 { atomic: false },
-                        8 => StoreKind::I64 { atomic: false },
-                        s => return Err(AbiUnpackError::RefInvalidStackDataSize(s))?,
-                    },
+                    inner.store_kind()?,
                     MemArg {
                         align: 0,
                         offset: 0,
@@ -268,7 +259,20 @@ mod tests {
         let data = SolType::abi_encode_params(&(88u8,));
 
         let mut expected = Vec::new();
-        expected.extend(&88u32.to_le_bytes());
+        expected.extend(&88u8.to_le_bytes());
+
+        test_unpack_ref(&data, int_type.clone(), &expected);
+    }
+
+    #[test]
+    fn test_unpack_ref_u16() {
+        type SolType = sol!((uint16,));
+        let int_type = IntermediateType::IRef(Box::new(IntermediateType::IU16));
+
+        let data = SolType::abi_encode_params(&(88u16,));
+
+        let mut expected = Vec::new();
+        expected.extend(&88u16.to_le_bytes());
 
         test_unpack_ref(&data, int_type.clone(), &expected);
     }
@@ -327,10 +331,10 @@ mod tests {
         let mut expected = Vec::new();
         expected.extend(&4u32.to_le_bytes()); // length
         expected.extend(&4u32.to_le_bytes()); // capacity
-        expected.extend(&1u32.to_le_bytes()); // first elem
-        expected.extend(&2u32.to_le_bytes()); // second elem
-        expected.extend(&3u32.to_le_bytes()); // third elem
-        expected.extend(&4u32.to_le_bytes()); // fourth elem
+        expected.extend(&1u8.to_le_bytes()); // first elem
+        expected.extend(&2u8.to_le_bytes()); // second elem
+        expected.extend(&3u8.to_le_bytes()); // third elem
+        expected.extend(&4u8.to_le_bytes()); // fourth elem
         test_unpack_ref(&data, vector_type.clone(), &expected);
     }
 

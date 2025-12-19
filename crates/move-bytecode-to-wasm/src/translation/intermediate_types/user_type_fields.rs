@@ -49,20 +49,10 @@ impl UserTypeFields {
                 | IntermediateType::IU16
                 | IntermediateType::IU32
                 | IntermediateType::IU64 => {
-                    let data_size = field.stack_data_size()?;
-                    let (val, load_kind, store_kind) = if data_size == 8 {
-                        (
-                            val_64,
-                            LoadKind::I64 { atomic: false },
-                            StoreKind::I64 { atomic: false },
-                        )
-                    } else {
-                        (
-                            val_32,
-                            LoadKind::I32 { atomic: false },
-                            StoreKind::I32 { atomic: false },
-                        )
-                    };
+                    let data_size = field.wasm_memory_data_size()?;
+                    let val = if data_size == 8 { val_64 } else { val_32 };
+                    let load_kind = field.load_kind()?;
+                    let store_kind = field.store_kind()?;
 
                     // Load intermediate pointer and value
                     builder
@@ -174,11 +164,11 @@ impl UserTypeFields {
         builder.i32_const(1).local_set(result);
 
         let load_value_to_stack = |field: &IntermediateType, builder: &mut InstrSeqBuilder<'_>| {
-            match field.stack_data_size() {
-                Ok(8) => {
+            match field.load_kind() {
+                Ok(load_kind) => {
                     builder.load(
                         compilation_ctx.memory_id,
-                        LoadKind::I64 { atomic: false },
+                        load_kind,
                         MemArg {
                             align: 0,
                             offset: 0,
@@ -186,16 +176,6 @@ impl UserTypeFields {
                     );
                 }
                 Err(e) => return Err(e),
-                _ => {
-                    builder.load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
-                }
             }
 
             Ok(())

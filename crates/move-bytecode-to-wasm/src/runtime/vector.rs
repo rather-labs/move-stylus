@@ -572,13 +572,14 @@ pub fn bytes_to_vec_function(
     let bytes_n = module.locals.add(ValType::I32);
 
     let vector_ptr = module.locals.add(ValType::I32);
+    // Allocate vector of u8 elements
     IVector::allocate_vector_with_header(
         &mut builder,
         compilation_ctx,
         vector_ptr,
         bytes_n,
         bytes_n,
-        4,
+        1,
     );
 
     let i = module.locals.add(ValType::I32);
@@ -586,8 +587,8 @@ pub fn bytes_to_vec_function(
     builder.loop_(None, |loop_block| {
         let loop_block_id = loop_block.id();
 
-        // address: vector_ptr + 8 (header) + i * 4
-        loop_block.vec_elem_ptr(vector_ptr, i, 4);
+        // address: vector_ptr + 8 (header) + i * 1
+        loop_block.vec_elem_ptr(vector_ptr, i, 1);
 
         // value: bytesN[i]
         loop_block
@@ -608,7 +609,7 @@ pub fn bytes_to_vec_function(
         // Store the i-th value at the i-th position of the vector
         loop_block.store(
             compilation_ctx.memory_id,
-            StoreKind::I32 { atomic: false },
+            StoreKind::I32_8 { atomic: false },
             MemArg {
                 align: 0,
                 offset: 0,

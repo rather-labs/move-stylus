@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use move_binary_format::file_format::FieldHandleIndex;
 use walrus::{
     FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
+    ir::{BinaryOp, ExtendedLoad, LoadKind, MemArg, StoreKind},
 };
 
 use crate::{
@@ -271,16 +271,16 @@ pub fn add_emit_log_fn(
 
         // If it is a stack type, we need to perform another load
         let local = if field.is_stack_type()? {
-            let (local, load_kind) = if field.stack_data_size()? == 8 {
-                (local_64, LoadKind::I64 { atomic: false })
-            } else {
-                (local, LoadKind::I32 { atomic: false })
+            let local = match ValType::try_from(field)? {
+                ValType::I32 => local,
+                ValType::I64 => local_64,
+                _ => unreachable!("Unsupported type size"),
             };
 
             builder
                 .load(
                     compilation_ctx.memory_id,
-                    load_kind,
+                    field.load_kind()?,
                     MemArg {
                         offset: 0,
                         align: 0,
@@ -499,25 +499,14 @@ fn add_encode_indexed_vector_instructions(
         | IntermediateType::IU256
         | IntermediateType::IAddress => {
             let writer_pointer = module.locals.add(ValType::I32);
-            let (value, load_kind) = if inner == &IntermediateType::IU64 {
-                (
-                    module.locals.add(ValType::I64),
-                    LoadKind::I64 { atomic: false },
-                )
-            } else {
-                (
-                    module.locals.add(ValType::I32),
-                    LoadKind::I32 { atomic: false },
-                )
-            };
-
+            let value = module.locals.add(ValType::try_from(inner)?);
             builder.loop_(None, |loop_| {
                 inner_result = (|| {
                     loop_
                         .local_get(vector_ptr)
                         .load(
                             compilation_ctx.memory_id,
-                            load_kind,
+                            inner.load_kind()?,
                             MemArg {
                                 align: 0,
                                 offset: 0,
@@ -544,7 +533,7 @@ fn add_encode_indexed_vector_instructions(
 
                     loop_
                         .local_get(vector_ptr)
-                        .i32_const(inner.stack_data_size()? as i32)
+                        .i32_const(inner.wasm_memory_data_size()? as i32)
                         .binop(BinaryOp::I32Add)
                         .local_set(vector_ptr);
 
@@ -759,17 +748,7 @@ fn add_encode_indexed_struct_instructions(
             | IntermediateType::IU256
             | IntermediateType::IAddress => {
                 let writer_pointer = module.locals.add(ValType::I32);
-                let (value, load_kind) = if *field == IntermediateType::IU64 {
-                    (
-                        module.locals.add(ValType::I64),
-                        LoadKind::I64 { atomic: false },
-                    )
-                } else {
-                    (
-                        module.locals.add(ValType::I32),
-                        LoadKind::I32 { atomic: false },
-                    )
-                };
+                let value = module.locals.add(ValType::try_from(field)?);
 
                 builder.local_get(struct_ptr).load(
                     compilation_ctx.memory_id,
@@ -784,7 +763,7 @@ fn add_encode_indexed_struct_instructions(
                     builder
                         .load(
                             compilation_ctx.memory_id,
-                            load_kind,
+                            field.load_kind()?,
                             MemArg {
                                 align: 0,
                                 offset: 0,
@@ -927,7 +906,9 @@ fn add_encode_indexed_struct_instructions(
                     )
                     .load(
                         compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
+                        LoadKind::I32_8 {
+                            kind: ExtendedLoad::ZeroExtend,
+                        },
                         MemArg {
                             align: 0,
                             offset: 0,
@@ -1043,21 +1024,21 @@ fn add_encode_indexed_string(
                 },
             );
 
-        // increment the local to point to next first value
+        // Increment the string pointer by 1 byte to point to the next u8 element
         loop_block
             .local_get(string_ptr)
-            .i32_const(4)
+            .i32_const(1)
             .binop(BinaryOp::I32Add)
             .local_set(string_ptr);
 
-        // increment data pointer
+        // Increment the writer pointer by 1 byte to point to the next u8 element
         loop_block
             .local_get(writer_pointer)
             .i32_const(1)
             .binop(BinaryOp::I32Add)
             .local_set(writer_pointer);
 
-        // increment i
+        // Increment i
         loop_block
             .local_get(i)
             .i32_const(1)

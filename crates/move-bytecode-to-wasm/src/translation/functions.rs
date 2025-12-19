@@ -5,7 +5,7 @@ use move_binary_format::file_format::{
 };
 use walrus::{
     InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
-    ir::{InstrSeqId, LoadKind, MemArg, StoreKind},
+    ir::{InstrSeqId, LoadKind, MemArg},
 };
 
 use super::{
@@ -178,22 +178,8 @@ pub fn add_unpack_function_return_values_instructions(
     let mut offset = 0;
     for return_ty in returns.iter() {
         builder.local_get(pointer);
-        if return_ty.stack_data_size()? == 4 {
-            builder.load(
-                memory,
-                LoadKind::I32 { atomic: false },
-                MemArg { align: 0, offset },
-            );
-        } else if return_ty.stack_data_size()? == 8 {
-            builder.load(
-                memory,
-                LoadKind::I64 { atomic: false },
-                MemArg { align: 0, offset },
-            );
-        } else {
-            unreachable!("Unsupported type size");
-        }
-        offset += return_ty.stack_data_size()?;
+        builder.load(memory, return_ty.load_kind()?, MemArg { align: 0, offset });
+        offset += return_ty.wasm_memory_data_size()?;
     }
 
     Ok(())
@@ -217,7 +203,7 @@ pub fn prepare_function_return(
         for return_ty in returns.iter().rev() {
             let local = return_ty.add_stack_to_local_instructions(module, builder)?;
             locals.push(local);
-            total_size += return_ty.stack_data_size()?;
+            total_size += return_ty.wasm_memory_data_size()?;
         }
         locals.reverse();
 
@@ -229,23 +215,12 @@ pub fn prepare_function_return(
         for (return_ty, local) in returns.iter().zip(locals.iter()) {
             builder.local_get(result_local_id);
             builder.local_get(*local);
-
-            if return_ty.stack_data_size()? == 4 {
-                builder.store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I32 { atomic: false },
-                    MemArg { align: 0, offset },
-                );
-            } else if return_ty.stack_data_size()? == 8 {
-                builder.store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I64 { atomic: false },
-                    MemArg { align: 0, offset },
-                );
-            } else {
-                unreachable!("Unsupported type size");
-            }
-            offset += return_ty.stack_data_size()?;
+            builder.store(
+                compilation_ctx.memory_id,
+                return_ty.store_kind()?,
+                MemArg { align: 0, offset },
+            );
+            offset += return_ty.wasm_memory_data_size()?;
         }
     }
 
