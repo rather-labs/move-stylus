@@ -55,10 +55,8 @@ pub enum RuntimeFunction {
     VecEqualityHeapType,
     IsZero,
     // Vector
-    VecSwap32,
-    VecSwap64,
-    VecPopBack32,
-    VecPopBack64,
+    VecSwap,
+    VecPopBack,
     VecBorrow,
     VecIncrementLen,
     VecDecrementLen,
@@ -127,10 +125,8 @@ impl RuntimeFunction {
             Self::VecEqualityHeapType => "vec_equality_heap_type",
             Self::IsZero => "is_zero",
             // Vector
-            Self::VecSwap32 => "vec_swap_32",
-            Self::VecSwap64 => "vec_swap_64",
-            Self::VecPopBack32 => "vec_pop_back_32",
-            Self::VecPopBack64 => "vec_pop_back_64",
+            Self::VecSwap => "vec_swap",
+            Self::VecPopBack => "vec_pop_back",
             Self::VecBorrow => "vec_borrow",
             Self::VecIncrementLen => "vec_increment_len",
             Self::VecDecrementLen => "vec_decrement_len",
@@ -244,10 +240,6 @@ impl RuntimeFunction {
                 }
                 (Self::IsZero, Some(ctx)) => equality::is_zero(module, ctx),
                 // Vector
-                (Self::VecSwap32, Some(ctx)) => vector::vec_swap_32_function(module, ctx)?,
-                (Self::VecSwap64, Some(ctx)) => vector::vec_swap_64_function(module, ctx)?,
-                (Self::VecPopBack32, Some(ctx)) => vector::vec_pop_back_32_function(module, ctx)?,
-                (Self::VecPopBack64, Some(ctx)) => vector::vec_pop_back_64_function(module, ctx)?,
                 (Self::VecBorrow, Some(ctx)) => vector::vec_borrow_function(module, ctx),
                 (Self::VecIncrementLen, Some(ctx)) => {
                     vector::increment_vec_len_function(module, ctx)
@@ -344,6 +336,14 @@ impl RuntimeFunction {
             Self::ComputeEnumStorageTailPosition => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
                 enums::compute_enum_storage_tail_position(module, compilation_ctx, generics[0])?
+            }
+            Self::VecSwap => {
+                Self::assert_generics_length(generics.len(), 1, self.name())?;
+                vector::vec_swap_function(module, compilation_ctx, generics[0])?
+            }
+            Self::VecPopBack => {
+                Self::assert_generics_length(generics.len(), 1, self.name())?;
+                vector::vec_pop_back_function(module, compilation_ctx, generics[0])?
             }
             _ => {
                 return Err(RuntimeFunctionError::CouldNotLinkGeneric(

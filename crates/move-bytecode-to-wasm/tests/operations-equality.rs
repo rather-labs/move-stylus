@@ -117,6 +117,7 @@ mod vector {
 
     sol!(
         #[allow(missing_docs)]
+        function eqVecU8(uint8[], uint8[]) external returns (bool);
         function eqVecStackType(uint16[], uint16[]) external returns (bool);
         function eqVecHeapType(uint128[], uint128[]) external returns (bool);
         function eqVecHeapType2(address[], address[]) external returns (bool);
@@ -133,6 +134,16 @@ mod vector {
     );
 
     #[rstest]
+    #[case(eqVecU8Call::new((
+        vec![u8::MAX, u8::MAX, 0, 1, 2, 3, u8::MAX],
+        vec![u8::MAX, u8::MAX, 0, 1, 2, 3, u8::MAX])),
+        true
+    )]
+    #[case(eqVecU8Call::new((
+        vec![u8::MAX, u8::MAX, 0, 1, 2, 3, u8::MAX],
+        vec![u8::MAX, u8::MAX, 9, 8, 7, 6, u8::MAX])),
+        false
+    )]
     #[case(eqVecStackTypeCall::new((
         vec![u16::MAX, u16::MAX, 0, 1, 2, 3, u16::MAX],
         vec![u16::MAX, u16::MAX, 0, 1, 2, 3, u16::MAX])),

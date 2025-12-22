@@ -16,9 +16,6 @@ pub enum AbiUnpackError {
     #[error("cannot unpack generic type parameter")]
     UnpackingGenericTypeParameter,
 
-    #[error("unsupported stack_data_size {0} for IRef")]
-    RefInvalidStackDataSize(u32),
-
     #[error("found a reference inside a reference")]
     RefInsideRef,
 

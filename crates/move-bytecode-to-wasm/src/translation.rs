@@ -1571,6 +1571,7 @@ fn translate_instruction(
                 | IntermediateType::IU8
                 | IntermediateType::IU16
                 | IntermediateType::IU32
+                | IntermediateType::IU64
                 | IntermediateType::IU128
                 | IntermediateType::IU256
                 | IntermediateType::IAddress
@@ -1580,13 +1581,11 @@ fn translate_instruction(
                 | IntermediateType::IVector(_)
                 | IntermediateType::IEnum { .. }
                 | IntermediateType::IGenericEnumInstance { .. } => {
-                    let pop_back_f =
-                        RuntimeFunction::VecPopBack32.get(module, Some(compilation_ctx))?;
-                    builder.call(pop_back_f);
-                }
-                IntermediateType::IU64 => {
-                    let pop_back_f =
-                        RuntimeFunction::VecPopBack64.get(module, Some(compilation_ctx))?;
+                    let pop_back_f = RuntimeFunction::VecPopBack.get_generic(
+                        module,
+                        compilation_ctx,
+                        &[&*vec_inner],
+                    )?;
                     builder.call(pop_back_f);
                 }
                 IntermediateType::ITypeParameter(_)
@@ -1666,16 +1665,9 @@ fn translate_instruction(
                 });
             }
 
-            match *vec_inner {
-                IntermediateType::IU64 => {
-                    let swap_f = RuntimeFunction::VecSwap64.get(module, Some(compilation_ctx))?;
-                    builder.call(swap_f);
-                }
-                _ => {
-                    let swap_f = RuntimeFunction::VecSwap32.get(module, Some(compilation_ctx))?;
-                    builder.call(swap_f);
-                }
-            }
+            let swap_f =
+                RuntimeFunction::VecSwap.get_generic(module, compilation_ctx, &[&*vec_inner])?;
+            builder.call(swap_f);
         }
         Bytecode::VecLen(signature_index) => {
             let elem_ir_type =

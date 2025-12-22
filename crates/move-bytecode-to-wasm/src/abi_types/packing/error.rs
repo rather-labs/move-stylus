@@ -22,9 +22,6 @@ pub enum AbiPackError {
     #[error("cannot check if generic type parameter is dynamic at compile time")]
     GenericTypeParameterIsDynamic,
 
-    #[error("unsupported stack_data_size {0} for IRef")]
-    RefInvalidStackDataSize(u32),
-
     #[error("found a reference inside a reference")]
     RefInsideRef,
 

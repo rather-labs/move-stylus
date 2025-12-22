@@ -5,6 +5,7 @@ use walrus::{
 
 use super::{RuntimeFunction, error::RuntimeFunctionError};
 use crate::CompilationContext;
+use crate::translation::intermediate_types::IntermediateType;
 use crate::translation::intermediate_types::vector::IVector;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 
@@ -108,145 +109,7 @@ pub fn decrement_vec_len_function(
     function.finish(vec![ptr], &mut module.funcs)
 }
 
-/// Swaps the elements at two indices in the vector. Abort the execution if any of the indice
-/// is out of bounds.
-///
-/// ```..., vector_reference, u64_value(1), u64_value(2) -> ...```
-pub fn vec_swap_32_function(
-    module: &mut Module,
-    compilation_ctx: &CompilationContext,
-) -> Result<FunctionId, RuntimeFunctionError> {
-    let mut function = FunctionBuilder::new(
-        &mut module.types,
-        &[ValType::I32, ValType::I64, ValType::I64],
-        &[],
-    );
-    let mut builder = function
-        .name(RuntimeFunction::VecSwap32.name().to_owned())
-        .func_body();
-
-    let ptr = module.locals.add(ValType::I32);
-    let idx1_i64 = module.locals.add(ValType::I64);
-    let idx2_i64 = module.locals.add(ValType::I64);
-
-    let idx2 = module.locals.add(ValType::I32);
-    let idx1 = module.locals.add(ValType::I32);
-    let len = module.locals.add(ValType::I32);
-
-    let downcast_f = RuntimeFunction::DowncastU64ToU32.get(module, None)?;
-
-    builder.local_get(idx1_i64).call(downcast_f).local_set(idx1);
-    builder.local_get(idx2_i64).call(downcast_f).local_set(idx2);
-
-    // Load vector ptr and len
-    builder
-        .local_get(ptr)
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
-        .local_tee(ptr)
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
-        .local_set(len);
-
-    builder.block(None, |block| {
-        let block_id = block.id();
-
-        block
-            .local_get(idx1_i64)
-            .local_get(idx2_i64)
-            .binop(BinaryOp::I64Eq)
-            .br_if(block_id);
-
-        // Helper: emit trap if idx >= len
-        let trap_if_idx_oob = |b: &mut InstrSeqBuilder, idx: LocalId| {
-            b.local_get(idx)
-                .local_get(len)
-                .binop(BinaryOp::I32GeU)
-                .if_else(
-                    None,
-                    |then_| {
-                        then_.unreachable();
-                    },
-                    |_| {},
-                );
-        };
-
-        trap_if_idx_oob(block, idx1);
-        trap_if_idx_oob(block, idx2);
-
-        // Swap elements
-        let aux = module.locals.add(ValType::I32);
-
-        let ptr1 = module.locals.add(ValType::I32);
-        let ptr2 = module.locals.add(ValType::I32);
-
-        block.vec_elem_ptr(ptr, idx1, 4);
-        block.local_set(ptr1);
-
-        block.vec_elem_ptr(ptr, idx2, 4);
-        block.local_set(ptr2);
-
-        // Load elem 1 into aux
-        block
-            .local_get(ptr1)
-            .load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            )
-            .local_set(aux);
-
-        // Store elem 2 into ptr1
-        block
-            .local_get(ptr1)
-            .local_get(ptr2)
-            .load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            )
-            .store(
-                compilation_ctx.memory_id,
-                StoreKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
-
-        // Store elem 1 into ptr2
-        block.local_get(ptr2).local_get(aux).store(
-            compilation_ctx.memory_id,
-            StoreKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        );
-    });
-
-    Ok(function.finish(vec![ptr, idx1_i64, idx2_i64], &mut module.funcs))
-}
-
-/// Swaps the elements at two indices in the vector. Abort the execution if any of the indice
+/// Swaps the elements at two indices in the vector. Abort the execution if any of the indices
 /// is out of bounds.
 ///
 /// Stack transition:
@@ -256,20 +119,36 @@ pub fn vec_swap_32_function(
 /// * `ptr` (i32) - pointer to the vector
 /// * `idx1_i64` (i64) - first index
 /// * `idx2_i64` (i64) - second index
-pub fn vec_swap_64_function(
+///
+/// # Arguments
+/// * `inner_type` - The intermediate type of the vector's inner elements
+pub fn vec_swap_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    inner_type: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
+    let element_size = inner_type.wasm_memory_data_size()?;
+    let load_kind = inner_type.load_kind()?;
+    let store_kind = inner_type.store_kind()?;
+
+    let elem_val_type = ValType::try_from(inner_type)?;
+
+    let name =
+        RuntimeFunction::VecSwap.get_generic_function_name(compilation_ctx, &[inner_type])?;
+    if let Some(function) = module.funcs.by_name(&name) {
+        return Ok(function);
+    }
+
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I64, ValType::I64],
         &[],
     );
-    let mut builder = function
-        .name(RuntimeFunction::VecSwap64.name().to_owned())
-        .func_body();
 
-    let ptr = module.locals.add(ValType::I32);
+    let mut builder = function.name(name).func_body();
+
+    // Arguments
+    let vector_ref = module.locals.add(ValType::I32);
     let idx1_i64 = module.locals.add(ValType::I64);
     let idx2_i64 = module.locals.add(ValType::I64);
 
@@ -284,7 +163,7 @@ pub fn vec_swap_64_function(
 
     // Load vector ptr and len
     builder
-        .local_get(ptr)
+        .local_get(vector_ref)
         .load(
             compilation_ctx.memory_id,
             LoadKind::I32 { atomic: false },
@@ -293,7 +172,7 @@ pub fn vec_swap_64_function(
                 offset: 0,
             },
         )
-        .local_tee(ptr)
+        .local_tee(vector_ref)
         .load(
             compilation_ctx.memory_id,
             LoadKind::I32 { atomic: false },
@@ -303,6 +182,8 @@ pub fn vec_swap_64_function(
             },
         )
         .local_set(len);
+
+    let vector_ptr = vector_ref;
 
     builder.block(None, |block| {
         let block_id = block.id();
@@ -331,15 +212,15 @@ pub fn vec_swap_64_function(
         trap_if_idx_oob(block, idx2);
 
         // Swap elements
-        let aux = module.locals.add(ValType::I64);
+        let aux = module.locals.add(elem_val_type);
 
         let ptr1 = module.locals.add(ValType::I32);
         let ptr2 = module.locals.add(ValType::I32);
 
-        block.vec_elem_ptr(ptr, idx1, 8);
+        block.vec_elem_ptr(vector_ptr, idx1, element_size);
         block.local_set(ptr1);
 
-        block.vec_elem_ptr(ptr, idx2, 8);
+        block.vec_elem_ptr(vector_ptr, idx2, element_size);
         block.local_set(ptr2);
 
         // Load elem 1 into aux
@@ -347,7 +228,7 @@ pub fn vec_swap_64_function(
             .local_get(ptr1)
             .load(
                 compilation_ctx.memory_id,
-                LoadKind::I64 { atomic: false },
+                load_kind,
                 MemArg {
                     align: 0,
                     offset: 0,
@@ -361,7 +242,7 @@ pub fn vec_swap_64_function(
             .local_get(ptr2)
             .load(
                 compilation_ctx.memory_id,
-                LoadKind::I64 { atomic: false },
+                load_kind,
                 MemArg {
                     align: 0,
                     offset: 0,
@@ -369,7 +250,7 @@ pub fn vec_swap_64_function(
             )
             .store(
                 compilation_ctx.memory_id,
-                StoreKind::I64 { atomic: false },
+                store_kind,
                 MemArg {
                     align: 0,
                     offset: 0,
@@ -379,7 +260,7 @@ pub fn vec_swap_64_function(
         // Store elem 1 into ptr2
         block.local_get(ptr2).local_get(aux).store(
             compilation_ctx.memory_id,
-            StoreKind::I64 { atomic: false },
+            store_kind,
             MemArg {
                 align: 0,
                 offset: 0,
@@ -387,7 +268,7 @@ pub fn vec_swap_64_function(
         );
     });
 
-    Ok(function.finish(vec![ptr, idx1_i64, idx2_i64], &mut module.funcs))
+    Ok(function.finish(vec![vector_ref, idx1_i64, idx2_i64], &mut module.funcs))
 }
 
 /// Pop an element from the end of vector. Aborts if the vector is empty.
@@ -396,28 +277,39 @@ pub fn vec_swap_64_function(
 /// ```..., vector_reference -> ..., element```
 ///
 /// # WASM Function Arguments
-/// * `ptr` (i32) - reference to the vector
+/// * `vector_ref` (i32) - reference to the vector
 ///
 /// # WASM Function Returns
-/// * element (i32)
-pub fn vec_pop_back_32_function(
+/// * element - type depends on `inner_type`
+///
+/// # Arguments
+/// * `inner_type` - The intermediate type of the vector's inner elements
+pub fn vec_pop_back_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    inner_type: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
+    let element_size = inner_type.wasm_memory_data_size()?;
+    let load_kind = inner_type.load_kind()?;
+    let return_type = ValType::try_from(inner_type)?;
+
+    let name =
+        RuntimeFunction::VecPopBack.get_generic_function_name(compilation_ctx, &[inner_type])?;
+    if let Some(function) = module.funcs.by_name(&name) {
+        return Ok(function);
+    }
+
     let decrement_vec_len_function =
         RuntimeFunction::VecDecrementLen.get(module, Some(compilation_ctx))?;
 
-    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
-    let mut builder = function
-        .name(RuntimeFunction::VecPopBack32.name().to_owned())
-        .func_body();
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[return_type]);
+    let mut builder = function.name(name).func_body();
 
-    const SIZE: i32 = 4;
-    let ptr = module.locals.add(ValType::I32);
+    let vector_ref = module.locals.add(ValType::I32);
     let len = module.locals.add(ValType::I32);
 
     builder
-        .local_get(ptr)
+        .local_get(vector_ref)
         .load(
             compilation_ctx.memory_id,
             LoadKind::I32 { atomic: false },
@@ -426,7 +318,7 @@ pub fn vec_pop_back_32_function(
                 offset: 0,
             },
         )
-        .local_tee(ptr)
+        .local_tee(vector_ref)
         .load(
             compilation_ctx.memory_id,
             LoadKind::I32 { atomic: false },
@@ -438,11 +330,13 @@ pub fn vec_pop_back_32_function(
         .local_set(len);
 
     // Decrement vector length
-    builder.local_get(ptr).call(decrement_vec_len_function);
+    builder
+        .local_get(vector_ref)
+        .call(decrement_vec_len_function);
 
     // Update vector length
     builder
-        .local_get(ptr)
+        .local_get(vector_ref)
         .load(
             compilation_ctx.memory_id,
             LoadKind::I32 { atomic: false },
@@ -453,95 +347,18 @@ pub fn vec_pop_back_32_function(
         )
         .local_set(len);
 
-    builder.vec_elem_ptr(ptr, len, SIZE);
+    builder.vec_elem_ptr(vector_ref, len, element_size);
 
     builder.load(
         compilation_ctx.memory_id,
-        LoadKind::I32 { atomic: false },
+        load_kind,
         MemArg {
             align: 0,
             offset: 0,
         },
     );
 
-    Ok(function.finish(vec![ptr], &mut module.funcs))
-}
-
-/// Pop an element from the end of vector. Aborts if the vector is empty.
-///
-/// Stack transition:
-/// ```..., vector_reference -> ..., element```
-///
-/// # WASM Function Arguments
-/// * `ptr` (i32) - reference to the vector
-///
-/// # WASM Function Returns
-/// * element (i64)
-pub fn vec_pop_back_64_function(
-    module: &mut Module,
-    compilation_ctx: &CompilationContext,
-) -> Result<FunctionId, RuntimeFunctionError> {
-    let decrement_vec_len_function =
-        RuntimeFunction::VecDecrementLen.get(module, Some(compilation_ctx))?;
-
-    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I64]);
-    let mut builder = function
-        .name(RuntimeFunction::VecPopBack64.name().to_owned())
-        .func_body();
-
-    const SIZE: i32 = 8;
-    let ptr = module.locals.add(ValType::I32);
-    let len = module.locals.add(ValType::I32);
-
-    builder
-        .local_get(ptr)
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
-        .local_tee(ptr)
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
-        .local_set(len);
-
-    // Decrement vector length
-    builder.local_get(ptr).call(decrement_vec_len_function);
-
-    // Update vector length
-    builder
-        .local_get(ptr)
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
-        .local_set(len);
-
-    builder.vec_elem_ptr(ptr, len, SIZE);
-
-    builder.load(
-        compilation_ctx.memory_id,
-        LoadKind::I64 { atomic: false },
-        MemArg {
-            align: 0,
-            offset: 0,
-        },
-    );
-
-    Ok(function.finish(vec![ptr], &mut module.funcs))
+    Ok(function.finish(vec![vector_ref], &mut module.funcs))
 }
 
 /// Pushes a pointer to a non-heap element in a vector.
@@ -754,13 +571,14 @@ pub fn bytes_to_vec_function(
     let bytes_n = module.locals.add(ValType::I32);
 
     let vector_ptr = module.locals.add(ValType::I32);
+    // Allocate vector of u8 elements
     IVector::allocate_vector_with_header(
         &mut builder,
         compilation_ctx,
         vector_ptr,
         bytes_n,
         bytes_n,
-        4,
+        1,
     );
 
     let i = module.locals.add(ValType::I32);
@@ -768,8 +586,8 @@ pub fn bytes_to_vec_function(
     builder.loop_(None, |loop_block| {
         let loop_block_id = loop_block.id();
 
-        // address: vector_ptr + 8 (header) + i * 4
-        loop_block.vec_elem_ptr(vector_ptr, i, 4);
+        // address: vector_ptr + 8 (header) + i * 1
+        loop_block.vec_elem_ptr(vector_ptr, i, 1);
 
         // value: bytesN[i]
         loop_block
@@ -790,7 +608,7 @@ pub fn bytes_to_vec_function(
         // Store the i-th value at the i-th position of the vector
         loop_block.store(
             compilation_ctx.memory_id,
-            StoreKind::I32 { atomic: false },
+            StoreKind::I32_8 { atomic: false },
             MemArg {
                 align: 0,
                 offset: 0,

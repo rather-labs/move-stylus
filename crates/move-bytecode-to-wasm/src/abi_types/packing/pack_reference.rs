@@ -52,11 +52,11 @@ impl IRef {
                     compilation_ctx,
                 )?;
             }
-            IntermediateType::IU8
+            IntermediateType::IBool
+            | IntermediateType::IU8
             | IntermediateType::IU16
             | IntermediateType::IU32
-            | IntermediateType::IU64
-            | IntermediateType::IBool => {
+            | IntermediateType::IU64 => {
                 // Load the intermediate pointer
                 builder
                     .local_get(local)
@@ -72,22 +72,14 @@ impl IRef {
 
                 builder.load(
                     compilation_ctx.memory_id,
-                    match inner.stack_data_size()? {
-                        4 => LoadKind::I32 { atomic: false },
-                        8 => LoadKind::I64 { atomic: false },
-                        s => return Err(AbiPackError::RefInvalidStackDataSize(s))?,
-                    },
+                    inner.load_kind()?,
                     MemArg {
                         align: 0,
                         offset: 0,
                     },
                 );
 
-                let value_local = module.locals.add(match inner.stack_data_size()? {
-                    4 => ValType::I32,
-                    8 => ValType::I64,
-                    s => return Err(AbiPackError::RefInvalidStackDataSize(s))?,
-                });
+                let value_local = module.locals.add(ValType::try_from(inner)?);
                 builder.local_set(value_local);
 
                 inner.add_pack_instructions(
@@ -154,11 +146,11 @@ impl IMutRef {
                 )?;
             }
             // Immediate types: deref the pointer and pass the value as LocalId
-            IntermediateType::IU8
+            IntermediateType::IBool
+            | IntermediateType::IU8
             | IntermediateType::IU16
             | IntermediateType::IU32
-            | IntermediateType::IU64
-            | IntermediateType::IBool => {
+            | IntermediateType::IU64 => {
                 builder
                     .local_get(local)
                     .load(
@@ -173,21 +165,13 @@ impl IMutRef {
 
                 builder.load(
                     compilation_ctx.memory_id,
-                    match inner.stack_data_size()? {
-                        4 => LoadKind::I32 { atomic: false },
-                        8 => LoadKind::I64 { atomic: false },
-                        s => return Err(AbiPackError::RefInvalidStackDataSize(s))?,
-                    },
+                    inner.load_kind()?,
                     MemArg {
                         align: 0,
                         offset: 0,
                     },
                 );
-                let value_local = module.locals.add(match inner.stack_data_size()? {
-                    4 => ValType::I32,
-                    8 => ValType::I64,
-                    s => return Err(AbiPackError::RefInvalidStackDataSize(s))?,
-                });
+                let value_local = module.locals.add(ValType::try_from(inner)?);
                 builder.local_set(value_local);
 
                 inner.add_pack_instructions(
@@ -372,6 +356,54 @@ mod tests {
         ))));
 
         let expected = SolType::abi_encode_params(&(vec![1u8, 2u8, 3u8],));
+
+        test_pack(
+            &[
+                4u32.to_le_bytes().as_slice(), // pointer to the vector
+                3u32.to_le_bytes().as_slice(),
+                3u32.to_le_bytes().as_slice(),
+                1u8.to_le_bytes().as_slice(),
+                2u8.to_le_bytes().as_slice(),
+                3u8.to_le_bytes().as_slice(),
+            ]
+            .concat(),
+            ref_type.clone(),
+            &expected,
+        );
+    }
+
+    #[test]
+    fn test_pack_ref_vec_u16() {
+        type SolType = sol!((uint16[],));
+        let ref_type = IntermediateType::IRef(Box::new(IntermediateType::IVector(Box::new(
+            IntermediateType::IU16,
+        ))));
+
+        let expected = SolType::abi_encode_params(&(vec![1u16, 2u16, 3u16],));
+
+        test_pack(
+            &[
+                4u32.to_le_bytes().as_slice(), // pointer to the vector
+                3u32.to_le_bytes().as_slice(),
+                3u32.to_le_bytes().as_slice(),
+                1u16.to_le_bytes().as_slice(),
+                2u16.to_le_bytes().as_slice(),
+                3u16.to_le_bytes().as_slice(),
+            ]
+            .concat(),
+            ref_type.clone(),
+            &expected,
+        );
+    }
+
+    #[test]
+    fn test_pack_ref_vec_u32() {
+        type SolType = sol!((uint32[],));
+        let ref_type = IntermediateType::IRef(Box::new(IntermediateType::IVector(Box::new(
+            IntermediateType::IU32,
+        ))));
+
+        let expected = SolType::abi_encode_params(&(vec![1u32, 2u32, 3u32],));
 
         test_pack(
             &[

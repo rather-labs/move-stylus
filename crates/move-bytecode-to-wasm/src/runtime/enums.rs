@@ -38,7 +38,7 @@ pub fn get_storage_size_by_offset(
     // Argument
     let slot_offset = module.locals.add(ValType::I32);
 
-    // Write storage_size vector to memory at DATA_ENUM_STORAGE_SIZE_OFFSET
+    // Write storage_size to memory at DATA_ENUM_STORAGE_SIZE_OFFSET
     for (index, &size) in storage_size.iter().enumerate() {
         builder
             .i32_const(DATA_ENUM_STORAGE_SIZE_OFFSET)

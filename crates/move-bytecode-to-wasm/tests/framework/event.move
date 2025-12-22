@@ -289,7 +289,7 @@ public struct TestEvent9Anon has copy, drop {
 public struct TestEvent10Anon has copy, drop {
     a: u32,
     b: address,
-    c: vector<vector<u8>>,
+    c: vector<vector<u32>>,
 }
 
 #[allow(unused_field)]
@@ -392,7 +392,7 @@ entry fun emit_test_anon_event9(a: u64, b: std::ascii::String) {
     emit(TestEvent9Anon { a, b });
 }
 
-entry fun emit_test_anon_event10(a: u32, b: address, c: vector<vector<u8>>) {
+entry fun emit_test_anon_event10(a: u32, b: address, c: vector<vector<u32>>) {
     emit(TestEvent10Anon { a, b, c });
 }
 

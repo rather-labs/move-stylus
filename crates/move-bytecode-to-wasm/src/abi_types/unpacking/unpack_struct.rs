@@ -89,8 +89,6 @@ impl IStruct {
         compilation_ctx: &CompilationContext,
     ) -> Result<(), AbiError> {
         let struct_ptr = module.locals.add(ValType::I32);
-        let val_32 = module.locals.add(ValType::I32);
-        let val_64 = module.locals.add(ValType::I64);
         let field_ptr = module.locals.add(ValType::I32);
 
         // Moving pointer for reading data of the fields
@@ -158,19 +156,16 @@ impl IStruct {
                 | IntermediateType::IU16
                 | IntermediateType::IU32
                 | IntermediateType::IU64 => {
-                    let data_size = field.stack_data_size()?;
-                    let (val, store_kind) = if data_size == 8 {
-                        (val_64, StoreKind::I64 { atomic: false })
-                    } else {
-                        (val_32, StoreKind::I32 { atomic: false })
-                    };
+                    let data_size = field.wasm_memory_data_size()?;
+                    let val = module.locals.add(ValType::try_from(field)?);
+                    let store_kind = field.store_kind()?;
 
                     // Save the actual value
                     builder.local_set(val);
 
                     // Create a pointer for the value
                     builder
-                        .i32_const(data_size as i32)
+                        .i32_const(data_size)
                         .call(compilation_ctx.allocator)
                         .local_tee(field_ptr);
 

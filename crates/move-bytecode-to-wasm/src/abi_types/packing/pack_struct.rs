@@ -171,16 +171,15 @@ impl IStruct {
                 | IntermediateType::IU16
                 | IntermediateType::IU32
                 | IntermediateType::IU64 => {
-                    let (val, load_kind) = if field.stack_data_size()? == 8 {
-                        (val_64, LoadKind::I64 { atomic: false })
-                    } else {
-                        (val_32, LoadKind::I32 { atomic: false })
+                    let val = match ValType::try_from(field)? {
+                        ValType::I64 => val_64,
+                        _ => val_32,
                     };
 
                     block
                         .load(
                             compilation_ctx.memory_id,
-                            load_kind,
+                            field.load_kind()?,
                             MemArg {
                                 align: 0,
                                 offset: 0,

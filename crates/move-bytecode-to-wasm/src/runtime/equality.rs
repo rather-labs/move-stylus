@@ -1,6 +1,6 @@
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg},
+    ir::{BinaryOp, ExtendedLoad, LoadKind, MemArg},
 };
 
 use super::{RuntimeFunction, error::RuntimeFunctionError};
@@ -45,6 +45,7 @@ pub fn a_equals_b(module: &mut Module, compilation_ctx: &crate::CompilationConte
                 .binop(BinaryOp::I32Eq)
                 .br_if(block_id);
 
+            // Comparte byte by byte
             block.loop_(None, |loop_| {
                 let loop_id = loop_.id();
 
@@ -62,7 +63,9 @@ pub fn a_equals_b(module: &mut Module, compilation_ctx: &crate::CompilationConte
                     .binop(BinaryOp::I32Add)
                     .load(
                         compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
+                        LoadKind::I32_8 {
+                            kind: ExtendedLoad::ZeroExtend,
+                        },
                         MemArg {
                             align: 0,
                             offset: 0,
@@ -73,13 +76,15 @@ pub fn a_equals_b(module: &mut Module, compilation_ctx: &crate::CompilationConte
                     .binop(BinaryOp::I32Add)
                     .load(
                         compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
+                        LoadKind::I32_8 {
+                            kind: ExtendedLoad::ZeroExtend,
+                        },
                         MemArg {
                             align: 0,
                             offset: 0,
                         },
                     )
-                    // If we find that some chunk is not equal, we exit with false
+                    // Exit with false if the bytes are not equal
                     .binop(BinaryOp::I32Ne)
                     .if_else(
                         None,
@@ -91,7 +96,7 @@ pub fn a_equals_b(module: &mut Module, compilation_ctx: &crate::CompilationConte
 
                 loop_
                     .local_get(offset)
-                    .i32_const(4)
+                    .i32_const(1)
                     .binop(BinaryOp::I32Add)
                     .local_set(offset)
                     .br(loop_id);

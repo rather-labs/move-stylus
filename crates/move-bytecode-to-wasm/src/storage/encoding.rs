@@ -410,8 +410,8 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
     let elem_slot_ptr = module.locals.add(ValType::I32);
     let len = module.locals.add(ValType::I32);
 
-    // Stack size of the inner type
-    let stack_size = inner.stack_data_size()? as i32;
+    // Data size of the inner type
+    let data_size = inner.wasm_memory_data_size()?;
 
     // Element size in storage
     let elem_size = field_size(inner, compilation_ctx)? as i32;
@@ -585,13 +585,9 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                     .local_set(elem_slot_offset);
 
                 // Pointer to the element in memory
-                loop_.vec_elem_ptr(vector_ptr, i, stack_size).load(
+                loop_.vec_elem_ptr(vector_ptr, i, data_size).load(
                     compilation_ctx.memory_id,
-                    if stack_size == 8 {
-                        LoadKind::I64 { atomic: false }
-                    } else {
-                        LoadKind::I32 { atomic: false }
-                    },
+                    inner.load_kind().unwrap(),
                     MemArg {
                         align: 0,
                         offset: 0,
@@ -693,9 +689,8 @@ pub fn add_encode_intermediate_type_instructions(
     let val_32 = module.locals.add(ValType::I32);
     let val_64 = module.locals.add(ValType::I64);
 
-    // Stack and storage size of the type
-    let stack_size = itype.stack_data_size()? as i32;
-    let storage_size = field_size(itype, compilation_ctx)? as i32;
+    // Size of the type in wasm memory
+    let data_size = itype.wasm_memory_data_size()?;
 
     // Runtime functions
     let get_struct_id_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx))?;
@@ -708,12 +703,15 @@ pub fn add_encode_intermediate_type_instructions(
         | IntermediateType::IU16
         | IntermediateType::IU32
         | IntermediateType::IU64 => {
-            let (val, load_kind, swap_fn) = if stack_size == 8 {
-                let swap_fn = RuntimeFunction::SwapI64Bytes.get(module, None)?;
-                (val_64, LoadKind::I64 { atomic: false }, swap_fn)
+            let swap_fn = if data_size == 8 {
+                RuntimeFunction::SwapI64Bytes.get(module, None)?
             } else {
-                let swap_fn = RuntimeFunction::SwapI32Bytes.get(module, None)?;
-                (val_32, LoadKind::I32 { atomic: false }, swap_fn)
+                RuntimeFunction::SwapI32Bytes.get(module, None)?
+            };
+            let load_kind = itype.load_kind()?;
+            let val = match ValType::try_from(itype)? {
+                ValType::I64 => val_64,
+                _ => val_32,
             };
 
             // If we are processing a field from a struct, a second load is needed.
@@ -736,25 +734,17 @@ pub fn add_encode_intermediate_type_instructions(
             // to write a 16 bits number contained in a 32 bits number, without shifting, it will write
             // the zeroed part.
             // This only needs to be done for 32 bits (4 bytes) numbers
-            if stack_size == 4 {
-                if storage_size == 1 {
+            match itype {
+                IntermediateType::IBool | IntermediateType::IU8 => {
                     builder.i32_const(24).binop(BinaryOp::I32ShrU);
-                } else if storage_size == 2 {
+                }
+                IntermediateType::IU16 => {
                     builder.i32_const(16).binop(BinaryOp::I32ShrU);
                 }
+                _ => {}
             }
 
             builder.local_set(val);
-
-            let store_kind = if storage_size == 1 {
-                StoreKind::I32_8 { atomic: false }
-            } else if storage_size == 2 {
-                StoreKind::I32_16 { atomic: false }
-            } else if storage_size == 4 {
-                StoreKind::I32 { atomic: false }
-            } else {
-                StoreKind::I64 { atomic: false }
-            };
 
             // Save the value in slot data
             builder
@@ -762,7 +752,7 @@ pub fn add_encode_intermediate_type_instructions(
                 .local_get(val)
                 .store(
                     compilation_ctx.memory_id,
-                    store_kind,
+                    itype.store_kind()?,
                     MemArg {
                         align: 0,
                         offset: 0,

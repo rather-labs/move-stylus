@@ -214,33 +214,10 @@ impl Packable for IntermediateType {
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
     ) -> Result<LocalId, AbiError> {
-        match self {
-            IntermediateType::IBool
-            | IntermediateType::IU8
-            | IntermediateType::IU16
-            | IntermediateType::IU32
-            | IntermediateType::IU128
-            | IntermediateType::IU256
-            | IntermediateType::ISigner
-            | IntermediateType::IAddress
-            | IntermediateType::IVector(_)
-            | IntermediateType::IRef(_)
-            | IntermediateType::IMutRef(_)
-            | IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IEnum { .. }
-            | IntermediateType::IGenericEnumInstance { .. } => {
-                let local = module.locals.add(ValType::I32);
-                builder.local_set(local);
-                Ok(local)
-            }
-            IntermediateType::IU64 => {
-                let local = module.locals.add(ValType::I64);
-                builder.local_set(local);
-                Ok(local)
-            }
-            IntermediateType::ITypeParameter(_) => Err(AbiPackError::PackingGenericTypeParameter)?,
-        }
+        let val_type = ValType::try_from(self)?;
+        let local = module.locals.add(val_type);
+        builder.local_set(local);
+        Ok(local)
     }
 
     fn add_pack_instructions(
