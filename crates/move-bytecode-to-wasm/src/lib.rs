@@ -49,7 +49,7 @@ pub type GlobalFunctionTable<'move_package> =
     HashMap<FunctionId, &'move_package FunctionDefinition>;
 
 pub fn translate_single_module(
-    package: CompiledPackage,
+    package: &CompiledPackage,
     module_name: &str,
 ) -> Result<Module, CompilationError> {
     let mut modules = translate_package(package, Some(module_name.to_string()), false)?;
@@ -60,7 +60,7 @@ pub fn translate_single_module(
 }
 
 pub fn translate_package(
-    package: CompiledPackage,
+    package: &CompiledPackage,
     module_name: Option<String>,
     verbose: bool,
 ) -> Result<HashMap<String, Module>, CompilationError> {
@@ -232,7 +232,7 @@ pub fn translate_package(
         Ok(modules)
     } else {
         Err(CompilationError::CodeError {
-            mapped_files: package.file_map,
+            mapped_files: package.file_map.clone(),
             errors,
         })
     }
@@ -246,7 +246,7 @@ pub struct PackageModuleData<'move_package> {
 
 pub fn package_module_data<'move_package>(
     package: &'move_package CompiledPackage,
-    module_name: Option<String>,
+    root_compiled_units: &'move_package [&CompiledUnitWithSource],
     verbose: bool,
 ) -> Result<PackageModuleData<'move_package>, CompilationError> {
     // HashMap of package name to address
@@ -264,17 +264,7 @@ pub fn package_module_data<'move_package>(
     // This is not used in this function but is used in the others
     let mut function_definitions: GlobalFunctionTable = HashMap::new();
 
-    let root_compiled_units: Vec<&CompiledUnitWithSource> = if let Some(module_name) = module_name {
-        package
-            .root_compiled_units
-            .iter()
-            .filter(move |unit| *unit.unit.name == *module_name.as_str())
-            .collect()
-    } else {
-        package.root_compiled_units.iter().collect()
-    };
-
-    for root_compiled_module in &root_compiled_units {
+    for root_compiled_module in root_compiled_units {
         let module_name = root_compiled_module.unit.name.to_string();
         let root_compiled_module_unit = &root_compiled_module.unit.module;
 
@@ -285,7 +275,7 @@ pub fn package_module_data<'move_package>(
         if let Err(dependencies_errors) = process_dependency_tree(
             &mut modules_data,
             &package.deps_compiled_units,
-            &root_compiled_units,
+            root_compiled_units,
             &root_compiled_module_unit.immediate_dependencies(),
             &mut function_definitions,
             &address_alias_instantiation,
@@ -323,7 +313,7 @@ pub fn package_module_data<'move_package>(
             root_module_id,
             root_compiled_module,
             &package.deps_compiled_units,
-            &root_compiled_units,
+            root_compiled_units,
             &mut function_definitions,
             special_attributes,
         )?;

@@ -143,7 +143,7 @@ impl Default for ModuleId {
 }
 
 #[derive(Debug)]
-struct Constant<'move_compiled_unit> {
+pub struct Constant<'move_compiled_unit> {
     pub type_: IntermediateType,
     pub data: &'move_compiled_unit [u8],
 }

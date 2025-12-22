@@ -34,14 +34,14 @@ pub fn reroot_path(path: Option<&Path>) -> anyhow::Result<PathBuf> {
 }
 
 pub fn translate_package_cli(
-    package: CompiledPackage,
+    package: &CompiledPackage,
     rerooted_path: &Path,
     install_dir: Option<PathBuf>,
     emit_wat: bool,
     verbose: bool,
     optimize: bool,
 ) -> Result<(), Box<CompilationError>> {
-    let build_directory = get_build_directory(rerooted_path, &package, &install_dir);
+    let build_directory = get_build_directory(rerooted_path, package, &install_dir);
 
     // Create the build directory if it doesn't exist
     std::fs::create_dir_all(&build_directory)
