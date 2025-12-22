@@ -303,6 +303,8 @@ impl<'a> PublicFunction<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
+
     use alloy_sol_types::{SolType, sol};
     use walrus::{
         FunctionBuilder, MemoryId,
@@ -850,7 +852,7 @@ mod tests {
             arguments: vec![
                 IntermediateType::IBool,
                 IntermediateType::IU64,
-                IntermediateType::IVector(Box::new(IntermediateType::ISigner)),
+                IntermediateType::IVector(Rc::new(IntermediateType::ISigner)),
             ],
             returns: vec![],
         };
@@ -888,7 +890,7 @@ mod tests {
             arguments: vec![
                 IntermediateType::IBool,
                 IntermediateType::IU64,
-                IntermediateType::IVector(Box::new(IntermediateType::IVector(Box::new(
+                IntermediateType::IVector(Rc::new(IntermediateType::IVector(Rc::new(
                     IntermediateType::ISigner,
                 )))),
             ],

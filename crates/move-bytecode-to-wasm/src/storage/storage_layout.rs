@@ -237,6 +237,7 @@ mod tests {
     use move_binary_format::file_format::StructDefinitionIndex;
     use rstest::rstest;
     use std::collections::HashMap;
+    use std::rc::Rc;
 
     use crate::compilation_context::{ModuleData, ModuleId};
     use crate::runtime::RuntimeFunction;
@@ -516,7 +517,7 @@ mod tests {
                     0,
                     vec![
                         IntermediateType::IAddress,
-                        IntermediateType::IVector(Box::new(IntermediateType::IU8)),
+                        IntermediateType::IVector(Rc::new(IntermediateType::IU8)),
                         IntermediateType::IU64,
                     ],
                 ),
@@ -524,7 +525,7 @@ mod tests {
                     1,
                     0,
                     vec![
-                        IntermediateType::IVector(Box::new(IntermediateType::IU8)),
+                        IntermediateType::IVector(Rc::new(IntermediateType::IU8)),
                         IntermediateType::IU64,
                         IntermediateType::IAddress,
                     ],
@@ -631,7 +632,7 @@ mod tests {
                     0,
                     vec![
                         IntermediateType::IAddress,
-                        IntermediateType::IVector(Box::new(IntermediateType::IU8)),
+                        IntermediateType::IVector(Rc::new(IntermediateType::IU8)),
                         IntermediateType::IU64,
                     ],
                 ),
@@ -639,7 +640,7 @@ mod tests {
                     1,
                     0,
                     vec![
-                        IntermediateType::IVector(Box::new(IntermediateType::IU8)),
+                        IntermediateType::IVector(Rc::new(IntermediateType::IU8)),
                         IntermediateType::IU64,
                         IntermediateType::IAddress,
                     ],
@@ -752,6 +753,8 @@ mod tests {
         #[case] expected_tail_slot: [u8; 32],
         #[case] expected_tail_offset: u32,
     ) {
+        use std::rc::Rc;
+
         let module_id = ModuleId::default();
 
         // Create a struct without key
@@ -763,7 +766,7 @@ mod tests {
                 (None, IntermediateType::IU64), // 8
                 (
                     None,
-                    IntermediateType::IVector(Box::new(IntermediateType::IU8)),
+                    IntermediateType::IVector(Rc::new(IntermediateType::IU8)),
                 ), // 32
             ],
             HashMap::new(),
@@ -798,7 +801,7 @@ mod tests {
                 ), // 8
                 (
                     None,
-                    IntermediateType::IVector(Box::new(IntermediateType::IU8)),
+                    IntermediateType::IVector(Rc::new(IntermediateType::IU8)),
                 ), // 32
             ],
             HashMap::new(),

@@ -2,7 +2,9 @@ mod error;
 pub mod module_data;
 pub mod reserved_modules;
 
-use crate::translation::intermediate_types::{IntermediateType, enums::IEnum, structs::IStruct};
+use crate::translation::intermediate_types::{
+    ISignature, IntermediateType, enums::IEnum, structs::IStruct,
+};
 pub use error::CompilationContextError;
 pub use module_data::{ModuleData, ModuleId, UserDefinedType};
 use std::{borrow::Cow, collections::HashMap};
@@ -19,6 +21,8 @@ pub struct CompilationContext<'a> {
     pub root_module_data: &'a ModuleData,
 
     pub deps_data: &'a HashMap<ModuleId, ModuleData>,
+
+    pub empty_signature: ISignature,
 
     /// WASM memory id
     pub memory_id: MemoryId,
@@ -40,6 +44,10 @@ impl CompilationContext<'_> {
             deps_data,
             memory_id,
             allocator,
+            empty_signature: ISignature {
+                arguments: Vec::new(),
+                returns: Vec::new(),
+            },
         }
     }
 

@@ -185,6 +185,8 @@ impl IMutRef {
 
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
+
     use super::*;
     use crate::{
         test_compilation_context,
@@ -254,7 +256,7 @@ mod tests {
     #[test]
     fn test_unpack_ref_u8() {
         type SolType = sol!((uint8,));
-        let int_type = IntermediateType::IRef(Box::new(IntermediateType::IU8));
+        let int_type = IntermediateType::IRef(Rc::new(IntermediateType::IU8));
 
         let data = SolType::abi_encode_params(&(88u8,));
 
@@ -280,7 +282,7 @@ mod tests {
     #[test]
     fn test_unpack_ref_u32() {
         type SolType = sol!((uint32,));
-        let int_type = IntermediateType::IRef(Box::new(IntermediateType::IU32));
+        let int_type = IntermediateType::IRef(Rc::new(IntermediateType::IU32));
 
         let data = SolType::abi_encode_params(&(88u32,));
         test_unpack_ref(&data, int_type.clone(), &88u32.to_le_bytes());
@@ -289,7 +291,7 @@ mod tests {
     #[test]
     fn test_unpack_ref_u64() {
         type SolType = sol!((uint64,));
-        let int_type = IntermediateType::IRef(Box::new(IntermediateType::IU64));
+        let int_type = IntermediateType::IRef(Rc::new(IntermediateType::IU64));
 
         let data = SolType::abi_encode_params(&(88u64,));
         test_unpack_ref(&data, int_type.clone(), &88u64.to_le_bytes());
@@ -298,7 +300,7 @@ mod tests {
     #[test]
     fn test_unpack_ref_u128() {
         type SolType = sol!((uint128,));
-        let int_type = IntermediateType::IRef(Box::new(IntermediateType::IU128));
+        let int_type = IntermediateType::IRef(Rc::new(IntermediateType::IU128));
 
         let data = SolType::abi_encode_params(&(123u128,));
         let expected = 123u128.to_le_bytes().to_vec();
@@ -308,7 +310,7 @@ mod tests {
     #[test]
     fn test_unpack_ref_u256() {
         type SolType = sol!((uint256,));
-        let int_type = IntermediateType::IRef(Box::new(IntermediateType::IU256));
+        let int_type = IntermediateType::IRef(Rc::new(IntermediateType::IU256));
 
         let value = U256::from(123u128);
         let expected = value.to_le_bytes::<32>().to_vec();
@@ -321,7 +323,7 @@ mod tests {
     fn test_unpack_ref_vec_u8() {
         type SolType = sol!((uint8[],));
         let inner_type = IntermediateType::IU8;
-        let vector_type = IntermediateType::IRef(Box::new(IntermediateType::IVector(Box::new(
+        let vector_type = IntermediateType::IRef(Rc::new(IntermediateType::IVector(Rc::new(
             inner_type.clone(),
         ))));
 
@@ -342,7 +344,7 @@ mod tests {
     fn test_unpack_ref_vec_128() {
         type SolType = sol!((uint128[],));
         let inner_type = IntermediateType::IU128;
-        let vector_type = IntermediateType::IRef(Box::new(IntermediateType::IVector(Box::new(
+        let vector_type = IntermediateType::IRef(Rc::new(IntermediateType::IVector(Rc::new(
             inner_type.clone(),
         ))));
 
@@ -367,7 +369,7 @@ mod tests {
     #[test]
     fn test_unpack_ref_address() {
         type SolType = sol!((address,));
-        let ref_type = IntermediateType::IRef(Box::new(IntermediateType::IAddress));
+        let ref_type = IntermediateType::IRef(Rc::new(IntermediateType::IAddress));
 
         let data =
             SolType::abi_encode_params(&(address!("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"),));

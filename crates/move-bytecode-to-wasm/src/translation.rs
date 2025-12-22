@@ -1193,13 +1193,13 @@ fn translate_instruction(
             let local = function_locals[*local_id as usize];
             let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
             builder.local_get(local);
-            types_stack.push(IntermediateType::IRef(Box::new(local_type.clone())));
+            types_stack.push(IntermediateType::IRef(Rc::new(local_type.clone())));
         }
         Bytecode::MutBorrowLoc(local_id) => {
             let local = function_locals[*local_id as usize];
             let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
             builder.local_get(local);
-            types_stack.push(IntermediateType::IMutRef(Box::new(local_type.clone())));
+            types_stack.push(IntermediateType::IMutRef(Rc::new(local_type.clone())));
         }
         Bytecode::ImmBorrowField(field_id) => {
             let struct_ = module_data.structs.get_by_field_handle_idx(field_id)?;
@@ -1218,7 +1218,8 @@ fn translate_instruction(
                 (
                     IntermediateType::IStruct { ref module_id, index, vm_handled_struct },
                     "struct",
-                    *ref_inner
+                    (*ref_inner).clone()
+
                 )
             );
 
@@ -1232,7 +1233,7 @@ fn translate_instruction(
                     found: IntermediateType::IStruct {
                         module_id: *module_id,
                         index,
-                        vm_handled_struct,
+                        vm_handled_struct: vm_handled_struct.clone(),
                     },
                 }
                 .into());
@@ -1247,7 +1248,7 @@ fn translate_instruction(
                 module_data,
             )?;
 
-            types_stack.push(IntermediateType::IRef(Box::new(field_type)));
+            types_stack.push(IntermediateType::IRef(Rc::new(field_type)));
         }
         Bytecode::ImmBorrowFieldGeneric(field_id) => {
             let (struct_field_id, instantiation_types) = module_data
@@ -1298,7 +1299,7 @@ fn translate_instruction(
                 (
                     IntermediateType::IGenericStructInstance { ref module_id, index, ref types, vm_handled_struct },
                     "generic struct",
-                    *ref_inner
+                    (*ref_inner).clone()
                 )
             );
             if module_id != &module_data.id || index != struct_.index() {
@@ -1333,13 +1334,13 @@ fn translate_instruction(
                 module_data,
             )?;
 
-            types_stack.push(IntermediateType::IRef(Box::new(field_type)));
+            types_stack.push(IntermediateType::IRef(Rc::new(field_type)));
         }
         Bytecode::MutBorrowField(field_id) => {
             let struct_ = module_data.structs.get_by_field_handle_idx(field_id)?;
 
             // Check if in the types stack we have the correct type
-            types_stack.pop_expecting(&IntermediateType::IMutRef(Box::new(
+            types_stack.pop_expecting(&IntermediateType::IMutRef(Rc::new(
                 IntermediateType::IStruct {
                     module_id: module_data.id,
                     index: struct_.index(),
@@ -1356,7 +1357,7 @@ fn translate_instruction(
                 module_data,
             )?;
 
-            types_stack.push(IntermediateType::IMutRef(Box::new(field_type)));
+            types_stack.push(IntermediateType::IMutRef(Rc::new(field_type)));
         }
         Bytecode::MutBorrowFieldGeneric(field_id) => {
             let (struct_field_id, instantiation_types) = module_data
@@ -1394,7 +1395,7 @@ fn translate_instruction(
             };
 
             // Check if in the types stack we have the correct type
-            types_stack.pop_expecting(&IntermediateType::IMutRef(Box::new(
+            types_stack.pop_expecting(&IntermediateType::IMutRef(Rc::new(
                 IntermediateType::IGenericStructInstance {
                     module_id: module_data.id,
                     index: struct_.index(),
@@ -1418,7 +1419,7 @@ fn translate_instruction(
                 module_data,
             )?;
 
-            types_stack.push(IntermediateType::IMutRef(Box::new(field_type)));
+            types_stack.push(IntermediateType::IMutRef(Rc::new(field_type)));
         }
         Bytecode::VecUnpack(signature_index, length) => {
             let expected_vec_inner =
@@ -1426,7 +1427,7 @@ fn translate_instruction(
 
             let expected_vec_inner = get_expected_vec_inner(expected_vec_inner, mapped_function)?;
 
-            types_stack.pop_expecting(&IntermediateType::IVector(Box::new(
+            types_stack.pop_expecting(&IntermediateType::IVector(Rc::new(
                 expected_vec_inner.clone(),
             )))?;
 
@@ -1449,7 +1450,11 @@ fn translate_instruction(
             types_stack::match_types!(
                 (IntermediateType::IU64, "u64", t1),
                 (IntermediateType::IRef(ref_inner), "vector reference", t2),
-                (IntermediateType::IVector(vec_inner), "vector", *ref_inner)
+                (
+                    IntermediateType::IVector(vec_inner),
+                    "vector",
+                    (*ref_inner).clone()
+                )
             );
 
             let expected_vec_inner =
@@ -1460,13 +1465,13 @@ fn translate_instruction(
             if *vec_inner != expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
                     expected: expected_vec_inner,
-                    found: *vec_inner,
+                    found: (*vec_inner).clone(),
                 });
             }
 
             IVector::vec_borrow_instructions(&vec_inner, module, builder, compilation_ctx)?;
 
-            types_stack.push(IntermediateType::IRef(Box::new(*vec_inner)));
+            types_stack.push(IntermediateType::IRef(vec_inner.clone()));
         }
         Bytecode::VecMutBorrow(signature_index) => {
             let [t1, t2] = types_stack.pop_n_from_stack()?;
@@ -1478,7 +1483,11 @@ fn translate_instruction(
                     "mutable vector reference",
                     t2
                 ),
-                (IntermediateType::IVector(vec_inner), "vector", *ref_inner)
+                (
+                    IntermediateType::IVector(vec_inner),
+                    "vector",
+                    (*ref_inner).clone()
+                )
             );
 
             let expected_vec_inner =
@@ -1489,13 +1498,13 @@ fn translate_instruction(
             if *vec_inner != expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
                     expected: expected_vec_inner,
-                    found: *vec_inner,
+                    found: (*vec_inner).clone(),
                 });
             }
 
             IVector::vec_borrow_instructions(&vec_inner, module, builder, compilation_ctx)?;
 
-            types_stack.push(IntermediateType::IMutRef(Box::new(*vec_inner)));
+            types_stack.push(IntermediateType::IMutRef(vec_inner.clone()));
         }
         Bytecode::VecPack(signature_index, num_elements) => {
             // If the inner type is a type parameter, replace it with the last type in the types stack.
@@ -1540,7 +1549,7 @@ fn translate_instruction(
                 n -= 1;
             }
 
-            types_stack.push(IntermediateType::IVector(Box::new(expected_vec_inner)));
+            types_stack.push(IntermediateType::IVector(Rc::new(expected_vec_inner)));
         }
         Bytecode::VecPopBack(signature_index) => {
             let ty = types_stack.pop()?;
@@ -1551,7 +1560,11 @@ fn translate_instruction(
                     "mutable vector reference",
                     ty
                 ),
-                (IntermediateType::IVector(vec_inner), "vector", *ref_inner)
+                (
+                    IntermediateType::IVector(vec_inner),
+                    "vector",
+                    (*ref_inner).clone()
+                )
             );
 
             let expected_vec_inner =
@@ -1562,7 +1575,7 @@ fn translate_instruction(
             if *vec_inner != expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
                     expected: expected_vec_inner.clone(),
-                    found: *vec_inner,
+                    found: (*vec_inner).clone(),
                 });
             }
 
@@ -1593,12 +1606,12 @@ fn translate_instruction(
                 | IntermediateType::IMutRef(_) => {
                     return Err(TranslationError::InvalidOperation {
                         operation: instruction.clone(),
-                        operand_type: *vec_inner,
+                        operand_type: (*vec_inner).clone(),
                     });
                 }
             }
 
-            types_stack.push(*vec_inner);
+            types_stack.push((*vec_inner).clone());
         }
         Bytecode::VecPushBack(signature_index) => {
             let [elem_ty, ref_ty] = types_stack.pop_n_from_stack()?;
@@ -1609,12 +1622,16 @@ fn translate_instruction(
                     "mutable vector reference",
                     ref_ty
                 ),
-                (IntermediateType::IVector(vec_inner), "vector", *mut_inner)
+                (
+                    IntermediateType::IVector(vec_inner),
+                    "vector",
+                    (*mut_inner).clone()
+                )
             );
 
             if elem_ty != *vec_inner {
                 return Err(TranslationError::TypeMismatch {
-                    expected: *vec_inner,
+                    expected: (*vec_inner).clone(),
                     found: elem_ty,
                 });
             }
@@ -1627,7 +1644,7 @@ fn translate_instruction(
             if *vec_inner != expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
                     expected: expected_vec_inner.clone(),
-                    found: *vec_inner,
+                    found: (*vec_inner).clone(),
                 });
             }
 
@@ -1650,7 +1667,11 @@ fn translate_instruction(
                     "mutable vector reference",
                     ref_ty
                 ),
-                (IntermediateType::IVector(vec_inner), "vector", *mut_inner)
+                (
+                    IntermediateType::IVector(vec_inner),
+                    "vector",
+                    (*mut_inner).clone()
+                )
             );
 
             let expected_vec_inner =
@@ -1661,7 +1682,7 @@ fn translate_instruction(
             if *vec_inner != expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
                     expected: expected_vec_inner,
-                    found: *vec_inner,
+                    found: (*vec_inner).clone(),
                 });
             }
 
@@ -1677,11 +1698,15 @@ fn translate_instruction(
                 let ref_ty = types_stack.pop()?;
                 types_stack::match_types!(
                     (IntermediateType::IRef(inner), "vector reference", ref_ty),
-                    (IntermediateType::IVector(_vec_inner), "vector", *inner)
+                    (
+                        IntermediateType::IVector(_vec_inner),
+                        "vector",
+                        (*inner).clone()
+                    )
                 );
             } else {
-                types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
-                    IntermediateType::IVector(Box::new(elem_ir_type)),
+                types_stack.pop_expecting(&IntermediateType::IRef(Rc::new(
+                    IntermediateType::IVector(Rc::new(elem_ir_type)),
                 )))?;
             };
 
@@ -1716,7 +1741,7 @@ fn translate_instruction(
             ));
 
             inner.add_read_ref_instructions(builder, module, compilation_ctx, module_data)?;
-            types_stack.push(*inner);
+            types_stack.push((*inner).clone());
         }
         Bytecode::WriteRef => {
             let [iref, value_type] = types_stack.pop_n_from_stack()?;
@@ -1727,7 +1752,7 @@ fn translate_instruction(
                 inner.add_write_ref_instructions(module, builder, compilation_ctx)?;
             } else {
                 Err(TranslationError::TypeMismatch {
-                    expected: *inner,
+                    expected: (*inner).clone(),
                     found: value_type,
                 })?;
             }
@@ -2693,9 +2718,9 @@ fn translate_instruction(
                 index: enum_.index,
             };
             let expected_type = if is_mut_ref {
-                IntermediateType::IMutRef(Box::new(enum_type))
+                IntermediateType::IMutRef(Rc::new(enum_type))
             } else {
-                IntermediateType::IRef(Box::new(enum_type))
+                IntermediateType::IRef(Rc::new(enum_type))
             };
             types_stack.pop_expecting(&expected_type)?;
 
@@ -2746,9 +2771,9 @@ fn translate_instruction(
                 types,
             };
             let expected_type = if is_mut_ref {
-                IntermediateType::IMutRef(Box::new(generic_enum_type))
+                IntermediateType::IMutRef(Rc::new(generic_enum_type))
             } else {
-                IntermediateType::IRef(Box::new(generic_enum_type))
+                IntermediateType::IRef(Rc::new(generic_enum_type))
             };
             types_stack.pop_expecting(&expected_type)?;
 

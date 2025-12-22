@@ -487,6 +487,8 @@ impl Packable for IntermediateType {
 
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
+
     use alloy_primitives::U256;
     use alloy_sol_types::sol;
     use walrus::{FunctionBuilder, ValType};
@@ -705,7 +707,7 @@ mod tests {
             &mut func_body,
             &[
                 IntermediateType::IU16,
-                IntermediateType::IVector(Box::new(IntermediateType::IVector(Box::new(
+                IntermediateType::IVector(Rc::new(IntermediateType::IVector(Rc::new(
                     IntermediateType::IU128,
                 )))),
                 IntermediateType::IU256,

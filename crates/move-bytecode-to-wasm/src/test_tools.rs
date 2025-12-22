@@ -150,6 +150,10 @@ macro_rules! test_compilation_context {
             deps_data: &std::collections::HashMap::new(),
             memory_id: $memory_id,
             allocator: $allocator,
+            empty_signature: $crate::translation::intermediate_types::ISignature {
+                arguments: Vec::new(),
+                returns: Vec::new(),
+            },
         }
     };
 }
