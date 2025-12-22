@@ -120,7 +120,7 @@ pub fn decrement_vec_len_function(
 /// * `idx1_i64` (i64) - first index
 /// * `idx2_i64` (i64) - second index
 ///
-/// # Parameters
+/// # Arguments
 /// * `inner_type` - The intermediate type of the vector's inner elements
 pub fn vec_swap_function(
     module: &mut Module,
