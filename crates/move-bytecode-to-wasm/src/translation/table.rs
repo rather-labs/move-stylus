@@ -30,10 +30,11 @@ pub struct FunctionId {
 impl FunctionId {
     /// Returns the generic function ID corresponding to a function ID with type instantiations.
     pub fn get_generic_fn_id(&self) -> Self {
-        // TODO: clone...
-        let mut id = self.clone();
-        id.type_instantiations = None;
-        id
+        Self {
+            identifier: self.identifier,
+            module_id: self.module_id,
+            type_instantiations: None,
+        }
     }
 }
 

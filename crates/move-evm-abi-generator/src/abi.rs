@@ -468,7 +468,7 @@ impl Abi {
                     .special_attributes
                     .structs
                     .iter()
-                    .find(|s| s.name == struct_.identifier)
+                    .find(|s| *s.name == *struct_.identifier)
                     .unwrap();
 
                 (struct_, parsed_struct)
@@ -539,14 +539,14 @@ impl Abi {
             let event_special_attributes = event_module
                 .special_attributes
                 .events
-                .get(&event_struct.identifier)
+                .get(event_struct.identifier.as_str())
                 .unwrap();
 
             let event_struct_parsed = event_module
                 .special_attributes
                 .structs
                 .iter()
-                .find(|s| s.name.as_str() == event_struct.identifier)
+                .find(|s| *s.name == *event_struct.identifier)
                 .unwrap();
 
             // Collect structs from event fields
@@ -603,7 +603,7 @@ impl Abi {
                 .special_attributes
                 .structs
                 .iter()
-                .find(|s| s.name.as_str() == error_struct.identifier)
+                .find(|s| *s.name == *error_struct.identifier)
                 .unwrap();
 
             // Collect structs from error fields

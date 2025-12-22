@@ -127,7 +127,7 @@ impl Type {
                     ("String", STANDARD_LIB_ADDRESS, STDLIB_MODULE_NAME_STRING) => Self::String,
                     ("String", STANDARD_LIB_ADDRESS, STDLIB_MODULE_NAME_ASCII) => Self::String,
                     _ => Self::Struct {
-                        identifier: struct_.identifier.clone(),
+                        identifier: struct_.identifier.to_string(),
                         type_instances: None,
                         module_id: *module_id,
                     },
@@ -155,7 +155,7 @@ impl Type {
                 ) {
                     ("NamedId", STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => Self::Bytes32,
                     _ => Self::Struct {
-                        identifier: struct_.identifier.clone(),
+                        identifier: struct_.identifier.to_string(),
                         type_instances: Some(types),
                         module_id: *module_id,
                     },
@@ -166,7 +166,7 @@ impl Type {
                 let enum_ = enum_module.enums.get_by_index(*index).unwrap();
                 if enum_.is_simple {
                     Type::Enum {
-                        identifier: enum_.identifier.clone(),
+                        identifier: enum_.identifier.to_string(),
                         module_id: *module_id,
                     }
                 } else {
@@ -187,7 +187,7 @@ impl Type {
 
                 if enum_.is_simple {
                     Type::Enum {
-                        identifier: enum_.identifier.clone(),
+                        identifier: enum_.identifier.to_string(),
                         module_id: *module_id,
                     }
                 } else {

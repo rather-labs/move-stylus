@@ -302,7 +302,7 @@ impl IEnum {
             .collect();
 
         Self {
-            identifier: self.identifier.clone(),
+            identifier: self.identifier,
             index: self.index,
             is_simple: self.is_simple,
             variants,

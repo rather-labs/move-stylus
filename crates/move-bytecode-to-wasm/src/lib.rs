@@ -441,8 +441,7 @@ pub fn process_dependency_tree<'move_package>(
             DependencyProcessingError::ICE(ICEError::new(ICEErrorKind::CompilationContext(e)))
         })?;
 
-        let processed_dependency =
-            dependencies_data.insert(module_id, dependency_module_data);
+        let processed_dependency = dependencies_data.insert(module_id, dependency_module_data);
 
         if processed_dependency.is_some() {
             Err(DependencyError::DependencyProcessedMoreThanOnce(module_id))?;

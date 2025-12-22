@@ -78,8 +78,7 @@ pub fn add_external_contract_call_fn(
     let self_ = function_args
         .first()
         .ok_or(NativeFunctionError::ContractCallFunctionNoArgs(
-            *module_id,
-            name,
+            *module_id, name,
         ))?;
 
     // Locals
