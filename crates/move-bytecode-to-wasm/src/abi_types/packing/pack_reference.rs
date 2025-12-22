@@ -377,7 +377,7 @@ mod tests {
     #[test]
     fn test_pack_ref_vec_u16() {
         type SolType = sol!((uint16[],));
-        let ref_type = IntermediateType::IRef(Box::new(IntermediateType::IVector(Box::new(
+        let ref_type = IntermediateType::IRef(Rc::new(IntermediateType::IVector(Rc::new(
             IntermediateType::IU16,
         ))));
 
@@ -401,7 +401,7 @@ mod tests {
     #[test]
     fn test_pack_ref_vec_u32() {
         type SolType = sol!((uint32[],));
-        let ref_type = IntermediateType::IRef(Box::new(IntermediateType::IVector(Box::new(
+        let ref_type = IntermediateType::IRef(Rc::new(IntermediateType::IVector(Rc::new(
             IntermediateType::IU32,
         ))));
 

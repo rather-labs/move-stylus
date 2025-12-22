@@ -269,7 +269,7 @@ mod tests {
     #[test]
     fn test_unpack_ref_u16() {
         type SolType = sol!((uint16,));
-        let int_type = IntermediateType::IRef(Box::new(IntermediateType::IU16));
+        let int_type = IntermediateType::IRef(Rc::new(IntermediateType::IU16));
 
         let data = SolType::abi_encode_params(&(88u16,));
 
