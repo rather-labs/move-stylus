@@ -166,7 +166,7 @@ impl IVector {
         let len = module.locals.add(ValType::I32); // length of the original vector
         let multiplier = module.locals.add(ValType::I32); // multiplier for capacity calculation
         let capacity = module.locals.add(ValType::I32); // capacity of the new vector
-        let data_size = inner.wasm_memory_data_size()? as i32; // size of the inner type data in the vector
+        let data_size = inner.wasm_memory_data_size()?; // size of the inner type data in the vector
 
         builder.local_set(multiplier);
 
@@ -485,7 +485,7 @@ impl IVector {
                             then.skip_vec_header(v1_ptr)
                                 .skip_vec_header(v2_ptr)
                                 .local_get(len)
-                                .i32_const(inner.wasm_memory_data_size()? as i32)
+                                .i32_const(inner.wasm_memory_data_size()?)
                                 .binop(BinaryOp::I32Mul)
                                 .call(equality_f)
                                 .local_set(result);
@@ -502,7 +502,7 @@ impl IVector {
                             then.loop_(None, |loop_| {
                                 loop_result = (|| {
                                     //  Get the i-th element of both vectors and compare them
-                                    let data_size = inner.wasm_memory_data_size()? as i32;
+                                    let data_size = inner.wasm_memory_data_size()?;
                                     loop_.vec_elem_ptr(v1_ptr, i, data_size).load(
                                         compilation_ctx.memory_id,
                                         inner.load_kind()?,
@@ -588,7 +588,7 @@ impl IVector {
         // Local declarations
         let ptr_local = module.locals.add(ValType::I32);
         let len_local = module.locals.add(ValType::I32);
-        let data_size = inner.wasm_memory_data_size()? as i32;
+        let data_size = inner.wasm_memory_data_size()?;
 
         if num_elements == 0 {
             // Set length
@@ -679,7 +679,7 @@ impl IVector {
                         | IntermediateType::IEnum { .. }
                         | IntermediateType::IGenericEnumInstance { .. } => {
                             loop_
-                                .vec_elem_ptr(vec_ptr, i, inner.wasm_memory_data_size()? as i32)
+                                .vec_elem_ptr(vec_ptr, i, inner.wasm_memory_data_size()?)
                                 .load(
                                     compilation_ctx.memory_id,
                                     inner.load_kind()?,
@@ -756,7 +756,7 @@ impl IVector {
             }
         }
 
-        builder.i32_const(inner.wasm_memory_data_size()? as i32);
+        builder.i32_const(inner.wasm_memory_data_size()?);
 
         let borrow_f = RuntimeFunction::VecBorrow.get(module, Some(compilation_ctx))?;
         builder.call(borrow_f);
@@ -781,7 +781,7 @@ impl IVector {
         module_data: &ModuleData,
     ) -> Result<(), IntermediateTypeError> {
         let valtype = inner.try_into()?;
-        let size = inner.wasm_memory_data_size()? as i32;
+        let size = inner.wasm_memory_data_size()?;
         let vec_ref = module.locals.add(ValType::I32);
         let vec_ptr = module.locals.add(ValType::I32);
         let len = module.locals.add(ValType::I32);

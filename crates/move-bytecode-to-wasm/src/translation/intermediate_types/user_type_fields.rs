@@ -74,7 +74,7 @@ impl UserTypeFields {
 
                     // Create a pointer for the value
                     builder
-                        .i32_const(data_size as i32)
+                        .i32_const(data_size)
                         .call(compilation_ctx.allocator)
                         .local_tee(ptr_to_data);
 

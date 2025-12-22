@@ -452,13 +452,13 @@ pub fn add_read_and_decode_storage_vector_instructions(
         .local_set(len);
 
     // Stack size of the inner type
-    let stack_size = inner.wasm_memory_data_size()? as i32;
+    let data_size = inner.wasm_memory_data_size()?;
 
     // Element size in STORAGE
     let elem_size = field_size(inner, compilation_ctx)? as i32;
 
     // Allocate memory for the vector and write the header data
-    IVector::allocate_vector_with_header(builder, compilation_ctx, data_ptr, len, len, stack_size);
+    IVector::allocate_vector_with_header(builder, compilation_ctx, data_ptr, len, len, data_size);
 
     let mut inner_result: Result<(), StorageError> = Ok(());
     // Iterate through the vector reading and decoding the elements from storage.
@@ -521,7 +521,7 @@ pub fn add_read_and_decode_storage_vector_instructions(
                     )?;
 
                     // Destination address of the element in memory
-                    loop_.vec_elem_ptr(data_ptr, i, stack_size);
+                    loop_.vec_elem_ptr(data_ptr, i, data_size);
 
                     // Get the decoded element
                     loop_.local_get(elem_data_ptr);
@@ -530,7 +530,7 @@ pub fn add_read_and_decode_storage_vector_instructions(
                     if inner.is_stack_type()? {
                         loop_.load(
                             compilation_ctx.memory_id,
-                            if stack_size == 8 {
+                            if data_size == 8 {
                                 LoadKind::I64 { atomic: false }
                             } else {
                                 LoadKind::I32 { atomic: false }
@@ -542,10 +542,10 @@ pub fn add_read_and_decode_storage_vector_instructions(
                         );
                     };
 
-                    // Store the decoded element at data_ptr + i * stack_size
+                    // Store the decoded element at data_ptr + i * data_size
                     loop_.store(
                         compilation_ctx.memory_id,
-                        if stack_size == 8 {
+                        if data_size == 8 {
                             StoreKind::I64 { atomic: false }
                         } else {
                             StoreKind::I32 { atomic: false }
@@ -608,7 +608,7 @@ pub fn add_decode_intermediate_type_instructions(
     itype: &IntermediateType,
 ) -> Result<(), StorageError> {
     // Stack and storage size of the type
-    let stack_size = itype.wasm_memory_data_size()? as i32;
+    let data_size = itype.wasm_memory_data_size()?;
     let storage_size = field_size(itype, compilation_ctx)? as i32;
 
     // Host functions
@@ -624,7 +624,7 @@ pub fn add_decode_intermediate_type_instructions(
         | IntermediateType::IU16
         | IntermediateType::IU32
         | IntermediateType::IU64 => {
-            let (store_kind, swap_fn) = if stack_size == 8 {
+            let (store_kind, swap_fn) = if data_size == 8 {
                 (
                     StoreKind::I64 { atomic: false },
                     RuntimeFunction::SwapI64Bytes.get(module, None)?,
@@ -650,7 +650,7 @@ pub fn add_decode_intermediate_type_instructions(
 
             // Allocate memory to write the decoded value
             builder
-                .i32_const(stack_size)
+                .i32_const(data_size)
                 .call(compilation_ctx.allocator)
                 .local_tee(data_ptr);
 

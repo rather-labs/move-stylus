@@ -74,7 +74,7 @@ impl IRef {
             | IntermediateType::IBool => {
                 let ptr_local = module.locals.add(walrus::ValType::I32);
 
-                let data_size = inner.wasm_memory_data_size()? as i32;
+                let data_size = inner.wasm_memory_data_size()?;
                 builder.i32_const(data_size);
                 builder.call(compilation_ctx.allocator);
                 builder.local_tee(ptr_local);
@@ -146,7 +146,7 @@ impl IMutRef {
             | IntermediateType::IBool => {
                 let ptr_local = module.locals.add(walrus::ValType::I32);
 
-                let data_size = inner.wasm_memory_data_size()? as i32;
+                let data_size = inner.wasm_memory_data_size()?;
                 builder.i32_const(data_size);
                 builder.call(compilation_ctx.allocator);
                 builder.local_tee(ptr_local);

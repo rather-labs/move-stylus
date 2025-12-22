@@ -93,7 +93,7 @@ impl IVector {
         let vector_pointer = module.locals.add(ValType::I32);
         let writer_pointer = module.locals.add(ValType::I32);
 
-        let data_size = inner.wasm_memory_data_size()? as i32;
+        let data_size = inner.wasm_memory_data_size()?;
         IVector::allocate_vector_with_header(
             block,
             compilation_ctx,

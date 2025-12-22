@@ -214,14 +214,10 @@ impl Packable for IntermediateType {
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
     ) -> Result<LocalId, AbiError> {
-        match ValType::try_from(self) {
-            Ok(val_type) => {
-                let local = module.locals.add(val_type);
-                builder.local_set(local);
-                Ok(local)
-            }
-            Err(_) => Err(AbiPackError::PackingGenericTypeParameter)?,
-        }
+        let val_type = ValType::try_from(self)?;
+        let local = module.locals.add(val_type);
+        builder.local_set(local);
+        Ok(local)
     }
 
     fn add_pack_instructions(

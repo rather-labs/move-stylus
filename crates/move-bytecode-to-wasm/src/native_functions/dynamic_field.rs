@@ -11,6 +11,7 @@ use crate::{
     },
     hostio::host_functions::{native_keccak256, storage_load_bytes32},
     runtime::RuntimeFunction,
+    translation::intermediate_types::error::IntermediateTypeError,
     translation::intermediate_types::{
         IntermediateType,
         address::IAddress,
@@ -411,21 +412,17 @@ fn copy_data_to_memory(
     data: LocalId,
 ) -> Result<(), NativeFunctionError> {
     let load_value_to_stack = |field: &IntermediateType, builder: &mut InstrSeqBuilder<'_>| {
-        match field.load_kind() {
-            Ok(load_kind) => {
-                builder.load(
-                    compilation_ctx.memory_id,
-                    load_kind,
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-            }
-            Err(e) => return Err(e),
-        }
+        let load_kind = field.load_kind()?;
+        builder.load(
+            compilation_ctx.memory_id,
+            load_kind,
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
 
-        Ok(())
+        Ok::<(), IntermediateTypeError>(())
     };
 
     // Copy the data after the parent addresss
@@ -447,7 +444,7 @@ fn copy_data_to_memory(
         | IntermediateType::IU32
         | IntermediateType::IU64 => {
             builder
-                .i32_const(itype.wasm_memory_data_size()? as i32)
+                .i32_const(itype.wasm_memory_data_size()?)
                 .call(compilation_ctx.allocator);
 
             builder.local_get(data).store(
@@ -539,7 +536,7 @@ fn copy_data_to_memory(
 
             let load_kind = inner.load_kind()?;
             let field_data = module.locals.add(ValType::try_from(&**inner)?);
-            let element_multiplier = inner.wasm_memory_data_size()? as i32;
+            let element_multiplier = inner.wasm_memory_data_size()?;
 
             builder.i32_const(0).local_set(i);
             builder.skip_vec_header(data).local_set(data);

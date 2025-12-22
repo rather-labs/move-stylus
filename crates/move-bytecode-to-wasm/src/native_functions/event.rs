@@ -272,9 +272,8 @@ pub fn add_emit_log_fn(
         // If it is a stack type, we need to perform another load
         let local = if field.is_stack_type()? {
             let local = match ValType::try_from(field)? {
-                ValType::I32 => local,
                 ValType::I64 => local_64,
-                _ => unreachable!("Unsupported type size"),
+                _ => local,
             };
 
             builder
@@ -533,7 +532,7 @@ fn add_encode_indexed_vector_instructions(
 
                     loop_
                         .local_get(vector_ptr)
-                        .i32_const(inner.wasm_memory_data_size()? as i32)
+                        .i32_const(inner.wasm_memory_data_size()?)
                         .binop(BinaryOp::I32Add)
                         .local_set(vector_ptr);
 

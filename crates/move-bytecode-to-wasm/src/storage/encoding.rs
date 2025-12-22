@@ -410,8 +410,8 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
     let elem_slot_ptr = module.locals.add(ValType::I32);
     let len = module.locals.add(ValType::I32);
 
-    // Stack size of the inner type
-    let stack_size = inner.wasm_memory_data_size()? as i32;
+    // Data size of the inner type
+    let data_size = inner.wasm_memory_data_size()?;
 
     // Element size in storage
     let elem_size = field_size(inner, compilation_ctx)? as i32;
@@ -585,7 +585,7 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                     .local_set(elem_slot_offset);
 
                 // Pointer to the element in memory
-                loop_.vec_elem_ptr(vector_ptr, i, stack_size).load(
+                loop_.vec_elem_ptr(vector_ptr, i, data_size).load(
                     compilation_ctx.memory_id,
                     inner.load_kind().unwrap(),
                     MemArg {
@@ -686,10 +686,11 @@ pub fn add_encode_intermediate_type_instructions(
     is_field: bool,
 ) -> Result<(), StorageError> {
     // Locals
-    let val = module.locals.add(ValType::I32);
+    let val_32 = module.locals.add(ValType::I32);
+    let val_64 = module.locals.add(ValType::I64);
 
-    // Stack and storage size of the type
-    let stack_size = itype.wasm_memory_data_size()? as i32;
+    // Size of the type in wasm memory
+    let data_size = itype.wasm_memory_data_size()?;
 
     // Runtime functions
     let get_struct_id_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx))?;
@@ -702,15 +703,15 @@ pub fn add_encode_intermediate_type_instructions(
         | IntermediateType::IU16
         | IntermediateType::IU32
         | IntermediateType::IU64 => {
-            let swap_fn = if stack_size == 8 {
+            let swap_fn = if data_size == 8 {
                 RuntimeFunction::SwapI64Bytes.get(module, None)?
             } else {
                 RuntimeFunction::SwapI32Bytes.get(module, None)?
             };
             let load_kind = itype.load_kind()?;
-            let val = match itype {
-                IntermediateType::IU64 => module.locals.add(ValType::I64),
-                _ => val,
+            let val = match ValType::try_from(itype)? {
+                ValType::I64 => val_64,
+                _ => val_32,
             };
 
             // If we are processing a field from a struct, a second load is needed.
@@ -780,13 +781,16 @@ pub fn add_encode_intermediate_type_instructions(
         IntermediateType::IAddress | IntermediateType::ISigner => {
             // We need to swap values before copying because memory copy takes dest pointer
             // first
-            builder.local_set(val);
+            builder.local_set(val_32);
 
             // Slot data plus offset as dest ptr
             builder.add_slot_data_ptr_plus_offset(slot_offset);
 
             // Grab the last 20 bytes of the address
-            builder.local_get(val).i32_const(12).binop(BinaryOp::I32Add);
+            builder
+                .local_get(val_32)
+                .i32_const(12)
+                .binop(BinaryOp::I32Add);
 
             // Amount of bytes to copy
             builder.i32_const(20);
@@ -891,13 +895,13 @@ pub fn add_encode_intermediate_type_instructions(
             }
         }
         IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
-            builder.local_set(val);
+            builder.local_set(val_32);
 
             add_encode_and_save_into_storage_enum_instructions(
                 module,
                 builder,
                 compilation_ctx,
-                val,
+                val_32,
                 slot_ptr,
                 slot_offset,
                 owner_ptr,
@@ -905,13 +909,13 @@ pub fn add_encode_intermediate_type_instructions(
             )?;
         }
         IntermediateType::IVector(inner) => {
-            builder.local_set(val);
+            builder.local_set(val_32);
 
             add_encode_and_save_into_storage_vector_instructions(
                 module,
                 builder,
                 compilation_ctx,
-                val,
+                val_32,
                 slot_ptr,
                 owner_ptr,
                 inner,

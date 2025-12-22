@@ -122,13 +122,12 @@ pub fn decrement_vec_len_function(
 ///
 /// # Parameters
 /// * `inner_type` - The intermediate type of the vector's inner elements
-/// * `function_name` - The name to use for the generated WASM function
 pub fn vec_swap_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     inner_type: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
-    let element_size = inner_type.wasm_memory_data_size()? as i32;
+    let element_size = inner_type.wasm_memory_data_size()?;
     let load_kind = inner_type.load_kind()?;
     let store_kind = inner_type.store_kind()?;
 
@@ -283,14 +282,14 @@ pub fn vec_swap_function(
 /// # WASM Function Returns
 /// * element - type depends on `inner_type`
 ///
-/// # Parameters
+/// # Arguments
 /// * `inner_type` - The intermediate type of the vector's inner elements
 pub fn vec_pop_back_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     inner_type: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
-    let element_size = inner_type.wasm_memory_data_size()? as i32;
+    let element_size = inner_type.wasm_memory_data_size()?;
     let load_kind = inner_type.load_kind()?;
     let return_type = ValType::try_from(inner_type)?;
 

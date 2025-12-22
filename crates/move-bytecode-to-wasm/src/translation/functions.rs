@@ -179,7 +179,7 @@ pub fn add_unpack_function_return_values_instructions(
     for return_ty in returns.iter() {
         builder.local_get(pointer);
         builder.load(memory, return_ty.load_kind()?, MemArg { align: 0, offset });
-        offset += return_ty.wasm_memory_data_size()?;
+        offset += return_ty.wasm_memory_data_size()? as u32;
     }
 
     Ok(())
@@ -203,7 +203,7 @@ pub fn prepare_function_return(
         for return_ty in returns.iter().rev() {
             let local = return_ty.add_stack_to_local_instructions(module, builder)?;
             locals.push(local);
-            total_size += return_ty.wasm_memory_data_size()?;
+            total_size += return_ty.wasm_memory_data_size()? as u32;
         }
         locals.reverse();
 
@@ -220,7 +220,7 @@ pub fn prepare_function_return(
                 return_ty.store_kind()?,
                 MemArg { align: 0, offset },
             );
-            offset += return_ty.wasm_memory_data_size()?;
+            offset += return_ty.wasm_memory_data_size()? as u32;
         }
     }
 

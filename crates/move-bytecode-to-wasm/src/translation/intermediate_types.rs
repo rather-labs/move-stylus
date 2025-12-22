@@ -142,7 +142,7 @@ impl IntermediateType {
     }
 
     /// Returns the size in bytes, that this type needs in memory to be stored
-    pub fn wasm_memory_data_size(&self) -> Result<u32, IntermediateTypeError> {
+    pub fn wasm_memory_data_size(&self) -> Result<i32, IntermediateTypeError> {
         let size = match self {
             IntermediateType::IBool | IntermediateType::IU8 => 1,
             IntermediateType::IU16 => 2,
@@ -742,7 +742,7 @@ impl IntermediateType {
                     .local_tee(local);
 
                 builder
-                    .i32_const(self.wasm_memory_data_size()? as i32)
+                    .i32_const(self.wasm_memory_data_size()?)
                     .call(compilation_ctx.allocator)
                     .local_tee(ptr);
 

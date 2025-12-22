@@ -137,7 +137,7 @@ impl IVector {
                     // Increment the vector pointer to point to next value
                     loop_block
                         .local_get(vector_pointer)
-                        .i32_const(inner.wasm_memory_data_size()? as i32)
+                        .i32_const(inner.wasm_memory_data_size()?)
                         .binop(BinaryOp::I32Add)
                         .local_set(vector_pointer);
 

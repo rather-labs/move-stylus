@@ -107,7 +107,8 @@ impl IStruct {
         compilation_ctx: &CompilationContext,
         base_calldata_reference_pointer: Option<LocalId>,
     ) -> Result<(), AbiError> {
-        let val = module.locals.add(ValType::I32);
+        let val_32 = module.locals.add(ValType::I32);
+        let val_64 = module.locals.add(ValType::I64);
         let struct_ptr = local;
         let reference_value = module.locals.add(ValType::I32);
 
@@ -170,9 +171,9 @@ impl IStruct {
                 | IntermediateType::IU16
                 | IntermediateType::IU32
                 | IntermediateType::IU64 => {
-                    let val = match field {
-                        IntermediateType::IU64 => module.locals.add(ValType::I64),
-                        _ => val,
+                    let val = match ValType::try_from(field)? {
+                        ValType::I64 => val_64,
+                        _ => val_32,
                     };
 
                     block
@@ -189,8 +190,8 @@ impl IStruct {
                     val
                 }
                 _ => {
-                    block.local_set(val);
-                    val
+                    block.local_set(val_32);
+                    val_32
                 }
             };
 

@@ -156,7 +156,7 @@ impl IStruct {
                 | IntermediateType::IU16
                 | IntermediateType::IU32
                 | IntermediateType::IU64 => {
-                    let data_size = field.wasm_memory_data_size()? as i32;
+                    let data_size = field.wasm_memory_data_size()?;
                     let val = module.locals.add(ValType::try_from(field)?);
                     let store_kind = field.store_kind()?;
 
