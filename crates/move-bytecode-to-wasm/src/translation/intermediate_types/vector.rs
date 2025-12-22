@@ -85,7 +85,7 @@ impl IVector {
         inner: &IntermediateType,
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
-        bytes: &mut std::vec::IntoIter<u8>,
+        bytes: &[u8],
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
         let ptr_local = module.locals.add(ValType::I32);
@@ -93,14 +93,14 @@ impl IVector {
 
         // First byte is the length of the vector
         let len = bytes
-            .next()
+            .first()
             .ok_or(IntermediateTypeError::EmptyBytesInVector)?;
-        builder.i32_const(len as i32).local_set(len_local);
+        builder.i32_const(*len as i32).local_set(len_local);
 
         let data_size: usize = inner.wasm_memory_data_size()? as usize;
 
         // len + capacity + data_size * len
-        let needed_bytes = 4 + 4 + data_size * (len as usize);
+        let needed_bytes = 4 + 4 + data_size * (*len as usize);
 
         IVector::allocate_vector_with_header(
             builder,

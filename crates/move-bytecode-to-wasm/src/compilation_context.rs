@@ -18,9 +18,9 @@ type Result<T> = std::result::Result<T, CompilationContextError>;
 /// arguments we must know the index of it)
 pub struct CompilationContext<'a> {
     /// Data of the module we are currently compiling
-    pub root_module_data: &'a ModuleData,
+    pub root_module_data: &'a ModuleData<'a>,
 
-    pub deps_data: &'a HashMap<ModuleId, ModuleData>,
+    pub deps_data: &'a HashMap<ModuleId, ModuleData<'a>>,
 
     pub empty_signature: ISignature,
 

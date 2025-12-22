@@ -239,16 +239,16 @@ pub fn translate_package(
 }
 
 #[derive(Debug)]
-pub struct PackageModuleData {
+pub struct PackageModuleData<'move_package> {
     pub modules_paths: HashMap<PathBuf, ModuleId>,
-    pub modules_data: HashMap<ModuleId, ModuleData>,
+    pub modules_data: HashMap<ModuleId, ModuleData<'move_package>>,
 }
 
-pub fn package_module_data(
-    package: &CompiledPackage,
+pub fn package_module_data<'move_package>(
+    package: &'move_package CompiledPackage,
     module_name: Option<String>,
     verbose: bool,
-) -> Result<PackageModuleData, CompilationError> {
+) -> Result<PackageModuleData<'move_package>, CompilationError> {
     // HashMap of package name to address
     let address_alias_instantiation: HashMap<String, [u8; 32]> = package
         .compiled_package_info
@@ -268,7 +268,7 @@ pub fn package_module_data(
         package
             .root_compiled_units
             .iter()
-            .filter(move |unit| unit.unit.name.to_string() == module_name)
+            .filter(move |unit| *unit.unit.name == *module_name.as_str())
             .collect()
     } else {
         package.root_compiled_units.iter().collect()
@@ -349,7 +349,7 @@ pub fn package_module_data(
 ///
 /// It builds `ModuleData` for every module in the dependency tree and saves it in a HashMap.
 pub fn process_dependency_tree<'move_package>(
-    dependencies_data: &mut HashMap<ModuleId, ModuleData>,
+    dependencies_data: &mut HashMap<ModuleId, ModuleData<'move_package>>,
     deps_compiled_units: &'move_package [(PackageName, CompiledUnitWithSource)],
     root_compiled_units: &'move_package [&CompiledUnitWithSource],
     dependencies: &[move_core_types::language_storage::ModuleId],

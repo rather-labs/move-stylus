@@ -166,7 +166,7 @@ struct StorageIdParentInformation {
 /// This is used to pass around the context of the translation process. Also clippy complains about too many arguments in translate_instruction.
 struct TranslateFlowContext<'a> {
     compilation_ctx: &'a CompilationContext<'a>,
-    module_data: &'a ModuleData,
+    module_data: &'a ModuleData<'a>,
     types_stack: &'a mut TypesStack,
     function_information: &'a MappedFunction,
     function_table: &'a mut FunctionTable,
@@ -528,25 +528,16 @@ fn translate_instruction(
     match instruction {
         // Load a fixed constant
         Bytecode::LdConst(global_index) => {
-            let constant = &module_data.constants[global_index.0 as usize];
-            let mut data = constant.data.clone().into_iter();
-            let constant_type = &constant.type_;
-            let constant_type: IntermediateType = IntermediateType::try_from_signature_token(
-                constant_type,
-                &module_data.datatype_handles_map,
-            )?;
+            let constant = &module_data.constants[global_index.into_index()];
 
-            constant_type.load_constant_instructions(
+            constant.type_.load_constant_instructions(
                 module,
                 builder,
-                &mut data,
+                constant.data,
                 compilation_ctx,
             )?;
 
-            types_stack.push(constant_type);
-            if data.next().is_some() {
-                return Err(TranslationError::ConstantDataNotConsumed);
-            }
+            types_stack.push(constant.type_.clone());
         }
         // Load literals
         Bytecode::LdFalse => {

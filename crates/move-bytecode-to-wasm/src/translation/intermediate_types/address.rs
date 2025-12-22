@@ -17,12 +17,10 @@ impl IAddress {
     pub fn load_constant_instructions(
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
-        bytes: &mut std::vec::IntoIter<u8>,
+        bytes: &[u8],
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
         let bytes: [u8; 32] = bytes
-            .take(32)
-            .collect::<Vec<u8>>()
             .try_into()
             .map_err(|_| IntermediateTypeError::CouldNotProcessByteArray)?;
 

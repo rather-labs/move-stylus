@@ -72,12 +72,10 @@ impl IU128 {
     pub fn load_constant_instructions(
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
-        bytes: &mut std::vec::IntoIter<u8>,
+        bytes: &[u8],
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
         let bytes: [u8; Self::HEAP_SIZE as usize] = bytes
-            .take(Self::HEAP_SIZE as usize)
-            .collect::<Vec<u8>>()
             .try_into()
             .map_err(|_| IntermediateTypeError::CouldNotProcessByteArray)?;
 
@@ -389,12 +387,10 @@ impl IU256 {
     pub fn load_constant_instructions(
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
-        bytes: &mut std::vec::IntoIter<u8>,
+        bytes: &[u8],
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
         let bytes: [u8; Self::HEAP_SIZE as usize] = bytes
-            .take(Self::HEAP_SIZE as usize)
-            .collect::<Vec<u8>>()
             .try_into()
             .map_err(|_| IntermediateTypeError::CouldNotProcessByteArray)?;
 

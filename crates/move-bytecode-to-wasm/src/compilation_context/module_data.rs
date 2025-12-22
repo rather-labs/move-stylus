@@ -24,11 +24,10 @@ use function_data::FunctionData;
 use move_binary_format::{
     CompiledModule,
     file_format::{
-        Ability, AbilitySet, Constant, DatatypeHandleIndex, EnumDefInstantiationIndex,
-        EnumDefinitionIndex, FieldHandleIndex, FieldInstantiationIndex, FunctionDefinition,
-        FunctionDefinitionIndex, Signature, SignatureIndex, SignatureToken,
-        StructDefInstantiationIndex, StructDefinitionIndex, VariantHandleIndex,
-        VariantInstantiationHandleIndex, Visibility,
+        Ability, AbilitySet, DatatypeHandleIndex, EnumDefInstantiationIndex, EnumDefinitionIndex,
+        FieldHandleIndex, FieldInstantiationIndex, FunctionDefinition, FunctionDefinitionIndex,
+        Signature, SignatureIndex, SignatureToken, StructDefInstantiationIndex,
+        StructDefinitionIndex, VariantHandleIndex, VariantInstantiationHandleIndex, Visibility,
     },
     internals::ModuleIndex,
 };
@@ -144,13 +143,19 @@ impl Default for ModuleId {
 }
 
 #[derive(Debug)]
+struct Constant<'move_compiled_unit> {
+    pub type_: IntermediateType,
+    pub data: &'move_compiled_unit [u8],
+}
+
+#[derive(Debug)]
 #[cfg_attr(test, derive(Default))]
-pub struct ModuleData {
+pub struct ModuleData<'move_compiled_unit> {
     /// Module's ID
     pub id: ModuleId,
 
     /// Move's connstant pool
-    pub constants: Vec<Constant>,
+    pub constants: Vec<Constant<'move_compiled_unit>>,
 
     /// Module's functions information
     pub functions: FunctionData,
@@ -173,15 +178,15 @@ pub struct ModuleData {
     pub special_attributes: SpecialAttributes,
 }
 
-impl ModuleData {
+impl ModuleData<'_> {
     pub fn build_module_data<'move_package>(
         module_id: ModuleId,
         move_module: &'move_package CompiledUnitWithSource,
         move_module_dependencies: &'move_package [(PackageName, CompiledUnitWithSource)],
-        root_compiled_units: &'move_package [&CompiledUnitWithSource],
+        root_compiled_units: &[&CompiledUnitWithSource],
         function_definitions: &mut GlobalFunctionTable<'move_package>,
         special_attributes: SpecialAttributes,
-    ) -> Result<Self> {
+    ) -> Result<ModuleData<'move_package>> {
         let move_module_unit = &move_module.unit.module;
 
         let datatype_handles_map = Self::process_datatype_handles(
@@ -245,9 +250,11 @@ impl ModuleData {
             })
             .collect::<std::result::Result<Vec<Vec<IntermediateType>>, _>>()?;
 
+        let constants = Self::process_constants(move_module_unit, &datatype_handles_map)?;
+
         Ok(ModuleData {
             id: module_id,
-            constants: move_module_unit.constant_pool.clone(), // TODO: Clone
+            constants,
             functions,
             structs,
             enums,
@@ -255,6 +262,25 @@ impl ModuleData {
             datatype_handles_map,
             special_attributes,
         })
+    }
+
+    fn process_constants<'move_package>(
+        module: &'move_package CompiledModule,
+        datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
+    ) -> Result<Vec<Constant<'move_package>>> {
+        let mut constants = Vec::with_capacity(module.constant_pool.len());
+
+        for constant in &module.constant_pool {
+            let constant_type =
+                IntermediateType::try_from_signature_token(&constant.type_, datatype_handles_map)?;
+
+            constants.push(Constant {
+                type_: constant_type,
+                data: &constant.data,
+            });
+        }
+
+        Ok(constants)
     }
 
     fn process_datatype_handles(
