@@ -212,13 +212,13 @@ pub enum TranslationError {
     #[error("{field_id} not found in {struct_identifier}")]
     StructFieldNotFound {
         field_id: usize,
-        struct_identifier: String,
+        struct_identifier: Symbol,
     },
 
     #[error("{field_id} offset not found in {struct_identifier}")]
     StructFieldOffsetNotFound {
         field_id: usize,
-        struct_identifier: String,
+        struct_identifier: Symbol,
     },
 
     #[error("multiple WASM return values not supported, found {0} return values")]

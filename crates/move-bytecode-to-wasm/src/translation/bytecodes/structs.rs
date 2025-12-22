@@ -26,14 +26,14 @@ pub fn borrow_field(
     let Some(field_type) = struct_.fields_types.get(field_id) else {
         return Err(TranslationError::StructFieldNotFound {
             field_id: field_id.into_index(),
-            struct_identifier: struct_.identifier.clone(),
+            struct_identifier: struct_.identifier,
         });
     };
 
     let Some(field_offset) = struct_.field_offsets.get(field_id) else {
         return Err(TranslationError::StructFieldOffsetNotFound {
             field_id: field_id.into_index(),
-            struct_identifier: struct_.identifier.clone(),
+            struct_identifier: struct_.identifier,
         });
     };
 

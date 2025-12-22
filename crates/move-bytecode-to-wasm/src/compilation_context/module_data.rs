@@ -422,9 +422,7 @@ impl ModuleData {
             }
 
             let struct_datatype_handle = module.datatype_handle_at(struct_def.struct_handle);
-            let identifier = module
-                .identifier_at(struct_datatype_handle.name)
-                .to_string();
+            let identifier = module.identifier_at(struct_datatype_handle.name).as_str();
 
             let has_key = struct_datatype_handle
                 .abilities
@@ -433,12 +431,12 @@ impl ModuleData {
 
             let type_ = if Self::is_one_time_witness(module, struct_def.struct_handle) {
                 IStructType::OneTimeWitness
-            } else if let Some(event) = module_special_attributes.events.get(&identifier) {
+            } else if let Some(event) = module_special_attributes.events.get(identifier) {
                 IStructType::Event {
                     indexes: event.indexes,
                     is_anonymous: event.is_anonymous,
                 }
-            } else if let Some(_abi_error) = module_special_attributes.abi_errors.get(&identifier) {
+            } else if let Some(_abi_error) = module_special_attributes.abi_errors.get(identifier) {
                 IStructType::AbiError
             } else {
                 IStructType::Common

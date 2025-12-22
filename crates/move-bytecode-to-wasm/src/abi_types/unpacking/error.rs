@@ -1,3 +1,5 @@
+use move_symbol_pool::Symbol;
+
 use crate::{
     abi_types::error::AbiEncodingError, native_functions::error::NativeFunctionError,
     runtime::error::RuntimeFunctionError,
@@ -8,7 +10,7 @@ pub enum AbiUnpackError {
     #[error(
         "expected stylus::object::UID or stylus::object::NamedId as first field in {0} struct (it has key ability)"
     )]
-    StorageObjectHasNoId(String),
+    StorageObjectHasNoId(Symbol),
 
     #[error(r#"cannot abi unpack enum "{0}", it contains at least one variant with fields"#)]
     EnumIsNotSimple(String),

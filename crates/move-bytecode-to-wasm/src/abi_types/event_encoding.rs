@@ -120,7 +120,7 @@ mod tests {
 
         let struct_1 = IStruct::new(
             StructDefinitionIndex::new(0),
-            "TestStruct".to_string(),
+            "TestStruct",
             vec![
                 (None, IntermediateType::IAddress),
                 (
@@ -154,7 +154,7 @@ mod tests {
 
         let struct_2 = IStruct::new(
             StructDefinitionIndex::new(1),
-            "TestStruct2".to_string(),
+            "TestStruct2",
             vec![
                 (None, IntermediateType::IU32),
                 (None, IntermediateType::IU128),
@@ -182,7 +182,7 @@ mod tests {
     #[case(
         &IStruct::new(
             StructDefinitionIndex::new(0),
-            "Approval".to_string(),
+            "Approval",
             vec![
                 (None, IntermediateType::IAddress),
                 (None, IntermediateType::IAddress),
@@ -197,7 +197,7 @@ mod tests {
     #[case(
         &IStruct::new(
             StructDefinitionIndex::new(0),
-            "Transfer".to_string(),
+            "Transfer",
             vec![
                 (None, IntermediateType::IAddress),
                 (None, IntermediateType::IAddress),
@@ -212,7 +212,7 @@ mod tests {
     #[case(
         &IStruct::new(
             StructDefinitionIndex::new(0),
-            "Empty".to_string(),
+            "Empty",
             vec![],
             HashMap::new(),
             false,

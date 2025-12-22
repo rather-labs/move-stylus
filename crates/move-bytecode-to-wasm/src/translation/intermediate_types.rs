@@ -11,6 +11,7 @@ pub(crate) mod user_type_fields;
 pub mod vector;
 
 use std::{
+    borrow::Cow,
     collections::HashMap,
     hash::{Hash, Hasher},
 };
@@ -1087,33 +1088,35 @@ impl IntermediateType {
         }
     }
 
-    pub fn get_name(
-        &self,
-        compilation_ctx: &CompilationContext,
-    ) -> Result<String, IntermediateTypeError> {
+    pub fn get_name<'a>(
+        &'a self,
+        compilation_ctx: &'a CompilationContext,
+    ) -> Result<Cow<'a, str>, IntermediateTypeError> {
         let name = match self {
-            IntermediateType::IBool => "bool".to_string(),
-            IntermediateType::IU8 => "u8".to_string(),
-            IntermediateType::IU16 => "u16".to_string(),
-            IntermediateType::IU32 => "u32".to_string(),
-            IntermediateType::IU64 => "u64".to_string(),
-            IntermediateType::IU128 => "u128".to_string(),
-            IntermediateType::IU256 => "u256".to_string(),
-            IntermediateType::IAddress => "address".to_string(),
-            IntermediateType::ISigner => "signer".to_string(),
+            IntermediateType::IBool => Cow::Borrowed("bool"),
+            IntermediateType::IU8 => Cow::Borrowed("u8"),
+            IntermediateType::IU16 => Cow::Borrowed("u16"),
+            IntermediateType::IU32 => Cow::Borrowed("u32"),
+            IntermediateType::IU64 => Cow::Borrowed("u64"),
+            IntermediateType::IU128 => Cow::Borrowed("u128"),
+            IntermediateType::IU256 => Cow::Borrowed("u256"),
+            IntermediateType::IAddress => Cow::Borrowed("address"),
+            IntermediateType::ISigner => Cow::Borrowed("signer"),
             IntermediateType::IVector(inner) => {
-                format!("vector<{}>", inner.get_name(compilation_ctx)?)
+                Cow::Owned(format!("vector<{}>", inner.get_name(compilation_ctx)?))
             }
-            IntermediateType::IRef(inner) => format!("&{}", inner.get_name(compilation_ctx)?),
+            IntermediateType::IRef(inner) => {
+                Cow::Owned(format!("&{}", inner.get_name(compilation_ctx)?))
+            }
             IntermediateType::IMutRef(inner) => {
-                format!("&mut {}", inner.get_name(compilation_ctx)?)
+                Cow::Owned(format!("&mut {}", inner.get_name(compilation_ctx)?))
             }
             IntermediateType::IStruct {
                 module_id, index, ..
             } => {
                 let struct_ = compilation_ctx.get_struct_by_index(module_id, *index)?;
 
-                struct_.identifier.clone()
+                Cow::Borrowed(struct_.identifier.as_str())
             }
             IntermediateType::IGenericStructInstance {
                 module_id,
@@ -1126,17 +1129,17 @@ impl IntermediateType {
                 let types = types
                     .iter()
                     .map(|t| t.get_name(compilation_ctx))
-                    .collect::<Result<Vec<String>, IntermediateTypeError>>()?
+                    .collect::<Result<Vec<Cow<str>>, IntermediateTypeError>>()?
                     .join(",");
 
-                format!("{}<{types}>", struct_.identifier.clone())
+                Cow::Owned(format!("{}<{types}>", struct_.identifier.clone()))
             }
             IntermediateType::ITypeParameter(_) => {
                 return Err(IntermediateTypeError::FoundTypeParameter);
             }
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
                 let enum_ = compilation_ctx.get_enum_by_intermediate_type(self)?;
-                enum_.identifier.clone()
+                Cow::Owned(enum_.identifier.clone())
             }
         };
 

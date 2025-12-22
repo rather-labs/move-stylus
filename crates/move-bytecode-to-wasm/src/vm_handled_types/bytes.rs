@@ -35,9 +35,7 @@ impl VmHandledType for Bytes {
             if module_id.address != STYLUS_FRAMEWORK_ADDRESS
                 || module_id.module_name.as_str() != SF_MODULE_NAME_SOL_TYPES
             {
-                return Err(VmHandledTypeError::InvalidFrameworkType(Box::leak(
-                    identifier.clone().into_boxed_str(),
-                )));
+                return Err(VmHandledTypeError::InvalidFrameworkType(*identifier));
             }
             return Ok(true);
         }

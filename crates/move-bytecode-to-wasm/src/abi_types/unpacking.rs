@@ -315,9 +315,7 @@ fn load_struct_storage_id(
             function_builder.call(compute_named_id_fn);
         }
         _ => {
-            Err(AbiUnpackError::StorageObjectHasNoId(
-                struct_.identifier.clone(),
-            ))?;
+            Err(AbiUnpackError::StorageObjectHasNoId(struct_.identifier))?;
         }
     }
     Ok(())

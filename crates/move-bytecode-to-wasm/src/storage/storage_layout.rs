@@ -757,7 +757,7 @@ mod tests {
         // Create a struct without key
         let child_struct_1 = IStruct::new(
             StructDefinitionIndex::new(0),
-            "ChildStruct1".to_string(),
+            "ChildStruct1",
             vec![
                 (None, IntermediateType::IU32), // 4
                 (None, IntermediateType::IU64), // 8
@@ -773,7 +773,7 @@ mod tests {
 
         let child_struct_2 = IStruct::new(
             StructDefinitionIndex::new(1),
-            "ChildStruct2".to_string(),
+            "ChildStruct2",
             vec![
                 (None, IntermediateType::IU32), // 4
                 (None, IntermediateType::IU64), // 8
@@ -786,7 +786,7 @@ mod tests {
         // Struct with key
         let child_struct_3 = IStruct::new(
             StructDefinitionIndex::new(2),
-            "ChildStruct3".to_string(),
+            "ChildStruct3",
             vec![
                 (
                     None,

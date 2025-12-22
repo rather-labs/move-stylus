@@ -37,7 +37,7 @@ pub fn add_revert_fn(
 
     let IStructType::AbiError = error_struct.type_ else {
         return Err(NativeFunctionError::RevertFunctionNoError(
-            error_struct.identifier.clone(),
+            error_struct.identifier,
         ));
     };
 

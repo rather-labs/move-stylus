@@ -92,7 +92,7 @@ mod tests {
 
         let struct_1 = IStruct::new(
             StructDefinitionIndex::new(0),
-            "TestStruct".to_string(),
+            "TestStruct",
             vec![
                 (None, IntermediateType::IAddress),
                 (
@@ -126,7 +126,7 @@ mod tests {
 
         let struct_2 = IStruct::new(
             StructDefinitionIndex::new(1),
-            "TestStruct2".to_string(),
+            "TestStruct2",
             vec![
                 (None, IntermediateType::IU32),
                 (None, IntermediateType::IU128),
