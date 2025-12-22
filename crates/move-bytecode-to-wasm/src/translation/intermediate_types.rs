@@ -1137,9 +1137,25 @@ impl IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 return Err(IntermediateTypeError::FoundTypeParameter);
             }
-            IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
-                let enum_ = compilation_ctx.get_enum_by_intermediate_type(self)?;
-                Cow::Owned(enum_.identifier.clone())
+            IntermediateType::IEnum { index, module_id } => {
+                let enum_ = compilation_ctx.get_enum_by_index(module_id, *index)?;
+                Cow::Borrowed(enum_.identifier.as_str())
+            }
+            IntermediateType::IGenericEnumInstance {
+                module_id,
+                index,
+                types,
+                ..
+            } => {
+                let struct_ = compilation_ctx.get_enum_by_index(module_id, *index)?;
+
+                let types = types
+                    .iter()
+                    .map(|t| t.get_name(compilation_ctx))
+                    .collect::<Result<Vec<Cow<str>>, IntermediateTypeError>>()?
+                    .join(",");
+
+                Cow::Owned(format!("{}<{types}>", struct_.identifier.clone()))
             }
         };
 

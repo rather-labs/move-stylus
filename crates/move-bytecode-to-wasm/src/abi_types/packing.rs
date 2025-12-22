@@ -340,7 +340,7 @@ impl Packable for IntermediateType {
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
                 let enum_ = compilation_ctx.get_enum_by_intermediate_type(self)?;
                 if !enum_.is_simple {
-                    return Err(AbiPackError::EnumIsNotSimple(enum_.identifier.clone()))?;
+                    return Err(AbiPackError::EnumIsNotSimple(enum_.identifier))?;
                 }
                 enum_.add_pack_instructions(
                     builder,

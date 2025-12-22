@@ -248,7 +248,7 @@ impl Unpackable for IntermediateType {
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
                 let enum_ = compilation_ctx.get_enum_by_intermediate_type(self)?;
                 if !enum_.is_simple {
-                    return Err(AbiUnpackError::EnumIsNotSimple(enum_.identifier.to_owned()))?;
+                    return Err(AbiUnpackError::EnumIsNotSimple(enum_.identifier))?;
                 }
 
                 IEnum::add_unpack_instructions(

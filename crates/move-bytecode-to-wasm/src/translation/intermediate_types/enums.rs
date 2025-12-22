@@ -24,6 +24,7 @@ use super::{
     user_type_fields::{FieldsErrorContext, UserTypeFields},
 };
 
+use move_symbol_pool::Symbol;
 use walrus::{
     InstrSeqBuilder, LocalId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
@@ -45,7 +46,7 @@ pub struct IEnumVariant {
 
 #[derive(Debug, Clone)]
 pub struct IEnum {
-    pub identifier: String,
+    pub identifier: Symbol,
 
     pub index: u16,
 
@@ -66,14 +67,14 @@ impl IEnumVariant {
 
 impl IEnum {
     pub fn new(
-        identifier: String,
+        identifier: &str,
         index: u16,
         variants: Vec<IEnumVariant>,
     ) -> Result<Self, IntermediateTypeError> {
         let is_simple = variants.iter().all(|v| v.fields.is_empty());
 
         Ok(Self {
-            identifier,
+            identifier: Symbol::from(identifier),
             is_simple,
             variants,
             index,

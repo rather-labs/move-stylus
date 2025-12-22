@@ -13,7 +13,7 @@ pub enum AbiUnpackError {
     StorageObjectHasNoId(Symbol),
 
     #[error(r#"cannot abi unpack enum "{0}", it contains at least one variant with fields"#)]
-    EnumIsNotSimple(String),
+    EnumIsNotSimple(Symbol),
 
     #[error("cannot unpack generic type parameter")]
     UnpackingGenericTypeParameter,

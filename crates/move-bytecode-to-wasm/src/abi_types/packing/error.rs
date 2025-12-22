@@ -1,3 +1,5 @@
+use move_symbol_pool::Symbol;
+
 use crate::{
     abi_types::error::AbiEncodingError, native_functions::error::NativeFunctionError,
     runtime::error::RuntimeFunctionError,
@@ -11,7 +13,7 @@ pub enum AbiPackError {
     StorageObjectHasNoId(String),
 
     #[error(r#"cannot abi pack enum "{0}", it contains at least one variant with fields"#)]
-    EnumIsNotSimple(String),
+    EnumIsNotSimple(Symbol),
 
     #[error("cannot pack generic type parameter")]
     PackingGenericTypeParameter,

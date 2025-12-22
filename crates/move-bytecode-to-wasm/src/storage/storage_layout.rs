@@ -404,7 +404,7 @@ mod tests {
         #[case] expected_end_written_bytes: u32,
     ) {
         let enum_ = IEnum::new(
-            "TestEnum".to_string(),
+            "TestEnum",
             0,
             vec![
                 IEnumVariant::new(0, 0, vec![IntermediateType::IU8, IntermediateType::IU16]),
@@ -508,7 +508,7 @@ mod tests {
         #[case] expected_tail_offset: u32,
     ) {
         let enum_ = IEnum::new(
-            "TestEnum".to_string(),
+            "TestEnum",
             0,
             vec![
                 IEnumVariant::new(
@@ -611,7 +611,7 @@ mod tests {
 
         // Create a simple enum (no fields)
         let nested_enum_1 = IEnum::new(
-            "TestEnum".to_string(),
+            "TestEnum",
             0,
             vec![
                 IEnumVariant::new(0, 0, vec![]),
@@ -623,7 +623,7 @@ mod tests {
 
         // More complex enum
         let nested_enum_2 = IEnum::new(
-            "TestEnum2".to_string(),
+            "TestEnum2",
             0,
             vec![
                 IEnumVariant::new(
@@ -650,7 +650,7 @@ mod tests {
 
         // Create enum that contains the simple enum
         let enum_ = IEnum::new(
-            "TestEnum3".to_string(),
+            "TestEnum3",
             2,
             vec![
                 IEnumVariant::new(
@@ -807,7 +807,7 @@ mod tests {
         );
 
         let enum_ = IEnum::new(
-            "TestEnum".to_string(),
+            "TestEnum",
             0,
             vec![
                 IEnumVariant::new(

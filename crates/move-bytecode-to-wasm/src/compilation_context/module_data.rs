@@ -610,7 +610,7 @@ impl ModuleData {
 
             let enum_datatype_handle = module.datatype_handle_at(enum_def.enum_handle);
             let identifier = module.identifier_at(enum_datatype_handle.name);
-            module_enums.push(IEnum::new(identifier.to_string(), index as u16, variants)?);
+            module_enums.push(IEnum::new(identifier.as_str(), index as u16, variants)?);
         }
 
         Ok((module_enums, variants_to_enum_map))
