@@ -126,7 +126,7 @@ mod event {
         function emitTestAnonEvent7(uint32 a, uint8[] b, uint32 c, address d, uint128 e) external;
         function emitTestAnonEvent8(uint64 a, string b) external;
         function emitTestAnonEvent9(uint64 a, string b) external;
-        function emitTestAnonEvent10(uint32 a, address b, uint8[][] c) external;
+        function emitTestAnonEvent10(uint32 a, address b, uint32[][] c) external;
         function emitTestAnonEvent11(uint32 a, address b, uint32 c, uint16[] d, string e) external;
         function emitTestAnonEvent12(uint64 a, string[] b) external;
         function emitTestAnonEvent13(uint64 a, TestEnum[] b) external;
@@ -491,8 +491,6 @@ mod event {
         assert_eq!(result, 0, "Function returned non-zero exit code: {result}");
 
         let (topic, data) = runtime.log_events.lock().unwrap().recv().unwrap();
-        println!("Topic {topic}");
-        println!("Data {data:?}");
         assert_eq!(expected_topic, topic);
         assert_eq!(expected_data, data.as_slice());
     }

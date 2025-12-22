@@ -89,8 +89,6 @@ impl IStruct {
         compilation_ctx: &CompilationContext,
     ) -> Result<(), AbiError> {
         let struct_ptr = module.locals.add(ValType::I32);
-        let val_32 = module.locals.add(ValType::I32);
-        let val_64 = module.locals.add(ValType::I64);
         let field_ptr = module.locals.add(ValType::I32);
 
         // Moving pointer for reading data of the fields
@@ -104,30 +102,10 @@ impl IStruct {
             // Big-endian to Little-endian
             let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
 
-            // We are just assuming that the max value can fit in 32 bits, otherwise we cannot
-            // reference WASM memory. If the value is greater than 32 bits, the WASM program
-            // will panic.
-            for i in 0..7 {
-                builder.block(None, |inner_block| {
-                    let inner_block_id = inner_block.id();
-
-                    inner_block
-                        .local_get(reader_pointer)
-                        .load(
-                            compilation_ctx.memory_id,
-                            LoadKind::I32 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                // Abi encoded value is Big endian
-                                offset: i * 4,
-                            },
-                        )
-                        .i32_const(0)
-                        .binop(BinaryOp::I32Eq)
-                        .br_if(inner_block_id)
-                        .unreachable();
-                });
-            }
+            // Validate that the pointer fits in 32 bits
+            let validate_pointer_fn =
+                RuntimeFunction::ValidatePointer32Bit.get(module, Some(compilation_ctx))?;
+            builder.local_get(reader_pointer).call(validate_pointer_fn);
 
             builder
                 .local_get(reader_pointer)
@@ -178,19 +156,16 @@ impl IStruct {
                 | IntermediateType::IU16
                 | IntermediateType::IU32
                 | IntermediateType::IU64 => {
-                    let data_size = field.stack_data_size()?;
-                    let (val, store_kind) = if data_size == 8 {
-                        (val_64, StoreKind::I64 { atomic: false })
-                    } else {
-                        (val_32, StoreKind::I32 { atomic: false })
-                    };
+                    let data_size = field.wasm_memory_data_size()?;
+                    let val = module.locals.add(ValType::try_from(field)?);
+                    let store_kind = field.store_kind()?;
 
                     // Save the actual value
                     builder.local_set(val);
 
                     // Create a pointer for the value
                     builder
-                        .i32_const(data_size as i32)
+                        .i32_const(data_size)
                         .call(compilation_ctx.allocator)
                         .local_tee(field_ptr);
 

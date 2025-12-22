@@ -49,6 +49,13 @@ entry fun eq_address(x: address, y: address): bool {
     w == z
 }
 
+entry fun eq_vec_u8(x: vector<u8>, y: vector<u8>): bool {
+    let w = &x;
+    let z = &y;
+
+    w == z
+}
+
 entry fun eq_vec_stack_type(x: vector<u16>, y: vector<u16>): bool {
     let w = &x;
     let z = &y;

@@ -7,13 +7,14 @@ use super::pack_native_int::pack_i32_type_instructions;
 use crate::{
     CompilationContext, abi_types::error::AbiError,
     translation::intermediate_types::IntermediateType, vm_handled_types::string::String_,
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 
 impl String_ {
     pub fn add_pack_instructions(
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
-        local: LocalId,
+        string_pointer: LocalId,
         writer_pointer: LocalId,
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
@@ -28,7 +29,7 @@ impl String_ {
         //
         // So we need to perform a load first to get to the inner vector
         builder
-            .local_get(local)
+            .local_get(string_pointer)
             .load(
                 compilation_ctx.memory_id,
                 LoadKind::I32 { atomic: false },
@@ -37,12 +38,14 @@ impl String_ {
                     offset: 0,
                 },
             )
-            .local_set(local);
+            .local_set(string_pointer);
+
+        let vector_pointer = string_pointer;
 
         let len = IntermediateType::IU32.add_load_memory_to_local_instructions(
             module,
             builder,
-            local,
+            vector_pointer,
             compilation_ctx.memory_id,
         )?;
 
@@ -77,10 +80,8 @@ impl String_ {
 
         // Set the local to point to the first element
         builder
-            .local_get(local)
-            .i32_const(8)
-            .binop(BinaryOp::I32Add)
-            .local_set(local);
+            .skip_vec_header(vector_pointer)
+            .local_set(vector_pointer);
 
         /*
          *  Store the values at allocated memory at the end of calldata
@@ -95,7 +96,7 @@ impl String_ {
             data_pointer,
         )?;
 
-        // increment the data pointer
+        // Increment the data pointer
         builder
             .local_get(data_pointer)
             .i32_const(32)
@@ -122,7 +123,7 @@ impl String_ {
 
                 loop_block
                     .local_get(data_pointer)
-                    .local_get(local)
+                    .local_get(vector_pointer)
                     .load(
                         compilation_ctx.memory_id,
                         LoadKind::I32 { atomic: false },
@@ -140,21 +141,21 @@ impl String_ {
                         },
                     );
 
-                // increment the local to point to next first value
+                // Increment the vector pointer by 1 byte to point to the next u8 element
                 loop_block
-                    .local_get(local)
-                    .i32_const(4)
+                    .local_get(vector_pointer)
+                    .i32_const(1)
                     .binop(BinaryOp::I32Add)
-                    .local_set(local);
+                    .local_set(vector_pointer);
 
-                // increment data pointer
+                // Increment the data pointer by 1 byte to point to the next u8 element
                 loop_block
                     .local_get(data_pointer)
                     .i32_const(1)
                     .binop(BinaryOp::I32Add)
                     .local_set(data_pointer);
 
-                // increment i
+                // Increment i
                 loop_block
                     .local_get(i)
                     .i32_const(1)

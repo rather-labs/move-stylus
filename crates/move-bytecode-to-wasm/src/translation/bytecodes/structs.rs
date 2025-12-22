@@ -68,8 +68,6 @@ pub fn pack(
     // Pointer for simple types
     let ptr_to_data = module.locals.add(ValType::I32);
 
-    let val_32 = module.locals.add(ValType::I32);
-    let val_64 = module.locals.add(ValType::I64);
     let mut offset = struct_.heap_size;
 
     // If the struct is saved in storage (has key ability), the owner's id must be prepended to the
@@ -95,19 +93,16 @@ pub fn pack(
                     | IntermediateType::IU16
                     | IntermediateType::IU32
                     | IntermediateType::IU64 => {
-                        let data_size = pack_type.stack_data_size()?;
-                        let (val, store_kind) = if data_size == 8 {
-                            (val_64, StoreKind::I64 { atomic: false })
-                        } else {
-                            (val_32, StoreKind::I32 { atomic: false })
-                        };
+                        let data_size = pack_type.wasm_memory_data_size()?;
+                        let val = module.locals.add(ValType::try_from(pack_type)?);
+                        let store_kind = pack_type.store_kind()?;
 
                         // Save the actual value
                         builder.local_set(val);
 
                         // Create a pointer for the value
                         builder
-                            .i32_const(data_size as i32)
+                            .i32_const(data_size)
                             .call(compilation_ctx.allocator)
                             .local_tee(ptr_to_data);
 
@@ -245,11 +240,7 @@ pub fn unpack_fields(
                 // Load the actual value
                 builder.load(
                     compilation_ctx.memory_id,
-                    if field.stack_data_size()? == 8 {
-                        LoadKind::I64 { atomic: false }
-                    } else {
-                        LoadKind::I32 { atomic: false }
-                    },
+                    field.load_kind()?,
                     MemArg {
                         align: 0,
                         offset: 0,

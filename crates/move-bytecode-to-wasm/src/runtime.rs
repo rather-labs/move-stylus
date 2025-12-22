@@ -12,6 +12,7 @@ use crate::{
     },
 };
 
+mod abi;
 mod copy;
 mod enums;
 mod equality;
@@ -54,10 +55,8 @@ pub enum RuntimeFunction {
     VecEqualityHeapType,
     IsZero,
     // Vector
-    VecSwap32,
-    VecSwap64,
-    VecPopBack32,
-    VecPopBack64,
+    VecSwap,
+    VecPopBack,
     VecBorrow,
     VecIncrementLen,
     VecDecrementLen,
@@ -87,6 +86,8 @@ pub enum RuntimeFunction {
     ComputeEnumStorageTailPosition,
     // ASCII conversion
     U64ToAsciiBase10,
+    // ABI validation
+    ValidatePointer32Bit,
 }
 
 impl RuntimeFunction {
@@ -124,10 +125,8 @@ impl RuntimeFunction {
             Self::VecEqualityHeapType => "vec_equality_heap_type",
             Self::IsZero => "is_zero",
             // Vector
-            Self::VecSwap32 => "vec_swap_32",
-            Self::VecSwap64 => "vec_swap_64",
-            Self::VecPopBack32 => "vec_pop_back_32",
-            Self::VecPopBack64 => "vec_pop_back_64",
+            Self::VecSwap => "vec_swap",
+            Self::VecPopBack => "vec_pop_back",
             Self::VecBorrow => "vec_borrow",
             Self::VecIncrementLen => "vec_increment_len",
             Self::VecDecrementLen => "vec_decrement_len",
@@ -156,6 +155,8 @@ impl RuntimeFunction {
             // Enums
             Self::GetStorageSizeByOffset => "get_storage_size_by_offset",
             Self::ComputeEnumStorageTailPosition => "compute_enum_storage_tail_position",
+            // ABI validation
+            Self::ValidatePointer32Bit => "validate_pointer_32_bit",
         }
     }
 
@@ -239,10 +240,6 @@ impl RuntimeFunction {
                 }
                 (Self::IsZero, Some(ctx)) => equality::is_zero(module, ctx),
                 // Vector
-                (Self::VecSwap32, Some(ctx)) => vector::vec_swap_32_function(module, ctx)?,
-                (Self::VecSwap64, Some(ctx)) => vector::vec_swap_64_function(module, ctx)?,
-                (Self::VecPopBack32, Some(ctx)) => vector::vec_pop_back_32_function(module, ctx)?,
-                (Self::VecPopBack64, Some(ctx)) => vector::vec_pop_back_64_function(module, ctx)?,
                 (Self::VecBorrow, Some(ctx)) => vector::vec_borrow_function(module, ctx),
                 (Self::VecIncrementLen, Some(ctx)) => {
                     vector::increment_vec_len_function(module, ctx)
@@ -279,6 +276,10 @@ impl RuntimeFunction {
                 // ASCII conversion
                 (Self::U64ToAsciiBase10, Some(ctx)) => {
                     integers::ascii::u64_to_ascii_base_10(module, ctx)
+                }
+                // ABI validation
+                (Self::ValidatePointer32Bit, Some(ctx)) => {
+                    abi::validate_pointer_32_bit(module, ctx)
                 }
                 // Error
                 _ => return Err(RuntimeFunctionError::CouldNotLink(self.name().to_owned())),
@@ -335,6 +336,14 @@ impl RuntimeFunction {
             Self::ComputeEnumStorageTailPosition => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
                 enums::compute_enum_storage_tail_position(module, compilation_ctx, generics[0])?
+            }
+            Self::VecSwap => {
+                Self::assert_generics_length(generics.len(), 1, self.name())?;
+                vector::vec_swap_function(module, compilation_ctx, generics[0])?
+            }
+            Self::VecPopBack => {
+                Self::assert_generics_length(generics.len(), 1, self.name())?;
+                vector::vec_pop_back_function(module, compilation_ctx, generics[0])?
             }
             _ => {
                 return Err(RuntimeFunctionError::CouldNotLinkGeneric(

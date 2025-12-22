@@ -97,25 +97,14 @@ pub fn build_custom_error_message(
 
         // If the field is a stack type, load the value from memory
         if field.is_stack_type()? {
-            if field.stack_data_size()? == 8 {
-                builder.load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I64 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-            } else {
-                builder.load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-            }
+            builder.load(
+                compilation_ctx.memory_id,
+                field.load_kind()?,
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
         }
     }
 
