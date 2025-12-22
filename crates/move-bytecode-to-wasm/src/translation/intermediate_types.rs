@@ -1181,7 +1181,7 @@ impl IntermediateType {
                 } else {
                     Hash::hash(&module_id, &mut hasher);
                 }
-                struct_.identifier.hash(&mut hasher);
+                struct_.identifier.as_str().hash(&mut hasher);
             }
             IntermediateType::IGenericStructInstance {
                 module_id,
@@ -1209,7 +1209,7 @@ impl IntermediateType {
                 for t in types {
                     t.process_hash(&mut hasher, compilation_ctx)?;
                 }
-                struct_.identifier.hash(&mut hasher);
+                struct_.identifier.as_str().hash(&mut hasher);
             }
             _ => {
                 self.hash(&mut hasher);
