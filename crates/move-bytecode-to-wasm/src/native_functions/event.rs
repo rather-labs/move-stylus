@@ -549,7 +549,7 @@ fn add_encode_indexed_vector_instructions(
                 })();
             });
         }
-        IntermediateType::IVector(inner) => {
+        IntermediateType::IVector(nested_inner) => {
             let value = module.locals.add(ValType::I32);
             builder.i32_const(0).local_set(i);
 
@@ -561,7 +561,7 @@ fn add_encode_indexed_vector_instructions(
                         .local_get(vector_ptr)
                         .load(
                             compilation_ctx.memory_id,
-                            LoadKind::I32 { atomic: false },
+                            inner.load_kind()?,
                             MemArg {
                                 align: 0,
                                 offset: 0,
@@ -573,13 +573,13 @@ fn add_encode_indexed_vector_instructions(
                         module,
                         loop_,
                         compilation_ctx,
-                        inner,
+                        nested_inner,
                         value,
                     )?;
 
                     loop_
                         .local_get(vector_ptr)
-                        .i32_const(inner.stack_data_size()? as i32)
+                        .i32_const(inner.wasm_memory_data_size()?)
                         .binop(BinaryOp::I32Add)
                         .local_set(vector_ptr);
 

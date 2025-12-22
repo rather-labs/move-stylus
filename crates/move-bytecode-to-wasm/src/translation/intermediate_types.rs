@@ -115,33 +115,6 @@ pub enum IntermediateType {
 
 impl IntermediateType {
     /// Returns the size in bytes, that this type needs in memory to be stored
-    pub fn stack_data_size(&self) -> Result<u32, IntermediateTypeError> {
-        let size = match self {
-            IntermediateType::IU64 => 8,
-            IntermediateType::IBool
-            | IntermediateType::IU8
-            | IntermediateType::IU16
-            | IntermediateType::IU32
-            | IntermediateType::IU128
-            | IntermediateType::IU256
-            | IntermediateType::IAddress
-            | IntermediateType::ISigner
-            | IntermediateType::IVector(_)
-            | IntermediateType::IRef(_)
-            | IntermediateType::IMutRef(_)
-            | IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IEnum { .. }
-            | IntermediateType::IGenericEnumInstance { .. } => 4,
-            IntermediateType::ITypeParameter(_) => {
-                return Err(IntermediateTypeError::FoundTypeParameter);
-            }
-        };
-
-        Ok(size)
-    }
-
-    /// Returns the size in bytes, that this type needs in memory to be stored
     pub fn wasm_memory_data_size(&self) -> Result<i32, IntermediateTypeError> {
         let size = match self {
             IntermediateType::IBool | IntermediateType::IU8 => 1,
