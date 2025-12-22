@@ -12,6 +12,7 @@ use crate::{
     },
 };
 
+mod abi;
 mod copy;
 mod enums;
 mod equality;
@@ -85,6 +86,8 @@ pub enum RuntimeFunction {
     ComputeEnumStorageTailPosition,
     // ASCII conversion
     U64ToAsciiBase10,
+    // ABI validation
+    ValidatePointer32Bit,
 }
 
 impl RuntimeFunction {
@@ -152,6 +155,8 @@ impl RuntimeFunction {
             // Enums
             Self::GetStorageSizeByOffset => "get_storage_size_by_offset",
             Self::ComputeEnumStorageTailPosition => "compute_enum_storage_tail_position",
+            // ABI validation
+            Self::ValidatePointer32Bit => "validate_pointer_32_bit",
         }
     }
 
@@ -271,6 +276,10 @@ impl RuntimeFunction {
                 // ASCII conversion
                 (Self::U64ToAsciiBase10, Some(ctx)) => {
                     integers::ascii::u64_to_ascii_base_10(module, ctx)
+                }
+                // ABI validation
+                (Self::ValidatePointer32Bit, Some(ctx)) => {
+                    abi::validate_pointer_32_bit(module, ctx)
                 }
                 // Error
                 _ => return Err(RuntimeFunctionError::CouldNotLink(self.name().to_owned())),

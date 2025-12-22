@@ -26,99 +26,69 @@ impl IVector {
         let mut inner_result: Result<(), AbiError> = Ok(());
         // Big-endian to Little-endian
         let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
+        // Validate that the pointer fits in 32 bits
+        let validate_pointer_fn =
+            RuntimeFunction::ValidatePointer32Bit.get(module, Some(compilation_ctx))?;
 
         let data_reader_pointer = module.locals.add(ValType::I32);
 
         // The ABI encoded value of a dynamic type is a reference to the location of the
         // values in the call data.
-        // We are just assuming that the max value can fit in 32 bits, otherwise we cannot reference WASM memory
-        // If the value is greater than 32 bits, the WASM program will panic
-        for i in 0..7 {
-            block.block(None, |inner_block| {
-                let inner_block_id = inner_block.id();
 
-                inner_block.local_get(reader_pointer);
-                inner_block.load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        // Abi encoded value is Big endian
-                        offset: i * 4,
-                    },
-                );
-                inner_block.i32_const(0);
-                inner_block.binop(BinaryOp::I32Eq);
-                inner_block.br_if(inner_block_id);
-                inner_block.unreachable();
-            });
-        }
-        block.local_get(reader_pointer);
-        block.load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                // Abi encoded value is Big endian
-                offset: 28,
-            },
-        );
-        block.call(swap_i32_bytes_function);
-        block.local_get(calldata_reader_pointer);
-        block.binop(BinaryOp::I32Add);
-        block.local_set(data_reader_pointer); // This references the vector actual data
+        // Validate that the pointer fits in 32 bits
+        block.local_get(reader_pointer).call(validate_pointer_fn);
+
+        // Load the pointer to the data, swap it to little-endian and add that to the calldata reader pointer.
+        block
+            .local_get(reader_pointer)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    // Abi encoded value is Big endian
+                    offset: 28,
+                },
+            )
+            .call(swap_i32_bytes_function)
+            .local_get(calldata_reader_pointer)
+            .binop(BinaryOp::I32Add)
+            .local_set(data_reader_pointer); // This references the vector actual data
 
         // The reader will only be incremented until the next argument
-        block.local_get(reader_pointer);
-        block.i32_const(32); // The size of the argument we just read
-        block.binop(BinaryOp::I32Add);
-        block.local_set(reader_pointer);
+        block
+            .local_get(reader_pointer)
+            .i32_const(32)
+            .binop(BinaryOp::I32Add)
+            .local_set(reader_pointer);
 
-        // First 256 bits of the vector are the length
-        // We are handling the length as u32 so the first 28 bytes are not needed
-        // We need to ensure that they are zero to avoid runtime errors
-        for i in 0..7 {
-            block.block(None, |inner_block| {
-                let inner_block_id = inner_block.id();
-
-                inner_block.local_get(data_reader_pointer);
-                inner_block.load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        // Abi encoded value is Big endian
-                        offset: i * 4,
-                    },
-                );
-                inner_block.i32_const(0);
-                inner_block.binop(BinaryOp::I32Eq);
-                inner_block.br_if(inner_block_id);
-                inner_block.unreachable();
-            });
-        }
+        // Validate that the data reader pointer fits in 32 bits
+        block
+            .local_get(data_reader_pointer)
+            .call(validate_pointer_fn);
 
         // Vector length: current number of elements in the vector
         let length = module.locals.add(ValType::I32);
 
-        block.local_get(data_reader_pointer);
-        block.load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                // Abi encoded value is Big endian
-                offset: 28,
-            },
-        );
-        block.call(swap_i32_bytes_function);
-        block.local_set(length);
+        block
+            .local_get(data_reader_pointer)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 28,
+                },
+            )
+            .call(swap_i32_bytes_function)
+            .local_set(length);
 
-        // increment data reader pointer
-        block.local_get(data_reader_pointer);
-        block.i32_const(32); // The size of the length in the ABI
-        block.binop(BinaryOp::I32Add);
-        block.local_set(data_reader_pointer);
+        // Increment data reader pointer
+        block
+            .local_get(data_reader_pointer)
+            .i32_const(32)
+            .binop(BinaryOp::I32Add)
+            .local_set(data_reader_pointer);
 
         let vector_pointer = module.locals.add(ValType::I32);
         let writer_pointer = module.locals.add(ValType::I32);
