@@ -104,30 +104,10 @@ impl IStruct {
             // Big-endian to Little-endian
             let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
 
-            // We are just assuming that the max value can fit in 32 bits, otherwise we cannot
-            // reference WASM memory. If the value is greater than 32 bits, the WASM program
-            // will panic.
-            for i in 0..7 {
-                builder.block(None, |inner_block| {
-                    let inner_block_id = inner_block.id();
-
-                    inner_block
-                        .local_get(reader_pointer)
-                        .load(
-                            compilation_ctx.memory_id,
-                            LoadKind::I32 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                // Abi encoded value is Big endian
-                                offset: i * 4,
-                            },
-                        )
-                        .i32_const(0)
-                        .binop(BinaryOp::I32Eq)
-                        .br_if(inner_block_id)
-                        .unreachable();
-                });
-            }
+            // Validate that the pointer fits in 32 bits
+            let validate_pointer_fn =
+                RuntimeFunction::ValidatePointer32Bit.get(module, Some(compilation_ctx))?;
+            builder.local_get(reader_pointer).call(validate_pointer_fn);
 
             builder
                 .local_get(reader_pointer)
