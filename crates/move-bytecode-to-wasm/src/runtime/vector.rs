@@ -570,6 +570,43 @@ pub fn bytes_to_vec_function(
     let bytes_ptr = module.locals.add(ValType::I32);
     let n = module.locals.add(ValType::I32);
 
+    // If `n` is zero, this function is being called for a dynamic bytes value (Solidity `bytes`/`Bytes` in Move),
+    // whose runtime encoding is a pointer to a struct in memory that contains:
+    //   offset 0: length (u32/i32)
+    //   offset 4: pointer to u8 buffer (the data)
+    // In this case, we need to load the actual length and data pointer from memory before continuing.
+    // If `n` is nonzero, then this is a fixed-size byte array (e.g., `bytes4`, `bytes32`), and `bytes_ptr`
+    // already points directly to the start of the buffer, with `n` providing the correct number of bytes.
+    builder.local_get(n).unop(UnaryOp::I32Eqz).if_else(
+        None,
+        |then| {
+            // Load the dynamic bytes length from memory
+            then.local_get(bytes_ptr)
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
+                .local_set(n);
+
+            // Load the actual bytes_ptr from memory, which points to the start of the dynamic bytes data
+            then.local_get(bytes_ptr)
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 4,
+                    },
+                )
+                .local_set(bytes_ptr);
+        },
+        |_| {},
+    );
+
     let vector_ptr = module.locals.add(ValType::I32);
     // Allocate vector of u8 elements
     IVector::allocate_vector_with_header(&mut builder, compilation_ctx, vector_ptr, n, n, 1);

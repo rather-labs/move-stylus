@@ -1,5 +1,5 @@
 module 0x01::bytes;
-use stylus::sol_types::{Bytes1, Bytes2, Bytes4, Bytes8, Bytes16, Bytes32};
+use stylus::sol_types::{Bytes, Bytes1, Bytes2, Bytes4, Bytes8, Bytes16, Bytes32};
 
 entry fun test_bytes4_as_vec(b: &Bytes4): vector<u8> {
     b.as_vec()
@@ -31,4 +31,8 @@ entry fun test_mixed_bytes_as_vec(a: &Bytes4, b: &Bytes4, c: &Bytes8, d: &Bytes1
     vector::append(&mut vec, c.as_vec());
    
     vec == d.as_vec()
+}
+
+entry fun test_dynamic_bytes(data: Bytes): vector<u8> {
+    data.as_vec()
 }

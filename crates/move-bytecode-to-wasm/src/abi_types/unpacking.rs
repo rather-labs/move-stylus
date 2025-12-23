@@ -205,7 +205,14 @@ impl Unpackable for IntermediateType {
             IntermediateType::IStruct {
                 module_id, index, ..
             } if Bytes::is_vm_type(module_id, *index, compilation_ctx)? => {
-                Bytes::add_unpack_instructions(function_builder, reader_pointer)?;
+                Bytes::add_unpack_instructions(
+                    function_builder,
+                    module,
+                    reader_pointer,
+                    calldata_reader_pointer,
+                    self,
+                    compilation_ctx,
+                )?;
             }
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
                 let struct_ = compilation_ctx.get_struct_by_intermediate_type(self)?;
@@ -230,7 +237,6 @@ impl Unpackable for IntermediateType {
                 } else {
                     // TODO: Check if the struct is TxContext. If it is, panic since the only valid
                     // TxContext is the one defined in the stylus framework.
-
                     struct_.add_unpack_instructions(
                         function_builder,
                         module,

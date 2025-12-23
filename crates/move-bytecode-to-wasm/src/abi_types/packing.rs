@@ -21,6 +21,7 @@ use crate::{
 use super::error::{AbiEncodingError, AbiError};
 
 pub mod error;
+mod pack_bytes;
 mod pack_enum;
 mod pack_heap_int;
 mod pack_native_int;
@@ -153,7 +154,7 @@ pub fn build_pack_instructions<T: Packable>(
     builder.local_set(writer_pointer);
 
     for (local, signature_token) in locals.iter().zip(function_return_signature.iter()) {
-        // Copy the reference just to be safe in case in internal function modifies it
+        // Copy the reference just to be safe in case an internal function modifies it
         builder
             .local_get(pointer)
             .local_set(calldata_reference_pointer);

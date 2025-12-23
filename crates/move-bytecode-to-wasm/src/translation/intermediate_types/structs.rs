@@ -53,7 +53,7 @@ use crate::{
     },
     compilation_context::ModuleData,
     generics::replace_type_parameters,
-    vm_handled_types::{VmHandledType, string::String_},
+    vm_handled_types::{VmHandledType, bytes::Bytes, string::String_},
 };
 
 use super::{
@@ -253,6 +253,9 @@ impl IStruct {
                 IntermediateType::IStruct {
                     module_id, index, ..
                 } if String_::is_vm_type(module_id, *index, compilation_ctx)? => return Ok(true),
+                IntermediateType::IStruct { .. } if Bytes::is_dynamic(field, compilation_ctx)? => {
+                    return Ok(true);
+                }
                 IntermediateType::IStruct { .. }
                 | IntermediateType::IGenericStructInstance { .. } => {
                     let child_struct = compilation_ctx.get_struct_by_intermediate_type(field)?;
