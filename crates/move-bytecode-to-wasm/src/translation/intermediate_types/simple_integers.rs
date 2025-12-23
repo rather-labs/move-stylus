@@ -21,9 +21,11 @@ impl IU8 {
 
     pub fn load_constant_instructions(
         builder: &mut InstrSeqBuilder,
-        bytes: &[u8],
+        bytes: &mut std::slice::Iter<'_, u8>,
     ) -> Result<(), IntermediateTypeError> {
-        builder.load_i32_from_bytes(bytes)?;
+        let bytes: [u8; 1] = std::array::from_fn(|_| bytes.next().copied().unwrap_or(0));
+        builder.load_i32_from_bytes(&bytes)?;
+
         Ok(())
     }
 
@@ -162,9 +164,11 @@ impl IU16 {
 
     pub fn load_constant_instructions(
         builder: &mut InstrSeqBuilder,
-        bytes: &[u8],
+        bytes: &mut std::slice::Iter<'_, u8>,
     ) -> Result<(), IntermediateTypeError> {
-        builder.load_i32_from_bytes(bytes)?;
+        let bytes: [u8; 2] = std::array::from_fn(|_| bytes.next().copied().unwrap_or(0));
+        builder.load_i32_from_bytes(&bytes)?;
+
         Ok(())
     }
 
@@ -306,9 +310,11 @@ impl IU32 {
 
     pub fn load_constant_instructions(
         builder: &mut InstrSeqBuilder,
-        bytes: &[u8],
+        bytes: &mut std::slice::Iter<'_, u8>,
     ) -> Result<(), IntermediateTypeError> {
-        builder.load_i32_from_bytes(bytes)?;
+        let bytes: [u8; 4] = std::array::from_fn(|_| bytes.next().copied().unwrap_or(0));
+        builder.load_i32_from_bytes(&bytes)?;
+
         Ok(())
     }
 
@@ -426,9 +432,11 @@ pub struct IU64;
 impl IU64 {
     pub fn load_constant_instructions(
         builder: &mut InstrSeqBuilder,
-        bytes: &[u8],
+        bytes: &mut std::slice::Iter<'_, u8>,
     ) -> Result<(), IntermediateTypeError> {
-        builder.load_i64_from_bytes(bytes)?;
+        let bytes: [u8; 8] = std::array::from_fn(|_| bytes.next().copied().unwrap_or(0));
+        builder.load_i64_from_bytes(&bytes)?;
+
         Ok(())
     }
 

@@ -85,7 +85,7 @@ impl IVector {
         inner: &IntermediateType,
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
-        bytes: &[u8],
+        bytes: &mut std::slice::Iter<'_, u8>,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
         let ptr_local = module.locals.add(ValType::I32);
@@ -93,7 +93,7 @@ impl IVector {
 
         // First byte is the length of the vector
         let len = bytes
-            .first()
+            .next()
             .ok_or(IntermediateTypeError::EmptyBytesInVector)?;
         builder.i32_const(*len as i32).local_set(len_local);
 
@@ -940,7 +940,7 @@ mod tests {
             &inner_type,
             &mut raw_module,
             &mut builder,
-            data,
+            &mut data.iter(),
             &compilation_ctx,
         )
         .unwrap();
@@ -976,7 +976,7 @@ mod tests {
             &inner_type,
             &mut raw_module,
             &mut builder,
-            data,
+            &mut data.iter(),
             &compilation_ctx,
         )
         .unwrap();
@@ -1027,7 +1027,7 @@ mod tests {
                 .load_constant_instructions(
                     &mut raw_module,
                     &mut builder,
-                    element_bytes,
+                    &mut element_bytes.iter(),
                     &compilation_ctx,
                 )
                 .unwrap();
@@ -1077,12 +1077,11 @@ mod tests {
         let ptr = raw_module.locals.add(ValType::I32);
         builder.i32_const(4).call(allocator).local_tee(ptr);
 
-        let data = data.to_vec();
         IVector::load_constant_instructions(
             &inner_type,
             &mut raw_module,
             &mut builder,
-            &data,
+            &mut data.iter(),
             &compilation_ctx,
         )
         .unwrap();
@@ -1150,7 +1149,7 @@ mod tests {
             &inner_type,
             &mut raw_module,
             &mut builder,
-            vector_data,
+            &mut vector_data.iter(),
             &compilation_ctx,
         )
         .unwrap();
@@ -1176,7 +1175,7 @@ mod tests {
             .load_constant_instructions(
                 &mut raw_module,
                 &mut builder,
-                element_data,
+                &mut element_data.iter(),
                 &compilation_ctx,
             )
             .unwrap();
@@ -1267,7 +1266,7 @@ mod tests {
             &inner_type,
             &mut raw_module,
             &mut builder,
-            data,
+            &mut data.iter(),
             &compilation_ctx,
         )
         .unwrap();

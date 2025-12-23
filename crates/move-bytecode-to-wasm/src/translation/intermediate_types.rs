@@ -281,7 +281,7 @@ impl IntermediateType {
         &self,
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
-        bytes: &[u8],
+        bytes: &mut std::slice::Iter<'_, u8>,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
         match self {

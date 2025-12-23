@@ -530,14 +530,15 @@ fn translate_instruction(
         Bytecode::LdConst(global_index) => {
             let constant = &module_data.constants[global_index.into_index()];
 
-            constant.type_.load_constant_instructions(
-                module,
-                builder,
-                constant.data,
-                compilation_ctx,
-            )?;
+            let data = &mut constant.data.iter();
+            constant
+                .type_
+                .load_constant_instructions(module, builder, data, compilation_ctx)?;
 
             types_stack.push(constant.type_.clone());
+            if data.next().is_some() {
+                return Err(TranslationError::ConstantDataNotConsumed);
+            }
         }
         // Load literals
         Bytecode::LdFalse => {
