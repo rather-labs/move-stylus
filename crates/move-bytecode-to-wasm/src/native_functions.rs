@@ -19,6 +19,7 @@ mod unit_test;
 use std::hash::Hasher;
 
 use error::NativeFunctionError;
+use move_symbol_pool::Symbol;
 use walrus::{FunctionId, Module};
 
 use crate::{
@@ -376,8 +377,10 @@ impl NativeFunction {
 
             let function_information = module_data.functions.get_information_by_identifier(name)?;
 
-            if let Some(special_attributes) =
-                module_data.special_attributes.external_calls.get(name)
+            if let Some(special_attributes) = module_data
+                .special_attributes
+                .external_calls
+                .get(&Symbol::from(name))
             {
                 contract_calls::add_external_contract_call_fn(
                     module,

@@ -27,6 +27,7 @@ use move_compiler::shared::files::MappedFiles;
 use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
 use move_package::compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource};
 use move_parse_special_attributes::SpecialAttributeError;
+use move_symbol_pool::Symbol;
 
 pub struct Abi {
     pub file: PathBuf,
@@ -105,20 +106,20 @@ const STYLUS_FRAMEWORK_ADDRESS: AccountAddress = AccountAddress::new([
 #[derive(Debug)]
 pub(crate) struct FunctionCall {
     module_id: ModuleId,
-    identifier: String,
+    identifier: Symbol,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub(crate) struct EventStruct {
     module_id: ModuleId,
-    identifier: String,
+    identifier: Symbol,
     type_parameters: Option<Vec<IntermediateType>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub(crate) struct ErrorStruct {
     module_id: ModuleId,
-    identifier: String,
+    identifier: Symbol,
 }
 
 /// This functions recursively searches for `emit` and `revert` calls to put in the ABI which
@@ -147,10 +148,12 @@ fn process_events_and_errors(
                         let function_handle = module.function_handle_at(instantiation.handle);
                         let module_id = module
                             .module_id_for_handle(module.module_handle_at(function_handle.module));
-                        let identifier = module.identifier_at(function_handle.name).to_string();
+                        let identifier =
+                            Symbol::from(module.identifier_at(function_handle.name).as_str());
 
                         if module_id.address() == &STYLUS_FRAMEWORK_ADDRESS {
-                            if module_id.name().as_str() == "event" && identifier == "emit" {
+                            if module_id.name().as_str() == "event" && identifier.as_str() == "emit"
+                            {
                                 let signature = module.signature_at(instantiation.type_parameters);
                                 match &signature.0[0] {
                                     SignatureToken::Datatype(datatype_handle_index) => {
@@ -160,9 +163,9 @@ fn process_events_and_errors(
                                             module_id: module.module_id_for_handle(
                                                 module.module_handle_at(struct_handle.module),
                                             ),
-                                            identifier: module
-                                                .identifier_at(struct_handle.name)
-                                                .to_string(),
+                                            identifier: Symbol::from(
+                                                module.identifier_at(struct_handle.name).as_str(),
+                                            ),
                                             type_parameters: None,
                                         });
                                     }
@@ -189,8 +192,9 @@ fn process_events_and_errors(
                                             .unwrap();
 
                                         // The identifier is the same accross instantiations because events can be overloaded in the ABI
-                                        let event_identifier =
-                                            module.identifier_at(struct_handle.name).to_string();
+                                        let event_identifier = Symbol::from(
+                                            module.identifier_at(struct_handle.name).as_str(),
+                                        );
 
                                         top_level_events.insert(EventStruct {
                                             module_id: event_module_id,
@@ -203,7 +207,8 @@ fn process_events_and_errors(
                                         signature.0[0]
                                     ),
                                 }
-                            } else if module_id.name().as_str() == "error" && identifier == "revert"
+                            } else if module_id.name().as_str() == "error"
+                                && identifier.as_str() == "revert"
                             {
                                 let signature = module.signature_at(instantiation.type_parameters);
                                 match signature.0[0] {
@@ -214,9 +219,9 @@ fn process_events_and_errors(
                                             module_id: module.module_id_for_handle(
                                                 module.module_handle_at(struct_handle.module),
                                             ),
-                                            identifier: module
-                                                .identifier_at(struct_handle.name)
-                                                .to_string(),
+                                            identifier: Symbol::from(
+                                                module.identifier_at(struct_handle.name).as_str(),
+                                            ),
                                         });
                                     }
                                     _ => panic!("invalid type found in revert function"),
@@ -233,7 +238,8 @@ fn process_events_and_errors(
                         let function_handle = module.function_handle_at(*idx);
                         let module_id = module
                             .module_id_for_handle(module.module_handle_at(function_handle.module));
-                        let identifier = module.identifier_at(function_handle.name).to_string();
+                        let identifier =
+                            Symbol::from(module.identifier_at(function_handle.name).as_str());
                         top_level_functions.push(FunctionCall {
                             module_id,
                             identifier,

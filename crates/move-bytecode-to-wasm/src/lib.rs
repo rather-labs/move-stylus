@@ -32,6 +32,7 @@ use move_package::{
     source_package::parsed_manifest::PackageName,
 };
 use move_parse_special_attributes::process_special_attributes;
+use move_symbol_pool::Symbol;
 use std::{collections::HashMap, path::PathBuf};
 use translation::{
     TranslationError,
@@ -66,11 +67,11 @@ pub fn translate_package(
 ) -> Result<HashMap<String, Module>, CompilationError> {
     // HashMap of package name to address
     // This includes all the dependencies of the root package
-    let address_alias_instantiation: HashMap<String, [u8; 32]> = package
+    let address_alias_instantiation: HashMap<Symbol, [u8; 32]> = package
         .compiled_package_info
         .address_alias_instantiation
         .iter()
-        .map(|(key, value)| (key.as_str().to_string(), value.into_bytes()))
+        .map(|(key, value)| (*key, value.into_bytes()))
         .collect();
 
     let root_compiled_units: Vec<&CompiledUnitWithSource> = if let Some(module_name) = module_name {
@@ -250,11 +251,11 @@ pub fn package_module_data<'move_package>(
     verbose: bool,
 ) -> Result<PackageModuleData<'move_package>, CompilationError> {
     // HashMap of package name to address
-    let address_alias_instantiation: HashMap<String, [u8; 32]> = package
+    let address_alias_instantiation: HashMap<Symbol, [u8; 32]> = package
         .compiled_package_info
         .address_alias_instantiation
         .iter()
-        .map(|(key, value)| (key.as_str().to_string(), value.into_bytes()))
+        .map(|(key, value)| (*key, value.into_bytes()))
         .collect();
 
     let mut modules_data = HashMap::new();
@@ -344,7 +345,7 @@ pub fn process_dependency_tree<'move_package>(
     root_compiled_units: &'move_package [&CompiledUnitWithSource],
     dependencies: &[move_core_types::language_storage::ModuleId],
     function_definitions: &mut GlobalFunctionTable<'move_package>,
-    address_alias_instantiation: &HashMap<String, [u8; 32]>,
+    address_alias_instantiation: &HashMap<Symbol, [u8; 32]>,
     verbose: bool,
 ) -> Result<(), DependencyProcessingError> {
     let mut errors = Vec::new();
@@ -459,7 +460,7 @@ fn build_dependency_structs_map(
         deps_structs.insert(
             move_parse_special_attributes::ModuleId {
                 address: <[u8; 32]>::try_from(md.id.address.as_slice()).unwrap(),
-                module_name: md.id.module_name.to_string(),
+                module_name: md.id.module_name,
             },
             md.special_attributes.structs.clone(),
         );

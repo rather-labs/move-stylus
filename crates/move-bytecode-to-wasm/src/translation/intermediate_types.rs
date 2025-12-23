@@ -1045,7 +1045,7 @@ impl IntermediateType {
                 if let Some(external_struct) = module_data
                     .special_attributes
                     .external_struct
-                    .get(struct_.identifier.as_str())
+                    .get(&struct_.identifier)
                 {
                     let foreign_module_id = ModuleId::new(
                         Address::from_bytes(external_struct.address),
@@ -1069,7 +1069,7 @@ impl IntermediateType {
                 if let Some(external_struct) = module_data
                     .special_attributes
                     .external_struct
-                    .get(struct_.identifier.as_str())
+                    .get(&struct_.identifier)
                 {
                     let foreign_module_id = ModuleId {
                         address: Address::from_bytes(external_struct.address),

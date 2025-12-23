@@ -155,7 +155,7 @@ pub fn process_events(contract_abi: &mut String, abi: &Abi) {
     let mut event_indices: Vec<usize> = (0..abi.events.len()).collect();
     event_indices.sort_by_key(|&i| {
         let event = &abi.events[i];
-        (event.identifier.clone(), format_signature(event))
+        (event.identifier, format_signature(event))
     });
 
     for &i in &event_indices {

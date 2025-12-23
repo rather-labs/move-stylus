@@ -216,7 +216,7 @@ impl Abi {
                                 } else {
                                     {
                                         function_parameters.push(NamedType {
-                                            identifier: param.name.clone(),
+                                            identifier: param.name,
                                             type_: Type::from_intermediate_type(
                                                 itype,
                                                 modules_data,
@@ -255,7 +255,7 @@ impl Abi {
                         } else {
                             {
                                 function_parameters.push(NamedType {
-                                    identifier: param.name.clone(),
+                                    identifier: param.name,
                                     type_: Type::from_intermediate_type(itype, modules_data),
                                 });
                                 if Self::should_process_struct(itype, modules_data) {
@@ -271,7 +271,7 @@ impl Abi {
                             panic!("found not simple enum in function signature");
                         } else {
                             function_parameters.push(NamedType {
-                                identifier: param.name.clone(),
+                                identifier: param.name,
                                 type_: Type::from_intermediate_type(itype, modules_data),
                             });
                         }
@@ -292,14 +292,14 @@ impl Abi {
                             panic!("found not simple enum in function signature");
                         } else {
                             function_parameters.push(NamedType {
-                                identifier: param.name.clone(),
+                                identifier: param.name,
                                 type_: Type::from_intermediate_type(itype, modules_data),
                             });
                         }
                     }
                     _ => {
                         function_parameters.push(NamedType {
-                            identifier: param.name.clone(),
+                            identifier: param.name,
                             type_: Type::from_intermediate_type(itype, modules_data),
                         });
                     }
@@ -339,9 +339,9 @@ impl Abi {
 
             // Function name
             let function_name = if function_type == FunctionType::Constructor {
-                "constructor".to_string()
+                Symbol::from("constructor")
             } else {
-                snake_to_camel(&function.function_id.identifier)
+                Symbol::from(snake_to_camel(&function.function_id.identifier))
             };
 
             result.push(Function {
@@ -385,13 +385,13 @@ impl Abi {
                 ) {
                     ("UID", STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => {
                         function_parameters.push(NamedType {
-                            identifier: param.name.clone(),
+                            identifier: param.name,
                             type_: Type::Bytes32,
                         });
                     }
                     _ => {
                         function_parameters.push(NamedType {
-                            identifier: param.name.clone(),
+                            identifier: param.name,
                             type_: Type::from_intermediate_type(struct_itype, modules_data),
                         });
                         if Self::should_process_struct(struct_itype, modules_data) {
@@ -421,7 +421,7 @@ impl Abi {
                     ("NamedId", STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => {}
                     _ => {
                         function_parameters.push(NamedType {
-                            identifier: param.name.clone(),
+                            identifier: param.name,
                             type_: Type::from_intermediate_type(struct_itype, modules_data),
                         });
                         if Self::should_process_struct(struct_itype, modules_data) {
@@ -485,7 +485,7 @@ impl Abi {
                         child_structs_to_process.insert(field_itype.clone());
                     }
                     NamedType {
-                        identifier: name.clone(),
+                        identifier: *name,
                         type_: Type::from_intermediate_type(field_itype, modules_data),
                     }
                 })
@@ -540,7 +540,7 @@ impl Abi {
             let event_special_attributes = event_module
                 .special_attributes
                 .events
-                .get(event_struct.identifier.as_str())
+                .get(&event_struct.identifier)
                 .unwrap();
 
             let event_struct_parsed = event_module
@@ -558,7 +558,7 @@ impl Abi {
             }
 
             result.push(Event {
-                identifier: event.identifier.clone(),
+                identifier: event.identifier,
                 fields: event_struct
                     .fields
                     .iter()
@@ -566,7 +566,7 @@ impl Abi {
                     .enumerate()
                     .map(|(index, (f, (identifier, _)))| EventField {
                         named_type: NamedType {
-                            identifier: identifier.clone(),
+                            identifier: *identifier,
                             type_: Type::from_intermediate_type(f, modules_data),
                         },
                         indexed: index < event_special_attributes.indexes as usize,
@@ -617,13 +617,13 @@ impl Abi {
                 });
 
             result.push(Struct_ {
-                identifier: error_struct.identifier.to_string(),
+                identifier: error_struct.identifier,
                 fields: error_struct
                     .fields
                     .iter()
                     .zip(&error_struct_parsed.fields)
                     .map(|(f, (identifier, _))| NamedType {
-                        identifier: identifier.clone(),
+                        identifier: *identifier,
                         type_: Type::from_intermediate_type(f, modules_data),
                     })
                     .collect(),

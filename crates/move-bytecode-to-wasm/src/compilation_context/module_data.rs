@@ -457,12 +457,18 @@ impl ModuleData<'_> {
 
             let type_ = if Self::is_one_time_witness(module, struct_def.struct_handle) {
                 IStructType::OneTimeWitness
-            } else if let Some(event) = module_special_attributes.events.get(identifier) {
+            } else if let Some(event) = module_special_attributes
+                .events
+                .get(&Symbol::from(identifier))
+            {
                 IStructType::Event {
                     indexes: event.indexes,
                     is_anonymous: event.is_anonymous,
                 }
-            } else if let Some(_abi_error) = module_special_attributes.abi_errors.get(identifier) {
+            } else if let Some(_abi_error) = module_special_attributes
+                .abi_errors
+                .get(&Symbol::from(identifier))
+            {
                 IStructType::AbiError
             } else {
                 IStructType::Common
@@ -835,8 +841,12 @@ impl ModuleData<'_> {
                 let function_sa = special_attributes
                     .functions
                     .iter()
-                    .find(|f| f.name == function_name)
-                    .or_else(|| special_attributes.external_calls.get(function_name))
+                    .find(|f| *f.name == *function_name)
+                    .or_else(|| {
+                        special_attributes
+                            .external_calls
+                            .get(&Symbol::from(function_name))
+                    })
                     .ok_or(ModuleDataError::FunctionByIdentifierNotFound(
                         function_name.to_string(),
                     ))?;
@@ -932,7 +942,7 @@ impl ModuleData<'_> {
     pub fn is_external_call(&self, function_identifier: &str) -> bool {
         self.special_attributes
             .external_calls
-            .contains_key(function_identifier)
+            .contains_key(&Symbol::from(function_identifier))
     }
 
     // The init() function is a special function that is called once when the module is first deployed,
