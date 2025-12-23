@@ -20,6 +20,7 @@ pub mod error;
 mod integers;
 mod storage;
 mod swap;
+mod unpacking;
 mod vector;
 
 #[derive(PartialEq)]
@@ -88,6 +89,8 @@ pub enum RuntimeFunction {
     U64ToAsciiBase10,
     // ABI validation
     ValidatePointer32Bit,
+    // ABI unpacking
+    UnpackVector,
 }
 
 impl RuntimeFunction {
@@ -157,6 +160,8 @@ impl RuntimeFunction {
             Self::ComputeEnumStorageTailPosition => "compute_enum_storage_tail_position",
             // ABI validation
             Self::ValidatePointer32Bit => "validate_pointer_32_bit",
+            // ABI unpacking
+            Self::UnpackVector => "unpack_vector",
         }
     }
 
@@ -344,6 +349,10 @@ impl RuntimeFunction {
             Self::VecPopBack => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
                 vector::vec_pop_back_function(module, compilation_ctx, generics[0])?
+            }
+            Self::UnpackVector => {
+                Self::assert_generics_length(generics.len(), 1, self.name())?;
+                unpacking::add_unpack_vector_fn(module, compilation_ctx, generics[0])?
             }
             _ => {
                 return Err(RuntimeFunctionError::CouldNotLinkGeneric(

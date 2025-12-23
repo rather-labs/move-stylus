@@ -1,5 +1,8 @@
 use error::AbiUnpackError;
-use walrus::{InstrSeqBuilder, LocalId, Module, ValType};
+use walrus::{
+    InstrSeqBuilder, LocalId, Module, ValType,
+    ir::{LoadKind, MemArg},
+};
 
 use crate::{
     CompilationContext,
@@ -19,7 +22,6 @@ use crate::{
         reference::{IMutRef, IRef},
         simple_integers::{IU8, IU16, IU32, IU64},
         structs::IStruct,
-        vector::IVector,
     },
     vm_handled_types::{
         VmHandledType, bytes::Bytes, fallback::Calldata, named_id::NamedId, string::String_,
@@ -37,7 +39,6 @@ mod unpack_native_int;
 mod unpack_reference;
 mod unpack_string;
 mod unpack_struct;
-mod unpack_vector;
 
 pub trait Unpackable {
     /// Adds the instructions to unpack the abi encoded type to WASM function parameters
@@ -158,14 +159,38 @@ impl Unpackable for IntermediateType {
                 calldata_reader_pointer,
                 compilation_ctx,
             )?,
-            IntermediateType::IVector(inner) => IVector::add_unpack_instructions(
-                inner,
-                function_builder,
-                module,
-                reader_pointer,
-                calldata_reader_pointer,
-                compilation_ctx,
-            )?,
+            IntermediateType::IVector(inner) => {
+                let unpack_vector_fn =
+                    RuntimeFunction::UnpackVector.get_generic(module, compilation_ctx, &[inner])?;
+
+                // Push arguments: reader_pointer and calldata_reader_pointer
+                function_builder
+                    .local_get(reader_pointer)
+                    .local_get(calldata_reader_pointer)
+                    .call(unpack_vector_fn);
+
+                let return_pointer = module.locals.add(ValType::I32);
+                function_builder
+                    .local_tee(return_pointer)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(reader_pointer);
+
+                function_builder.local_get(return_pointer).load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 4,
+                    },
+                );
+            }
             // The signer must not be unpacked here, since it can't be part of the calldata. It is
             // injected directly by the VM into the stack
             IntermediateType::ISigner => (),

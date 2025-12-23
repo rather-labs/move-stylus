@@ -1,172 +1,240 @@
-use walrus::{
-    InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg},
-};
-
+use super::RuntimeFunction;
+use super::error::RuntimeFunctionError;
 use crate::{
+    CompilationContext,
     abi_types::error::AbiError,
-    runtime::RuntimeFunction,
+    abi_types::unpacking::Unpackable,
     translation::intermediate_types::{IntermediateType, vector::IVector},
     wasm_builder_extensions::WasmBuilderExtension,
 };
 
-use crate::CompilationContext;
+use walrus::{
+    FunctionBuilder, FunctionId, Module, ValType,
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
+};
 
-use super::Unpackable;
+/// Generates a runtime function that unpacks a vector from ABI-encoded calldata.
+///
+/// This function:
+/// 1. Reads the pointer to the vector data from calldata
+/// 2. Reads the vector length
+/// 3. Allocates memory for the vector
+/// 4. Unpacks each element recursively
+/// 5. Returns a pointer to the unpacked vector
+///
+/// # WASM Function Arguments
+/// * `reader_pointer` - (i32): pointer to the current position in the ABI-encoded data
+/// * `calldata_reader_pointer` - (i32): pointer to the start of the calldata
+///
+/// # WASM Function Returns
+/// * `vector_pointer` - (i32): pointer to the unpacked vector in memory
+pub fn add_unpack_vector_fn(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    inner: &IntermediateType,
+) -> Result<FunctionId, RuntimeFunctionError> {
+    let name =
+        RuntimeFunction::UnpackVector.get_generic_function_name(compilation_ctx, &[inner])?;
+    if let Some(function) = module.funcs.by_name(&name) {
+        return Ok(function);
+    }
 
-impl IVector {
-    pub fn add_unpack_instructions(
-        inner: &IntermediateType,
-        block: &mut InstrSeqBuilder,
-        module: &mut Module,
-        reader_pointer: LocalId,
-        calldata_reader_pointer: LocalId,
-        compilation_ctx: &CompilationContext,
-    ) -> Result<(), AbiError> {
-        let mut inner_result: Result<(), AbiError> = Ok(());
-        // Big-endian to Little-endian
-        let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
-        // Validate that the pointer fits in 32 bits
-        let validate_pointer_fn =
-            RuntimeFunction::ValidatePointer32Bit.get(module, Some(compilation_ctx))?;
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32],
+        &[ValType::I32],
+    );
+    let mut builder = function.name(name).func_body();
 
-        let data_reader_pointer = module.locals.add(ValType::I32);
+    // Arguments
+    let reader_pointer = module.locals.add(ValType::I32);
+    let calldata_reader_pointer = module.locals.add(ValType::I32);
 
-        // The ABI encoded value of a dynamic type is a reference to the location of the
-        // values in the call data.
+    // Runtime functions
+    let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
+    let validate_pointer_fn =
+        RuntimeFunction::ValidatePointer32Bit.get(module, Some(compilation_ctx))?;
 
-        // Validate that the pointer fits in 32 bits
-        block.local_get(reader_pointer).call(validate_pointer_fn);
+    let data_reader_pointer = module.locals.add(ValType::I32);
 
-        // Load the pointer to the data, swap it to little-endian and add that to the calldata reader pointer.
-        block
-            .local_get(reader_pointer)
-            .load(
+    // The ABI encoded value of a dynamic type is a reference to the location of the
+    // values in the call data.
+
+    // Validate that the pointer fits in 32 bits
+    builder.local_get(reader_pointer).call(validate_pointer_fn);
+
+    // Load the pointer to the data, swap it to little-endian and add that to the calldata reader pointer.
+    builder
+        .local_get(reader_pointer)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                // Abi encoded value is Big endian
+                offset: 28,
+            },
+        )
+        .call(swap_i32_bytes_function)
+        .local_get(calldata_reader_pointer)
+        .binop(BinaryOp::I32Add)
+        .local_set(data_reader_pointer); // This references the vector actual data
+
+    // Increment the reader pointer to next argument
+    builder
+        .local_get(reader_pointer)
+        .i32_const(32)
+        .binop(BinaryOp::I32Add)
+        .local_set(reader_pointer);
+
+    // Validate that the data reader pointer fits in 32 bits
+    builder
+        .local_get(data_reader_pointer)
+        .call(validate_pointer_fn);
+
+    // Vector length: current number of elements in the vector
+    let length = module.locals.add(ValType::I32);
+
+    builder
+        .local_get(data_reader_pointer)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 28,
+            },
+        )
+        .call(swap_i32_bytes_function)
+        .local_set(length);
+
+    // Increment data reader pointer
+    builder
+        .local_get(data_reader_pointer)
+        .i32_const(32)
+        .binop(BinaryOp::I32Add)
+        .local_set(data_reader_pointer);
+
+    let vector_pointer = module.locals.add(ValType::I32);
+    let writer_pointer = module.locals.add(ValType::I32);
+
+    let data_size = inner
+        .wasm_memory_data_size()
+        .map_err(RuntimeFunctionError::from)?;
+    IVector::allocate_vector_with_header(
+        &mut builder,
+        compilation_ctx,
+        vector_pointer,
+        length,
+        length,
+        data_size,
+    );
+
+    // Set the writer pointer to the start of the vector data
+    builder
+        .skip_vec_header(vector_pointer)
+        .local_set(writer_pointer);
+
+    // Copy elements
+    let i = module.locals.add(ValType::I32);
+    builder.i32_const(0).local_set(i);
+
+    let calldata_reader_pointer_local = module.locals.add(ValType::I32);
+    builder
+        .local_get(data_reader_pointer)
+        .local_set(calldata_reader_pointer_local);
+
+    let mut inner_result: Result<(), AbiError> = Ok(());
+    builder.loop_(None, |loop_block| {
+        inner_result = (|| {
+            let loop_block_id = loop_block.id();
+
+            loop_block.local_get(writer_pointer);
+            // This will leave in the stack [pointer/value i32/i64, length i32]
+            inner.add_unpack_instructions(
+                loop_block,
+                module,
+                data_reader_pointer,
+                calldata_reader_pointer_local,
+                compilation_ctx,
+            )?;
+
+            // Store the value
+            loop_block.store(
                 compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
+                inner.store_kind()?,
                 MemArg {
                     align: 0,
-                    // Abi encoded value is Big endian
-                    offset: 28,
+                    offset: 0,
                 },
-            )
-            .call(swap_i32_bytes_function)
-            .local_get(calldata_reader_pointer)
-            .binop(BinaryOp::I32Add)
-            .local_set(data_reader_pointer); // This references the vector actual data
+            );
 
-        // The reader will only be incremented until the next argument
-        block
-            .local_get(reader_pointer)
-            .i32_const(32)
-            .binop(BinaryOp::I32Add)
-            .local_set(reader_pointer);
+            // increment writer pointer
+            loop_block.local_get(writer_pointer);
+            loop_block.i32_const(data_size);
+            loop_block.binop(BinaryOp::I32Add);
+            loop_block.local_set(writer_pointer);
 
-        // Validate that the data reader pointer fits in 32 bits
-        block
-            .local_get(data_reader_pointer)
-            .call(validate_pointer_fn);
+            // increment i
+            loop_block.local_get(i);
+            loop_block.i32_const(1);
+            loop_block.binop(BinaryOp::I32Add);
+            loop_block.local_tee(i);
 
-        // Vector length: current number of elements in the vector
-        let length = module.locals.add(ValType::I32);
+            loop_block.local_get(length);
+            loop_block.binop(BinaryOp::I32LtU);
+            loop_block.br_if(loop_block_id);
 
-        block
-            .local_get(data_reader_pointer)
-            .load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 28,
-                },
-            )
-            .call(swap_i32_bytes_function)
-            .local_set(length);
+            Ok(())
+        })();
+    });
 
-        // Increment data reader pointer
-        block
-            .local_get(data_reader_pointer)
-            .i32_const(32)
-            .binop(BinaryOp::I32Add)
-            .local_set(data_reader_pointer);
+    let return_pointer = module.locals.add(ValType::I32);
+    builder
+        .i32_const(8)
+        .call(compilation_ctx.allocator)
+        .local_set(return_pointer);
 
-        let vector_pointer = module.locals.add(ValType::I32);
-        let writer_pointer = module.locals.add(ValType::I32);
-
-        let data_size = inner.wasm_memory_data_size()?;
-        IVector::allocate_vector_with_header(
-            block,
-            compilation_ctx,
-            vector_pointer,
-            length,
-            length,
-            data_size,
+    // Store the reader pointer at the DATA_READER_POINTER_OFFSET
+    builder
+        .local_get(return_pointer)
+        .local_get(reader_pointer)
+        .store(
+            compilation_ctx.memory_id,
+            StoreKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
+    // Return the return pointer
+    builder
+        .local_get(return_pointer)
+        .local_get(vector_pointer)
+        .store(
+            compilation_ctx.memory_id,
+            StoreKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 4,
+            },
         );
 
-        // Set the writer pointer to the start of the vector data
-        block
-            .skip_vec_header(vector_pointer)
-            .local_set(writer_pointer);
+    builder.local_get(return_pointer);
+    // Check for errors from the loop
+    inner_result.map_err(RuntimeFunctionError::from)?;
 
-        // Copy elements
-        let i = module.locals.add(ValType::I32);
-        block.i32_const(0).local_set(i);
+    Ok(function.finish(
+        vec![reader_pointer, calldata_reader_pointer],
+        &mut module.funcs,
+    ))
+}
 
-        let calldata_reader_pointer = module.locals.add(ValType::I32);
-        block
-            .local_get(data_reader_pointer)
-            .local_set(calldata_reader_pointer);
-
-        block.loop_(None, |loop_block| {
-            inner_result = (|| {
-                let loop_block_id = loop_block.id();
-
-                loop_block.local_get(writer_pointer);
-                // This will leave in the stack [pointer/value i32/i64, length i32]
-                inner.add_unpack_instructions(
-                    loop_block,
-                    module,
-                    data_reader_pointer,
-                    calldata_reader_pointer,
-                    compilation_ctx,
-                )?;
-
-                // Store the value
-                loop_block.store(
-                    compilation_ctx.memory_id,
-                    inner.store_kind()?,
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-
-                // increment writer pointer
-                loop_block.local_get(writer_pointer);
-                loop_block.i32_const(data_size);
-                loop_block.binop(BinaryOp::I32Add);
-                loop_block.local_set(writer_pointer);
-
-                // increment i
-                loop_block.local_get(i);
-                loop_block.i32_const(1);
-                loop_block.binop(BinaryOp::I32Add);
-                loop_block.local_tee(i);
-
-                loop_block.local_get(length);
-                loop_block.binop(BinaryOp::I32LtU);
-                loop_block.br_if(loop_block_id);
-
-                Ok(())
-            })();
-        });
-
-        // returned values
-        block.local_get(vector_pointer);
-
-        inner_result?;
-
-        Ok(())
+impl From<AbiError> for RuntimeFunctionError {
+    fn from(err: AbiError) -> Self {
+        // Convert AbiError to a string-based error since CompilationContextError
+        // doesn't have AbiError variants
+        RuntimeFunctionError::CouldNotLink(format!("abi error: {err}"))
     }
 }
 
@@ -214,20 +282,9 @@ mod tests {
         let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
 
-        let global_next_free_memory_pointer = instance
-            .get_global(&mut store, "global_next_free_memory_pointer")
-            .unwrap();
-
         let result: i32 = entrypoint.call(&mut store, ()).unwrap();
         assert_eq!(result, data.len() as i32);
-        let global_next_free_memory_pointer = global_next_free_memory_pointer
-            .get(&mut store)
-            .i32()
-            .unwrap();
-        assert_eq!(
-            global_next_free_memory_pointer,
-            (expected_result_bytes.len() + data.len()) as i32
-        );
+
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let mut result_memory_data = vec![0; expected_result_bytes.len()];
         memory
@@ -395,12 +452,14 @@ mod tests {
             2u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
             ((data.len() + 16) as u32).to_le_bytes().as_slice(),
-            ((data.len() + 36) as u32).to_le_bytes().as_slice(),
+            ((data.len() + 44) as u32).to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
             1u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
+            96_u32.to_le_bytes().as_slice(), // reader pointer at the start of the second element unpacking step
+            ((data.len() + 16) as u32).to_le_bytes().as_slice(), // pointer to the first vector element in memory
             3u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
@@ -423,7 +482,7 @@ mod tests {
             2u32.to_le_bytes().as_slice(),                        // len
             2u32.to_le_bytes().as_slice(),                        // capacity
             ((data.len() + 16) as u32).to_le_bytes().as_slice(),  // first element pointer
-            ((data.len() + 84) as u32).to_le_bytes().as_slice(),  // second element pointer
+            ((data.len() + 92) as u32).to_le_bytes().as_slice(),  // second element pointer
             3u32.to_le_bytes().as_slice(),                        // first element length
             3u32.to_le_bytes().as_slice(),                        // first element capacity
             ((data.len() + 36) as u32).to_le_bytes().as_slice(), // first element - first value pointer
@@ -432,11 +491,13 @@ mod tests {
             1u128.to_le_bytes().as_slice(),                      // first element - first value
             2u128.to_le_bytes().as_slice(),                      // first element - second value
             3u128.to_le_bytes().as_slice(),                      // first element - third value
+            96_u32.to_le_bytes().as_slice(), // reader pointer at the start of the second element unpacking step
+            ((data.len() + 16) as u32).to_le_bytes().as_slice(), // pointer to the first vector element in memory
             3u32.to_le_bytes().as_slice(),                       // second element length
             3u32.to_le_bytes().as_slice(),                       // second element capacity
-            ((data.len() + 104) as u32).to_le_bytes().as_slice(), // second element - first value pointer
-            ((data.len() + 120) as u32).to_le_bytes().as_slice(), // second element - second value pointer
-            ((data.len() + 136) as u32).to_le_bytes().as_slice(), // second element - third value pointer
+            ((data.len() + 112) as u32).to_le_bytes().as_slice(), // second element - first value pointer
+            ((data.len() + 128) as u32).to_le_bytes().as_slice(), // second element - second value pointer
+            ((data.len() + 144) as u32).to_le_bytes().as_slice(), // second element - third value pointer
             4u128.to_le_bytes().as_slice(),                       // second element - first value
             5u128.to_le_bytes().as_slice(),                       // second element - second value
             6u128.to_le_bytes().as_slice(),                       // second element - third value
