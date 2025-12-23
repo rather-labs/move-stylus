@@ -47,7 +47,7 @@ pub trait Unpackable {
     /// and the pointer is pushed onto the stack in the parameter location.
     ///
     /// The reader pointer should be updated internally when a value is read from the args
-    /// The calldata reader pointer should never be updated, it is considered static for each type value
+    /// The calldata base pointer should never be updated, it is considered static for each type value
     ///
     /// The stack at the end contains the value(or pointer to the value) as **i32/i64**
     fn add_unpack_instructions(
@@ -55,7 +55,7 @@ pub trait Unpackable {
         function_builder: &mut InstrSeqBuilder,
         module: &mut Module,
         reader_pointer: LocalId,
-        calldata_reader_pointer: LocalId,
+        calldata_base_pointer: LocalId,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), AbiError>;
 }
@@ -72,11 +72,12 @@ pub fn build_unpack_instructions<T: Unpackable>(
     compilation_ctx: &CompilationContext,
 ) -> Result<(), AbiError> {
     let reader_pointer = module.locals.add(ValType::I32);
-    let calldata_reader_pointer = module.locals.add(ValType::I32);
+    let calldata_base_pointer = module.locals.add(ValType::I32);
 
-    function_builder.local_get(args_pointer);
-    function_builder.local_tee(reader_pointer);
-    function_builder.local_set(calldata_reader_pointer);
+    function_builder
+        .local_get(args_pointer)
+        .local_tee(reader_pointer)
+        .local_set(calldata_base_pointer);
 
     // The ABI encoded params are always a tuple
     // Static types are stored in-place, but dynamic types are referenced to the call data
@@ -85,7 +86,7 @@ pub fn build_unpack_instructions<T: Unpackable>(
             function_builder,
             module,
             reader_pointer,
-            calldata_reader_pointer,
+            calldata_base_pointer,
             compilation_ctx,
         )?;
     }
@@ -99,77 +100,78 @@ impl Unpackable for IntermediateType {
         function_builder: &mut InstrSeqBuilder,
         module: &mut Module,
         reader_pointer: LocalId,
-        calldata_reader_pointer: LocalId,
+        calldata_base_pointer: LocalId,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), AbiError> {
+        let return_pointer = module.locals.add(ValType::I32);
+
         match self {
             IntermediateType::IBool => IBool::add_unpack_instructions(
                 function_builder,
                 module,
                 reader_pointer,
-                calldata_reader_pointer,
+                calldata_base_pointer,
                 compilation_ctx,
             )?,
             IntermediateType::IU8 => IU8::add_unpack_instructions(
                 function_builder,
                 module,
                 reader_pointer,
-                calldata_reader_pointer,
+                calldata_base_pointer,
                 compilation_ctx,
             )?,
             IntermediateType::IU16 => IU16::add_unpack_instructions(
                 function_builder,
                 module,
                 reader_pointer,
-                calldata_reader_pointer,
+                calldata_base_pointer,
                 compilation_ctx,
             )?,
             IntermediateType::IU32 => IU32::add_unpack_instructions(
                 function_builder,
                 module,
                 reader_pointer,
-                calldata_reader_pointer,
+                calldata_base_pointer,
                 compilation_ctx,
             )?,
             IntermediateType::IU64 => IU64::add_unpack_instructions(
                 function_builder,
                 module,
                 reader_pointer,
-                calldata_reader_pointer,
+                calldata_base_pointer,
                 compilation_ctx,
             )?,
             IntermediateType::IU128 => IU128::add_unpack_instructions(
                 function_builder,
                 module,
                 reader_pointer,
-                calldata_reader_pointer,
+                calldata_base_pointer,
                 compilation_ctx,
             )?,
             IntermediateType::IU256 => IU256::add_unpack_instructions(
                 function_builder,
                 module,
                 reader_pointer,
-                calldata_reader_pointer,
+                calldata_base_pointer,
                 compilation_ctx,
             )?,
             IntermediateType::IAddress => IAddress::add_unpack_instructions(
                 function_builder,
                 module,
                 reader_pointer,
-                calldata_reader_pointer,
+                calldata_base_pointer,
                 compilation_ctx,
             )?,
             IntermediateType::IVector(inner) => {
                 let unpack_vector_fn =
                     RuntimeFunction::UnpackVector.get_generic(module, compilation_ctx, &[inner])?;
 
-                // Push arguments: reader_pointer and calldata_reader_pointer
+                // Push arguments: reader_pointer and calldata_base_pointer
                 function_builder
                     .local_get(reader_pointer)
-                    .local_get(calldata_reader_pointer)
+                    .local_get(calldata_base_pointer)
                     .call(unpack_vector_fn);
 
-                let return_pointer = module.locals.add(ValType::I32);
                 function_builder
                     .local_tee(return_pointer)
                     .load(
@@ -199,7 +201,7 @@ impl Unpackable for IntermediateType {
                 function_builder,
                 module,
                 reader_pointer,
-                calldata_reader_pointer,
+                calldata_base_pointer,
                 compilation_ctx,
             )?,
             IntermediateType::IMutRef(inner) => IMutRef::add_unpack_instructions(
@@ -207,7 +209,7 @@ impl Unpackable for IntermediateType {
                 function_builder,
                 module,
                 reader_pointer,
-                calldata_reader_pointer,
+                calldata_base_pointer,
                 compilation_ctx,
             )?,
 
@@ -223,7 +225,7 @@ impl Unpackable for IntermediateType {
                     function_builder,
                     module,
                     reader_pointer,
-                    calldata_reader_pointer,
+                    calldata_base_pointer,
                     compilation_ctx,
                 )?;
             }
@@ -245,7 +247,7 @@ impl Unpackable for IntermediateType {
                         function_builder,
                         module,
                         reader_pointer,
-                        calldata_reader_pointer,
+                        calldata_base_pointer,
                         compilation_ctx,
                         &struct_,
                     )?;
@@ -265,7 +267,7 @@ impl Unpackable for IntermediateType {
                         function_builder,
                         module,
                         reader_pointer,
-                        calldata_reader_pointer,
+                        calldata_base_pointer,
                         compilation_ctx,
                     )?;
                 }
@@ -302,7 +304,7 @@ fn load_struct_storage_id(
     function_builder: &mut InstrSeqBuilder,
     module: &mut Module,
     reader_pointer: LocalId,
-    calldata_reader_pointer: LocalId,
+    calldata_base_pointer: LocalId,
     compilation_ctx: &CompilationContext,
     struct_: &IStruct,
 ) -> Result<(), AbiError> {
@@ -316,7 +318,7 @@ fn load_struct_storage_id(
                 function_builder,
                 module,
                 reader_pointer,
-                calldata_reader_pointer,
+                calldata_base_pointer,
                 compilation_ctx,
             )?;
         }

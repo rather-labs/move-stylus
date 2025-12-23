@@ -226,10 +226,6 @@ mod tests {
         let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
 
-        let global_next_free_memory_pointer = instance
-            .get_global(&mut store, "global_next_free_memory_pointer")
-            .unwrap();
-
         let result_ptr: i32 = entrypoint.call(&mut store, ()).unwrap();
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let mut result_memory_data = vec![0; expected_memory_bytes.len()];

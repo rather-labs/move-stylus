@@ -91,6 +91,8 @@ pub enum RuntimeFunction {
     ValidatePointer32Bit,
     // ABI unpacking
     UnpackVector,
+    UnpackI32,
+    UnpackI64,
 }
 
 impl RuntimeFunction {
@@ -162,6 +164,8 @@ impl RuntimeFunction {
             Self::ValidatePointer32Bit => "validate_pointer_32_bit",
             // ABI unpacking
             Self::UnpackVector => "unpack_vector",
+            Self::UnpackI32 => "unpack_i32",
+            Self::UnpackI64 => "unpack_i64",
         }
     }
 
@@ -286,6 +290,9 @@ impl RuntimeFunction {
                 (Self::ValidatePointer32Bit, Some(ctx)) => {
                     abi::validate_pointer_32_bit(module, ctx)
                 }
+                // ABI unpacking
+                (Self::UnpackI32, Some(ctx)) => unpacking::unpack_i32_function(module, ctx)?,
+                (Self::UnpackI64, Some(ctx)) => unpacking::unpack_i64_function(module, ctx)?,
                 // Error
                 _ => return Err(RuntimeFunctionError::CouldNotLink(self.name().to_owned())),
             };
@@ -352,7 +359,7 @@ impl RuntimeFunction {
             }
             Self::UnpackVector => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
-                unpacking::add_unpack_vector_fn(module, compilation_ctx, generics[0])?
+                unpacking::unpack_vector_function(module, compilation_ctx, generics[0])?
             }
             _ => {
                 return Err(RuntimeFunctionError::CouldNotLinkGeneric(

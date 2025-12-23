@@ -24,11 +24,11 @@ use walrus::{
 ///
 /// # WASM Function Arguments
 /// * `reader_pointer` - (i32): pointer to the current position in the ABI-encoded data
-/// * `calldata_reader_pointer` - (i32): pointer to the start of the calldata
+/// * `calldata_base_pointer` - (i32): pointer to the start of the calldata
 ///
 /// # WASM Function Returns
 /// * `vector_pointer` - (i32): pointer to the unpacked vector in memory
-pub fn add_unpack_vector_fn(
+pub fn unpack_vector_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     inner: &IntermediateType,
@@ -48,7 +48,7 @@ pub fn add_unpack_vector_fn(
 
     // Arguments
     let reader_pointer = module.locals.add(ValType::I32);
-    let calldata_reader_pointer = module.locals.add(ValType::I32);
+    let calldata_base_pointer = module.locals.add(ValType::I32);
 
     // Runtime functions
     let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
@@ -76,7 +76,7 @@ pub fn add_unpack_vector_fn(
             },
         )
         .call(swap_i32_bytes_function)
-        .local_get(calldata_reader_pointer)
+        .local_get(calldata_base_pointer)
         .binop(BinaryOp::I32Add)
         .local_set(data_reader_pointer); // This references the vector actual data
 
@@ -139,10 +139,10 @@ pub fn add_unpack_vector_fn(
     let i = module.locals.add(ValType::I32);
     builder.i32_const(0).local_set(i);
 
-    let calldata_reader_pointer_local = module.locals.add(ValType::I32);
+    let calldata_base_pointer_ = module.locals.add(ValType::I32);
     builder
         .local_get(data_reader_pointer)
-        .local_set(calldata_reader_pointer_local);
+        .local_set(calldata_base_pointer_);
 
     let mut inner_result: Result<(), AbiError> = Ok(());
     builder.loop_(None, |loop_block| {
@@ -155,7 +155,7 @@ pub fn add_unpack_vector_fn(
                 loop_block,
                 module,
                 data_reader_pointer,
-                calldata_reader_pointer_local,
+                calldata_base_pointer_,
                 compilation_ctx,
             )?;
 
@@ -195,7 +195,6 @@ pub fn add_unpack_vector_fn(
         .call(compilation_ctx.allocator)
         .local_set(return_pointer);
 
-    // Store the reader pointer at the DATA_READER_POINTER_OFFSET
     builder
         .local_get(return_pointer)
         .local_get(reader_pointer)
@@ -207,7 +206,7 @@ pub fn add_unpack_vector_fn(
                 offset: 0,
             },
         );
-    // Return the return pointer
+
     builder
         .local_get(return_pointer)
         .local_get(vector_pointer)
@@ -221,13 +220,96 @@ pub fn add_unpack_vector_fn(
         );
 
     builder.local_get(return_pointer);
+
     // Check for errors from the loop
     inner_result.map_err(RuntimeFunctionError::from)?;
 
     Ok(function.finish(
-        vec![reader_pointer, calldata_reader_pointer],
+        vec![reader_pointer, calldata_base_pointer],
         &mut module.funcs,
     ))
+}
+
+pub fn unpack_i32_function(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) -> Result<FunctionId, RuntimeFunctionError> {
+    // Big-endian to Little-endian
+    let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
+
+    let mut function_builder = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32],
+        &[ValType::I32],
+    );
+    let mut function_body = function_builder.func_body();
+
+    let reader_pointer = module.locals.add(ValType::I32);
+    let encoded_size = module.locals.add(ValType::I32);
+
+    // Load the value
+    function_body
+        .local_get(reader_pointer)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 28,
+            },
+        )
+        .call(swap_i32_bytes_function);
+
+    // Increment reader pointer
+    function_body
+        .local_get(reader_pointer)
+        .local_get(encoded_size)
+        .binop(BinaryOp::I32Add)
+        .local_set(reader_pointer);
+
+    function_builder.name(RuntimeFunction::UnpackI32.name().to_owned());
+    Ok(function_builder.finish(vec![reader_pointer, encoded_size], &mut module.funcs))
+}
+
+pub fn unpack_i64_function(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) -> Result<FunctionId, RuntimeFunctionError> {
+    // Big-endian to Little-endian
+    let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None)?;
+
+    let mut function_builder = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32],
+        &[ValType::I32],
+    );
+    let mut function_body = function_builder.func_body();
+
+    let reader_pointer = module.locals.add(ValType::I32);
+    let encoded_size = module.locals.add(ValType::I32);
+
+    // Load the value
+    function_body
+        .local_get(reader_pointer)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I64 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 24,
+            },
+        )
+        .call(swap_i64_bytes_function);
+
+    // Increment reader pointer
+    function_body
+        .local_get(reader_pointer)
+        .local_get(encoded_size)
+        .binop(BinaryOp::I32Add)
+        .local_set(reader_pointer);
+
+    function_builder.name(RuntimeFunction::UnpackI64.name().to_owned());
+    Ok(function_builder.finish(vec![reader_pointer, encoded_size], &mut module.funcs))
 }
 
 impl From<AbiError> for RuntimeFunctionError {
