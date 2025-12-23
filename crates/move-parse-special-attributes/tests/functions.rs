@@ -3,6 +3,7 @@ use std::{fs, path::PathBuf};
 use move_parse_special_attributes::{
     FunctionValidationError, ModuleId, error::SpecialAttributeErrorKind, process_special_attributes,
 };
+use move_symbol_pool::Symbol;
 
 #[test]
 pub fn test_function_validation() {
@@ -13,21 +14,21 @@ pub fn test_function_validation() {
 
     let address_alias_instantiation = std::collections::HashMap::from([
         (
-            "std".to_string(),
+            Symbol::from("std"),
             [
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 1,
             ],
         ),
         (
-            "stylus".to_string(),
+            Symbol::from("stylus"),
             [
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 2,
             ],
         ),
         (
-            "test".to_string(),
+            Symbol::from("test"),
             [
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0,
@@ -53,7 +54,7 @@ pub fn test_function_validation() {
     deps_structs.insert(
         ModuleId {
             address: package_address,
-            module_name: external_special_attributes.module_name.clone(),
+            module_name: external_special_attributes.module_name,
         },
         external_special_attributes.structs,
     );
@@ -73,7 +74,7 @@ pub fn test_function_validation() {
     deps_structs.insert(
         ModuleId {
             address: package_address,
-            module_name: external_special_attributes.module_name.clone(),
+            module_name: external_special_attributes.module_name,
         },
         external_special_attributes.structs,
     );

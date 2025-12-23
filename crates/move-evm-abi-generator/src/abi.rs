@@ -8,6 +8,7 @@ use move_bytecode_to_wasm::compilation_context::{
     },
 };
 use move_parse_special_attributes::function_modifiers::{FunctionModifier, Parameter};
+use move_symbol_pool::Symbol;
 
 use crate::{
     ErrorStruct, EventStruct,
@@ -36,7 +37,7 @@ pub enum Visibility {
 #[derive(Debug)]
 pub struct Function {
     pub(crate) function_type: FunctionType,
-    pub(crate) identifier: String,
+    pub(crate) identifier: Symbol,
     pub(crate) parameters: Vec<NamedType>,
     pub(crate) return_types: Type,
     pub(crate) visibility: Visibility,
@@ -46,14 +47,14 @@ pub struct Function {
 
 #[derive(Debug)]
 pub struct Struct_ {
-    pub(crate) identifier: String,
+    pub(crate) identifier: Symbol,
     pub(crate) fields: Vec<NamedType>,
     pub(crate) positional_fields: bool,
 }
 
 #[derive(Debug)]
 pub struct Event {
-    pub(crate) identifier: String,
+    pub(crate) identifier: Symbol,
     pub(crate) fields: Vec<EventField>,
     pub(crate) is_anonymous: bool,
     pub(crate) positional_fields: bool,
@@ -62,7 +63,7 @@ pub struct Event {
 /// A unified struct representing a typed field used in functions, structs, and events.
 #[derive(Debug)]
 pub struct NamedType {
-    pub(crate) identifier: String,
+    pub(crate) identifier: Symbol,
     pub(crate) type_: Type,
 }
 
@@ -74,7 +75,7 @@ pub struct EventField {
 
 #[derive(Debug)]
 pub struct Abi {
-    pub(crate) contract_name: String,
+    pub(crate) contract_name: Symbol,
     pub(crate) functions: Vec<Function>,
     pub(crate) structs: Vec<Struct_>,
     pub(crate) events: Vec<Event>,
@@ -109,7 +110,7 @@ impl Abi {
             Self::process_structs(structs_to_process, modules_data, &mut processed_structs);
 
         Abi {
-            contract_name: processing_module.special_attributes.module_name.clone(),
+            contract_name: processing_module.special_attributes.module_name,
             functions,
             structs,
             events,

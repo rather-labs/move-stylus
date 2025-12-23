@@ -2,6 +2,7 @@ use move_compiler::{
     diagnostics::codes::{DiagnosticInfo, Severity, custom},
     parser::ast::{Function, FunctionBody_},
 };
+use move_symbol_pool::Symbol;
 
 use crate::{
     AbiError, Event, Struct_,
@@ -50,7 +51,7 @@ impl From<&FunctionValidationError> for DiagnosticInfo {
 }
 
 /// Checks if a type is an Event by comparing its name with known events
-fn is_event_type(type_: &Type, events: &HashMap<String, Event>) -> bool {
+fn is_event_type(type_: &Type, events: &HashMap<Symbol, Event>) -> bool {
     match type_ {
         Type::UserDataType(name, _) => events.contains_key(name),
         _ => false,
@@ -58,7 +59,7 @@ fn is_event_type(type_: &Type, events: &HashMap<String, Event>) -> bool {
 }
 
 /// Checks if a type is an AbiError by comparing its name with known abi_errors
-fn is_abi_error_type(type_: &Type, abi_errors: &HashMap<String, AbiError>) -> bool {
+fn is_abi_error_type(type_: &Type, abi_errors: &HashMap<Symbol, AbiError>) -> bool {
     match type_ {
         Type::UserDataType(name, _) => abi_errors.contains_key(name),
         _ => false,
@@ -68,7 +69,7 @@ fn is_abi_error_type(type_: &Type, abi_errors: &HashMap<String, AbiError>) -> bo
 /// Validates that a function with Event type parameter is a native emit function
 fn validate_emit_function(
     function: &Function,
-    events: &HashMap<String, Event>,
+    events: &HashMap<Symbol, Event>,
 ) -> Result<(), SpecialAttributeError> {
     let err = SpecialAttributeError {
         kind: SpecialAttributeErrorKind::FunctionValidation(
@@ -117,7 +118,7 @@ fn validate_emit_function(
 /// Validates that a function with an Error type parameter is a native revert function
 fn validate_revert_function(
     function: &Function,
-    abi_errors: &HashMap<String, AbiError>,
+    abi_errors: &HashMap<Symbol, AbiError>,
 ) -> Result<(), SpecialAttributeError> {
     let err = SpecialAttributeError {
         kind: SpecialAttributeErrorKind::FunctionValidation(
@@ -164,9 +165,9 @@ fn validate_revert_function(
 }
 
 /// Extracts all struct names from a type (recursively handles vectors, tuples, etc.)
-fn extract_struct_names(type_: &Type) -> Vec<String> {
+fn extract_struct_names(type_: &Type) -> Vec<Symbol> {
     match type_ {
-        Type::UserDataType(name, _) => vec![name.clone()],
+        Type::UserDataType(name, _) => vec![*name],
         Type::Vector(inner) => extract_struct_names(inner),
         Type::Tuple(types) => types.iter().flat_map(extract_struct_names).collect(),
         _ => Vec::new(),
@@ -182,11 +183,11 @@ fn extract_struct_names(type_: &Type) -> Vec<String> {
 /// - Functions cannot take a UID as arguments, unless it is a function from the Stylus Framework package.
 pub fn validate_function(
     function: &Function,
-    events: &HashMap<String, Event>,
-    abi_errors: &HashMap<String, AbiError>,
+    events: &HashMap<Symbol, Event>,
+    abi_errors: &HashMap<Symbol, AbiError>,
     structs: &[Struct_],
     deps_structs: &HashMap<ModuleId, Vec<Struct_>>,
-    imported_members: &HashMap<ModuleId, Vec<(String, Option<String>)>>,
+    imported_members: &HashMap<ModuleId, Vec<(Symbol, Option<Symbol>)>>,
     package_address: [u8; 32],
 ) -> Result<(), SpecialAttributeError> {
     let signature = crate::function_modifiers::Function::parse_signature(&function.signature);
@@ -195,14 +196,14 @@ pub fn validate_function(
     if package_address != crate::reserved_modules::SF_ADDRESS {
         for param in &signature.parameters {
             for struct_name in extract_struct_names(&param.type_) {
-                if struct_name == "UID" {
+                if struct_name.as_str() == "UID" {
                     return Err(SpecialAttributeError {
                         kind: SpecialAttributeErrorKind::FunctionValidation(
                             FunctionValidationError::InvalidUidArgument,
                         ),
                         line_of_code: function.loc,
                     });
-                } else if struct_name == "NamedId" {
+                } else if struct_name.as_str() == "NamedId" {
                     return Err(SpecialAttributeError {
                         kind: SpecialAttributeErrorKind::FunctionValidation(
                             FunctionValidationError::InvalidNamedIdArgument,

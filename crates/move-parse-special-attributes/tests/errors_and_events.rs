@@ -4,6 +4,7 @@ use move_parse_special_attributes::{
     FunctionValidationError, StructValidationError, abi_error::AbiErrorParseError,
     error::SpecialAttributeErrorKind, event::EventParseError, process_special_attributes,
 };
+use move_symbol_pool::Symbol;
 
 #[test]
 pub fn test_errors_and_events() {
@@ -13,21 +14,21 @@ pub fn test_errors_and_events() {
     ];
     let address_alias_instantiation = std::collections::HashMap::from([
         (
-            "std".to_string(),
+            Symbol::from("std"),
             [
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 1,
             ],
         ),
         (
-            "stylus".to_string(),
+            Symbol::from("stylus"),
             [
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 2,
             ],
         ),
         (
-            "test".to_string(),
+            Symbol::from("test"),
             [
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0,
