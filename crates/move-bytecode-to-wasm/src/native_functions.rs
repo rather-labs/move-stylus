@@ -8,7 +8,6 @@ mod contract_calls;
 mod dynamic_field;
 pub mod error;
 mod event;
-mod fallback;
 pub mod object;
 mod tests;
 mod transaction;
@@ -27,10 +26,10 @@ use crate::{
         ModuleId,
         reserved_modules::{
             SF_MODULE_NAME_ACCOUNT, SF_MODULE_NAME_DYNAMIC_FIELD, SF_MODULE_NAME_ERROR,
-            SF_MODULE_NAME_EVENT, SF_MODULE_NAME_FALLBACK, SF_MODULE_NAME_OBJECT,
-            SF_MODULE_NAME_SOL_TYPES, SF_MODULE_NAME_TRANSFER, SF_MODULE_NAME_TX_CONTEXT,
-            SF_MODULE_NAME_TYPES, SF_MODULE_TEST_SCENARIO, STANDARD_LIB_ADDRESS,
-            STDLIB_MODULE_UNIT_TEST, STYLUS_FRAMEWORK_ADDRESS,
+            SF_MODULE_NAME_EVENT, SF_MODULE_NAME_OBJECT, SF_MODULE_NAME_SOL_TYPES,
+            SF_MODULE_NAME_TRANSFER, SF_MODULE_NAME_TX_CONTEXT, SF_MODULE_NAME_TYPES,
+            SF_MODULE_TEST_SCENARIO, STANDARD_LIB_ADDRESS, STDLIB_MODULE_UNIT_TEST,
+            STYLUS_FRAMEWORK_ADDRESS,
         },
     },
     hasher::get_hasher,
@@ -51,6 +50,7 @@ impl NativeFunction {
     const NATIVE_CHAIN_ID: &str = "native_chain_id";
     const NATIVE_GAS_PRICE: &str = "native_gas_price";
     const NATIVE_FRESH_ID: &str = "fresh_id";
+    const NATIVE_DATA: &str = "native_data";
 
     // Transfer functions
     pub const NATIVE_TRANSFER_OBJECT: &str = "transfer";
@@ -90,10 +90,6 @@ impl NativeFunction {
     const NATIVE_BORROW_CHILD_OBJECT_MUT: &str = "borrow_child_object_mut";
     const NATIVE_REMOVE_CHILD_OBJECT: &str = "remove_child_object";
     const NATIVE_HAS_CHILD_OBJECT: &str = "has_child_object";
-
-    // Fallback functions
-    const NATIVE_CALLDATA_AS_VECTOR: &str = "calldata_as_vector";
-    const NATIVE_CALLDATA_LENGTH: &str = "calldata_length";
 
     // Account functions
     const NATIVE_ACCOUNT_CODE_SIZE: &str = "account_code_size";
@@ -316,6 +312,9 @@ impl NativeFunction {
                 (Self::NATIVE_FRESH_ID, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TX_CONTEXT) => {
                     object::add_native_fresh_id_fn(module, compilation_ctx, module_id)
                 }
+                (Self::NATIVE_DATA, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TX_CONTEXT) => {
+                    transaction::add_native_data_fn(module, compilation_ctx, module_id)
+                }
                 (
                     Self::NATIVE_HAS_CHILD_OBJECT,
                     STYLUS_FRAMEWORK_ADDRESS,
@@ -325,16 +324,6 @@ impl NativeFunction {
                 (Self::NATIVE_GET_LAST_MEMORY_POSITION, _, _) => {
                     tests::add_get_last_memory_position_fn(module, compilation_ctx)
                 }
-                (
-                    Self::NATIVE_CALLDATA_AS_VECTOR,
-                    STYLUS_FRAMEWORK_ADDRESS,
-                    SF_MODULE_NAME_FALLBACK,
-                ) => fallback::add_calldata_as_vector_fn(module, compilation_ctx, module_id),
-                (
-                    Self::NATIVE_CALLDATA_LENGTH,
-                    STYLUS_FRAMEWORK_ADDRESS,
-                    SF_MODULE_NAME_FALLBACK,
-                ) => fallback::add_calldata_length_fn(module, compilation_ctx, module_id),
                 (
                     Self::NATIVE_ACCOUNT_CODE_SIZE,
                     STYLUS_FRAMEWORK_ADDRESS,
