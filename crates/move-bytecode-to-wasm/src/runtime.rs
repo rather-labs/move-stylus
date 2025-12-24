@@ -96,6 +96,8 @@ pub enum RuntimeFunction {
     UnpackU128,
     UnpackU256,
     UnpackAddress,
+    UnpackEnum,
+    UnpackString,
 }
 
 impl RuntimeFunction {
@@ -172,6 +174,8 @@ impl RuntimeFunction {
             Self::UnpackU128 => "unpack_u128",
             Self::UnpackU256 => "unpack_u256",
             Self::UnpackAddress => "unpack_address",
+            Self::UnpackEnum => "unpack_enum",
+            Self::UnpackString => "unpack_string",
         }
     }
 
@@ -304,6 +308,7 @@ impl RuntimeFunction {
                 (Self::UnpackAddress, Some(ctx)) => {
                     unpacking::unpack_address_function(module, ctx)?
                 }
+                (Self::UnpackString, Some(ctx)) => unpacking::unpack_string_function(module, ctx)?,
                 // Error
                 _ => return Err(RuntimeFunctionError::CouldNotLink(self.name().to_owned())),
             };
@@ -371,6 +376,10 @@ impl RuntimeFunction {
             Self::UnpackVector => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
                 unpacking::unpack_vector_function(module, compilation_ctx, generics[0])?
+            }
+            Self::UnpackEnum => {
+                Self::assert_generics_length(generics.len(), 1, self.name())?;
+                unpacking::unpack_enum_function(module, compilation_ctx, generics[0])?
             }
             _ => {
                 return Err(RuntimeFunctionError::CouldNotLinkGeneric(

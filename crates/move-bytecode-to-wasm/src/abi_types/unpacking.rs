@@ -13,7 +13,6 @@ use crate::{
     runtime::RuntimeFunction,
     translation::intermediate_types::{
         IntermediateType,
-        enums::IEnum,
         reference::{IMutRef, IRef},
         structs::IStruct,
     },
@@ -27,9 +26,7 @@ use super::error::AbiError;
 
 pub(crate) mod error;
 mod unpack_bytes;
-mod unpack_enum;
 mod unpack_reference;
-mod unpack_string;
 mod unpack_struct;
 
 pub trait Unpackable {
@@ -180,13 +177,12 @@ impl Unpackable for IntermediateType {
             IntermediateType::IStruct {
                 module_id, index, ..
             } if String_::is_vm_type(module_id, *index, compilation_ctx)? => {
-                String_::add_unpack_instructions(
-                    builder,
-                    module,
-                    reader_pointer,
-                    calldata_base_pointer,
-                    compilation_ctx,
-                )?;
+                let unpack_string_function =
+                    RuntimeFunction::UnpackString.get(module, Some(compilation_ctx))?;
+                builder
+                    .local_get(reader_pointer)
+                    .local_get(calldata_base_pointer)
+                    .call(unpack_string_function);
             }
             IntermediateType::IStruct {
                 module_id, index, ..
@@ -231,18 +227,9 @@ impl Unpackable for IntermediateType {
                 }
             }
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
-                let enum_ = compilation_ctx.get_enum_by_intermediate_type(self)?;
-                if !enum_.is_simple {
-                    return Err(AbiUnpackError::EnumIsNotSimple(enum_.identifier.to_owned()))?;
-                }
-
-                IEnum::add_unpack_instructions(
-                    &enum_,
-                    builder,
-                    module,
-                    reader_pointer,
-                    compilation_ctx,
-                )?
+                let unpack_enum_function =
+                    RuntimeFunction::UnpackEnum.get_generic(module, &compilation_ctx, &[self])?;
+                builder.local_get(reader_pointer).call(unpack_enum_function);
             }
             IntermediateType::ITypeParameter(_) => {
                 return Err(AbiUnpackError::UnpackingGenericTypeParameter)?;
