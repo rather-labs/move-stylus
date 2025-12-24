@@ -31,7 +31,7 @@ use move_binary_format::{
 };
 
 use crate::{
-    CompilationContext, GlobalFunctionTable,
+    CompilationContext,
     abi_types::error_encoding::build_abort_error_message,
     compilation_context::{ModuleData, ModuleId},
     data::DATA_ABORT_MESSAGE_PTR_OFFSET,
@@ -3106,7 +3106,7 @@ fn get_storage_structs_with_named_ids(
 pub(crate) fn translate_and_link_functions(
     function_id: &FunctionId,
     function_table: &mut FunctionTable,
-    function_definitions: &GlobalFunctionTable,
+    modules_data: &HashMap<ModuleId, ModuleData>,
     module: &mut walrus::Module,
     compilation_ctx: &CompilationContext,
     dynamic_fields_global_variables: &mut Vec<(GlobalId, IntermediateType)>,
@@ -3159,9 +3159,11 @@ pub(crate) fn translate_and_link_functions(
         function_table.add(module, function_id.clone(), function_information)?;
     }
 
-    let function_definition = function_definitions
-        .get(&function_id.get_generic_fn_id())
-        .ok_or_else(|| TranslationError::FunctionDefinitionNotFound(function_id.clone()))?;
+    let function_definition = modules_data
+        .get(&function_id.module_id)
+        .unwrap_or(compilation_ctx.root_module_data)
+        .functions
+        .get_move_definition_by_id(&function_id.get_generic_fn_id())?;
 
     // If the function contains code we translate it
     // If it does not it means is a native function, we do nothing, it is linked and called
@@ -3184,7 +3186,7 @@ pub(crate) fn translate_and_link_functions(
             translate_and_link_functions(
                 function_id,
                 function_table,
-                function_definitions,
+                modules_data,
                 module,
                 compilation_ctx,
                 dynamic_fields_global_variables,

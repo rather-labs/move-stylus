@@ -95,10 +95,6 @@ pub fn translate_package(
     // Contains the module data for all the root package and its dependencies
     // let mut modules_data: HashMap<ModuleId, ModuleData> = HashMap::new();
 
-    // Contains all a reference for all functions definitions in case we need to process them and
-    // statically link them
-    let mut function_definitions: GlobalFunctionTable = HashMap::new();
-
     let mut errors = Vec::new();
 
     // TODO: a lot of clones, we must create a symbol pool
@@ -139,7 +135,6 @@ pub fn translate_package(
             &package.deps_compiled_units,
             &root_compiled_units,
             &root_compiled_module_unit.immediate_dependencies(),
-            &mut function_definitions,
             &address_alias_instantiation,
             verbose,
         ) {
@@ -176,7 +171,6 @@ pub fn translate_package(
             root_compiled_module,
             &package.deps_compiled_units,
             &root_compiled_units,
-            &mut function_definitions,
             special_attributes,
         )?;
 
@@ -190,7 +184,7 @@ pub fn translate_package(
             translate_and_link_functions(
                 &function_information.function_id,
                 &mut function_table,
-                &function_definitions,
+                modules_data,
                 &mut module,
                 &compilation_ctx,
                 &mut dynamic_fields_global_variables,
@@ -267,9 +261,6 @@ pub fn package_module_data(
     let mut modules_paths = HashMap::new();
     let mut errors = Vec::new();
 
-    // This is not used in this function but is used in the others
-    let mut function_definitions: GlobalFunctionTable = HashMap::new();
-
     let root_compiled_units: Vec<&CompiledUnitWithSource> = if let Some(module_name) = module_name {
         package
             .root_compiled_units
@@ -296,7 +287,6 @@ pub fn package_module_data(
             &package.deps_compiled_units,
             &root_compiled_units,
             &root_compiled_module_unit.immediate_dependencies(),
-            &mut function_definitions,
             &address_alias_instantiation,
             verbose,
         ) {
@@ -333,7 +323,6 @@ pub fn package_module_data(
             root_compiled_module,
             &package.deps_compiled_units,
             &root_compiled_units,
-            &mut function_definitions,
             special_attributes,
         )?;
 
@@ -362,7 +351,6 @@ pub fn process_dependency_tree<'move_package>(
     deps_compiled_units: &'move_package [(PackageName, CompiledUnitWithSource)],
     root_compiled_units: &'move_package [&CompiledUnitWithSource],
     dependencies: &[move_core_types::language_storage::ModuleId],
-    function_definitions: &mut GlobalFunctionTable<'move_package>,
     address_alias_instantiation: &HashMap<String, [u8; 32]>,
     verbose: bool,
 ) -> Result<(), DependencyProcessingError> {
@@ -404,7 +392,6 @@ pub fn process_dependency_tree<'move_package>(
                 deps_compiled_units,
                 root_compiled_units,
                 immediate_dependencies,
-                function_definitions,
                 address_alias_instantiation,
                 verbose,
             )
@@ -446,7 +433,6 @@ pub fn process_dependency_tree<'move_package>(
             dependency_module,
             deps_compiled_units,
             root_compiled_units,
-            function_definitions,
             special_attributes,
         )
         .map_err(|e| {

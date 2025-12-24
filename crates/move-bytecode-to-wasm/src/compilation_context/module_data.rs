@@ -4,7 +4,6 @@ pub mod function_data;
 pub mod struct_data;
 
 use crate::{
-    GlobalFunctionTable,
     compilation_context::reserved_modules::STYLUS_FRAMEWORK_ADDRESS,
     hasher::get_hasher,
     translation::{
@@ -163,7 +162,6 @@ impl ModuleData {
         move_module: &'move_package CompiledUnitWithSource,
         move_module_dependencies: &'move_package [(PackageName, CompiledUnitWithSource)],
         root_compiled_units: &'move_package [&CompiledUnitWithSource],
-        function_definitions: &mut GlobalFunctionTable<'move_package>,
         special_attributes: SpecialAttributes,
     ) -> Result<Self> {
         let move_module_unit = &move_module.unit.module;
@@ -214,7 +212,6 @@ impl ModuleData {
             module_id.clone(),
             move_module_unit,
             &datatype_handles_map,
-            function_definitions,
             move_module_dependencies,
             &special_attributes,
         )?;
@@ -684,7 +681,6 @@ impl ModuleData {
         module_id: ModuleId,
         move_module: &'move_package CompiledModule,
         datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
-        function_definitions: &mut GlobalFunctionTable<'move_package>,
         move_module_dependencies: &'move_package [(PackageName, CompiledUnitWithSource)],
         special_attributes: &SpecialAttributes,
     ) -> Result<FunctionData> {
@@ -693,6 +689,7 @@ impl ModuleData {
         let mut functions_arguments = Vec::new();
         let mut function_calls = Vec::new();
         let mut function_information = Vec::new();
+        let mut move_definitions = HashMap::new();
 
         // Special reserved functions
         let mut init: Option<FunctionId> = None;
@@ -757,7 +754,7 @@ impl ModuleData {
                     datatype_handles_map,
                 )?);
 
-                function_definitions.insert(function_id.clone(), function_def);
+                move_definitions.insert(function_id.clone(), function_def.clone());
 
                 function_calls.push(function_id);
                 continue;
@@ -843,7 +840,7 @@ impl ModuleData {
                     datatype_handles_map,
                 )?);
 
-                function_definitions.insert(function_id.clone(), function_def);
+                move_definitions.insert(function_id.clone(), function_def.clone());
             }
 
             function_calls.push(function_id);
@@ -888,6 +885,7 @@ impl ModuleData {
             init,
             receive,
             fallback,
+            move_definitions,
         })
     }
 

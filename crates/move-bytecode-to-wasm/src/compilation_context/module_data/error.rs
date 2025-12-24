@@ -1,5 +1,7 @@
 use move_binary_format::file_format::FieldInstantiationIndex;
 
+use crate::translation::table::FunctionId;
+
 #[derive(Debug, thiserror::Error)]
 pub enum ModuleDataError {
     #[error(
@@ -37,6 +39,9 @@ pub enum ModuleDataError {
 
     #[error("function {0} not found in module data")]
     FunctionByIdentifierNotFound(String),
+
+    #[error("function definition not found for function id {0}")]
+    FunctionDefinitionByIdNotFound(FunctionId),
 
     #[error("generic field index not found for field instantiation index {0}")]
     InstantiatedFieldGenericIndexNotFound(FieldInstantiationIndex),
