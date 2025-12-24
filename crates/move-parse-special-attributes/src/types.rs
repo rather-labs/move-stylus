@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::sync::Arc;
 
 use move_compiler::parser::ast::{NameAccessChain_, Type_};
 
@@ -8,7 +8,7 @@ pub enum Type {
     Bool,
     UserDataType(String, Option<Vec<Type>>),
     Signer,
-    Vector(Rc<Type>),
+    Vector(Arc<Type>),
     U8,
     U16,
     U32,
@@ -17,9 +17,9 @@ pub enum Type {
     U256,
     Unit,
     Tuple(Vec<Type>),
-    Function(Vec<Type>, Rc<Type>),
-    Ref(Rc<Type>),
-    MutRef(Rc<Type>),
+    Function(Vec<Type>, Arc<Type>),
+    Ref(Arc<Type>),
+    MutRef(Arc<Type>),
 }
 
 impl Type {
@@ -45,7 +45,7 @@ impl Type {
                                     .expect("expected a type for inner vector type")
                                     .value,
                             );
-                            Self::Vector(Rc::new(inner))
+                            Self::Vector(Arc::new(inner))
                         } else {
                             panic!("found a vector without inner type")
                         }
@@ -84,9 +84,9 @@ impl Type {
             },
             Type_::Ref(is_mut, spanned) => {
                 if *is_mut {
-                    Self::MutRef(Rc::new(Self::parse_type(&spanned.value)))
+                    Self::MutRef(Arc::new(Self::parse_type(&spanned.value)))
                 } else {
-                    Self::Ref(Rc::new(Self::parse_type(&spanned.value)))
+                    Self::Ref(Arc::new(Self::parse_type(&spanned.value)))
                 }
             }
             Type_::Unit => Self::Unit,
@@ -103,7 +103,7 @@ impl Type {
                     .map(|a| Self::parse_type(&a.value))
                     .collect();
                 let return_type = Self::parse_type(&spanned.value);
-                Self::Function(arguments, Rc::new(return_type))
+                Self::Function(arguments, Arc::new(return_type))
             }
             Type_::UnresolvedError => todo!(),
         }

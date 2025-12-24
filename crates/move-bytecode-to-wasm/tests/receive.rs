@@ -60,7 +60,7 @@ mod receive_bad {
     #[case("receive_bad_args_2", "tests/receive/receive_bad_args_2.move")]
     #[should_panic(expected = "ReceiveFunctionIsNotPayable")]
     #[case("receive_bad_mutability", "tests/receive/receive_bad_mutability.move")]
-    fn test_receive_bad(#[case] module_name: &str, #[case] source_path: &str) {
+    fn test_receive_bad(#[case] module_name: &str, #[case] source_path: &'static str) {
         translate_test_package_with_framework(source_path, module_name);
     }
 }

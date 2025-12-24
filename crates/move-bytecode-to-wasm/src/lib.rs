@@ -51,8 +51,10 @@ pub type GlobalFunctionTable<'move_package> =
 pub fn translate_single_module(
     package: CompiledPackage,
     module_name: &str,
+    modules_data: &mut HashMap<ModuleId, ModuleData>,
 ) -> Result<Module, CompilationError> {
-    let mut modules = translate_package(package, Some(module_name.to_string()), false)?;
+    let mut modules =
+        translate_package(package, Some(module_name.to_string()), modules_data, false)?;
 
     Ok(modules
         .remove(module_name)
@@ -62,6 +64,7 @@ pub fn translate_single_module(
 pub fn translate_package(
     package: CompiledPackage,
     module_name: Option<String>,
+    modules_data: &mut HashMap<ModuleId, ModuleData>,
     verbose: bool,
 ) -> Result<HashMap<String, Module>, CompilationError> {
     // HashMap of package name to address
@@ -90,7 +93,7 @@ pub fn translate_package(
     let mut modules = HashMap::new();
 
     // Contains the module data for all the root package and its dependencies
-    let mut modules_data: HashMap<ModuleId, ModuleData> = HashMap::new();
+    // let mut modules_data: HashMap<ModuleId, ModuleData> = HashMap::new();
 
     // Contains all a reference for all functions definitions in case we need to process them and
     // statically link them
@@ -132,7 +135,7 @@ pub fn translate_package(
 
         // Process the dependency tree
         if let Err(dependencies_errors) = process_dependency_tree(
-            &mut modules_data,
+            modules_data,
             &package.deps_compiled_units,
             &root_compiled_units,
             &root_compiled_module_unit.immediate_dependencies(),
@@ -153,7 +156,7 @@ pub fn translate_package(
 
         // Build a HashMap of structs by module id from all dependencies.
         // This allows proper validation of entry function return values, ensuring they do not return imported structs with the key ability.
-        let deps_structs = build_dependency_structs_map(&modules_data);
+        let deps_structs = build_dependency_structs_map(modules_data);
 
         let special_attributes = match process_special_attributes(
             &root_compiled_module.source_path,
@@ -178,7 +181,7 @@ pub fn translate_package(
         )?;
 
         let compilation_ctx =
-            CompilationContext::new(&root_module_data, &modules_data, memory_id, allocator_func);
+            CompilationContext::new(&root_module_data, modules_data, memory_id, allocator_func);
 
         let mut public_functions = Vec::new();
         for function_information in root_module_data.functions.information.iter().filter(|fi| {

@@ -188,7 +188,7 @@ mod signer_type {
     #[case("tests/primitives/signer_invalid_dup_signer.move")]
     #[should_panic]
     #[case("tests/primitives/signer_invalid_nested_signer.move")]
-    fn test_signer_invalid(#[case] path: &str) {
+    fn test_signer_invalid(#[case] path: &'static str) {
         translate_test_package(path, "signer_type");
     }
 }
