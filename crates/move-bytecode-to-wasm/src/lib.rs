@@ -67,6 +67,7 @@ pub fn translate_package(
     modules_data: &mut HashMap<ModuleId, ModuleData>,
     verbose: bool,
 ) -> Result<HashMap<String, Module>, CompilationError> {
+    println!("module data: {:?}", modules_data.keys());
     // HashMap of package name to address
     // This includes all the dependencies of the root package
     let address_alias_instantiation: HashMap<String, [u8; 32]> = package

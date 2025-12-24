@@ -47,7 +47,7 @@ mod receive_with_tx_context {
 
 mod receive_bad {
     use super::*;
-    use crate::common::translate_test_package_with_framework;
+    use crate::common::translate_test_package;
 
     #[rstest]
     #[should_panic(expected = "ReceiveFunctionBadVisibility")]
@@ -61,6 +61,6 @@ mod receive_bad {
     #[should_panic(expected = "ReceiveFunctionIsNotPayable")]
     #[case("receive_bad_mutability", "tests/receive/receive_bad_mutability.move")]
     fn test_receive_bad(#[case] module_name: &str, #[case] source_path: &'static str) {
-        translate_test_package_with_framework(source_path, module_name);
+        translate_test_package(source_path, module_name);
     }
 }
