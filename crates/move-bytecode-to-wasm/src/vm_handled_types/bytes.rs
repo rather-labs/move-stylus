@@ -3,7 +3,6 @@ use crate::{
     CompilationContext,
     compilation_context::ModuleId,
     compilation_context::reserved_modules::{SF_MODULE_NAME_SOL_TYPES, STYLUS_FRAMEWORK_ADDRESS},
-    translation::intermediate_types::IntermediateType,
 };
 use walrus::{InstrSeqBuilder, Module};
 
@@ -47,11 +46,8 @@ impl VmHandledType for Bytes {
 }
 
 impl Bytes {
-    // Returns true if the identifier is exactly "Bytes" or matches "BytesN" with N in 1..=32
+    // Returns true if the identifier matches "BytesN" with N in 1..=32
     pub fn validate_identifier(identifier: &str) -> bool {
-        if identifier == "Bytes" {
-            return true;
-        }
         if let Some(num_str) = identifier.strip_prefix("Bytes") {
             if let Ok(n) = num_str.parse::<u8>() {
                 if (1..=32).contains(&n) {
@@ -60,21 +56,5 @@ impl Bytes {
             }
         }
         false
-    }
-
-    // Returns true if the identifier is exactly "Bytes",
-    // meaning we are dealing with a dynamic bytes type, not the fixed bytes types (Bytes1, Bytes2, ..., Bytes32)
-    pub fn is_dynamic(
-        itype: &IntermediateType,
-        compilation_ctx: &CompilationContext,
-    ) -> Result<bool, VmHandledTypeError> {
-        let identifier = &compilation_ctx
-            .get_struct_by_intermediate_type(itype)?
-            .identifier;
-
-        if identifier == "Bytes" {
-            return Ok(true);
-        }
-        Ok(false)
     }
 }

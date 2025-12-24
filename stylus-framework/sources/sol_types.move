@@ -2,14 +2,6 @@ module stylus::sol_types;
 
 public(package) native fun as_vec_bytes_n<T: copy + drop>(value: &T, n: u8): vector<u8>;
 
-public struct Bytes has copy, drop {}
-
-public fun as_vec_bytes(value: &Bytes): vector<u8> {
-    as_vec_bytes_n<Bytes>(value, 0)
-}
-
-public use fun as_vec_bytes as Bytes.as_vec;
-
 public struct Bytes1 has copy, drop {}
 public struct Bytes2 has copy, drop {}
 public struct Bytes3 has copy, drop {}

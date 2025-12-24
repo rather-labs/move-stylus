@@ -205,14 +205,7 @@ impl Unpackable for IntermediateType {
             IntermediateType::IStruct {
                 module_id, index, ..
             } if Bytes::is_vm_type(module_id, *index, compilation_ctx)? => {
-                Bytes::add_unpack_instructions(
-                    function_builder,
-                    module,
-                    reader_pointer,
-                    calldata_reader_pointer,
-                    self,
-                    compilation_ctx,
-                )?;
+                Bytes::add_unpack_instructions(function_builder, reader_pointer)?;
             }
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
                 let struct_ = compilation_ctx.get_struct_by_intermediate_type(self)?;
