@@ -21,7 +21,6 @@ use crate::{
 use super::error::{AbiEncodingError, AbiError};
 
 pub mod error;
-mod pack_bytes;
 mod pack_enum;
 mod pack_heap_int;
 mod pack_native_int;

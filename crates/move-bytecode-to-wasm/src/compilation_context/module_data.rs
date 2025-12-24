@@ -1181,15 +1181,13 @@ impl ModuleData {
 }
 
 fn is_vector_u8_ref(argument: &IntermediateType) -> bool {
-    matches!(
-        argument,
-        IntermediateType::IRef(ref_inner) | IntermediateType::IMutRef(ref_inner)
-            if matches!(
-                ref_inner.as_ref(),
-                IntermediateType::IVector(vec_inner)
-                    if matches!(vec_inner.as_ref(), IntermediateType::IU8)
-            )
-    )
+    let IntermediateType::IRef(ref_inner) = argument else {
+        return false;
+    };
+    let IntermediateType::IVector(vec_inner) = ref_inner.as_ref() else {
+        return false;
+    };
+    matches!(vec_inner.as_ref(), IntermediateType::IU8)
 }
 
 /// Helper function to check if the argument is a reference to the TxContext.
