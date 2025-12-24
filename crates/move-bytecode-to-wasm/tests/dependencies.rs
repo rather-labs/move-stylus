@@ -4,7 +4,7 @@ use common::run_test;
 use move_test_runner::wasm_runner::RuntimeSandbox;
 use rstest::{fixture, rstest};
 
-declare_fixture_complete_package!("main", "tests/dependencies");
+declare_fixture!("main", "tests/dependencies");
 
 sol!(
     struct AnotherTest {

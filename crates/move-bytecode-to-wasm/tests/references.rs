@@ -894,7 +894,7 @@ mod reference_structs_generic {
 mod external_struct {
     use super::*;
 
-    declare_fixture_complete_package!("external_struct", "tests/references/external");
+    declare_fixture!("external_struct", "tests/references/external");
 
     sol!(
         #[allow(missing_docs)]
@@ -1010,7 +1010,7 @@ mod external_struct {
 mod external_generic_struct {
     use super::*;
 
-    declare_fixture_complete_package!("external_generic_struct", "tests/references/external");
+    declare_fixture!("external_generic_struct", "tests/references/external");
 
     sol!(
         #[allow(missing_docs)]

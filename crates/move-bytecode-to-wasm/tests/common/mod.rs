@@ -107,21 +107,6 @@ pub fn reroot_path(path: &Path) -> PathBuf {
     temp_install_directory
 }
 
-fn create_move_toml(install_dir: &Path) {
-    // create Move.toml in dir
-    std::fs::write(
-        install_dir.join("Move.toml"),
-        r#"[package]
-name = "test"
-edition = "2024"
-
-[addresses]
-test = "0x0"
-"#,
-    )
-    .unwrap();
-}
-
 fn create_move_toml_with_framework(install_dir: &Path, framework_dir: &str) {
     copy_dir_recursive(
         &PathBuf::from(framework_dir),
@@ -174,11 +159,11 @@ fn get_build_config() -> BuildConfig {
 pub fn translate_test_package(path: &'static str, module_name: &str) -> Arc<Vec<u8>> {
     let mut cache = MODULE_CACHE.lock().unwrap();
     if let Some(cached_module) = cache.get(&(path, module_name.to_owned())) {
-        println!("CACHE HIT for {}::{}", path, module_name);
+        // println!("CACHE HIT for {}::{}", path, module_name);
         return cached_module.clone();
     }
 
-    println!("CACHE MISS for {}::{}", path, module_name);
+    // println!("CACHE MISS for {}::{}", path, module_name);
 
     let mut dependencies_cache = MODULE_DEPENDENCIES_CACHE.lock().unwrap();
 
@@ -198,7 +183,7 @@ pub fn translate_test_package(path: &'static str, module_name: &str) -> Arc<Vec<
         }
     };
 
-    println!("Translating package at path: {}", rerooted_path.display());
+    // println!("Translating package at path: {}", rerooted_path.display());
     let compiled_modules = match translate_package(package, None, &mut dependencies_cache, false) {
         Ok(modules) => modules,
         Err(err) => {
@@ -211,13 +196,9 @@ pub fn translate_test_package(path: &'static str, module_name: &str) -> Arc<Vec<
             );
         }
     };
-    println!(
-        "Finished translating package at path: {}",
-        rerooted_path.display()
-    );
 
     for (module_name, mut module) in compiled_modules.into_iter() {
-        println!("CACHE INSERT for {}::{}", path, module_name);
+        // println!("CACHE INSERT for {}::{}", path, module_name);
         cache.insert((path, module_name), Arc::new(module.emit_wasm()));
     }
 
@@ -276,32 +257,8 @@ macro_rules! declare_fixture {
     };
 }
 
-#[macro_export]
-macro_rules! declare_fixture_complete_package {
-    ($module_name:literal, $source_path:literal) => {
-        #[fixture]
-        #[once]
-        pub fn runtime() -> move_test_runner::wasm_runner::RuntimeSandbox {
-            let translated_packages =
-                $crate::common::translate_test_package($source_path, $module_name);
-
-            move_test_runner::wasm_runner::RuntimeSandbox::from_binary(&translated_packages)
-        }
-    };
-}
-
 #[fixture]
-pub fn runtime_with_framework(
-    #[default("")] module_name: &str,
-    #[default("")] source_path: &'static str,
-) -> RuntimeSandbox {
-    let translated_package = translate_test_package(source_path, module_name);
-
-    RuntimeSandbox::from_binary(&translated_package)
-}
-
-#[fixture]
-pub fn runtime_package_with_framework(
+pub fn test_runtime(
     #[default("")] module_name: &str,
     #[default("")] source_path: &'static str,
 ) -> RuntimeSandbox {

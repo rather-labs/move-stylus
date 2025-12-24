@@ -2251,7 +2251,7 @@ mod struct_misc {
 mod external_struct_copy {
     use super::*;
 
-    declare_fixture_complete_package!("external_struct_copy", "tests/structs/external");
+    declare_fixture!("external_struct_copy", "tests/structs/external");
 
     sol!(
         #[allow(missing_docs)]
@@ -2411,7 +2411,7 @@ mod external_struct_copy {
 mod external_generic_struct_copy {
     use super::*;
 
-    declare_fixture_complete_package!("external_generic_struct_copy", "tests/structs/external");
+    declare_fixture!("external_generic_struct_copy", "tests/structs/external");
 
     sol!(
         #[allow(missing_docs)]

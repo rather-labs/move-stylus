@@ -14,7 +14,7 @@ use rstest::rstest;
 
 mod tx_context {
     use super::*;
-    use crate::common::runtime_with_framework as runtime;
+    use crate::common::test_runtime as runtime;
 
     sol!(
         #[allow(missing_docs)]
@@ -86,7 +86,7 @@ mod tx_context {
 
 mod event {
     use super::*;
-    use crate::common::runtime_with_framework as runtime;
+    use crate::common::test_runtime as runtime;
 
     sol!(
         #[allow(missing_docs)]
@@ -498,7 +498,7 @@ mod event {
 
 mod cross_contract_calls {
     use super::*;
-    use crate::common::runtime_package_with_framework as runtime;
+    use crate::common::test_runtime as runtime;
 
     sol!(
         #[allow(missing_docs)]
@@ -859,7 +859,7 @@ mod cross_contract_calls {
 mod cross_contract_calls_result {
     #![allow(clippy::too_many_arguments)]
     use super::*;
-    use crate::common::runtime_package_with_framework as runtime;
+    use crate::common::test_runtime as runtime;
 
     const GET_RESULT_ERROR_CODE: &str = "101";
     const DATA_ABORT_MESSAGE_PTR_OFFSET: usize = 256;
@@ -1493,7 +1493,7 @@ mod cross_contract_calls_result {
 
 mod error {
     use super::*;
-    use crate::common::runtime_with_framework as runtime;
+    use crate::common::test_runtime as runtime;
 
     sol!(
         struct SimpleError {

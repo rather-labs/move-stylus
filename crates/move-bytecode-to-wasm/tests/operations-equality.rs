@@ -1141,7 +1141,7 @@ mod structs {
 mod external_structs {
     use super::*;
 
-    declare_fixture_complete_package!(
+    declare_fixture!(
         "equality_external_structs",
         "tests/operations-equality/external"
     );

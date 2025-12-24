@@ -1,5 +1,5 @@
 mod common;
-use crate::common::runtime_with_framework as runtime;
+use crate::common::test_runtime as runtime;
 use alloy_sol_types::{SolCall, sol};
 use move_test_runner::wasm_runner::RuntimeSandbox;
 use rstest::rstest;

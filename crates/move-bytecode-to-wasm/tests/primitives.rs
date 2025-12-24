@@ -50,7 +50,7 @@ mod bool_type {
 
 mod bytes_type {
     use super::*;
-    use crate::common::runtime_with_framework as runtime;
+    use crate::common::test_runtime as runtime;
     use alloy_primitives::fixed_bytes;
 
     sol!(
@@ -2141,7 +2141,7 @@ mod vec_struct {
 mod vec_external_struct {
     use super::*;
 
-    declare_fixture_complete_package!("vec_external_struct", "tests/primitives/external");
+    declare_fixture!("vec_external_struct", "tests/primitives/external");
 
     sol!(
         #[allow(missing_docs)]
@@ -2656,7 +2656,7 @@ mod vec_external_struct {
 mod vec_external_generic_struct {
     use super::*;
 
-    declare_fixture_complete_package!("vec_external_generic_struct", "tests/primitives/external");
+    declare_fixture!("vec_external_generic_struct", "tests/primitives/external");
 
     sol!(
         #[allow(missing_docs)]
