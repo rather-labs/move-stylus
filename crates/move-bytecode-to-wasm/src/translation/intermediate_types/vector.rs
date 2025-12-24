@@ -920,14 +920,20 @@ mod tests {
     };
     use alloy_primitives::U256;
     use walrus::ir::UnaryOp;
-    use walrus::{FunctionBuilder, ValType};
+    use walrus::{ConstExpr, FunctionBuilder, ValType, ir::Value};
 
     use super::*;
 
     fn test_vector(data: &[u8], inner_type: IntermediateType, expected_result_bytes: &[u8]) {
         let (mut raw_module, allocator, memory_id) = build_module(None);
-
-        let compilation_ctx = test_compilation_context!(memory_id, allocator);
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            false,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
@@ -964,7 +970,14 @@ mod tests {
     fn test_vector_copy(data: &[u8], inner_type: IntermediateType, expected_result_bytes: &[u8]) {
         let (mut raw_module, allocator, memory_id) = build_module(None);
 
-        let compilation_ctx = test_compilation_context!(memory_id, allocator);
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            false,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
@@ -1016,7 +1029,14 @@ mod tests {
         expected_result_bytes: &[u8],
     ) {
         let (mut raw_module, allocator, memory_id) = build_module(None);
-        let compilation_ctx = test_compilation_context!(memory_id, allocator);
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            false,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
@@ -1068,7 +1088,14 @@ mod tests {
     ) {
         let (mut raw_module, allocator, memory_id) = build_module(None);
 
-        let compilation_ctx = test_compilation_context!(memory_id, allocator);
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            false,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
@@ -1133,7 +1160,14 @@ mod tests {
     ) {
         let (mut raw_module, allocator, memory_id) = build_module(None);
 
-        let compilation_ctx = test_compilation_context!(memory_id, allocator);
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            false,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
@@ -1256,7 +1290,14 @@ mod tests {
     ) {
         let (mut raw_module, allocator, memory_id) = build_module(None);
 
-        let compilation_ctx = test_compilation_context!(memory_id, allocator);
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            false,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);

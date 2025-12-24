@@ -91,8 +91,11 @@ pub enum RuntimeFunction {
     ValidatePointer32Bit,
     // ABI unpacking
     UnpackVector,
-    UnpackI32,
-    UnpackI64,
+    UnpackU32,
+    UnpackU64,
+    UnpackU128,
+    UnpackU256,
+    UnpackAddress,
 }
 
 impl RuntimeFunction {
@@ -164,8 +167,11 @@ impl RuntimeFunction {
             Self::ValidatePointer32Bit => "validate_pointer_32_bit",
             // ABI unpacking
             Self::UnpackVector => "unpack_vector",
-            Self::UnpackI32 => "unpack_i32",
-            Self::UnpackI64 => "unpack_i64",
+            Self::UnpackU32 => "unpack_u32",
+            Self::UnpackU64 => "unpack_u64",
+            Self::UnpackU128 => "unpack_u128",
+            Self::UnpackU256 => "unpack_u256",
+            Self::UnpackAddress => "unpack_address",
         }
     }
 
@@ -291,8 +297,13 @@ impl RuntimeFunction {
                     abi::validate_pointer_32_bit(module, ctx)
                 }
                 // ABI unpacking
-                (Self::UnpackI32, Some(ctx)) => unpacking::unpack_i32_function(module, ctx)?,
-                (Self::UnpackI64, Some(ctx)) => unpacking::unpack_i64_function(module, ctx)?,
+                (Self::UnpackU32, Some(ctx)) => unpacking::unpack_u32_function(module, ctx)?,
+                (Self::UnpackU64, Some(ctx)) => unpacking::unpack_u64_function(module, ctx)?,
+                (Self::UnpackU128, Some(ctx)) => unpacking::unpack_u128_function(module, ctx)?,
+                (Self::UnpackU256, Some(ctx)) => unpacking::unpack_u256_function(module, ctx)?,
+                (Self::UnpackAddress, Some(ctx)) => {
+                    unpacking::unpack_address_function(module, ctx)?
+                }
                 // Error
                 _ => return Err(RuntimeFunctionError::CouldNotLink(self.name().to_owned())),
             };

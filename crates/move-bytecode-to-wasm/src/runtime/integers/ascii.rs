@@ -193,7 +193,7 @@ mod tests {
     use crate::test_compilation_context;
     use crate::test_tools::{build_module, setup_wasmtime_module};
     use rstest::rstest;
-    use walrus::FunctionBuilder;
+    use walrus::{ConstExpr, FunctionBuilder, ValType, ir::Value};
 
     use super::*;
 
@@ -212,7 +212,14 @@ mod tests {
     #[case(i64::MAX as u64 + 1, "9223372036854775808")]
     fn test_u64_to_ascii_base_10(#[case] error_code: u64, #[case] expected: &str) {
         let (mut raw_module, allocator_func, memory_id) = build_module(None);
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            false,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 
         // Add the u64_to_ascii_base_10 function to the module
         let ascii_func = u64_to_ascii_base_10(&mut raw_module, &compilation_ctx);

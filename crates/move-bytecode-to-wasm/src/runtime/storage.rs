@@ -1418,7 +1418,7 @@ mod tests {
     use alloy_primitives::U256;
     use rstest::rstest;
     use std::str::FromStr;
-    use walrus::FunctionBuilder;
+    use walrus::{ConstExpr, FunctionBuilder, ValType, ir::Value};
 
     use super::*;
 
@@ -1478,7 +1478,12 @@ mod tests {
             .call(allocator_func)
             .local_set(result_ptr);
 
-        let ctx = test_compilation_context!(memory_id, allocator_func);
+        let calldata_reader_pointer_global =
+            module
+                .globals
+                .add_local(ValType::I32, false, false, ConstExpr::Value(Value::I32(0)));
+        let ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 
         // Call derive_mapping_slot with the proper arguments
         func_body
@@ -1564,7 +1569,12 @@ mod tests {
             .call(allocator_func)
             .local_set(result_ptr);
 
-        let ctx = test_compilation_context!(memory_id, allocator_func);
+        let calldata_reader_pointer_global =
+            module
+                .globals
+                .add_local(ValType::I32, false, false, ConstExpr::Value(Value::I32(0)));
+        let ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 
         // Call derive_mapping_slot with the proper arguments
         func_body
@@ -1700,7 +1710,12 @@ mod tests {
             .call(allocator_func)
             .local_set(result_ptr);
 
-        let ctx = test_compilation_context!(memory_id, allocator_func);
+        let calldata_reader_pointer_global =
+            module
+                .globals
+                .add_local(ValType::I32, false, false, ConstExpr::Value(Value::I32(0)));
+        let ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 
         func_body
             .local_get(slot_ptr)
@@ -1791,7 +1806,12 @@ mod tests {
             .i32_const(32)
             .local_set(array_header_size);
 
-        let ctx = test_compilation_context!(memory_id, allocator_func);
+        let calldata_reader_pointer_global =
+            module
+                .globals
+                .add_local(ValType::I32, false, false, ConstExpr::Value(Value::I32(0)));
+        let ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 
         // Call derive_dyn_array_slot_for_index with the proper arguments
         func_body

@@ -8,6 +8,7 @@ use crate::memory::setup_module_memory;
 pub fn build_module(initial_memory_offset: Option<i32>) -> (Module, FunctionId, MemoryId) {
     let config = ModuleConfig::new();
     let mut module = Module::with_config(config);
+
     let (allocator_func, memory_id) = setup_module_memory(&mut module, initial_memory_offset);
 
     (module, allocator_func, memory_id)
@@ -144,12 +145,13 @@ pub fn inject_host_debug_functions(module: &mut Module) {
 
 #[macro_export]
 macro_rules! test_compilation_context {
-    ($memory_id: ident, $allocator: ident) => {
+    ($memory_id: ident, $allocator: ident, $calldata_reader_pointer: ident) => {
         $crate::CompilationContext {
             root_module_data: &$crate::ModuleData::default(),
             deps_data: &std::collections::HashMap::new(),
             memory_id: $memory_id,
             allocator: $allocator,
+            calldata_reader_pointer: $calldata_reader_pointer,
         }
     };
 }

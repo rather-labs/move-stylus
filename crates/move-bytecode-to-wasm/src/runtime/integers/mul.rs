@@ -421,7 +421,7 @@ mod tests {
     use crate::test_tools::{build_module, setup_wasmtime_module};
     use alloy_primitives::U256;
     use rstest::rstest;
-    use walrus::FunctionBuilder;
+    use walrus::{ConstExpr, FunctionBuilder, ValType, ir::Value};
 
     use super::*;
 
@@ -469,7 +469,14 @@ mod tests {
             .i32_const(TYPE_HEAP_SIZE)
             .i32_const(TYPE_HEAP_SIZE);
 
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            false,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         let heap_integers_add_f = heap_integers_mul(&mut raw_module, &compilation_ctx);
         func_body.call(heap_integers_add_f);
 
@@ -577,7 +584,14 @@ mod tests {
             .i32_const(TYPE_HEAP_SIZE)
             .i32_const(TYPE_HEAP_SIZE);
 
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            false,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         let heap_integers_add_f = heap_integers_mul(&mut raw_module, &compilation_ctx);
         // Shift left
         func_body.call(heap_integers_add_f);

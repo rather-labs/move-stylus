@@ -44,7 +44,6 @@ impl IRef {
                         builder,
                         module,
                         reader_pointer,
-                        calldata_reader_pointer,
                         compilation_ctx,
                         &struct_,
                     )?;
@@ -193,11 +192,18 @@ mod tests {
     };
     use alloy_primitives::{U256, address};
     use alloy_sol_types::{SolType, sol};
-    use walrus::{FunctionBuilder, ValType};
+    use walrus::{ConstExpr, FunctionBuilder, ValType, ir::Value};
 
     fn test_unpack_ref(data: &[u8], ref_type: IntermediateType, expected_memory_bytes: &[u8]) {
         let (mut raw_module, allocator, memory_id) = build_module(Some(data.len() as i32));
-        let compilation_ctx = test_compilation_context!(memory_id, allocator);
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            true,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);

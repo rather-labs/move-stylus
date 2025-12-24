@@ -66,7 +66,7 @@ pub fn pack_i64_type_instructions(
 #[cfg(test)]
 mod tests {
     use alloy_sol_types::{SolType, sol};
-    use walrus::{FunctionBuilder, ValType};
+    use walrus::{ConstExpr, FunctionBuilder, ValType, ir::Value};
 
     use crate::{
         abi_types::packing::Packable,
@@ -83,7 +83,14 @@ mod tests {
     fn test_uint(int_type: impl Packable, literal: Int, expected_result: &[u8]) {
         let (mut raw_module, alloc_function, memory_id) = build_module(None);
 
-        let compilation_ctx = test_compilation_context!(memory_id, alloc_function);
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            false,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, alloc_function, calldata_reader_pointer_global);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);

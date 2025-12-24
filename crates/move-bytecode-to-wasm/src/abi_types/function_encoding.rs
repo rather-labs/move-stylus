@@ -41,11 +41,19 @@ mod tests {
 
     use super::abi_encoding::selector;
     use super::*;
+    use walrus::{ConstExpr, ValType, ir::Value};
 
     #[test]
     fn test_move_signature_to_abi_selector() {
-        let (_, allocator_func, memory_id) = build_module(None);
-        let mut compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let (mut raw_module, allocator_func, memory_id) = build_module(None);
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            true,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let mut compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 
         let signature: &[IntermediateType] = &[IntermediateType::IU8, IntermediateType::IU16];
         assert_eq!(

@@ -6,7 +6,7 @@ use crate::translation::intermediate_types::{IntermediateType, enums::IEnum, str
 pub use error::CompilationContextError;
 pub use module_data::{ModuleData, ModuleId, UserDefinedType};
 use std::{borrow::Cow, collections::HashMap};
-use walrus::{FunctionId, MemoryId};
+use walrus::{FunctionId, GlobalId, MemoryId};
 
 type Result<T> = std::result::Result<T, CompilationContextError>;
 
@@ -25,6 +25,10 @@ pub struct CompilationContext<'a> {
 
     /// Allocator function id
     pub allocator: FunctionId,
+
+    /// Globals
+    /// - Calldata reader pointer
+    pub calldata_reader_pointer: GlobalId,
 }
 
 impl CompilationContext<'_> {
@@ -34,12 +38,14 @@ impl CompilationContext<'_> {
         deps_data: &'a HashMap<ModuleId, ModuleData>,
         memory_id: MemoryId,
         allocator: FunctionId,
+        calldata_reader_pointer: GlobalId,
     ) -> CompilationContext<'a> {
         CompilationContext::<'a> {
             root_module_data,
             deps_data,
             memory_id,
             allocator,
+            calldata_reader_pointer,
         }
     }
 

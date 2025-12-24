@@ -489,7 +489,7 @@ impl Packable for IntermediateType {
 mod tests {
     use alloy_primitives::U256;
     use alloy_sol_types::sol;
-    use walrus::{FunctionBuilder, ValType};
+    use walrus::{ConstExpr, FunctionBuilder, ValType, ir::Value};
     use wasmtime::{Caller, Engine, Extern, Linker};
 
     use crate::{
@@ -528,7 +528,14 @@ mod tests {
     #[test]
     fn test_build_pack_instructions() {
         let (mut raw_module, allocator_func, memory_id) = build_module(None);
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            true,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 
         let validator_func_type = raw_module.types.add(&[ValType::I32, ValType::I32], &[]);
         let (validator_func, _) = raw_module.add_import_func("", "validator", validator_func_type);
@@ -592,7 +599,14 @@ mod tests {
     fn test_build_pack_instructions_memory_offset() {
         // Memory offset starts at 100
         let (mut raw_module, allocator_func, memory_id) = build_module(Some(100));
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            true,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 
         let validator_func_type = raw_module.types.add(&[ValType::I32, ValType::I32], &[]);
         let (validator_func, _) = raw_module.add_import_func("", "validator", validator_func_type);
@@ -683,7 +697,14 @@ mod tests {
         let data_len = data.len() as i32;
 
         let (mut raw_module, allocator_func, memory_id) = build_module(Some(data_len));
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            true,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 
         let validator_func_type = raw_module.types.add(&[ValType::I32, ValType::I32], &[]);
         let (validator_func, _) = raw_module.add_import_func("", "validator", validator_func_type);

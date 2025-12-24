@@ -5,10 +5,9 @@ use walrus::{
 };
 
 use crate::{
-    CompilationContext, abi_types::error::AbiError, translation::intermediate_types::enums::IEnum,
+    CompilationContext, abi_types::error::AbiError, runtime::RuntimeFunction,
+    translation::intermediate_types::enums::IEnum,
 };
-
-use super::unpack_native_int::unpack_i32_type_instructions;
 
 impl IEnum {
     pub fn add_unpack_instructions(
@@ -23,13 +22,11 @@ impl IEnum {
 
         let encoded_size =
             sol_data::Uint::<8>::ENCODED_SIZE.ok_or(AbiError::UnableToGetTypeAbiSize)?;
-        unpack_i32_type_instructions(
-            block,
-            module,
-            compilation_ctx.memory_id,
-            reader_pointer,
-            encoded_size,
-        )?;
+        let unpack_u32_function = RuntimeFunction::UnpackU32.get(module, Some(compilation_ctx))?;
+        block
+            .local_get(reader_pointer)
+            .i32_const(encoded_size as i32)
+            .call(unpack_u32_function);
 
         // Save the variant to check it later
         block.local_tee(variant_number);

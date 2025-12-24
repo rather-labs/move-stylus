@@ -224,6 +224,8 @@ mod tests {
         translation::intermediate_types::ISignature, utils::display_module,
     };
 
+    use walrus::{ConstExpr, ir::Value};
+
     use super::*;
 
     fn add_noop_function<'a>(
@@ -388,7 +390,14 @@ mod tests {
     #[test]
     fn test_build_entrypoint_router_noop() {
         let (mut raw_module, allocator_func, memory_id) = build_module(None);
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            true,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         let signature = ISignature {
             arguments: vec![],
             returns: vec![],
@@ -428,7 +437,14 @@ mod tests {
     // #[should_panic(expected = "unreachable")]
     fn test_build_entrypoint_router_no_data() {
         let (mut raw_module, allocator_func, memory_id) = build_module(None);
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            true,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         let signature = ISignature {
             arguments: vec![],
             returns: vec![],
@@ -452,7 +468,14 @@ mod tests {
     #[test]
     fn test_build_entrypoint_router_no_match() {
         let (mut raw_module, allocator_func, memory_id) = build_module(None);
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            true,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         let signature = ISignature {
             arguments: vec![],
             returns: vec![],

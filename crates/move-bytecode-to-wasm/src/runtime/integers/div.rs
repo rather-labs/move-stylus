@@ -493,7 +493,7 @@ mod tests {
     };
     use alloy_primitives::U256;
     use rstest::rstest;
-    use walrus::FunctionBuilder;
+    use walrus::{ConstExpr, FunctionBuilder, ValType, ir::Value};
 
     use super::*;
 
@@ -532,7 +532,14 @@ mod tests {
 
         func_body.i32_const(0).i32_const(n).i32_const(128);
 
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            true,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         let shift_64bits_right_f = get_bit(&mut raw_module, &compilation_ctx);
         func_body.call(shift_64bits_right_f);
 
@@ -577,7 +584,14 @@ mod tests {
         // arguments for shift_64bits_right (a_ptr, size in heap)
         func_body.i32_const(0).i32_const(16);
 
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            false,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         let shift_64bits_right_f = shift_1bit_left(&mut raw_module, &compilation_ctx);
         func_body.call(shift_64bits_right_f);
 
@@ -625,7 +639,14 @@ mod tests {
         // arguments for shift_64bits_right (a_ptr, size in heap)
         func_body.i32_const(0).i32_const(32);
 
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            false,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         let shift_64bits_right_f = shift_1bit_left(&mut raw_module, &compilation_ctx);
         func_body.call(shift_64bits_right_f);
 
@@ -683,7 +704,14 @@ mod tests {
             .i32_const(128)
             .i32_const(1);
 
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            false,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         let heap_integers_add_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
         func_body.call(heap_integers_add_f);
 
@@ -752,7 +780,14 @@ mod tests {
             .i32_const(128)
             .i32_const(0);
 
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            false,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         let heap_integers_add_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
         // Shift left
         func_body.call(heap_integers_add_f);
@@ -840,7 +875,14 @@ mod tests {
             .i32_const(256)
             .i32_const(1);
 
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            false,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         let heap_integers_add_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
         // Shift left
         func_body.call(heap_integers_add_f);
@@ -927,7 +969,14 @@ mod tests {
             .i32_const(256)
             .i32_const(0);
 
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            false,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         let heap_integers_add_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
         // Shift left
         func_body.call(heap_integers_add_f);

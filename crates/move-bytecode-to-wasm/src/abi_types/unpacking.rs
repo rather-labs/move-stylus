@@ -1,8 +1,6 @@
+use alloy_sol_types::{SolType, sol_data};
 use error::AbiUnpackError;
-use walrus::{
-    InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{LoadKind, MemArg},
-};
+use walrus::{InstrSeqBuilder, LocalId, Module, ValType};
 
 use crate::{
     CompilationContext,
@@ -15,12 +13,8 @@ use crate::{
     runtime::RuntimeFunction,
     translation::intermediate_types::{
         IntermediateType,
-        address::IAddress,
-        boolean::IBool,
         enums::IEnum,
-        heap_integers::{IU128, IU256},
         reference::{IMutRef, IRef},
-        simple_integers::{IU8, IU16, IU32, IU64},
         structs::IStruct,
     },
     vm_handled_types::{
@@ -34,8 +28,6 @@ use super::error::AbiError;
 pub(crate) mod error;
 mod unpack_bytes;
 mod unpack_enum;
-mod unpack_heap_int;
-mod unpack_native_int;
 mod unpack_reference;
 mod unpack_string;
 mod unpack_struct;
@@ -79,6 +71,11 @@ pub fn build_unpack_instructions<T: Unpackable>(
         .local_tee(reader_pointer)
         .local_set(calldata_base_pointer);
 
+    // Set the global calldata reader pointer to the reader pointer
+    function_builder
+        .local_get(reader_pointer)
+        .global_set(compilation_ctx.calldata_reader_pointer);
+
     // The ABI encoded params are always a tuple
     // Static types are stored in-place, but dynamic types are referenced to the call data
     for signature_token in function_arguments_signature.iter() {
@@ -97,108 +94,70 @@ pub fn build_unpack_instructions<T: Unpackable>(
 impl Unpackable for IntermediateType {
     fn add_unpack_instructions(
         &self,
-        function_builder: &mut InstrSeqBuilder,
+        builder: &mut InstrSeqBuilder,
         module: &mut Module,
         reader_pointer: LocalId,
         calldata_base_pointer: LocalId,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), AbiError> {
-        let return_pointer = module.locals.add(ValType::I32);
-
         match self {
-            IntermediateType::IBool => IBool::add_unpack_instructions(
-                function_builder,
-                module,
-                reader_pointer,
-                calldata_base_pointer,
-                compilation_ctx,
-            )?,
-            IntermediateType::IU8 => IU8::add_unpack_instructions(
-                function_builder,
-                module,
-                reader_pointer,
-                calldata_base_pointer,
-                compilation_ctx,
-            )?,
-            IntermediateType::IU16 => IU16::add_unpack_instructions(
-                function_builder,
-                module,
-                reader_pointer,
-                calldata_base_pointer,
-                compilation_ctx,
-            )?,
-            IntermediateType::IU32 => IU32::add_unpack_instructions(
-                function_builder,
-                module,
-                reader_pointer,
-                calldata_base_pointer,
-                compilation_ctx,
-            )?,
-            IntermediateType::IU64 => IU64::add_unpack_instructions(
-                function_builder,
-                module,
-                reader_pointer,
-                calldata_base_pointer,
-                compilation_ctx,
-            )?,
-            IntermediateType::IU128 => IU128::add_unpack_instructions(
-                function_builder,
-                module,
-                reader_pointer,
-                calldata_base_pointer,
-                compilation_ctx,
-            )?,
-            IntermediateType::IU256 => IU256::add_unpack_instructions(
-                function_builder,
-                module,
-                reader_pointer,
-                calldata_base_pointer,
-                compilation_ctx,
-            )?,
-            IntermediateType::IAddress => IAddress::add_unpack_instructions(
-                function_builder,
-                module,
-                reader_pointer,
-                calldata_base_pointer,
-                compilation_ctx,
-            )?,
+            IntermediateType::IBool
+            | IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32 => {
+                let encoded_size = match self {
+                    IntermediateType::IBool => sol_data::Bool::ENCODED_SIZE,
+                    IntermediateType::IU8 => sol_data::Uint::<8>::ENCODED_SIZE,
+                    IntermediateType::IU16 => sol_data::Uint::<16>::ENCODED_SIZE,
+                    IntermediateType::IU32 => sol_data::Uint::<32>::ENCODED_SIZE,
+                    _ => unreachable!(),
+                }
+                .ok_or(AbiError::UnableToGetTypeAbiSize)?;
+
+                let unpack_u32_function =
+                    RuntimeFunction::UnpackU32.get(module, Some(compilation_ctx))?;
+                builder
+                    .local_get(reader_pointer)
+                    .i32_const(encoded_size as i32)
+                    .call(unpack_u32_function);
+            }
+            IntermediateType::IU64 => {
+                let unpack_i64_function =
+                    RuntimeFunction::UnpackU64.get(module, Some(compilation_ctx))?;
+                builder.local_get(reader_pointer).call(unpack_i64_function);
+            }
+            IntermediateType::IU128 => {
+                let unpack_u128_function =
+                    RuntimeFunction::UnpackU128.get(module, Some(compilation_ctx))?;
+                builder.local_get(reader_pointer).call(unpack_u128_function);
+            }
+            IntermediateType::IU256 => {
+                let unpack_u256_function =
+                    RuntimeFunction::UnpackU256.get(module, Some(compilation_ctx))?;
+                builder.local_get(reader_pointer).call(unpack_u256_function);
+            }
+            IntermediateType::IAddress => {
+                let unpack_address_function =
+                    RuntimeFunction::UnpackAddress.get(module, Some(compilation_ctx))?;
+                builder
+                    .local_get(reader_pointer)
+                    .call(unpack_address_function);
+            }
             IntermediateType::IVector(inner) => {
                 let unpack_vector_fn =
                     RuntimeFunction::UnpackVector.get_generic(module, compilation_ctx, &[inner])?;
 
-                // Push arguments: reader_pointer and calldata_base_pointer
-                function_builder
+                builder
                     .local_get(reader_pointer)
                     .local_get(calldata_base_pointer)
                     .call(unpack_vector_fn);
-
-                function_builder
-                    .local_tee(return_pointer)
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    )
-                    .local_set(reader_pointer);
-
-                function_builder.local_get(return_pointer).load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 4,
-                    },
-                );
             }
             // The signer must not be unpacked here, since it can't be part of the calldata. It is
             // injected directly by the VM into the stack
             IntermediateType::ISigner => (),
             IntermediateType::IRef(inner) => IRef::add_unpack_instructions(
                 inner,
-                function_builder,
+                builder,
                 module,
                 reader_pointer,
                 calldata_base_pointer,
@@ -206,7 +165,7 @@ impl Unpackable for IntermediateType {
             )?,
             IntermediateType::IMutRef(inner) => IMutRef::add_unpack_instructions(
                 inner,
-                function_builder,
+                builder,
                 module,
                 reader_pointer,
                 calldata_base_pointer,
@@ -216,13 +175,13 @@ impl Unpackable for IntermediateType {
             IntermediateType::IStruct {
                 module_id, index, ..
             } if TxContext::is_vm_type(module_id, *index, compilation_ctx)? => {
-                TxContext::inject(function_builder, module, compilation_ctx);
+                TxContext::inject(builder, module, compilation_ctx);
             }
             IntermediateType::IStruct {
                 module_id, index, ..
             } if String_::is_vm_type(module_id, *index, compilation_ctx)? => {
                 String_::add_unpack_instructions(
-                    function_builder,
+                    builder,
                     module,
                     reader_pointer,
                     calldata_base_pointer,
@@ -232,28 +191,27 @@ impl Unpackable for IntermediateType {
             IntermediateType::IStruct {
                 module_id, index, ..
             } if Calldata::is_vm_type(module_id, *index, compilation_ctx)? => {
-                Calldata::inject(function_builder, module, compilation_ctx);
+                Calldata::inject(builder, module, compilation_ctx);
             }
             IntermediateType::IStruct {
                 module_id, index, ..
             } if Bytes::is_vm_type(module_id, *index, compilation_ctx)? => {
-                Bytes::add_unpack_instructions(function_builder, reader_pointer)?;
+                Bytes::add_unpack_instructions(builder, reader_pointer)?;
             }
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
                 let struct_ = compilation_ctx.get_struct_by_intermediate_type(self)?;
 
                 if struct_.has_key {
                     load_struct_storage_id(
-                        function_builder,
+                        builder,
                         module,
                         reader_pointer,
-                        calldata_base_pointer,
                         compilation_ctx,
                         &struct_,
                     )?;
 
                     add_unpack_from_storage_instructions(
-                        function_builder,
+                        builder,
                         module,
                         compilation_ctx,
                         self,
@@ -264,7 +222,7 @@ impl Unpackable for IntermediateType {
                     // TxContext is the one defined in the stylus framework.
 
                     struct_.add_unpack_instructions(
-                        function_builder,
+                        builder,
                         module,
                         reader_pointer,
                         calldata_base_pointer,
@@ -280,7 +238,7 @@ impl Unpackable for IntermediateType {
 
                 IEnum::add_unpack_instructions(
                     &enum_,
-                    function_builder,
+                    builder,
                     module,
                     reader_pointer,
                     compilation_ctx,
@@ -290,6 +248,10 @@ impl Unpackable for IntermediateType {
                 return Err(AbiUnpackError::UnpackingGenericTypeParameter)?;
             }
         }
+
+        builder
+            .global_get(compilation_ctx.calldata_reader_pointer)
+            .local_set(reader_pointer);
         Ok(())
     }
 }
@@ -304,7 +266,6 @@ fn load_struct_storage_id(
     function_builder: &mut InstrSeqBuilder,
     module: &mut Module,
     reader_pointer: LocalId,
-    calldata_base_pointer: LocalId,
     compilation_ctx: &CompilationContext,
     struct_: &IStruct,
 ) -> Result<(), AbiError> {
@@ -314,13 +275,11 @@ fn load_struct_storage_id(
         }) if Uid::is_vm_type(module_id, *index, compilation_ctx)? => {
             // First we add the instructions to unpack the UID. We use address to unpack it because ids are
             // 32 bytes static, same as an address
-            IAddress::add_unpack_instructions(
-                function_builder,
-                module,
-                reader_pointer,
-                calldata_base_pointer,
-                compilation_ctx,
-            )?;
+            let unpack_address_function =
+                RuntimeFunction::UnpackAddress.get(module, Some(compilation_ctx))?;
+            function_builder
+                .local_get(reader_pointer)
+                .call(unpack_address_function);
         }
         Some(IntermediateType::IGenericStructInstance {
             module_id,
@@ -402,7 +361,7 @@ fn add_unpack_from_storage_instructions(
 #[cfg(test)]
 mod tests {
     use alloy_sol_types::{SolType, sol};
-    use walrus::{FunctionBuilder, ValType};
+    use walrus::{ConstExpr, FunctionBuilder, ValType, ir::Value};
     use wasmtime::{Engine, Linker};
 
     use crate::{
@@ -424,7 +383,14 @@ mod tests {
     #[test]
     fn test_build_unpack_instructions() {
         let (mut raw_module, allocator_func, memory_id) = build_module(None);
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            true,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 
         let validator_func_type = raw_module
             .types
@@ -482,7 +448,14 @@ mod tests {
     #[test]
     fn test_build_unpack_instructions_reversed() {
         let (mut raw_module, allocator_func, memory_id) = build_module(None);
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            true,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 
         let validator_func_type = raw_module
             .types
@@ -547,7 +520,14 @@ mod tests {
     #[test]
     fn test_build_unpack_instructions_offset_memory() {
         let (mut raw_module, allocator_func, memory_id) = build_module(None);
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            true,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 
         let validator_func_type = raw_module
             .types
