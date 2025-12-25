@@ -2,7 +2,7 @@ use super::error::AbiUnpackError;
 use super::{Unpackable, load_struct_storage_id};
 use crate::CompilationContext;
 use crate::abi_types::error::AbiError;
-use crate::abi_types::unpacking::add_unpack_from_storage_instructions;
+use crate::runtime::RuntimeFunction;
 use crate::translation::intermediate_types::IntermediateType;
 use crate::translation::intermediate_types::reference::{IMutRef, IRef};
 use walrus::{InstrSeqBuilder, LocalId, Module, ir::MemArg};
@@ -48,13 +48,10 @@ impl IRef {
                         &struct_,
                     )?;
 
-                    add_unpack_from_storage_instructions(
-                        builder,
-                        module,
-                        compilation_ctx,
-                        inner,
-                        true,
-                    )?;
+                    let unpack_storage_struct_function = RuntimeFunction::UnpackStorageStruct
+                        .get_generic(module, compilation_ctx, &[inner])?;
+                    // unpack_frozen = true
+                    builder.i32_const(1).call(unpack_storage_struct_function);
                 } else {
                     inner.add_unpack_instructions(
                         builder,

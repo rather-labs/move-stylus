@@ -8,7 +8,6 @@ use crate::{
         ModuleId,
         reserved_modules::{SF_MODULE_NAME_OBJECT, STYLUS_FRAMEWORK_ADDRESS},
     },
-    data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
     native_functions::NativeFunction,
     runtime::RuntimeFunction,
     translation::intermediate_types::{
@@ -25,9 +24,7 @@ use crate::{
 use super::error::AbiError;
 
 pub(crate) mod error;
-mod unpack_bytes;
 mod unpack_reference;
-mod unpack_struct;
 
 pub trait Unpackable {
     /// Adds the instructions to unpack the abi encoded type to WASM function parameters
@@ -192,7 +189,11 @@ impl Unpackable for IntermediateType {
             IntermediateType::IStruct {
                 module_id, index, ..
             } if Bytes::is_vm_type(module_id, *index, compilation_ctx)? => {
-                Bytes::add_unpack_instructions(builder, reader_pointer)?;
+                let unpack_bytes_function =
+                    RuntimeFunction::UnpackBytes.get(module, Some(compilation_ctx))?;
+                builder
+                    .local_get(reader_pointer)
+                    .call(unpack_bytes_function);
             }
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
                 let struct_ = compilation_ctx.get_struct_by_intermediate_type(self)?;
@@ -206,29 +207,26 @@ impl Unpackable for IntermediateType {
                         &struct_,
                     )?;
 
-                    add_unpack_from_storage_instructions(
-                        builder,
-                        module,
-                        compilation_ctx,
-                        self,
-                        false,
-                    )?;
-                } else {
-                    // TODO: Check if the struct is TxContext. If it is, panic since the only valid
-                    // TxContext is the one defined in the stylus framework.
+                    let unpack_storage_struct_function = RuntimeFunction::UnpackStorageStruct
+                        .get_generic(module, compilation_ctx, &[self])?;
 
-                    struct_.add_unpack_instructions(
-                        builder,
+                    // unpack_frozen = false
+                    builder.i32_const(0).call(unpack_storage_struct_function);
+                } else {
+                    let unpack_struct_function = RuntimeFunction::UnpackStruct.get_generic(
                         module,
-                        reader_pointer,
-                        calldata_base_pointer,
                         compilation_ctx,
+                        &[self],
                     )?;
+                    builder
+                        .local_get(reader_pointer)
+                        .local_get(calldata_base_pointer)
+                        .call(unpack_struct_function);
                 }
             }
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
                 let unpack_enum_function =
-                    RuntimeFunction::UnpackEnum.get_generic(module, &compilation_ctx, &[self])?;
+                    RuntimeFunction::UnpackEnum.get_generic(module, compilation_ctx, &[self])?;
                 builder.local_get(reader_pointer).call(unpack_enum_function);
             }
             IntermediateType::ITypeParameter(_) => {
@@ -296,52 +294,6 @@ fn load_struct_storage_id(
             ))?;
         }
     }
-    Ok(())
-}
-
-/// This function searches in the storage for the structure that belongs to the object UID passed
-/// as argument.
-fn add_unpack_from_storage_instructions(
-    builder: &mut InstrSeqBuilder,
-    module: &mut Module,
-    compilation_ctx: &CompilationContext,
-    itype: &IntermediateType,
-    unpack_frozen: bool,
-) -> Result<(), AbiError> {
-    // Search for the object in the objects mappings
-    let locate_storage_data_fn =
-        RuntimeFunction::LocateStorageData.get(module, Some(compilation_ctx))?;
-
-    let uid_ptr = module.locals.add(ValType::I32);
-    builder.local_tee(uid_ptr);
-
-    if unpack_frozen {
-        builder.i32_const(1);
-    } else {
-        builder.i32_const(0);
-    }
-
-    builder.call(locate_storage_data_fn);
-
-    // Read the object
-    let read_and_decode_from_storage_fn =
-        RuntimeFunction::ReadAndDecodeFromStorage.get_generic(module, compilation_ctx, &[itype])?;
-
-    // Copy the slot number into a local to avoid overwriting it later
-    let slot_ptr = module.locals.add(ValType::I32);
-    builder
-        .i32_const(32)
-        .call(compilation_ctx.allocator)
-        .local_tee(slot_ptr)
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .i32_const(32)
-        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-
-    builder
-        .local_get(slot_ptr)
-        .local_get(uid_ptr)
-        .call(read_and_decode_from_storage_fn);
-
     Ok(())
 }
 

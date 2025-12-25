@@ -91,6 +91,7 @@ pub enum RuntimeFunction {
     ValidatePointer32Bit,
     // ABI unpacking
     UnpackVector,
+    UnpackBytes,
     UnpackU32,
     UnpackU64,
     UnpackU128,
@@ -98,6 +99,8 @@ pub enum RuntimeFunction {
     UnpackAddress,
     UnpackEnum,
     UnpackString,
+    UnpackStruct,
+    UnpackStorageStruct,
 }
 
 impl RuntimeFunction {
@@ -169,6 +172,7 @@ impl RuntimeFunction {
             Self::ValidatePointer32Bit => "validate_pointer_32_bit",
             // ABI unpacking
             Self::UnpackVector => "unpack_vector",
+            Self::UnpackBytes => "unpack_bytes",
             Self::UnpackU32 => "unpack_u32",
             Self::UnpackU64 => "unpack_u64",
             Self::UnpackU128 => "unpack_u128",
@@ -176,6 +180,8 @@ impl RuntimeFunction {
             Self::UnpackAddress => "unpack_address",
             Self::UnpackEnum => "unpack_enum",
             Self::UnpackString => "unpack_string",
+            Self::UnpackStruct => "unpack_struct",
+            Self::UnpackStorageStruct => "unpack_storage_struct",
         }
     }
 
@@ -301,6 +307,7 @@ impl RuntimeFunction {
                     abi::validate_pointer_32_bit(module, ctx)
                 }
                 // ABI unpacking
+                (Self::UnpackBytes, Some(ctx)) => unpacking::unpack_bytes_function(module, ctx)?,
                 (Self::UnpackU32, Some(ctx)) => unpacking::unpack_u32_function(module, ctx)?,
                 (Self::UnpackU64, Some(ctx)) => unpacking::unpack_u64_function(module, ctx)?,
                 (Self::UnpackU128, Some(ctx)) => unpacking::unpack_u128_function(module, ctx)?,
@@ -380,6 +387,14 @@ impl RuntimeFunction {
             Self::UnpackEnum => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
                 unpacking::unpack_enum_function(module, compilation_ctx, generics[0])?
+            }
+            Self::UnpackStruct => {
+                Self::assert_generics_length(generics.len(), 1, self.name())?;
+                unpacking::unpack_struct_function(module, compilation_ctx, generics[0])?
+            }
+            Self::UnpackStorageStruct => {
+                Self::assert_generics_length(generics.len(), 1, self.name())?;
+                unpacking::unpack_storage_struct_function(module, compilation_ctx, generics[0])?
             }
             _ => {
                 return Err(RuntimeFunctionError::CouldNotLinkGeneric(
