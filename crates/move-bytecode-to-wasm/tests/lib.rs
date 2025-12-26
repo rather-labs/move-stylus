@@ -1,3 +1,7 @@
+//! Module aggregating all test modules for the smart contract language
+//!
+//! We put all tests inside a single module to leverage on compiled modules cache. A lot of tests
+//! shared compiled code. This way we avoid recompiling the same code multiple times.
 pub mod common;
 pub mod constructor;
 pub mod control_flow;

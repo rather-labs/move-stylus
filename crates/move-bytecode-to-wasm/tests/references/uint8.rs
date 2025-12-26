@@ -1,6 +1,6 @@
 use crate::common::run_test;
 use crate::declare_fixture;
-use alloy_sol_types::{SolCall, SolType, SolValue, sol};
+use alloy_sol_types::{SolCall, SolType, sol};
 use move_test_runner::wasm_runner::RuntimeSandbox;
 use rstest::{fixture, rstest};
 

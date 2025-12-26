@@ -1,10 +1,6 @@
 use super::*;
 use crate::common::runtime;
-use alloy_primitives::{FixedBytes, U256, address, hex, keccak256};
-use alloy_sol_types::sol;
 use alloy_sol_types::{SolCall, SolValue, sol};
-use move_test_runner::constants::MSG_SENDER_ADDRESS;
-use move_test_runner::constants::SIGNER_ADDRESS;
 use move_test_runner::wasm_runner::RuntimeSandbox;
 use rstest::rstest;
 

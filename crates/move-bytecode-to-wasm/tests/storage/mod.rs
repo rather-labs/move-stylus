@@ -1,3 +1,18 @@
+mod capability;
+mod counter;
+mod counter_named_id;
+mod dynamic_fields;
+mod dynamic_fields_named_id;
+mod dynamic_table;
+mod encoding;
+mod enums;
+mod erc20;
+mod simple_warrior;
+mod transfer;
+mod transfer_named_id;
+mod trusted_swap;
+mod wrapped_objects;
+
 use alloy_primitives::{FixedBytes, U256, keccak256};
 
 pub const SHARED: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
