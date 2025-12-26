@@ -175,7 +175,7 @@ pub fn translate_package<'move_package>(
 
         let compilation_ctx = CompilationContext::new(
             &root_module_data,
-            &modules_data,
+            modules_data,
             memory_id,
             allocator_func,
             calldata_reader_pointer_global,
