@@ -1,4 +1,4 @@
-module 0x01::uint_8;
+module 0x01::references_uint_8;
 
 entry fun deref_u8(x: u8): u8 {
   let y = &x;

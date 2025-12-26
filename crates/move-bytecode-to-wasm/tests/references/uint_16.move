@@ -1,4 +1,4 @@
-module 0x01::uint_16;
+module 0x01::references_uint_16;
 
 entry fun deref_u16(x: u16): u16 {
   let y = &x;

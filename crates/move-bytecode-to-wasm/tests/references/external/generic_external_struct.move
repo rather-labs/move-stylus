@@ -1,6 +1,6 @@
-module test::external_generic_struct;
+module test::references_external_generic_struct;
 
-use test::external_generic_struct_defs::{Foo, Bar, get_foo};
+use test::references_external_generic_struct_defs::{Foo, Bar, get_foo};
 
 entry fun deref_struct(x: Foo<u32>): Foo<u32> {
   let y = &x;

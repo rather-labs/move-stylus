@@ -1,4 +1,4 @@
-module 0x01::vec_256;
+module 0x01::references_vec_256;
 
 entry fun deref(x: vector<u256>): vector<u256> {
   let y = &x;

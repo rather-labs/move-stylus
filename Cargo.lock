@@ -3807,9 +3807,6 @@ dependencies = [
  "alloy-primitives",
  "anyhow",
  "move-bytecode-to-wasm",
- "move-packages-build",
- "rstest",
- "wasmprinter 0.228.0",
  "wasmtime",
 ]
 

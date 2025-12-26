@@ -1,4 +1,4 @@
-module 0x01::uint_128;
+module 0x01::references_uint_128;
 
 entry fun deref_u128(x: u128): u128 {
   let y = &x;

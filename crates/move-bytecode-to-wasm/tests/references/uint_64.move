@@ -1,4 +1,4 @@
-module 0x01::uint_64;
+module 0x01::references_uint_64;
 
 entry fun deref_u64(x: u64): u64 {
   let y = &x;

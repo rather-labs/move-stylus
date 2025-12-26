@@ -1,4 +1,4 @@
-module 0x01::uint_32;
+module 0x01::references_uint_32;
 
 entry fun deref_u32(x: u32): u32 {
   let y = &x;

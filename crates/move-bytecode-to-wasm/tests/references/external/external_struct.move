@@ -1,6 +1,6 @@
-module test::external_struct;
+module test::references_external_struct;
 
-use test::external_struct_def::{Foo, Bar, get_foo};
+use test::references_external_struct_def::{Foo, Bar, get_foo};
 
 entry fun deref_struct(x: Foo): Foo {
   let y = &x;

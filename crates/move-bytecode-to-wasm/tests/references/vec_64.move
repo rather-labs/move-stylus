@@ -1,4 +1,4 @@
-module 0x01::vec_64;
+module 0x01::references_vec_64;
 
 entry fun deref(x: vector<u64>): vector<u64> {
   let y = &x;

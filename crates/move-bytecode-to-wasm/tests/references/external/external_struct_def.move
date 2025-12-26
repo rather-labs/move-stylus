@@ -1,4 +1,4 @@
-module test::external_struct_def;
+module test::references_external_struct_def;
 
 public struct Foo has drop, copy {
     q: address,

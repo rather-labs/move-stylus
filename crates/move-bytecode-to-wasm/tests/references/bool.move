@@ -1,4 +1,4 @@
-module 0x01::bool;
+module 0x01::references_bool;
 
 entry fun deref_bool(x: bool): bool {
   let y = &x;

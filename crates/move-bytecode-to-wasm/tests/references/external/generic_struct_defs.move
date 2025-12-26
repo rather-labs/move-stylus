@@ -1,4 +1,4 @@
-module test::external_generic_struct_defs;
+module test::references_external_generic_struct_defs;
 
 public struct Foo<T: copy> has drop, copy {
     g: T,

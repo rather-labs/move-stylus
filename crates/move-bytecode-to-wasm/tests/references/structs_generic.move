@@ -1,4 +1,4 @@
-module 0x01::structs_generic;
+module 0x01::references_structs_generic;
 
 public struct Foo<T> has drop, copy {
     g: T,

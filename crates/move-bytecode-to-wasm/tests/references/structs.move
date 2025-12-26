@@ -1,4 +1,4 @@
-module 0x01::structs;
+module 0x01::references_structs;
 
 public struct Foo has drop, copy {
     q: address,

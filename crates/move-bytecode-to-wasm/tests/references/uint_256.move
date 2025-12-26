@@ -1,4 +1,4 @@
-module 0x01::uint_256;
+module 0x01::references_uint_256;
 
 entry fun deref_u256(x: u256): u256 {
   let y = &x;

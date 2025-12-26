@@ -202,7 +202,18 @@ pub fn translate_test_package(path: &'static str, module_name: &str) -> Arc<Vec<
         cache.insert((path, module_name), Arc::new(module.emit_wasm()));
     }
 
-    cache.get(&(path, module_name.to_owned())).unwrap().clone()
+    match cache.get(&(path, module_name.to_owned())) {
+        None => {
+            drop(cache);
+            drop(dependencies_cache);
+            panic!(
+                "Module {} not found in package at path: {}. Is it named worng in the test?",
+                module_name,
+                rerooted_path.display()
+            );
+        }
+        Some(module) => module.clone(),
+    }
 }
 
 #[allow(dead_code)]
@@ -258,7 +269,7 @@ macro_rules! declare_fixture {
 }
 
 #[fixture]
-pub fn test_runtime(
+pub fn runtime(
     #[default("")] module_name: &str,
     #[default("")] source_path: &'static str,
 ) -> RuntimeSandbox {

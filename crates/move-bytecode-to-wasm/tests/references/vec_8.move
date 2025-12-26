@@ -1,4 +1,4 @@
-module 0x01::vec_8;
+module 0x01::references_vec_8;
 
 entry fun deref(x: vector<u8>): vector<u8> {
   let y = &x;
