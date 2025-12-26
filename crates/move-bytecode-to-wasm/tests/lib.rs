@@ -9,9 +9,9 @@ pub mod native;
 pub mod operations_bitwise;
 pub mod operations_cast;
 pub mod operations_comparisons;
-/*
 pub mod operations_equality;
 pub mod primitives;
+/*
 pub mod receive;
 pub mod references;
 pub mod stdlib;
