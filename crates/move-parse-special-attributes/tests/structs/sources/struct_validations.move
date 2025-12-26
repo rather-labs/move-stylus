@@ -55,7 +55,6 @@ public struct StructWithNestedError {
     error: NestedError,
 }
 
-public struct Calldata {}
 public struct CrossContractCall {}
 public struct ContractCallResult {}
 public struct ContractCallEmptyResult {}

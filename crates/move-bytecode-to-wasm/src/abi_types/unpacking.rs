@@ -22,8 +22,8 @@ use crate::{
         vector::IVector,
     },
     vm_handled_types::{
-        VmHandledType, bytes::Bytes, fallback::Calldata, named_id::NamedId, string::String_,
-        tx_context::TxContext, uid::Uid,
+        VmHandledType, bytes::Bytes, named_id::NamedId, string::String_, tx_context::TxContext,
+        uid::Uid,
     },
 };
 
@@ -204,11 +204,6 @@ impl Unpackable for IntermediateType {
             }
             IntermediateType::IStruct {
                 module_id, index, ..
-            } if Calldata::is_vm_type(module_id, *index, compilation_ctx)? => {
-                Calldata::inject(function_builder, module, compilation_ctx);
-            }
-            IntermediateType::IStruct {
-                module_id, index, ..
             } if Bytes::is_vm_type(module_id, *index, compilation_ctx)? => {
                 Bytes::add_unpack_instructions(function_builder, reader_pointer)?;
             }
@@ -235,7 +230,6 @@ impl Unpackable for IntermediateType {
                 } else {
                     // TODO: Check if the struct is TxContext. If it is, panic since the only valid
                     // TxContext is the one defined in the stylus framework.
-
                     struct_.add_unpack_instructions(
                         function_builder,
                         module,
