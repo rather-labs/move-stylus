@@ -1418,7 +1418,7 @@ mod tests {
     use alloy_primitives::U256;
     use rstest::rstest;
     use std::str::FromStr;
-    use walrus::{ConstExpr, FunctionBuilder, ValType, ir::Value};
+    use walrus::{FunctionBuilder, ValType};
 
     use super::*;
 
@@ -1459,7 +1459,8 @@ mod tests {
     ).unwrap()
     )]
     fn test_derive_mapping_slot(#[case] slot: U256, #[case] key: U256, #[case] expected: U256) {
-        let (mut module, allocator_func, memory_id) = build_module(Some(64));
+        let (mut module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(64));
 
         let slot_ptr = module.locals.add(ValType::I32);
         let key_ptr = module.locals.add(ValType::I32);
@@ -1478,10 +1479,6 @@ mod tests {
             .call(allocator_func)
             .local_set(result_ptr);
 
-        let calldata_reader_pointer_global =
-            module
-                .globals
-                .add_local(ValType::I32, false, false, ConstExpr::Value(Value::I32(0)));
         let ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 
@@ -1547,7 +1544,8 @@ mod tests {
         #[case] inner_key: U256,
         #[case] expected: U256,
     ) {
-        let (mut module, allocator_func, memory_id) = build_module(Some(96));
+        let (mut module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(96));
 
         let slot_ptr = module.locals.add(ValType::I32);
         let outer_key_ptr = module.locals.add(ValType::I32);
@@ -1569,10 +1567,6 @@ mod tests {
             .call(allocator_func)
             .local_set(result_ptr);
 
-        let calldata_reader_pointer_global =
-            module
-                .globals
-                .add_local(ValType::I32, false, false, ConstExpr::Value(Value::I32(0)));
         let ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 
@@ -1691,7 +1685,8 @@ mod tests {
         #[case] element_size: u32,
         #[case] expected: U256,
     ) {
-        let (mut module, allocator_func, memory_id) = build_module(Some(40)); // slot (32 bytes) + index (4 bytes) + elem_size (4 bytes)
+        let (mut module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(40)); // slot (32 bytes) + index (4 bytes) + elem_size (4 bytes)
 
         let slot_ptr = module.locals.add(ValType::I32);
         let index = module.locals.add(ValType::I32);
@@ -1710,10 +1705,6 @@ mod tests {
             .call(allocator_func)
             .local_set(result_ptr);
 
-        let calldata_reader_pointer_global =
-            module
-                .globals
-                .add_local(ValType::I32, false, false, ConstExpr::Value(Value::I32(0)));
         let ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 
@@ -1781,7 +1772,8 @@ mod tests {
         #[case] expected: U256,
     ) {
         // slot (32 bytes) + outer_index (4 bytes) + inner_index (4 bytes) + elem_size (4 bytes)
-        let (mut module, allocator_func, memory_id) = build_module(Some(44));
+        let (mut module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(44));
 
         let slot_ptr = module.locals.add(ValType::I32);
         let outer_index = module.locals.add(ValType::I32);
@@ -1806,10 +1798,6 @@ mod tests {
             .i32_const(32)
             .local_set(array_header_size);
 
-        let calldata_reader_pointer_global =
-            module
-                .globals
-                .add_local(ValType::I32, false, false, ConstExpr::Value(Value::I32(0)));
         let ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 

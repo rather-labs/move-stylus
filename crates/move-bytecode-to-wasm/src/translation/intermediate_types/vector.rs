@@ -922,18 +922,13 @@ mod tests {
     };
     use alloy_primitives::U256;
     use walrus::ir::UnaryOp;
-    use walrus::{ConstExpr, FunctionBuilder, ValType, ir::Value};
+    use walrus::{FunctionBuilder, ValType};
 
     use super::*;
 
     fn test_vector(data: &[u8], inner_type: IntermediateType, expected_result_bytes: &[u8]) {
-        let (mut raw_module, allocator, memory_id) = build_module(None);
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            false,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
 
@@ -969,14 +964,9 @@ mod tests {
     }
 
     fn test_vector_copy(data: &[u8], inner_type: IntermediateType, expected_result_bytes: &[u8]) {
-        let (mut raw_module, allocator, memory_id) = build_module(None);
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
 
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            false,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
 
@@ -1027,13 +1017,8 @@ mod tests {
         inner_type: IntermediateType,
         expected_result_bytes: &[u8],
     ) {
-        let (mut raw_module, allocator, memory_id) = build_module(None);
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            false,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
 
@@ -1084,14 +1069,9 @@ mod tests {
         expected_result_bytes: &[u8],
         expected_pop_stack: i32,
     ) {
-        let (mut raw_module, allocator, memory_id) = build_module(None);
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
 
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            false,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
 
@@ -1155,14 +1135,9 @@ mod tests {
         inner_type: IntermediateType,
         expected_result_bytes: &[u8],
     ) {
-        let (mut raw_module, allocator, memory_id) = build_module(None);
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
 
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            false,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
 
@@ -1283,14 +1258,9 @@ mod tests {
         idx1: i64,
         idx2: i64,
     ) {
-        let (mut raw_module, allocator, memory_id) = build_module(None);
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
 
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            false,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
 

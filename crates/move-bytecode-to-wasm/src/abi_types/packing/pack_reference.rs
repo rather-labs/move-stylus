@@ -206,20 +206,15 @@ mod tests {
     use crate::translation::intermediate_types::IntermediateType;
     use alloy_primitives::address;
     use alloy_sol_types::{SolType, sol};
-    use walrus::{ConstExpr, FunctionBuilder, ValType, ir::Value};
+    use walrus::{FunctionBuilder, ValType};
 
     fn test_pack(data: &[u8], ref_type: IntermediateType, expected_calldata_bytes: &[u8]) {
-        let (mut raw_module, allocator, memory_id) = build_module(None);
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
 
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            false,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
 

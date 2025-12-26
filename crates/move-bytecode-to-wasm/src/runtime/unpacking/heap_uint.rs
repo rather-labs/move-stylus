@@ -142,7 +142,7 @@ pub fn unpack_address_function(
 mod tests {
     use alloy_primitives::{Address, U256, address};
     use alloy_sol_types::{SolType, sol};
-    use walrus::{ConstExpr, FunctionBuilder, ValType, ir::Value};
+    use walrus::{FunctionBuilder, ValType};
 
     use crate::{
         abi_types::unpacking::Unpackable,
@@ -153,13 +153,8 @@ mod tests {
 
     /// Test helper for unpacking heap-allocated types (u128, u256, address)
     fn unpack_heap_uint(data: &[u8], int_type: IntermediateType, expected_result_bytes: &[u8]) {
-        let (mut raw_module, allocator, memory_id) = build_module(Some(data.len() as i32));
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            true,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(data.len() as i32));
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
 

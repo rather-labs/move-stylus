@@ -248,8 +248,8 @@ mod tests {
         structs::{IStruct, IStructType},
     };
     use walrus::{
-        ConstExpr, Module, ValType,
-        ir::{LoadKind, MemArg, Value},
+        Module, ValType,
+        ir::{LoadKind, MemArg},
     };
 
     // Helper to create a compilation context for tests
@@ -275,11 +275,7 @@ mod tests {
         let root = Box::leak(Box::new(module_data));
         let deps = Box::leak(Box::new(HashMap::new()));
         // Create module with memory_id and allocator that will be shared
-        let (mut module, allocator, memory_id) = build_module(None);
-        let calldata_reader_pointer_global =
-            module
-                .globals
-                .add_local(ValType::I32, false, false, ConstExpr::Value(Value::I32(0)));
+        let (module, allocator, memory_id, calldata_reader_pointer_global) = build_module(None);
         let ctx = CompilationContext::new(
             root,
             deps,

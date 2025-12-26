@@ -515,7 +515,7 @@ mod tests {
     use crate::test_tools::{build_module, setup_wasmtime_module};
     use alloy_primitives::U256;
     use rstest::rstest;
-    use walrus::{ConstExpr, FunctionBuilder, ValType, ir::Value};
+    use walrus::{FunctionBuilder, ValType};
 
     use super::*;
 
@@ -530,7 +530,8 @@ mod tests {
     #[case(u128::MAX, 180, 0)]
     fn test_u128_shift_left(#[case] n: u128, #[case] shift_amount: i32, #[case] expected: u128) {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE));
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(TYPE_HEAP_SIZE));
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -549,12 +550,6 @@ mod tests {
         // Heap size
         func_body.i32_const(TYPE_HEAP_SIZE);
 
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            false,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         let shift_left_f = heap_int_shift_left(&mut raw_module, &compilation_ctx).unwrap();
@@ -593,7 +588,8 @@ mod tests {
     #[case(U256::MAX, 256, U256::ZERO)]
     fn test_u256_shift_left(#[case] n: U256, #[case] shift_amount: i32, #[case] expected: U256) {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE));
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(TYPE_HEAP_SIZE));
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -612,12 +608,6 @@ mod tests {
         // Heap size
         func_body.i32_const(TYPE_HEAP_SIZE);
 
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            false,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         let shift_left_f = heap_int_shift_left(&mut raw_module, &compilation_ctx).unwrap();
@@ -656,7 +646,8 @@ mod tests {
     #[case(u128::MAX, 180, 0)]
     fn test_u128_shift_right(#[case] n: u128, #[case] shift_amount: i32, #[case] expected: u128) {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE));
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(TYPE_HEAP_SIZE));
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -675,12 +666,6 @@ mod tests {
         // Heap size
         func_body.i32_const(TYPE_HEAP_SIZE);
 
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            false,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         let shift_right_f = heap_int_shift_right(&mut raw_module, &compilation_ctx).unwrap();
@@ -717,7 +702,8 @@ mod tests {
     #[case(U256::MAX, 256, U256::ZERO)]
     fn test_u256_shift_right(#[case] n: U256, #[case] shift_amount: i32, #[case] expected: U256) {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE));
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(TYPE_HEAP_SIZE));
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -736,12 +722,6 @@ mod tests {
         // Heap size
         func_body.i32_const(TYPE_HEAP_SIZE);
 
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            false,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         let shift_right_f = heap_int_shift_right(&mut raw_module, &compilation_ctx).unwrap();

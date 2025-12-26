@@ -112,17 +112,11 @@ mod tests {
     };
 
     use super::*;
-    use walrus::{ConstExpr, ValType, ir::Value};
 
     #[test]
     fn test_move_signature_to_event_signature_hash_nested() {
-        let (mut raw_module, allocator_func, memory_id) = build_module(None);
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            true,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
+        let (raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
         let mut compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 
@@ -232,13 +226,8 @@ mod tests {
         #[case] event_struct: &IStruct,
         #[case] expected: AbiEventSignatureHash,
     ) {
-        let (mut raw_module, allocator_func, memory_id) = build_module(None);
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            true,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
+        let (raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
         let mut compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 
