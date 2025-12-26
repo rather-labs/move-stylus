@@ -25,7 +25,7 @@ pub fn move_signature_to_abi_selector(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::{collections::HashMap, sync::Arc};
 
     use move_binary_format::file_format::StructDefinitionIndex;
 
@@ -63,7 +63,7 @@ mod tests {
             IntermediateType::ISigner,
             IntermediateType::IAddress,
             IntermediateType::IU64,
-            IntermediateType::IVector(Box::new(IntermediateType::IBool)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IBool)),
         ];
         assert_eq!(
             move_signature_to_abi_selector("set_owner", signature, &compilation_ctx).unwrap(),
@@ -71,8 +71,8 @@ mod tests {
         );
 
         let signature: &[IntermediateType] = &[
-            IntermediateType::IVector(Box::new(IntermediateType::IU128)),
-            IntermediateType::IVector(Box::new(IntermediateType::IBool)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IU128)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IBool)),
         ];
         assert_eq!(
             move_signature_to_abi_selector("test_array", signature, &compilation_ctx).unwrap(),
@@ -80,10 +80,10 @@ mod tests {
         );
 
         let signature: &[IntermediateType] = &[
-            IntermediateType::IVector(Box::new(IntermediateType::IVector(Box::new(
+            IntermediateType::IVector(Arc::new(IntermediateType::IVector(Arc::new(
                 IntermediateType::IU128,
             )))),
-            IntermediateType::IVector(Box::new(IntermediateType::IBool)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IBool)),
         ];
         assert_eq!(
             move_signature_to_abi_selector("test_array", signature, &compilation_ctx).unwrap(),
@@ -92,16 +92,16 @@ mod tests {
 
         let struct_1 = IStruct::new(
             StructDefinitionIndex::new(0),
-            "TestStruct".to_string(),
+            "TestStruct",
             vec![
                 (None, IntermediateType::IAddress),
                 (
                     None,
-                    IntermediateType::IVector(Box::new(IntermediateType::IU32)),
+                    IntermediateType::IVector(Arc::new(IntermediateType::IU32)),
                 ),
                 (
                     None,
-                    IntermediateType::IVector(Box::new(IntermediateType::IU128)),
+                    IntermediateType::IVector(Arc::new(IntermediateType::IU128)),
                 ),
                 (None, IntermediateType::IBool),
                 (None, IntermediateType::IU8),
@@ -126,7 +126,7 @@ mod tests {
 
         let struct_2 = IStruct::new(
             StructDefinitionIndex::new(1),
-            "TestStruct2".to_string(),
+            "TestStruct2",
             vec![
                 (None, IntermediateType::IU32),
                 (None, IntermediateType::IU128),
@@ -147,7 +147,7 @@ mod tests {
                 index: 0,
                 vm_handled_struct: VmHandledStruct::None,
             },
-            IntermediateType::IVector(Box::new(IntermediateType::IStruct {
+            IntermediateType::IVector(Arc::new(IntermediateType::IStruct {
                 module_id: ModuleId::default(),
                 index: 1,
                 vm_handled_struct: VmHandledStruct::None,

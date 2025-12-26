@@ -61,3 +61,9 @@ public fun fresh_object_address(_ctx: &mut TxContext): address {
     fresh_id()
 }
 native fun fresh_id(): address;
+
+/// Return the calldata of the current transaction as a vector<u8>.
+public fun data(_self: &TxContext): vector<u8> {
+    native_data()
+}
+native fun native_data(): vector<u8>;

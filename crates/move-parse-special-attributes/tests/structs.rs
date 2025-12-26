@@ -3,6 +3,7 @@ use std::{fs, path::PathBuf};
 use move_parse_special_attributes::{
     StructValidationError, error::SpecialAttributeErrorKind, process_special_attributes,
 };
+use move_symbol_pool::Symbol;
 
 #[test]
 pub fn test_struct_validation() {
@@ -12,21 +13,21 @@ pub fn test_struct_validation() {
     ];
     let address_alias_instantiation = std::collections::HashMap::from([
         (
-            "std".to_string(),
+            Symbol::from("std"),
             [
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 1,
             ],
         ),
         (
-            "stylus".to_string(),
+            Symbol::from("stylus"),
             [
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 2,
             ],
         ),
         (
-            "test".to_string(),
+            Symbol::from("test"),
             [
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0,
@@ -45,7 +46,7 @@ pub fn test_struct_validation() {
         panic!("Expected error due to invalid struct validation");
     };
 
-    assert_eq!(special_attributes_errors.len(), 16);
+    assert_eq!(special_attributes_errors.len(), 15);
 
     assert_eq!(
         1,
@@ -122,7 +123,7 @@ pub fn test_struct_validation() {
     );
 
     assert_eq!(
-        9,
+        8,
         special_attributes_errors
             .iter()
             .filter(|e| matches!(

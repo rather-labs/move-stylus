@@ -22,8 +22,8 @@ use crate::{
         vector::IVector,
     },
     vm_handled_types::{
-        VmHandledType, bytes::Bytes, fallback::Calldata, named_id::NamedId, string::String_,
-        tx_context::TxContext, uid::Uid,
+        VmHandledType, bytes::Bytes, named_id::NamedId, string::String_, tx_context::TxContext,
+        uid::Uid,
     },
 };
 
@@ -204,11 +204,6 @@ impl Unpackable for IntermediateType {
             }
             IntermediateType::IStruct {
                 module_id, index, ..
-            } if Calldata::is_vm_type(module_id, *index, compilation_ctx)? => {
-                Calldata::inject(function_builder, module, compilation_ctx);
-            }
-            IntermediateType::IStruct {
-                module_id, index, ..
             } if Bytes::is_vm_type(module_id, *index, compilation_ctx)? => {
                 Bytes::add_unpack_instructions(function_builder, reader_pointer)?;
             }
@@ -235,7 +230,6 @@ impl Unpackable for IntermediateType {
                 } else {
                     // TODO: Check if the struct is TxContext. If it is, panic since the only valid
                     // TxContext is the one defined in the stylus framework.
-
                     struct_.add_unpack_instructions(
                         function_builder,
                         module,
@@ -248,7 +242,7 @@ impl Unpackable for IntermediateType {
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
                 let enum_ = compilation_ctx.get_enum_by_intermediate_type(self)?;
                 if !enum_.is_simple {
-                    return Err(AbiUnpackError::EnumIsNotSimple(enum_.identifier.to_owned()))?;
+                    return Err(AbiUnpackError::EnumIsNotSimple(enum_.identifier))?;
                 }
 
                 IEnum::add_unpack_instructions(
@@ -307,10 +301,7 @@ fn load_struct_storage_id(
                 NativeFunction::NATIVE_COMPUTE_NAMED_ID,
                 module,
                 compilation_ctx,
-                &ModuleId {
-                    address: STYLUS_FRAMEWORK_ADDRESS,
-                    module_name: SF_MODULE_NAME_OBJECT.to_owned(),
-                },
+                &ModuleId::new(STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT),
                 types,
             )
             .map_err(AbiUnpackError::NativeFunction)?;
@@ -318,9 +309,7 @@ fn load_struct_storage_id(
             function_builder.call(compute_named_id_fn);
         }
         _ => {
-            Err(AbiUnpackError::StorageObjectHasNoId(
-                struct_.identifier.clone(),
-            ))?;
+            Err(AbiUnpackError::StorageObjectHasNoId(struct_.identifier))?;
         }
     }
     Ok(())

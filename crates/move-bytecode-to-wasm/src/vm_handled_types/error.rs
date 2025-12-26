@@ -1,3 +1,5 @@
+use move_symbol_pool::Symbol;
+
 use crate::compilation_context::CompilationContextError;
 
 #[derive(Debug, thiserror::Error)]
@@ -6,8 +8,8 @@ pub enum VmHandledTypeError {
     CompilationContextError(#[from] CompilationContextError),
 
     #[error(r#"invalid "{0}" found, only the one from the stylus framework is valid"#)]
-    InvalidFrameworkType(&'static str),
+    InvalidFrameworkType(Symbol),
 
     #[error(r#"invalid "{0}" found, only the one from the standard library is valid"#)]
-    InvalidStdLibType(&'static str),
+    InvalidStdLibType(Symbol),
 }

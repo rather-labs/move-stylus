@@ -582,6 +582,99 @@ impl RuntimeSandbox {
         link_test_fn_write_u64_constant!(linker, "set_block_timestamp", current_timestamp);
         link_test_fn_write_u64_constant!(linker, "set_chain_id", current_chain_id);
 
+        linker
+            .func_wrap("", "print_i64", |param: i64| {
+                println!("--- i64 ---> {param}");
+            })
+            .unwrap();
+
+        linker
+            .func_wrap("", "print_i32", |param: i32| {
+                println!("--- i32 ---> {param}");
+            })
+            .unwrap();
+
+        linker
+            .func_wrap("", "print_separator", || {
+                println!("-----------------------------------------------");
+            })
+            .unwrap();
+
+        linker
+            .func_wrap(
+                "",
+                "print_u128",
+                |mut caller: Caller<'_, ModuleData>, ptr: i32| {
+                    println!("--- u128 ---\nPointer {ptr}");
+
+                    let memory = match caller.get_export("memory") {
+                        Some(wasmtime::Extern::Memory(mem)) => mem,
+                        _ => panic!("failed to find host memory"),
+                    };
+
+                    let mut result = [0; 16];
+                    memory.read(&caller, ptr as usize, &mut result).unwrap();
+                    println!("Data {result:?}");
+                    println!("Decimal data {}", u128::from_le_bytes(result));
+                    println!("--- end u128 ---\n");
+                },
+            )
+            .unwrap();
+
+        linker
+            .func_wrap(
+                "",
+                "print_memory_from",
+                |mut caller: Caller<'_, ModuleData>, ptr: i32, len: i32| {
+                    let memory = match caller.get_export("memory") {
+                        Some(wasmtime::Extern::Memory(mem)) => mem,
+                        _ => panic!("failed to find host memory"),
+                    };
+
+                    let mut result = vec![0; len as usize];
+                    memory.read(&caller, ptr as usize, &mut result).unwrap();
+                    println!("Data {result:?}");
+
+                    println!("In chunks of 32 bytes:");
+                    for chunk in result.chunks(32) {
+                        // print each byte in hex, for example
+                        for b in chunk {
+                            print!("{b:?} ");
+                        }
+                        println!(); // newline after each 32‑byte chunk
+                    }
+
+                    println!("--- --- ---\n");
+                },
+            )
+            .unwrap();
+
+        linker
+            .func_wrap(
+                "",
+                "print_address",
+                |mut caller: Caller<'_, ModuleData>, ptr: i32| {
+                    println!("--- address ---\nPointer {ptr}");
+
+                    let memory = match caller.get_export("memory") {
+                        Some(wasmtime::Extern::Memory(mem)) => mem,
+                        _ => panic!("failed to find host memory"),
+                    };
+
+                    let mut result = [0; 32];
+                    memory.read(&caller, ptr as usize, &mut result).unwrap();
+                    println!(
+                        "Data 0x{}",
+                        result[12..]
+                            .iter()
+                            .map(|b| format!("{b:02x}"))
+                            .collect::<String>()
+                    );
+                    println!("--- end address ---\n");
+                },
+            )
+            .unwrap();
+
         Self {
             engine,
             linker,

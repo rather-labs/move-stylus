@@ -2,6 +2,7 @@ use crate::abi::{Abi, FunctionType};
 use crate::common::snake_to_upper_camel;
 use crate::types::Type;
 use move_parse_special_attributes::function_modifiers::FunctionModifier;
+use move_symbol_pool::Symbol;
 use serde::Serialize;
 
 const EMPTY_STR: &str = "";
@@ -25,7 +26,7 @@ enum JsonAbiItem {
     Event {
         #[serde(rename = "type")]
         type_: AbiItemType, // Event
-        name: String,
+        name: Symbol,
         inputs: Vec<JsonIO>,
         anonymous: bool,
     },
@@ -33,7 +34,7 @@ enum JsonAbiItem {
     Error {
         #[serde(rename = "type")]
         type_: AbiItemType, // Error
-        name: String,
+        name: Symbol,
         inputs: Vec<JsonIO>,
     },
 
@@ -45,7 +46,7 @@ enum JsonAbiItem {
 
         // For normal functions and constructors
         #[serde(skip_serializing_if = "Option::is_none")]
-        name: Option<String>,
+        name: Option<Symbol>,
 
         #[serde(skip_serializing_if = "Option::is_none")]
         inputs: Option<Vec<JsonIO>>,
@@ -53,17 +54,17 @@ enum JsonAbiItem {
         #[serde(skip_serializing_if = "Option::is_none")]
         outputs: Option<Vec<JsonIO>>,
 
-        state_mutability: String,
+        state_mutability: &'static str,
     },
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct JsonIO {
-    name: String,
+    name: Symbol,
     #[serde(rename = "type")]
-    type_: String, // "uint256", "tuple", "tuple[]", "tuple[3]", ...
-    internal_type: String, // "uint256", "tuple", "tuple[]", "tuple[3]", ...
+    type_: Symbol, // "uint256", "tuple", "tuple[]", "tuple[3]", ...
+    internal_type: Symbol, // "uint256", "tuple", "tuple[]", "tuple[3]", ...
     #[serde(skip_serializing_if = "Option::is_none")]
     indexed: Option<bool>, // present for event top-level inputs only
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -73,10 +74,10 @@ struct JsonIO {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct JsonComponent {
-    name: String,
+    name: Symbol,
     #[serde(rename = "type")]
-    type_: String,
-    internal_type: String,
+    type_: Symbol,
+    internal_type: Symbol,
     #[serde(skip_serializing_if = "Option::is_none")]
     components: Option<Vec<JsonComponent>>,
 }
@@ -118,7 +119,7 @@ fn process_errors(abi: &Abi) -> Vec<JsonAbiItem> {
 
             JsonAbiItem::Error {
                 type_: AbiItemType::Error,
-                name: error.identifier.clone(),
+                name: error.identifier,
                 inputs,
             }
         })
@@ -126,7 +127,7 @@ fn process_errors(abi: &Abi) -> Vec<JsonAbiItem> {
 
     // Sort errors by name for deterministic output
     errors.sort_by_key(|item| match item {
-        JsonAbiItem::Error { name, .. } => name.clone(),
+        JsonAbiItem::Error { name, .. } => *name,
         _ => panic!(),
     });
 
@@ -155,7 +156,7 @@ fn process_events(abi: &Abi) -> Vec<JsonAbiItem> {
 
             JsonAbiItem::Event {
                 type_: AbiItemType::Event,
-                name: event.identifier.clone(),
+                name: event.identifier,
                 inputs,
                 anonymous: event.is_anonymous,
             }
@@ -192,7 +193,7 @@ fn process_functions(abi: &Abi) -> Vec<JsonAbiItem> {
                     f.parameters.iter().for_each(|param| {
                         process_io(
                             param.type_.clone(),
-                            &param.identifier,
+                            param.identifier,
                             None,
                             &mut inputs,
                             abi,
@@ -206,7 +207,7 @@ fn process_functions(abi: &Abi) -> Vec<JsonAbiItem> {
                     f.parameters.iter().for_each(|param| {
                         process_io(
                             param.type_.clone(),
-                            &param.identifier,
+                            param.identifier,
                             None,
                             &mut inputs,
                             abi,
@@ -226,11 +227,11 @@ fn process_functions(abi: &Abi) -> Vec<JsonAbiItem> {
                         }
                     };
 
-                    (Some(f.identifier.clone()), Some(inputs), Some(outputs))
+                    (Some(f.identifier), Some(inputs), Some(outputs))
                 }
             };
 
-            let state_mutability = map_state_mutability(&f.modifiers).to_string();
+            let state_mutability = map_state_mutability(&f.modifiers);
 
             JsonAbiItem::Function {
                 type_: f.function_type,
@@ -253,8 +254,7 @@ fn process_functions(abi: &Abi) -> Vec<JsonAbiItem> {
                     FunctionType::Function => 3,
                 };
                 // For regular functions, use the name; for special functions, use empty string
-                let name_key = name.clone().unwrap_or_default();
-                (priority, name_key)
+                (priority, *name)
             }
             _ => panic!("Expected Function variant"),
         }
@@ -278,7 +278,7 @@ fn map_state_mutability(mods: &[FunctionModifier]) -> &'static str {
 /// Processes an IO (input/output) parameter and adds it to the given vector if the type is not empty.
 fn process_io(
     type_: Type,
-    name: impl Into<String>,
+    name: impl Into<Symbol>,
     indexed: Option<bool>,
     io: &mut Vec<JsonIO>,
     abi: &Abi,
@@ -302,8 +302,8 @@ fn process_io(
 
 // A struct containing the ABI type, ABI internal type, and components.
 struct JsonAbiData {
-    abi_type: String,
-    abi_internal_type: String,
+    abi_type: Symbol,
+    abi_internal_type: Symbol,
     components: Option<Vec<JsonComponent>>,
 }
 
@@ -333,12 +333,12 @@ fn encode_for_json_abi(type_: Type, abi: &Abi) -> JsonAbiData {
             identifier,
             module_id,
         } => {
-            let abi_type = "uint8".to_string();
-            let abi_internal_type = format!(
+            let abi_type = Symbol::from("uint8");
+            let abi_internal_type = Symbol::from(format!(
                 "enum {}.{}",
                 snake_to_upper_camel(&module_id.module_name),
                 identifier
-            );
+            ));
             JsonAbiData {
                 abi_type,
                 abi_internal_type,
@@ -353,8 +353,8 @@ fn encode_for_json_abi(type_: Type, abi: &Abi) -> JsonAbiData {
             } = encode_for_json_abi((**inner).clone(), abi);
 
             JsonAbiData {
-                abi_type: format!("{abi_type}[]"),
-                abi_internal_type: format!("{abi_internal_type}[]"),
+                abi_type: Symbol::from(format!("{abi_type}[]")),
+                abi_internal_type: Symbol::from(format!("{abi_internal_type}[]")),
                 components,
             }
         }
@@ -377,7 +377,7 @@ fn encode_for_json_abi(type_: Type, abi: &Abi) -> JsonAbiData {
                     } = encode_for_json_abi(named_type.type_.clone(), abi);
 
                     JsonComponent {
-                        name: named_type.identifier.clone(),
+                        name: named_type.identifier,
                         type_: abi_type,
                         internal_type: abi_internal_type,
                         components,
@@ -385,12 +385,12 @@ fn encode_for_json_abi(type_: Type, abi: &Abi) -> JsonAbiData {
                 })
                 .collect();
 
-            let abi_type = "tuple".to_string();
-            let abi_internal_type = format!(
+            let abi_type = Symbol::from("tuple");
+            let abi_internal_type = Symbol::from(format!(
                 "struct {}.{}",
                 snake_to_upper_camel(&module_id.module_name),
                 type_.name()
-            );
+            ));
             JsonAbiData {
                 abi_type,
                 abi_internal_type,

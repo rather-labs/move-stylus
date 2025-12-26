@@ -15,6 +15,7 @@ pub mod table;
 use std::{
     collections::{HashMap, HashSet},
     rc::Rc,
+    sync::Arc,
 };
 
 use walrus::{
@@ -166,7 +167,7 @@ struct StorageIdParentInformation {
 /// This is used to pass around the context of the translation process. Also clippy complains about too many arguments in translate_instruction.
 struct TranslateFlowContext<'a> {
     compilation_ctx: &'a CompilationContext<'a>,
-    module_data: &'a ModuleData,
+    module_data: &'a ModuleData<'a>,
     types_stack: &'a mut TypesStack,
     function_information: &'a MappedFunction,
     function_table: &'a mut FunctionTable,
@@ -198,7 +199,7 @@ pub fn translate_function(
     let mut function = FunctionBuilder::new(&mut module.types, &params, &results);
 
     #[cfg(debug_assertions)]
-    function.name(function_information.function_id.identifier.clone());
+    function.name(function_information.function_id.identifier.to_string());
 
     let mut builder = function.func_body();
 
@@ -274,7 +275,7 @@ pub fn translate_function(
         .special_attributes
         .test_functions
         .iter()
-        .any(|f| f.name == function_information.function_id.identifier)
+        .any(|f| *f.name == *function_information.function_id.identifier)
     {
         module
             .exports
@@ -528,22 +529,14 @@ fn translate_instruction(
     match instruction {
         // Load a fixed constant
         Bytecode::LdConst(global_index) => {
-            let constant = &module_data.constants[global_index.0 as usize];
-            let mut data = constant.data.clone().into_iter();
-            let constant_type = &constant.type_;
-            let constant_type: IntermediateType = IntermediateType::try_from_signature_token(
-                constant_type,
-                &module_data.datatype_handles_map,
-            )?;
+            let constant = &module_data.constants[global_index.into_index()];
 
-            constant_type.load_constant_instructions(
-                module,
-                builder,
-                &mut data,
-                compilation_ctx,
-            )?;
+            let data = &mut constant.data.iter();
+            constant
+                .type_
+                .load_constant_instructions(module, builder, data, compilation_ctx)?;
 
-            types_stack.push(constant_type);
+            types_stack.push(constant.type_.clone());
             if data.next().is_some() {
                 return Err(TranslationError::ConstantDataNotConsumed);
             }
@@ -1073,7 +1066,7 @@ fn translate_instruction(
                         uid_locals.insert(
                             *local_id,
                             StorageIdParentInformation {
-                                module_id: parent_module_id.clone(),
+                                module_id: *parent_module_id,
                                 index: *parent_index,
                                 instance_types: instance_types.clone(),
                             },
@@ -1099,7 +1092,7 @@ fn translate_instruction(
                         uid_locals.insert(
                             *local_id,
                             StorageIdParentInformation {
-                                module_id: parent_module_id.clone(),
+                                module_id: *parent_module_id,
                                 index: *parent_index,
                                 instance_types: instance_types.clone(),
                             },
@@ -1136,10 +1129,10 @@ fn translate_instruction(
                     }) = uid_locals.get(local_id)
                     {
                         types_stack.push(IntermediateType::IStruct {
-                            module_id: module_id.clone(),
+                            module_id: *module_id,
                             index: *index,
                             vm_handled_struct: VmHandledStruct::StorageId {
-                                parent_module_id: parent_module_id.clone(),
+                                parent_module_id: *parent_module_id,
                                 parent_index: *parent_index,
                                 instance_types: instance_types.clone(),
                             },
@@ -1161,11 +1154,11 @@ fn translate_instruction(
                     }) = uid_locals.get(local_id)
                     {
                         types_stack.push(IntermediateType::IGenericStructInstance {
-                            module_id: module_id.clone(),
+                            module_id: *module_id,
                             index: *index,
                             types: types.clone(),
                             vm_handled_struct: VmHandledStruct::StorageId {
-                                parent_module_id: parent_module_id.clone(),
+                                parent_module_id: *parent_module_id,
                                 parent_index: *parent_index,
                                 instance_types: instance_types.clone(),
                             },
@@ -1193,13 +1186,13 @@ fn translate_instruction(
             let local = function_locals[*local_id as usize];
             let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
             builder.local_get(local);
-            types_stack.push(IntermediateType::IRef(Box::new(local_type.clone())));
+            types_stack.push(IntermediateType::IRef(Arc::new(local_type.clone())));
         }
         Bytecode::MutBorrowLoc(local_id) => {
             let local = function_locals[*local_id as usize];
             let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
             builder.local_get(local);
-            types_stack.push(IntermediateType::IMutRef(Box::new(local_type.clone())));
+            types_stack.push(IntermediateType::IMutRef(Arc::new(local_type.clone())));
         }
         Bytecode::ImmBorrowField(field_id) => {
             let struct_ = module_data.structs.get_by_field_handle_idx(field_id)?;
@@ -1218,21 +1211,22 @@ fn translate_instruction(
                 (
                     IntermediateType::IStruct { ref module_id, index, vm_handled_struct },
                     "struct",
-                    *ref_inner
+                    (*ref_inner).clone()
+
                 )
             );
 
             if module_id != &module_data.id || index != struct_.index() {
                 return Err(TypesStackError::TypeMismatch {
                     expected: IntermediateType::IStruct {
-                        module_id: module_data.id.clone(),
+                        module_id: module_data.id,
                         index: struct_.index(),
                         vm_handled_struct: VmHandledStruct::None,
                     },
                     found: IntermediateType::IStruct {
-                        module_id: module_id.clone(),
+                        module_id: *module_id,
                         index,
-                        vm_handled_struct,
+                        vm_handled_struct: vm_handled_struct.clone(),
                     },
                 }
                 .into());
@@ -1247,7 +1241,7 @@ fn translate_instruction(
                 module_data,
             )?;
 
-            types_stack.push(IntermediateType::IRef(Box::new(field_type)));
+            types_stack.push(IntermediateType::IRef(Arc::new(field_type)));
         }
         Bytecode::ImmBorrowFieldGeneric(field_id) => {
             let (struct_field_id, instantiation_types) = module_data
@@ -1298,19 +1292,19 @@ fn translate_instruction(
                 (
                     IntermediateType::IGenericStructInstance { ref module_id, index, ref types, vm_handled_struct },
                     "generic struct",
-                    *ref_inner
+                    (*ref_inner).clone()
                 )
             );
             if module_id != &module_data.id || index != struct_.index() {
                 return Err(TypesStackError::TypeMismatch {
                     expected: IntermediateType::IGenericStructInstance {
-                        module_id: module_data.id.clone(),
+                        module_id: module_data.id,
                         index: struct_.index(),
                         types: instantiation_types.clone(),
                         vm_handled_struct: VmHandledStruct::None,
                     },
                     found: IntermediateType::IGenericStructInstance {
-                        module_id: module_id.clone(),
+                        module_id: *module_id,
                         index,
                         types: types.clone(),
                         vm_handled_struct,
@@ -1333,15 +1327,15 @@ fn translate_instruction(
                 module_data,
             )?;
 
-            types_stack.push(IntermediateType::IRef(Box::new(field_type)));
+            types_stack.push(IntermediateType::IRef(Arc::new(field_type)));
         }
         Bytecode::MutBorrowField(field_id) => {
             let struct_ = module_data.structs.get_by_field_handle_idx(field_id)?;
 
             // Check if in the types stack we have the correct type
-            types_stack.pop_expecting(&IntermediateType::IMutRef(Box::new(
+            types_stack.pop_expecting(&IntermediateType::IMutRef(Arc::new(
                 IntermediateType::IStruct {
-                    module_id: module_data.id.clone(),
+                    module_id: module_data.id,
                     index: struct_.index(),
                     vm_handled_struct: VmHandledStruct::None,
                 },
@@ -1356,7 +1350,7 @@ fn translate_instruction(
                 module_data,
             )?;
 
-            types_stack.push(IntermediateType::IMutRef(Box::new(field_type)));
+            types_stack.push(IntermediateType::IMutRef(Arc::new(field_type)));
         }
         Bytecode::MutBorrowFieldGeneric(field_id) => {
             let (struct_field_id, instantiation_types) = module_data
@@ -1394,9 +1388,9 @@ fn translate_instruction(
             };
 
             // Check if in the types stack we have the correct type
-            types_stack.pop_expecting(&IntermediateType::IMutRef(Box::new(
+            types_stack.pop_expecting(&IntermediateType::IMutRef(Arc::new(
                 IntermediateType::IGenericStructInstance {
-                    module_id: module_data.id.clone(),
+                    module_id: module_data.id,
                     index: struct_.index(),
                     types: instantiation_types.to_vec(),
                     vm_handled_struct: VmHandledStruct::None,
@@ -1418,7 +1412,7 @@ fn translate_instruction(
                 module_data,
             )?;
 
-            types_stack.push(IntermediateType::IMutRef(Box::new(field_type)));
+            types_stack.push(IntermediateType::IMutRef(Arc::new(field_type)));
         }
         Bytecode::VecUnpack(signature_index, length) => {
             let expected_vec_inner =
@@ -1426,7 +1420,7 @@ fn translate_instruction(
 
             let expected_vec_inner = get_expected_vec_inner(expected_vec_inner, mapped_function)?;
 
-            types_stack.pop_expecting(&IntermediateType::IVector(Box::new(
+            types_stack.pop_expecting(&IntermediateType::IVector(Arc::new(
                 expected_vec_inner.clone(),
             )))?;
 
@@ -1449,7 +1443,11 @@ fn translate_instruction(
             types_stack::match_types!(
                 (IntermediateType::IU64, "u64", t1),
                 (IntermediateType::IRef(ref_inner), "vector reference", t2),
-                (IntermediateType::IVector(vec_inner), "vector", *ref_inner)
+                (
+                    IntermediateType::IVector(vec_inner),
+                    "vector",
+                    (*ref_inner).clone()
+                )
             );
 
             let expected_vec_inner =
@@ -1460,13 +1458,13 @@ fn translate_instruction(
             if *vec_inner != expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
                     expected: expected_vec_inner,
-                    found: *vec_inner,
+                    found: (*vec_inner).clone(),
                 });
             }
 
             IVector::vec_borrow_instructions(&vec_inner, module, builder, compilation_ctx)?;
 
-            types_stack.push(IntermediateType::IRef(Box::new(*vec_inner)));
+            types_stack.push(IntermediateType::IRef(vec_inner.clone()));
         }
         Bytecode::VecMutBorrow(signature_index) => {
             let [t1, t2] = types_stack.pop_n_from_stack()?;
@@ -1478,7 +1476,11 @@ fn translate_instruction(
                     "mutable vector reference",
                     t2
                 ),
-                (IntermediateType::IVector(vec_inner), "vector", *ref_inner)
+                (
+                    IntermediateType::IVector(vec_inner),
+                    "vector",
+                    (*ref_inner).clone()
+                )
             );
 
             let expected_vec_inner =
@@ -1489,13 +1491,13 @@ fn translate_instruction(
             if *vec_inner != expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
                     expected: expected_vec_inner,
-                    found: *vec_inner,
+                    found: (*vec_inner).clone(),
                 });
             }
 
             IVector::vec_borrow_instructions(&vec_inner, module, builder, compilation_ctx)?;
 
-            types_stack.push(IntermediateType::IMutRef(Box::new(*vec_inner)));
+            types_stack.push(IntermediateType::IMutRef(vec_inner.clone()));
         }
         Bytecode::VecPack(signature_index, num_elements) => {
             // If the inner type is a type parameter, replace it with the last type in the types stack.
@@ -1540,7 +1542,7 @@ fn translate_instruction(
                 n -= 1;
             }
 
-            types_stack.push(IntermediateType::IVector(Box::new(expected_vec_inner)));
+            types_stack.push(IntermediateType::IVector(Arc::new(expected_vec_inner)));
         }
         Bytecode::VecPopBack(signature_index) => {
             let ty = types_stack.pop()?;
@@ -1551,7 +1553,11 @@ fn translate_instruction(
                     "mutable vector reference",
                     ty
                 ),
-                (IntermediateType::IVector(vec_inner), "vector", *ref_inner)
+                (
+                    IntermediateType::IVector(vec_inner),
+                    "vector",
+                    (*ref_inner).clone()
+                )
             );
 
             let expected_vec_inner =
@@ -1562,7 +1568,7 @@ fn translate_instruction(
             if *vec_inner != expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
                     expected: expected_vec_inner.clone(),
-                    found: *vec_inner,
+                    found: (*vec_inner).clone(),
                 });
             }
 
@@ -1593,12 +1599,12 @@ fn translate_instruction(
                 | IntermediateType::IMutRef(_) => {
                     return Err(TranslationError::InvalidOperation {
                         operation: instruction.clone(),
-                        operand_type: *vec_inner,
+                        operand_type: (*vec_inner).clone(),
                     });
                 }
             }
 
-            types_stack.push(*vec_inner);
+            types_stack.push((*vec_inner).clone());
         }
         Bytecode::VecPushBack(signature_index) => {
             let [elem_ty, ref_ty] = types_stack.pop_n_from_stack()?;
@@ -1609,12 +1615,16 @@ fn translate_instruction(
                     "mutable vector reference",
                     ref_ty
                 ),
-                (IntermediateType::IVector(vec_inner), "vector", *mut_inner)
+                (
+                    IntermediateType::IVector(vec_inner),
+                    "vector",
+                    (*mut_inner).clone()
+                )
             );
 
             if elem_ty != *vec_inner {
                 return Err(TranslationError::TypeMismatch {
-                    expected: *vec_inner,
+                    expected: (*vec_inner).clone(),
                     found: elem_ty,
                 });
             }
@@ -1627,7 +1637,7 @@ fn translate_instruction(
             if *vec_inner != expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
                     expected: expected_vec_inner.clone(),
-                    found: *vec_inner,
+                    found: (*vec_inner).clone(),
                 });
             }
 
@@ -1650,7 +1660,11 @@ fn translate_instruction(
                     "mutable vector reference",
                     ref_ty
                 ),
-                (IntermediateType::IVector(vec_inner), "vector", *mut_inner)
+                (
+                    IntermediateType::IVector(vec_inner),
+                    "vector",
+                    (*mut_inner).clone()
+                )
             );
 
             let expected_vec_inner =
@@ -1661,7 +1675,7 @@ fn translate_instruction(
             if *vec_inner != expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
                     expected: expected_vec_inner,
-                    found: *vec_inner,
+                    found: (*vec_inner).clone(),
                 });
             }
 
@@ -1677,11 +1691,15 @@ fn translate_instruction(
                 let ref_ty = types_stack.pop()?;
                 types_stack::match_types!(
                     (IntermediateType::IRef(inner), "vector reference", ref_ty),
-                    (IntermediateType::IVector(_vec_inner), "vector", *inner)
+                    (
+                        IntermediateType::IVector(_vec_inner),
+                        "vector",
+                        (*inner).clone()
+                    )
                 );
             } else {
-                types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
-                    IntermediateType::IVector(Box::new(elem_ir_type)),
+                types_stack.pop_expecting(&IntermediateType::IRef(Arc::new(
+                    IntermediateType::IVector(Arc::new(elem_ir_type)),
                 )))?;
             };
 
@@ -1716,7 +1734,7 @@ fn translate_instruction(
             ));
 
             inner.add_read_ref_instructions(builder, module, compilation_ctx, module_data)?;
-            types_stack.push(*inner);
+            types_stack.push((*inner).clone());
         }
         Bytecode::WriteRef => {
             let [iref, value_type] = types_stack.pop_n_from_stack()?;
@@ -1727,7 +1745,7 @@ fn translate_instruction(
                 inner.add_write_ref_instructions(module, builder, compilation_ctx)?;
             } else {
                 Err(TranslationError::TypeMismatch {
-                    expected: *inner,
+                    expected: (*inner).clone(),
                     found: value_type,
                 })?;
             }
@@ -2338,7 +2356,7 @@ fn translate_instruction(
             bytecodes::structs::pack(struct_, module, builder, compilation_ctx, types_stack)?;
 
             types_stack.push(IntermediateType::IStruct {
-                module_id: module_data.id.clone(),
+                module_id: module_data.id,
                 index: struct_definition_index.0,
                 vm_handled_struct: VmHandledStruct::None,
             });
@@ -2427,7 +2445,7 @@ fn translate_instruction(
                 .get_generic_struct_idx_by_struct_definition_idx(struct_definition_index);
 
             types_stack.push(IntermediateType::IGenericStructInstance {
-                module_id: module_data.id.clone(),
+                module_id: module_data.id,
                 index: idx,
                 types,
                 vm_handled_struct: VmHandledStruct::None,
@@ -2435,7 +2453,7 @@ fn translate_instruction(
         }
         Bytecode::Unpack(struct_definition_index) => {
             let itype = types_stack.pop_expecting(&IntermediateType::IStruct {
-                module_id: module_data.id.clone(),
+                module_id: module_data.id,
                 index: struct_definition_index.0,
                 vm_handled_struct: VmHandledStruct::None,
             })?;
@@ -2485,7 +2503,7 @@ fn translate_instruction(
             };
 
             let itype = types_stack.pop_expecting(&IntermediateType::IGenericStructInstance {
-                module_id: module_data.id.clone(),
+                module_id: module_data.id,
                 index: idx,
                 types,
                 vm_handled_struct: VmHandledStruct::None,
@@ -2551,7 +2569,7 @@ fn translate_instruction(
             )?;
 
             types_stack.push(IntermediateType::IEnum {
-                module_id: module_data.id.clone(),
+                module_id: module_data.id,
                 index: enum_.index,
             });
         }
@@ -2611,7 +2629,7 @@ fn translate_instruction(
             )?;
 
             types_stack.push(IntermediateType::IGenericEnumInstance {
-                module_id: module_data.id.clone(),
+                module_id: module_data.id,
                 index: enum_.index,
                 types,
             });
@@ -2623,7 +2641,7 @@ fn translate_instruction(
                 .get_variant_position_by_variant_handle_idx(index)?;
 
             let itype = types_stack.pop_expecting(&IntermediateType::IEnum {
-                module_id: module_data.id.clone(),
+                module_id: module_data.id,
                 index: enum_.index,
             })?;
 
@@ -2666,7 +2684,7 @@ fn translate_instruction(
             };
 
             let itype = types_stack.pop_expecting(&IntermediateType::IGenericEnumInstance {
-                module_id: module_data.id.clone(),
+                module_id: module_data.id,
                 index: enum_.index,
                 types,
             })?;
@@ -2689,13 +2707,13 @@ fn translate_instruction(
 
             let is_mut_ref = matches!(instruction, Bytecode::UnpackVariantMutRef(_));
             let enum_type = IntermediateType::IEnum {
-                module_id: module_data.id.clone(),
+                module_id: module_data.id,
                 index: enum_.index,
             };
             let expected_type = if is_mut_ref {
-                IntermediateType::IMutRef(Box::new(enum_type))
+                IntermediateType::IMutRef(Arc::new(enum_type))
             } else {
-                IntermediateType::IRef(Box::new(enum_type))
+                IntermediateType::IRef(Arc::new(enum_type))
             };
             types_stack.pop_expecting(&expected_type)?;
 
@@ -2741,14 +2759,14 @@ fn translate_instruction(
 
             let is_mut_ref = matches!(instruction, Bytecode::UnpackVariantGenericMutRef(_));
             let generic_enum_type = IntermediateType::IGenericEnumInstance {
-                module_id: module_data.id.clone(),
+                module_id: module_data.id,
                 index: enum_.index,
                 types,
             };
             let expected_type = if is_mut_ref {
-                IntermediateType::IMutRef(Box::new(generic_enum_type))
+                IntermediateType::IMutRef(Arc::new(generic_enum_type))
             } else {
-                IntermediateType::IRef(Box::new(generic_enum_type))
+                IntermediateType::IRef(Arc::new(generic_enum_type))
             };
             types_stack.pop_expecting(&expected_type)?;
 
@@ -2965,10 +2983,10 @@ fn struct_field_borrow_add_storage_id_parent_information(
             vm_handled_struct: VmHandledStruct::None,
         } if Uid::is_vm_type(module_id, *index, compilation_ctx)? => {
             Ok(IntermediateType::IStruct {
-                module_id: module_id.clone(),
+                module_id: *module_id,
                 index: *index,
                 vm_handled_struct: VmHandledStruct::StorageId {
-                    parent_module_id: module_data.id.clone(),
+                    parent_module_id: module_data.id,
                     parent_index: struct_.index(),
                     instance_types: None,
                 },
@@ -2981,11 +2999,11 @@ fn struct_field_borrow_add_storage_id_parent_information(
             vm_handled_struct: VmHandledStruct::None,
         } if NamedId::is_vm_type(module_id, *index, compilation_ctx)? => {
             Ok(IntermediateType::IGenericStructInstance {
-                module_id: module_id.clone(),
+                module_id: *module_id,
                 index: *index,
                 types: types.clone(),
                 vm_handled_struct: VmHandledStruct::StorageId {
-                    parent_module_id: module_data.id.clone(),
+                    parent_module_id: module_data.id,
                     parent_index: struct_.index(),
                     instance_types: Some(types.clone()),
                 },
@@ -3078,11 +3096,11 @@ fn get_storage_structs_with_named_ids(
                 }) if NamedId::is_vm_type(module_id, *index, compilation_ctx)? => {
                     result.push((
                         IntermediateType::IGenericStructInstance {
-                            module_id: module_id.clone(),
+                            module_id: *module_id,
                             index: *index,
                             types: types.clone(),
                             vm_handled_struct: VmHandledStruct::StorageId {
-                                parent_module_id: parent_module_id.clone(),
+                                parent_module_id: *parent_module_id,
                                 parent_index: struct_.index(),
                                 instance_types,
                             },
@@ -3136,8 +3154,8 @@ pub(crate) fn translate_and_link_functions(
     let function_information = if function_information.is_generic {
         &function_information.instantiate(function_id.type_instantiations.as_ref().ok_or(
             TranslationError::GenericFunctionNoTypeInstantiations(
-                function_id.module_id.clone(),
-                function_id.identifier.clone(),
+                function_id.module_id,
+                function_id.identifier,
             ),
         )?)
     } else {

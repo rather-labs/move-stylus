@@ -1,6 +1,6 @@
 use walrus::{
     FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{BinaryOp, ExtendedLoad, LoadKind, MemArg, StoreKind, UnaryOp},
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
 };
 
 use super::{RuntimeFunction, error::RuntimeFunctionError};
@@ -550,7 +550,7 @@ pub fn vec_update_mut_ref_function(
 ///
 /// # WASM Function Arguments
 /// * `bytes_ptr` (i32) - pointer to the raw bytes in memory
-/// * `bytes_n` (i32) - number of bytes to convert
+/// * `n` (i32) - number of bytes to convert
 ///
 /// # WASM Function Returns
 /// * i32 pointer to the newly created vector
@@ -568,69 +568,19 @@ pub fn bytes_to_vec_function(
         .func_body();
 
     let bytes_ptr = module.locals.add(ValType::I32);
-    let bytes_n = module.locals.add(ValType::I32);
+    let n = module.locals.add(ValType::I32);
 
     let vector_ptr = module.locals.add(ValType::I32);
     // Allocate vector of u8 elements
-    IVector::allocate_vector_with_header(
-        &mut builder,
-        compilation_ctx,
-        vector_ptr,
-        bytes_n,
-        bytes_n,
-        1,
-    );
+    IVector::allocate_vector_with_header(&mut builder, compilation_ctx, vector_ptr, n, n, 1);
 
-    let i = module.locals.add(ValType::I32);
-    builder.i32_const(0).local_set(i);
-    builder.loop_(None, |loop_block| {
-        let loop_block_id = loop_block.id();
-
-        // address: vector_ptr + 8 (header) + i * 1
-        loop_block.vec_elem_ptr(vector_ptr, i, 1);
-
-        // value: bytesN[i]
-        loop_block
-            .local_get(bytes_ptr)
-            .local_get(i)
-            .binop(BinaryOp::I32Add)
-            .load(
-                compilation_ctx.memory_id,
-                LoadKind::I32_8 {
-                    kind: ExtendedLoad::ZeroExtend,
-                },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
-
-        // Store the i-th value at the i-th position of the vector
-        loop_block.store(
-            compilation_ctx.memory_id,
-            StoreKind::I32_8 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        );
-
-        // increment i
-        loop_block
-            .local_get(i)
-            .i32_const(1)
-            .binop(BinaryOp::I32Add)
-            .local_set(i);
-
-        // continue the loop if i < bytes_n
-        loop_block
-            .local_get(i)
-            .local_get(bytes_n)
-            .binop(BinaryOp::I32LtU)
-            .br_if(loop_block_id);
-    });
+    builder
+        .skip_vec_header(vector_ptr)
+        .local_get(bytes_ptr)
+        .local_get(n)
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
     builder.local_get(vector_ptr);
 
-    function.finish(vec![bytes_ptr, bytes_n], &mut module.funcs)
+    function.finish(vec![bytes_ptr, n], &mut module.funcs)
 }

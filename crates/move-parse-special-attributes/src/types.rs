@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
 use move_compiler::parser::ast::{NameAccessChain_, Type_};
+use move_symbol_pool::Symbol;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Type {
     Address,
     Bool,
-    UserDataType(String, Option<Vec<Type>>),
+    UserDataType(Symbol, Option<Vec<Type>>),
     Signer,
     Vector(Arc<Type>),
     U8,
@@ -50,7 +51,7 @@ impl Type {
                             panic!("found a vector without inner type")
                         }
                     }
-                    datatype => {
+                    _ => {
                         let types = if let Some(ref types) = path_entry.tyargs {
                             let types = types
                                 .value
@@ -62,7 +63,7 @@ impl Type {
                             None
                         };
 
-                        Self::UserDataType(datatype.to_string(), types)
+                        Self::UserDataType(path_entry.name.value, types)
                     }
                 },
                 NameAccessChain_::Path(name_path) => {
@@ -79,7 +80,7 @@ impl Type {
                         None
                     };
 
-                    Self::UserDataType(last_entry.name.to_string(), types)
+                    Self::UserDataType(last_entry.name.value, types)
                 }
             },
             Type_::Ref(is_mut, spanned) => {

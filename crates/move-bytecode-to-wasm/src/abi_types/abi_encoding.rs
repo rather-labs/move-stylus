@@ -121,7 +121,7 @@ fn sol_name_storage_ids(
             module_id, index, ..
         }) if NamedId::is_vm_type(module_id, *index, compilation_ctx)? => Ok(None),
 
-        _ => Err(AbiError::ExpectedUIDOrNamedId(struct_.identifier.clone())),
+        _ => Err(AbiError::ExpectedUIDOrNamedId(struct_.identifier)),
     }
 }
 

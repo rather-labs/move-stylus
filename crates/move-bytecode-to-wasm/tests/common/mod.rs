@@ -9,7 +9,7 @@ use move_bytecode_to_wasm::{
     compilation_context::{ModuleData, ModuleId},
     translate_package, translate_single_module,
 };
-use move_package::{BuildConfig, LintFlag};
+use move_package::{BuildConfig, LintFlag, compilation::compiled_package::CompiledPackage};
 use move_packages_build::implicit_dependencies;
 use move_test_runner::wasm_runner::RuntimeSandbox;
 use rstest::fixture;
@@ -17,7 +17,8 @@ use walrus::Module;
 
 type ModuleCache = LazyLock<Mutex<HashMap<(&'static str, String), Arc<Vec<u8>>>>>;
 
-type ModuleDependenciesCache = LazyLock<Mutex<HashMap<ModuleId, ModuleData>>>;
+type ModuleDependenciesCache<'move_module> =
+    LazyLock<Mutex<HashMap<ModuleId, ModuleData<'move_module>>>>;
 
 /// This will be used to avoud recompiling test files multiple times
 static MODULE_CACHE: ModuleCache = LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -182,6 +183,7 @@ pub fn translate_test_package(path: &'static str, module_name: &str) -> Arc<Vec<
             );
         }
     };
+    let package: &'static CompiledPackage = Box::leak(Box::new(package));
 
     // println!("Translating package at path: {}", rerooted_path.display());
     let compiled_modules = match translate_package(package, None, &mut dependencies_cache, false) {
@@ -231,6 +233,7 @@ pub fn translate_test_package_with_framework_result(
     let package = get_build_config()
         .compile_package(&rerooted_path, &mut Vec::new())
         .unwrap();
+    let package: &'static CompiledPackage = Box::leak(Box::new(package));
 
     translate_single_module(package, module_name, &mut dependencies_cache)
 }

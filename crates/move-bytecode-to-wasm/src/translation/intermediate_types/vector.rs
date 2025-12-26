@@ -85,7 +85,7 @@ impl IVector {
         inner: &IntermediateType,
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
-        bytes: &mut std::vec::IntoIter<u8>,
+        bytes: &mut std::slice::Iter<'_, u8>,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
         let ptr_local = module.locals.add(ValType::I32);
@@ -95,12 +95,12 @@ impl IVector {
         let len = bytes
             .next()
             .ok_or(IntermediateTypeError::EmptyBytesInVector)?;
-        builder.i32_const(len as i32).local_set(len_local);
+        builder.i32_const(*len as i32).local_set(len_local);
 
         let data_size: usize = inner.wasm_memory_data_size()? as usize;
 
         // len + capacity + data_size * len
-        let needed_bytes = 4 + 4 + data_size * (len as usize);
+        let needed_bytes = 4 + 4 + data_size * (*len as usize);
 
         IVector::allocate_vector_with_header(
             builder,
@@ -914,6 +914,8 @@ impl IVector {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use crate::{
         test_compilation_context,
         test_tools::{build_module, setup_wasmtime_module},
@@ -934,12 +936,11 @@ mod tests {
 
         let mut builder = function_builder.func_body();
 
-        let data = data.to_vec();
         IVector::load_constant_instructions(
             &inner_type,
             &mut raw_module,
             &mut builder,
-            &mut data.into_iter(),
+            &mut data.iter(),
             &compilation_ctx,
         )
         .unwrap();
@@ -970,14 +971,12 @@ mod tests {
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
         let mut builder = function_builder.func_body();
 
-        let data_iter = data.to_vec();
-
         // Load the constant vector and store in local
         IVector::load_constant_instructions(
             &inner_type,
             &mut raw_module,
             &mut builder,
-            &mut data_iter.into_iter(),
+            &mut data.iter(),
             &compilation_ctx,
         )
         .unwrap();
@@ -1024,12 +1023,11 @@ mod tests {
 
         // Push elements to the stack
         for element_bytes in elements.iter() {
-            let mut data_iter = element_bytes.clone().into_iter();
             inner_type
                 .load_constant_instructions(
                     &mut raw_module,
                     &mut builder,
-                    &mut data_iter,
+                    &mut element_bytes.iter(),
                     &compilation_ctx,
                 )
                 .unwrap();
@@ -1079,12 +1077,11 @@ mod tests {
         let ptr = raw_module.locals.add(ValType::I32);
         builder.i32_const(4).call(allocator).local_tee(ptr);
 
-        let data = data.to_vec();
         IVector::load_constant_instructions(
             &inner_type,
             &mut raw_module,
             &mut builder,
-            &mut data.into_iter(),
+            &mut data.iter(),
             &compilation_ctx,
         )
         .unwrap();
@@ -1148,12 +1145,11 @@ mod tests {
         // Load the vector data into memory.
         // When loading a vector constant, the capacity is set to be equal to the length.
         // A pointer to the vector is pushed to the stack.
-        let vector_data = vector_data.to_vec();
         IVector::load_constant_instructions(
             &inner_type,
             &mut raw_module,
             &mut builder,
-            &mut vector_data.into_iter(),
+            &mut vector_data.iter(),
             &compilation_ctx,
         )
         .unwrap();
@@ -1174,13 +1170,12 @@ mod tests {
 
         builder.local_get(vec_ref);
 
-        let element_data = element_data.to_vec();
         let element_pointer = raw_module.locals.add((&inner_type).try_into().unwrap());
         inner_type
             .load_constant_instructions(
                 &mut raw_module,
                 &mut builder,
-                &mut element_data.into_iter(),
+                &mut element_data.iter(),
                 &compilation_ctx,
             )
             .unwrap();
@@ -1267,12 +1262,11 @@ mod tests {
         let ptr = raw_module.locals.add(ValType::I32);
         builder.i32_const(4).call(allocator).local_tee(ptr);
 
-        let data = data.to_vec();
         IVector::load_constant_instructions(
             &inner_type,
             &mut raw_module,
             &mut builder,
-            &mut data.into_iter(),
+            &mut data.iter(),
             &compilation_ctx,
         )
         .unwrap();
@@ -2105,29 +2099,29 @@ mod tests {
 
         test_vector(
             &data,
-            IntermediateType::IVector(Box::new(IntermediateType::IU32)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IU32)),
             &expected_load_bytes,
         );
         test_vector_copy(
             &data,
-            IntermediateType::IVector(Box::new(IntermediateType::IU32)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IU32)),
             &expected_copy_bytes,
         );
         test_vector_pop_back(
             &data,
-            IntermediateType::IVector(Box::new(IntermediateType::IU32)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IU32)),
             &expected_pop_bytes,
             44,
         );
         test_vector_push_back(
             &data,
             &element_bytes,
-            IntermediateType::IVector(Box::new(IntermediateType::IU32)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IU32)),
             &expected_push_bytes,
         );
         test_vector_swap(
             &data,
-            IntermediateType::IVector(Box::new(IntermediateType::IU32)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IU32)),
             &expected_swap_bytes,
             0,
             1,
@@ -2329,29 +2323,29 @@ mod tests {
 
         test_vector(
             &data,
-            IntermediateType::IVector(Box::new(IntermediateType::IU256)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IU256)),
             &expected_load_bytes,
         );
         test_vector_copy(
             &data,
-            IntermediateType::IVector(Box::new(IntermediateType::IU256)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IU256)),
             &expected_copy_bytes,
         );
         test_vector_pop_back(
             &data,
-            IntermediateType::IVector(Box::new(IntermediateType::IU256)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IU256)),
             &expected_pop_bytes,
             100,
         );
         test_vector_push_back(
             &data,
             &element_bytes,
-            IntermediateType::IVector(Box::new(IntermediateType::IU256)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IU256)),
             &expected_push_bytes,
         );
         test_vector_swap(
             &data,
-            IntermediateType::IVector(Box::new(IntermediateType::IU256)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IU256)),
             &expected_swap_bytes,
             0,
             1,
@@ -2453,7 +2447,7 @@ mod tests {
 
         test_vector_pack(
             &element_bytes,
-            IntermediateType::IVector(Box::new(IntermediateType::IU32)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IU32)),
             &expected_result_bytes,
         );
     }
@@ -2491,7 +2485,7 @@ mod tests {
 
         test_vector_pack(
             &element_bytes,
-            IntermediateType::IVector(Box::new(IntermediateType::IU256)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IU256)),
             &expected_result_bytes,
         );
     }

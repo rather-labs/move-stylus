@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use move_binary_format::file_format::FieldHandleIndex;
 use walrus::{
@@ -53,9 +53,7 @@ pub fn add_emit_log_fn(
         is_anonymous,
     } = struct_.type_
     else {
-        return Err(NativeFunctionError::EmitFunctionNoEvent(
-            struct_.identifier.clone(),
-        ));
+        return Err(NativeFunctionError::EmitFunctionNoEvent(struct_.identifier));
     };
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
@@ -362,7 +360,7 @@ pub fn add_emit_log_fn(
 
         let data_struct = IStruct::new(
             move_binary_format::file_format::StructDefinitionIndex(0),
-            format!("{}Data", struct_.identifier),
+            &format!("{}Data", struct_.identifier),
             fields,
             HashMap::new(),
             false,
@@ -647,7 +645,7 @@ fn add_encode_indexed_vector_instructions(
 
             if !enum_.is_simple {
                 return Err(NativeFunctionError::EmitFunctionInvalidEventField(
-                    IntermediateType::IVector(Box::new(inner.clone())),
+                    IntermediateType::IVector(Arc::new(inner.clone())),
                 ));
             }
 
@@ -715,7 +713,7 @@ fn add_encode_indexed_vector_instructions(
         }
         _ => {
             return Err(NativeFunctionError::EmitFunctionInvalidEventField(
-                IntermediateType::IVector(Box::new(inner.clone())),
+                IntermediateType::IVector(Arc::new(inner.clone())),
             ));
         }
     }
