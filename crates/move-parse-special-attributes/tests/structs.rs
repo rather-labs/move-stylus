@@ -46,7 +46,7 @@ pub fn test_struct_validation() {
         panic!("Expected error due to invalid struct validation");
     };
 
-    assert_eq!(special_attributes_errors.len(), 16);
+    assert_eq!(special_attributes_errors.len(), 15);
 
     assert_eq!(
         1,
@@ -123,7 +123,7 @@ pub fn test_struct_validation() {
     );
 
     assert_eq!(
-        9,
+        8,
         special_attributes_errors
             .iter()
             .filter(|e| matches!(

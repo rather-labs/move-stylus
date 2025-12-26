@@ -19,7 +19,6 @@ pub const SF_MODULE_NAME_EVENT: &str = "event";
 pub const SF_MODULE_NAME_TYPES: &str = "types";
 pub const SF_MODULE_NAME_TABLE: &str = "table";
 pub const SF_MODULE_NAME_ERROR: &str = "error";
-pub const SF_MODULE_NAME_FALLBACK: &str = "fallback";
 pub const SF_MODULE_NAME_ACCOUNT: &str = "account";
 pub const SF_MODULE_TEST_SCENARIO: &str = "test_scenario";
 pub const SF_MODULE_NAME_SOL_TYPES: &str = "sol_types";

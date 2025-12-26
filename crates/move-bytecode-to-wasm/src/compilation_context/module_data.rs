@@ -1146,10 +1146,11 @@ impl ModuleData<'_> {
         move_module_dependencies: &[(PackageName, CompiledUnitWithSource)],
     ) -> Result<bool> {
         // Fallback function definition (see https://docs.soliditylang.org/en/latest/contracts.html#fallback-function):
-        // A contract can have at most one fallback function, declared using either fallback () external [payable]
-        // or fallback (bytes calldata input) external [payable] returns (bytes memory output) (both without the function keyword).
-        // This function must have external visibility, but it is not required to be payable.
-        // A fallback function can be virtual, can override and can have modifiers.
+        // - A contract can have at most one fallback function, declared using either fallback () external [payable]
+        //   or fallback (bytes calldata input) external [payable] returns (bytes memory output) (both without the function keyword).
+        //   --In our implementation, the calldata is not passed as argument but can be retrieved from TxContext.data()
+        //   --The return value must be empty or a vector<u8> representing the raw bytes of the calldata
+        // - This function must have external visibility, but it is not required to be payable.
 
         const FALLBACK_FUNCTION_NAME: &str = "fallback";
 
@@ -1172,48 +1173,17 @@ impl ModuleData<'_> {
                 // No arguments: valid
             }
             1 => {
-                // 1 argument: must be either vector<u8> or TxContext
+                // Argument must be &TxContext
                 let first_arg = move_function_arguments
                     .0
                     .first()
                     .and_then(|arg| {
                         IntermediateType::try_from_signature_token(arg, datatype_handles_map).ok()
                     })
-                    .ok_or(CompilationContextError::FallbackFunctionInvalidArgumentType(1))?;
+                    .ok_or(CompilationContextError::FallbackFunctionInvalidArgumentType)?;
 
-                // Check if it's fallback calldata or TxContext
-                if !(is_fallback_calldata(&first_arg, move_module_dependencies)
-                    || is_tx_context_ref(&first_arg, move_module_dependencies))
-                {
-                    return Err(CompilationContextError::FallbackFunctionInvalidArgumentType(1));
-                }
-            }
-            2 => {
-                // 2 arguments: first must be vector<u8>, second must be TxContext
-                let first_arg = move_function_arguments
-                    .0
-                    .first()
-                    .and_then(|arg| {
-                        IntermediateType::try_from_signature_token(arg, datatype_handles_map).ok()
-                    })
-                    .ok_or(CompilationContextError::FallbackFunctionInvalidArgumentType(1))?;
-
-                let second_arg = move_function_arguments
-                    .0
-                    .last()
-                    .and_then(|arg| {
-                        IntermediateType::try_from_signature_token(arg, datatype_handles_map).ok()
-                    })
-                    .ok_or(CompilationContextError::FallbackFunctionInvalidArgumentType(2))?;
-
-                // First argument must be fallback calldata
-                if !is_fallback_calldata(&first_arg, move_module_dependencies) {
-                    return Err(CompilationContextError::FallbackFunctionInvalidArgumentType(1));
-                }
-
-                // Second argument must be TxContext
-                if !is_tx_context_ref(&second_arg, move_module_dependencies) {
-                    return Err(CompilationContextError::FallbackFunctionInvalidArgumentType(2));
+                if !is_tx_context_ref(&first_arg, move_module_dependencies) {
+                    return Err(CompilationContextError::FallbackFunctionInvalidArgumentType);
                 }
             }
             _ => {
@@ -1228,7 +1198,7 @@ impl ModuleData<'_> {
                 // No return values: valid
             }
             1 => {
-                // 1 return value: must be fallback calldata
+                // Return value: must be fallback calldata
                 let return_type = move_function_return
                     .0
                     .first()
@@ -1237,7 +1207,7 @@ impl ModuleData<'_> {
                     })
                     .ok_or(CompilationContextError::FallbackFunctionInvalidReturnType)?;
 
-                if !is_fallback_calldata(&return_type, move_module_dependencies) {
+                if !is_vector_u8_ref(&return_type) {
                     return Err(CompilationContextError::FallbackFunctionInvalidReturnType);
                 }
             }
@@ -1251,44 +1221,14 @@ impl ModuleData<'_> {
     }
 }
 
-fn is_fallback_calldata(
-    argument: &IntermediateType,
-    move_module_dependencies: &[(PackageName, CompiledUnitWithSource)],
-) -> bool {
-    match argument {
-        IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
-            match inner.as_ref() {
-                IntermediateType::IStruct {
-                    module_id, index, ..
-                } if module_id.module_name.as_str() == "fallback"
-                    && module_id.address == STYLUS_FRAMEWORK_ADDRESS =>
-                {
-                    // TODO: Look for this external module one time and pass it down to this
-                    // function
-                    let external_module_source = &move_module_dependencies
-                        .iter()
-                        .find(|(_, m)| {
-                            m.unit.name().as_str() == "fallback"
-                                && Address::from(m.unit.address.into_bytes())
-                                    == STYLUS_FRAMEWORK_ADDRESS
-                        })
-                        .expect("could not find stylus framework as dependency")
-                        .1
-                        .unit
-                        .module;
-
-                    let struct_ =
-                        external_module_source.struct_def_at(StructDefinitionIndex::new(*index));
-                    let handle = external_module_source.datatype_handle_at(struct_.struct_handle);
-                    let identifier = external_module_source.identifier_at(handle.name);
-                    identifier.as_str() == "Calldata"
-                }
-
-                _ => false,
-            }
-        }
-        _ => false,
-    }
+fn is_vector_u8_ref(argument: &IntermediateType) -> bool {
+    let IntermediateType::IRef(ref_inner) = argument else {
+        return false;
+    };
+    let IntermediateType::IVector(vec_inner) = ref_inner.as_ref() else {
+        return false;
+    };
+    matches!(vec_inner.as_ref(), IntermediateType::IU8)
 }
 
 /// Helper function to check if the argument is a reference to the TxContext.
