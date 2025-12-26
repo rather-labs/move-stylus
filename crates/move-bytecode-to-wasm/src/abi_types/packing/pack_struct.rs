@@ -89,7 +89,8 @@ use walrus::{
 
 use crate::{
     CompilationContext,
-    abi_types::{error::AbiError, packing::pack_native_int::pack_i32_type_instructions},
+    abi_types::error::AbiError,
+    runtime::RuntimeFunction,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
 };
 
@@ -139,13 +140,11 @@ impl IStruct {
             // The result is saved where calldata_reference_pointer is pointing at, the value will
             // be the address where the struct  values are packed, using as origin
             // calldata_reference_pointer
-            pack_i32_type_instructions(
-                block,
-                module,
-                compilation_ctx.memory_id,
-                reference_value,
-                writer_pointer,
-            )?;
+            let pack_u32_function = RuntimeFunction::PackU32.get(module, Some(compilation_ctx))?;
+            block
+                .local_get(reference_value)
+                .local_get(writer_pointer)
+                .call(pack_u32_function);
         } else {
             block.local_get(writer_pointer).local_set(data_ptr);
         }

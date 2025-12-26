@@ -1,6 +1,5 @@
 use alloy_sol_types::{SolType, sol_data};
 use error::AbiPackError;
-use pack_native_int::{pack_i32_type_instructions, pack_i64_type_instructions};
 use walrus::{
     InstrSeqBuilder, LocalId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg},
@@ -23,7 +22,6 @@ use super::error::{AbiEncodingError, AbiError};
 
 pub mod error;
 mod pack_heap_int;
-mod pack_native_int;
 mod pack_reference;
 mod pack_string;
 mod pack_struct;
@@ -234,22 +232,20 @@ impl Packable for IntermediateType {
             | IntermediateType::IU8
             | IntermediateType::IU16
             | IntermediateType::IU32 => {
-                pack_i32_type_instructions(
-                    builder,
-                    module,
-                    compilation_ctx.memory_id,
-                    local,
-                    writer_pointer,
-                )?;
+                let pack_u32_function =
+                    RuntimeFunction::PackU32.get(module, Some(compilation_ctx))?;
+                builder
+                    .local_get(local)
+                    .local_get(writer_pointer)
+                    .call(pack_u32_function);
             }
             IntermediateType::IU64 => {
-                pack_i64_type_instructions(
-                    builder,
-                    module,
-                    compilation_ctx.memory_id,
-                    local,
-                    writer_pointer,
-                )?;
+                let pack_u64_function =
+                    RuntimeFunction::PackU64.get(module, Some(compilation_ctx))?;
+                builder
+                    .local_get(local)
+                    .local_get(writer_pointer)
+                    .call(pack_u64_function);
             }
             IntermediateType::IU128 => IU128::add_pack_instructions(
                 builder,

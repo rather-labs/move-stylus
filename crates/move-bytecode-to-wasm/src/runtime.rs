@@ -105,6 +105,8 @@ pub enum RuntimeFunction {
     UnpackReference,
     // ABI packing
     PackEnum,
+    PackU32,
+    PackU64,
 }
 
 impl RuntimeFunction {
@@ -189,6 +191,8 @@ impl RuntimeFunction {
             Self::UnpackReference => "unpack_reference",
             // ABI packing
             Self::PackEnum => "pack_enum",
+            Self::PackU32 => "pack_u32",
+            Self::PackU64 => "pack_u64",
         }
     }
 
@@ -333,6 +337,8 @@ impl RuntimeFunction {
                 }
                 // ABI packing
                 (Self::PackEnum, Some(ctx)) => packing::enums::pack_enum_function(module, ctx)?,
+                (Self::PackU32, Some(ctx)) => packing::uint::pack_u32_function(module, ctx)?,
+                (Self::PackU64, Some(ctx)) => packing::uint::pack_u64_function(module, ctx)?,
                 // Error
                 _ => return Err(RuntimeFunctionError::CouldNotLink(self.name().to_owned())),
             };

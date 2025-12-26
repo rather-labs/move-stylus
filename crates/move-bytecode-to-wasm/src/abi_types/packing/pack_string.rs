@@ -3,9 +3,8 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
-use super::pack_native_int::pack_i32_type_instructions;
 use crate::{
-    CompilationContext, abi_types::error::AbiError,
+    CompilationContext, abi_types::error::AbiError, runtime::RuntimeFunction,
     translation::intermediate_types::IntermediateType, vm_handled_types::string::String_,
     wasm_builder_extensions::WasmBuilderExtension,
 };
@@ -70,13 +69,11 @@ impl String_ {
             .binop(BinaryOp::I32Sub)
             .local_set(reference_value);
 
-        pack_i32_type_instructions(
-            builder,
-            module,
-            compilation_ctx.memory_id,
-            reference_value,
-            writer_pointer,
-        )?;
+        let pack_u32_function = RuntimeFunction::PackU32.get(module, Some(compilation_ctx))?;
+        builder
+            .local_get(reference_value)
+            .local_get(writer_pointer)
+            .call(pack_u32_function);
 
         // Set the local to point to the first element
         builder
@@ -88,13 +85,11 @@ impl String_ {
          */
 
         // Length
-        pack_i32_type_instructions(
-            builder,
-            module,
-            compilation_ctx.memory_id,
-            len,
-            data_pointer,
-        )?;
+        let pack_u32_function = RuntimeFunction::PackU32.get(module, Some(compilation_ctx))?;
+        builder
+            .local_get(len)
+            .local_get(data_pointer)
+            .call(pack_u32_function);
 
         // Increment the data pointer
         builder
