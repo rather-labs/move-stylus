@@ -4,7 +4,7 @@ use alloy_sol_types::{SolCall, SolType, SolValue, abi::TokenSeq, sol};
 use move_test_runner::wasm_runner::RuntimeSandbox;
 use rstest::{fixture, rstest};
 
-declare_fixture!("main", "tests/dependencies");
+declare_fixture!("main", "tests/dependencies/move_sources");
 
 sol!(
     struct AnotherTest {
