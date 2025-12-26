@@ -2,14 +2,30 @@ use std::{
     collections::{BTreeMap, HashMap},
     fs,
     path::{Path, PathBuf},
+    sync::{Arc, LazyLock, Mutex},
 };
 
-use move_bytecode_to_wasm::{translate_package, translate_single_module};
-use move_package::{BuildConfig, LintFlag};
+use move_bytecode_to_wasm::{
+    compilation_context::{ModuleData, ModuleId},
+    translate_package, translate_single_module,
+};
+use move_package::{BuildConfig, LintFlag, compilation::compiled_package::CompiledPackage};
 use move_packages_build::implicit_dependencies;
 use move_test_runner::wasm_runner::RuntimeSandbox;
 use rstest::fixture;
 use walrus::Module;
+
+type ModuleCache = LazyLock<Mutex<HashMap<(&'static str, String), Arc<Vec<u8>>>>>;
+
+type ModuleDependenciesCache<'move_module> =
+    LazyLock<Mutex<HashMap<ModuleId, ModuleData<'move_module>>>>;
+
+/// This will be used to avoud recompiling test files multiple times
+static MODULE_CACHE: ModuleCache = LazyLock::new(|| Mutex::new(HashMap::new()));
+
+// This is the cache for all the dependencies the modules might have
+static MODULE_DEPENDENCIES_CACHE: ModuleDependenciesCache =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
     if !dst.exists() {
@@ -53,11 +69,12 @@ pub fn reroot_path(path: &Path) -> PathBuf {
 
     let temp_install_directory = std::env::temp_dir()
         .join("move-bytecode-to-wasm")
+        //.join(format!("{}", path.file_name().unwrap().to_string_lossy(),));
         .join(format!(
             "{}_{}_{}",
-            path.file_name().unwrap().to_string_lossy(),
             timestamp,
-            thread_hash
+            thread_hash,
+            path.file_name().unwrap().to_string_lossy(),
         ));
 
     // copy source file to dir
@@ -89,21 +106,6 @@ pub fn reroot_path(path: &Path) -> PathBuf {
     }
 
     temp_install_directory
-}
-
-fn create_move_toml(install_dir: &Path) {
-    // create Move.toml in dir
-    std::fs::write(
-        install_dir.join("Move.toml"),
-        r#"[package]
-name = "test"
-edition = "2024"
-
-[addresses]
-test = "0x0"
-"#,
-    )
-    .unwrap();
 }
 
 fn create_move_toml_with_framework(install_dir: &Path, framework_dir: &str) {
@@ -153,63 +155,67 @@ fn get_build_config() -> BuildConfig {
     }
 }
 
-// TODO: rename to translate_test_module
-#[allow(dead_code)]
-/// Translates a single test module
-pub fn translate_test_package(path: &str, module_name: &str) -> Module {
-    let path = Path::new(path);
-    let rerooted_path = reroot_path(path);
-    create_move_toml(&rerooted_path);
-
-    let package = get_build_config()
-        .compile_package(&rerooted_path, &mut Vec::new())
-        .unwrap();
-
-    translate_single_module(&package, module_name).unwrap()
-}
-
 #[allow(dead_code)]
 /// Translates a complete package. It outputs all the corresponding wasm modules
-pub fn translate_test_complete_package(path: &str) -> HashMap<String, Module> {
-    let path = Path::new(path);
+pub fn translate_test_package(path: &'static str, module_name: &str) -> Arc<Vec<u8>> {
+    let mut cache = MODULE_CACHE.lock().unwrap();
+    if let Some(cached_module) = cache.get(&(path, module_name.to_owned())) {
+        // println!("CACHE HIT for {}::{}", path, module_name);
+        return cached_module.clone();
+    }
 
-    let rerooted_path = reroot_path(path);
-    create_move_toml(&rerooted_path);
+    // println!("CACHE MISS for {}::{}", path, module_name);
 
-    let package = get_build_config()
-        .compile_package(&rerooted_path, &mut Vec::new())
-        .unwrap();
+    let mut dependencies_cache = MODULE_DEPENDENCIES_CACHE.lock().unwrap();
 
-    translate_package(&package, None, false).unwrap()
-}
-
-#[allow(dead_code)]
-/// Translates a complete package. It outputs all the corresponding wasm modules
-pub fn translate_test_complete_package_with_framework(path: &str) -> HashMap<String, Module> {
-    let path = Path::new(path);
-
-    let rerooted_path = reroot_path(path);
+    let rerooted_path = reroot_path(Path::new(path));
     create_move_toml_with_framework(&rerooted_path, "../../stylus-framework");
 
-    let package = get_build_config()
-        .compile_package(&rerooted_path, &mut Vec::new())
-        .unwrap();
+    let package = match get_build_config().compile_package(&rerooted_path, &mut Vec::new()) {
+        Ok(pkg) => pkg,
+        Err(err) => {
+            drop(cache);
+            drop(dependencies_cache);
+            panic!(
+                "Failed to compile package at path: {}\nError: {:?}",
+                rerooted_path.display(),
+                err
+            );
+        }
+    };
+    let package: &'static CompiledPackage = Box::leak(Box::new(package));
 
-    translate_package(&package, None, false).unwrap()
-}
+    // println!("Translating package at path: {}", rerooted_path.display());
+    let compiled_modules = match translate_package(package, None, &mut dependencies_cache, false) {
+        Ok(modules) => modules,
+        Err(err) => {
+            drop(cache);
+            drop(dependencies_cache);
+            panic!(
+                "Failed to translate package at path: {}\nError: {:?}",
+                rerooted_path.display(),
+                err
+            );
+        }
+    };
 
-#[allow(dead_code)]
-/// Translates a single test module
-pub fn translate_test_package_with_framework(path: &str, module_name: &str) -> Module {
-    let path = Path::new(path);
-    let rerooted_path = reroot_path(path);
-    create_move_toml_with_framework(&rerooted_path, "../../stylus-framework");
+    for (module_name, mut module) in compiled_modules.into_iter() {
+        // println!("CACHE INSERT for {}::{}", path, module_name);
+        cache.insert((path, module_name), Arc::new(module.emit_wasm()));
+    }
 
-    let package = get_build_config()
-        .compile_package(&rerooted_path, &mut Vec::new())
-        .unwrap();
-
-    translate_single_module(&package, module_name).unwrap()
+    match cache.get(&(path, module_name.to_owned())) {
+        None => {
+            drop(cache);
+            drop(dependencies_cache);
+            panic!(
+                "Module {} not found in package at path: {}. Is it named worng in the test?",
+                module_name,
+                rerooted_path.display()
+            );
+        }
+        Some(module) => module.clone(),
+    }
 }
 
 #[allow(dead_code)]
@@ -222,11 +228,14 @@ pub fn translate_test_package_with_framework_result(
     let rerooted_path = reroot_path(path);
     create_move_toml_with_framework(&rerooted_path, "../../stylus-framework");
 
+    let mut dependencies_cache = MODULE_DEPENDENCIES_CACHE.lock().unwrap();
+
     let package = get_build_config()
         .compile_package(&rerooted_path, &mut Vec::new())
         .unwrap();
+    let package: &'static CompiledPackage = Box::leak(Box::new(package));
 
-    translate_single_module(&package, module_name)
+    translate_single_module(package, module_name, &mut dependencies_cache)
 }
 
 #[allow(dead_code)]
@@ -254,52 +263,20 @@ macro_rules! declare_fixture {
         #[fixture]
         #[once]
         pub fn runtime() -> move_test_runner::wasm_runner::RuntimeSandbox {
-            let mut translated_package =
+            let translated_package =
                 $crate::common::translate_test_package($source_path, $module_name);
 
-            move_test_runner::wasm_runner::RuntimeSandbox::from_binary(
-                &translated_package.emit_wasm(),
-            )
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! declare_fixture_complete_package {
-    ($module_name:literal, $source_path:literal) => {
-        #[fixture]
-        #[once]
-        pub fn runtime() -> move_test_runner::wasm_runner::RuntimeSandbox {
-            let mut translated_packages =
-                $crate::common::translate_test_complete_package($source_path);
-
-            let translated_package = translated_packages.get_mut($module_name).unwrap();
-
-            move_test_runner::wasm_runner::RuntimeSandbox::from_binary(
-                &translated_package.emit_wasm(),
-            )
+            move_test_runner::wasm_runner::RuntimeSandbox::from_binary(&translated_package)
         }
     };
 }
 
 #[fixture]
-pub fn runtime_with_framework(
+pub fn runtime(
     #[default("")] module_name: &str,
-    #[default("")] source_path: &str,
+    #[default("")] source_path: &'static str,
 ) -> RuntimeSandbox {
-    let mut translated_package = translate_test_package_with_framework(source_path, module_name);
+    let translated_package = translate_test_package(source_path, module_name);
 
-    RuntimeSandbox::from_binary(&translated_package.emit_wasm())
-}
-
-#[fixture]
-pub fn runtime_package_with_framework(
-    #[default("")] module_name: &str,
-    #[default("")] source_path: &str,
-) -> RuntimeSandbox {
-    let mut translated_packages = translate_test_complete_package_with_framework(source_path);
-
-    let translated_package = translated_packages.get_mut(module_name).unwrap();
-
-    RuntimeSandbox::from_binary(&translated_package.emit_wasm())
+    RuntimeSandbox::from_binary(&translated_package)
 }

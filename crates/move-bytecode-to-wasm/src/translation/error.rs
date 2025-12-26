@@ -1,8 +1,7 @@
-use std::rc::Rc;
-
 use move_binary_format::file_format::{Bytecode, SignatureIndex};
 use move_symbol_pool::Symbol;
 use relooper::BranchMode;
+use std::rc::Rc;
 use walrus::{LocalId, ValType};
 
 use crate::{

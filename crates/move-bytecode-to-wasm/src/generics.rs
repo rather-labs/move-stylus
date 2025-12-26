@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::translation::intermediate_types::IntermediateType;
 
@@ -31,11 +31,11 @@ pub fn replace_type_parameters(
         IntermediateType::ITypeParameter(index) => instance_types[*index as usize].clone(),
         // Reference type parameter: &T -> &concrete_type
         IntermediateType::IRef(inner) => {
-            IntermediateType::IRef(Rc::new(replace_type_parameters(inner, instance_types)))
+            IntermediateType::IRef(Arc::new(replace_type_parameters(inner, instance_types)))
         }
         // Mutable reference type parameter: &mut T -> &mut concrete_type
         IntermediateType::IMutRef(inner) => {
-            IntermediateType::IMutRef(Rc::new(replace_type_parameters(inner, instance_types)))
+            IntermediateType::IMutRef(Arc::new(replace_type_parameters(inner, instance_types)))
         }
         IntermediateType::IGenericStructInstance {
             module_id,
@@ -64,7 +64,7 @@ pub fn replace_type_parameters(
                 .collect(),
         },
         IntermediateType::IVector(inner) => {
-            IntermediateType::IVector(Rc::new(replace_type_parameters(inner, instance_types)))
+            IntermediateType::IVector(Arc::new(replace_type_parameters(inner, instance_types)))
         }
         // Non-generic type: keep as is
         _ => itype.clone(),

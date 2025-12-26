@@ -25,7 +25,7 @@ pub fn move_signature_to_abi_selector(
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, rc::Rc};
+    use std::{collections::HashMap, sync::Arc};
 
     use move_binary_format::file_format::StructDefinitionIndex;
 
@@ -63,7 +63,7 @@ mod tests {
             IntermediateType::ISigner,
             IntermediateType::IAddress,
             IntermediateType::IU64,
-            IntermediateType::IVector(Rc::new(IntermediateType::IBool)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IBool)),
         ];
         assert_eq!(
             move_signature_to_abi_selector("set_owner", signature, &compilation_ctx).unwrap(),
@@ -71,8 +71,8 @@ mod tests {
         );
 
         let signature: &[IntermediateType] = &[
-            IntermediateType::IVector(Rc::new(IntermediateType::IU128)),
-            IntermediateType::IVector(Rc::new(IntermediateType::IBool)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IU128)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IBool)),
         ];
         assert_eq!(
             move_signature_to_abi_selector("test_array", signature, &compilation_ctx).unwrap(),
@@ -80,10 +80,10 @@ mod tests {
         );
 
         let signature: &[IntermediateType] = &[
-            IntermediateType::IVector(Rc::new(IntermediateType::IVector(Rc::new(
+            IntermediateType::IVector(Arc::new(IntermediateType::IVector(Arc::new(
                 IntermediateType::IU128,
             )))),
-            IntermediateType::IVector(Rc::new(IntermediateType::IBool)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IBool)),
         ];
         assert_eq!(
             move_signature_to_abi_selector("test_array", signature, &compilation_ctx).unwrap(),
@@ -97,11 +97,11 @@ mod tests {
                 (None, IntermediateType::IAddress),
                 (
                     None,
-                    IntermediateType::IVector(Rc::new(IntermediateType::IU32)),
+                    IntermediateType::IVector(Arc::new(IntermediateType::IU32)),
                 ),
                 (
                     None,
-                    IntermediateType::IVector(Rc::new(IntermediateType::IU128)),
+                    IntermediateType::IVector(Arc::new(IntermediateType::IU128)),
                 ),
                 (None, IntermediateType::IBool),
                 (None, IntermediateType::IU8),
@@ -147,7 +147,7 @@ mod tests {
                 index: 0,
                 vm_handled_struct: VmHandledStruct::None,
             },
-            IntermediateType::IVector(Rc::new(IntermediateType::IStruct {
+            IntermediateType::IVector(Arc::new(IntermediateType::IStruct {
                 module_id: ModuleId::default(),
                 index: 1,
                 vm_handled_struct: VmHandledStruct::None,

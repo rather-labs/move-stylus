@@ -4,7 +4,6 @@ pub mod function_data;
 pub mod struct_data;
 
 use crate::{
-    GlobalFunctionTable,
     compilation_context::reserved_modules::STYLUS_FRAMEWORK_ADDRESS,
     hasher::get_hasher,
     translation::{
@@ -158,7 +157,7 @@ pub struct ModuleData<'move_compiled_unit> {
     pub constants: Vec<Constant<'move_compiled_unit>>,
 
     /// Module's functions information
-    pub functions: FunctionData,
+    pub functions: FunctionData<'move_compiled_unit>,
 
     /// Module's structs information
     pub structs: StructData,
@@ -183,8 +182,7 @@ impl ModuleData<'_> {
         module_id: ModuleId,
         move_module: &'move_package CompiledUnitWithSource,
         move_module_dependencies: &'move_package [(PackageName, CompiledUnitWithSource)],
-        root_compiled_units: &[&CompiledUnitWithSource],
-        function_definitions: &mut GlobalFunctionTable<'move_package>,
+        root_compiled_units: &[&'move_package CompiledUnitWithSource],
         special_attributes: SpecialAttributes,
     ) -> Result<ModuleData<'move_package>> {
         let move_module_unit = &move_module.unit.module;
@@ -235,7 +233,6 @@ impl ModuleData<'_> {
             module_id,
             move_module_unit,
             &datatype_handles_map,
-            function_definitions,
             move_module_dependencies,
             &special_attributes,
         )?;
@@ -728,15 +725,15 @@ impl ModuleData<'_> {
         module_id: ModuleId,
         move_module: &'move_package CompiledModule,
         datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
-        function_definitions: &mut GlobalFunctionTable<'move_package>,
         move_module_dependencies: &'move_package [(PackageName, CompiledUnitWithSource)],
         special_attributes: &SpecialAttributes,
-    ) -> Result<FunctionData> {
+    ) -> Result<FunctionData<'move_package>> {
         // Return types of functions in intermediate types. Used to fill the stack type
         let mut functions_returns = Vec::new();
         let mut functions_arguments = Vec::new();
         let mut function_calls = Vec::new();
         let mut function_information = Vec::new();
+        let mut move_definitions = HashMap::new();
 
         // Special reserved functions
         let mut init: Option<FunctionId> = None;
@@ -797,7 +794,7 @@ impl ModuleData<'_> {
                     datatype_handles_map,
                 )?);
 
-                function_definitions.insert(function_id.clone(), function_def);
+                move_definitions.insert(function_id.clone(), function_def);
 
                 function_calls.push(function_id);
                 continue;
@@ -887,7 +884,7 @@ impl ModuleData<'_> {
                     datatype_handles_map,
                 )?);
 
-                function_definitions.insert(function_id.clone(), function_def);
+                move_definitions.insert(function_id.clone(), function_def);
             }
 
             function_calls.push(function_id);
@@ -929,6 +926,7 @@ impl ModuleData<'_> {
             init,
             receive,
             fallback,
+            move_definitions,
         })
     }
 

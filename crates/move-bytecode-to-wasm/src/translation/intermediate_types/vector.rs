@@ -914,7 +914,7 @@ impl IVector {
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     use crate::{
         test_compilation_context,
@@ -2099,29 +2099,29 @@ mod tests {
 
         test_vector(
             &data,
-            IntermediateType::IVector(Rc::new(IntermediateType::IU32)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IU32)),
             &expected_load_bytes,
         );
         test_vector_copy(
             &data,
-            IntermediateType::IVector(Rc::new(IntermediateType::IU32)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IU32)),
             &expected_copy_bytes,
         );
         test_vector_pop_back(
             &data,
-            IntermediateType::IVector(Rc::new(IntermediateType::IU32)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IU32)),
             &expected_pop_bytes,
             44,
         );
         test_vector_push_back(
             &data,
             &element_bytes,
-            IntermediateType::IVector(Rc::new(IntermediateType::IU32)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IU32)),
             &expected_push_bytes,
         );
         test_vector_swap(
             &data,
-            IntermediateType::IVector(Rc::new(IntermediateType::IU32)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IU32)),
             &expected_swap_bytes,
             0,
             1,
@@ -2323,29 +2323,29 @@ mod tests {
 
         test_vector(
             &data,
-            IntermediateType::IVector(Rc::new(IntermediateType::IU256)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IU256)),
             &expected_load_bytes,
         );
         test_vector_copy(
             &data,
-            IntermediateType::IVector(Rc::new(IntermediateType::IU256)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IU256)),
             &expected_copy_bytes,
         );
         test_vector_pop_back(
             &data,
-            IntermediateType::IVector(Rc::new(IntermediateType::IU256)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IU256)),
             &expected_pop_bytes,
             100,
         );
         test_vector_push_back(
             &data,
             &element_bytes,
-            IntermediateType::IVector(Rc::new(IntermediateType::IU256)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IU256)),
             &expected_push_bytes,
         );
         test_vector_swap(
             &data,
-            IntermediateType::IVector(Rc::new(IntermediateType::IU256)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IU256)),
             &expected_swap_bytes,
             0,
             1,
@@ -2447,7 +2447,7 @@ mod tests {
 
         test_vector_pack(
             &element_bytes,
-            IntermediateType::IVector(Rc::new(IntermediateType::IU32)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IU32)),
             &expected_result_bytes,
         );
     }
@@ -2485,7 +2485,7 @@ mod tests {
 
         test_vector_pack(
             &element_bytes,
-            IntermediateType::IVector(Rc::new(IntermediateType::IU256)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IU256)),
             &expected_result_bytes,
         );
     }

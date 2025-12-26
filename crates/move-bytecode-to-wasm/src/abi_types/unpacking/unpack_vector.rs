@@ -172,7 +172,7 @@ impl IVector {
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     use alloy_primitives::{U256, address};
     use alloy_sol_types::{SolType, sol};
@@ -241,7 +241,7 @@ mod tests {
     #[test]
     fn test_unpack_vector_u8_empty() {
         type SolType = sol!((uint8[],));
-        let int_type = IntermediateType::IVector(Rc::new(IntermediateType::IU8));
+        let int_type = IntermediateType::IVector(Arc::new(IntermediateType::IU8));
 
         let data = SolType::abi_encode_params::<(Vec<u8>,)>(&(vec![],));
         let expected_result_bytes =
@@ -252,7 +252,7 @@ mod tests {
     #[test]
     fn test_unpack_vector_u8() {
         type SolType = sol!((uint8[],));
-        let int_type = IntermediateType::IVector(Rc::new(IntermediateType::IU8));
+        let int_type = IntermediateType::IVector(Arc::new(IntermediateType::IU8));
 
         let data = SolType::abi_encode_params(&(vec![1, 2, 3],));
         let expected_result_bytes = [
@@ -269,7 +269,7 @@ mod tests {
     #[test]
     fn test_unpack_vector_u16() {
         type SolType = sol!((uint16[],));
-        let int_type = IntermediateType::IVector(Rc::new(IntermediateType::IU16));
+        let int_type = IntermediateType::IVector(Arc::new(IntermediateType::IU16));
 
         let data = SolType::abi_encode_params(&(vec![1, 2],));
         let expected_result_bytes = [
@@ -285,7 +285,7 @@ mod tests {
     #[test]
     fn test_unpack_vector_u32() {
         type SolType = sol!((uint32[],));
-        let int_type = IntermediateType::IVector(Rc::new(IntermediateType::IU32));
+        let int_type = IntermediateType::IVector(Arc::new(IntermediateType::IU32));
 
         let data = SolType::abi_encode_params(&(vec![1, 2, 3],));
         let expected_result_bytes = [
@@ -302,7 +302,7 @@ mod tests {
     #[test]
     fn test_unpack_vector_u64() {
         type SolType = sol!((uint64[],));
-        let int_type = IntermediateType::IVector(Rc::new(IntermediateType::IU64));
+        let int_type = IntermediateType::IVector(Arc::new(IntermediateType::IU64));
 
         let data = SolType::abi_encode_params(&(vec![1, 2, 3],));
         let expected_result_bytes = [
@@ -319,7 +319,7 @@ mod tests {
     #[test]
     fn test_unpack_vector_u128() {
         type SolType = sol!((uint128[],));
-        let int_type = IntermediateType::IVector(Rc::new(IntermediateType::IU128));
+        let int_type = IntermediateType::IVector(Arc::new(IntermediateType::IU128));
 
         let data = SolType::abi_encode_params(&(vec![1, 2, 3],));
         let expected_result_bytes = [
@@ -339,7 +339,7 @@ mod tests {
     #[test]
     fn test_unpack_vector_u256() {
         type SolType = sol!((uint256[],));
-        let int_type = IntermediateType::IVector(Rc::new(IntermediateType::IU256));
+        let int_type = IntermediateType::IVector(Arc::new(IntermediateType::IU256));
 
         let data =
             SolType::abi_encode_params(&(vec![U256::from(1), U256::from(2), U256::from(3)],));
@@ -360,7 +360,7 @@ mod tests {
     #[test]
     fn test_unpack_vector_address() {
         type SolType = sol!((address[],));
-        let int_type = IntermediateType::IVector(Rc::new(IntermediateType::IAddress));
+        let int_type = IntermediateType::IVector(Arc::new(IntermediateType::IAddress));
 
         let data = SolType::abi_encode_params(&(vec![
             address!("0x1234567890abcdef1234567890abcdef12345678"),
@@ -387,7 +387,7 @@ mod tests {
     #[test]
     fn test_unpack_vector_vector_u32() {
         type SolType = sol!((uint32[][],));
-        let int_type = IntermediateType::IVector(Rc::new(IntermediateType::IVector(Rc::new(
+        let int_type = IntermediateType::IVector(Arc::new(IntermediateType::IVector(Arc::new(
             IntermediateType::IU32,
         ))));
 
@@ -416,7 +416,7 @@ mod tests {
     #[test]
     fn test_unpack_vector_vector_u128() {
         type SolType = sol!((uint128[][],));
-        let int_type = IntermediateType::IVector(Rc::new(IntermediateType::IVector(Rc::new(
+        let int_type = IntermediateType::IVector(Arc::new(IntermediateType::IVector(Arc::new(
             IntermediateType::IU128,
         ))));
 
