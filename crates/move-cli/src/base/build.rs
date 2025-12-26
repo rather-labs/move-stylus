@@ -43,7 +43,7 @@ impl Build {
         )?;
 
         if let Err(compilation_error) = translate_package_cli(
-            compiled,
+            &compiled,
             &rerooted_path,
             config.install_dir,
             emit_wat,

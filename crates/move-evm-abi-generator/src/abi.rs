@@ -8,6 +8,7 @@ use move_bytecode_to_wasm::compilation_context::{
     },
 };
 use move_parse_special_attributes::function_modifiers::{FunctionModifier, Parameter};
+use move_symbol_pool::Symbol;
 
 use crate::{
     ErrorStruct, EventStruct,
@@ -36,7 +37,7 @@ pub enum Visibility {
 #[derive(Debug)]
 pub struct Function {
     pub(crate) function_type: FunctionType,
-    pub(crate) identifier: String,
+    pub(crate) identifier: Symbol,
     pub(crate) parameters: Vec<NamedType>,
     pub(crate) return_types: Type,
     pub(crate) visibility: Visibility,
@@ -46,14 +47,14 @@ pub struct Function {
 
 #[derive(Debug)]
 pub struct Struct_ {
-    pub(crate) identifier: String,
+    pub(crate) identifier: Symbol,
     pub(crate) fields: Vec<NamedType>,
     pub(crate) positional_fields: bool,
 }
 
 #[derive(Debug)]
 pub struct Event {
-    pub(crate) identifier: String,
+    pub(crate) identifier: Symbol,
     pub(crate) fields: Vec<EventField>,
     pub(crate) is_anonymous: bool,
     pub(crate) positional_fields: bool,
@@ -62,7 +63,7 @@ pub struct Event {
 /// A unified struct representing a typed field used in functions, structs, and events.
 #[derive(Debug)]
 pub struct NamedType {
-    pub(crate) identifier: String,
+    pub(crate) identifier: Symbol,
     pub(crate) type_: Type,
 }
 
@@ -74,7 +75,7 @@ pub struct EventField {
 
 #[derive(Debug)]
 pub struct Abi {
-    pub(crate) contract_name: String,
+    pub(crate) contract_name: Symbol,
     pub(crate) functions: Vec<Function>,
     pub(crate) structs: Vec<Struct_>,
     pub(crate) events: Vec<Event>,
@@ -109,7 +110,7 @@ impl Abi {
             Self::process_structs(structs_to_process, modules_data, &mut processed_structs);
 
         Abi {
-            contract_name: processing_module.special_attributes.module_name.clone(),
+            contract_name: processing_module.special_attributes.module_name,
             functions,
             structs,
             events,
@@ -148,7 +149,7 @@ impl Abi {
                 .special_attributes
                 .functions
                 .iter()
-                .find(|f| f.name == function.function_id.identifier)
+                .find(|f| *f.name == *function.function_id.identifier)
                 .expect("function not found");
 
             // Determine the function type based on the function ID
@@ -215,7 +216,7 @@ impl Abi {
                                 } else {
                                     {
                                         function_parameters.push(NamedType {
-                                            identifier: param.name.clone(),
+                                            identifier: param.name,
                                             type_: Type::from_intermediate_type(
                                                 itype,
                                                 modules_data,
@@ -254,7 +255,7 @@ impl Abi {
                         } else {
                             {
                                 function_parameters.push(NamedType {
-                                    identifier: param.name.clone(),
+                                    identifier: param.name,
                                     type_: Type::from_intermediate_type(itype, modules_data),
                                 });
                                 if Self::should_process_struct(itype, modules_data) {
@@ -270,7 +271,7 @@ impl Abi {
                             panic!("found not simple enum in function signature");
                         } else {
                             function_parameters.push(NamedType {
-                                identifier: param.name.clone(),
+                                identifier: param.name,
                                 type_: Type::from_intermediate_type(itype, modules_data),
                             });
                         }
@@ -291,14 +292,14 @@ impl Abi {
                             panic!("found not simple enum in function signature");
                         } else {
                             function_parameters.push(NamedType {
-                                identifier: param.name.clone(),
+                                identifier: param.name,
                                 type_: Type::from_intermediate_type(itype, modules_data),
                             });
                         }
                     }
                     _ => {
                         function_parameters.push(NamedType {
-                            identifier: param.name.clone(),
+                            identifier: param.name,
                             type_: Type::from_intermediate_type(itype, modules_data),
                         });
                     }
@@ -338,9 +339,9 @@ impl Abi {
 
             // Function name
             let function_name = if function_type == FunctionType::Constructor {
-                "constructor".to_string()
+                Symbol::from("constructor")
             } else {
-                snake_to_camel(&function.function_id.identifier)
+                Symbol::from(snake_to_camel(&function.function_id.identifier))
             };
 
             result.push(Function {
@@ -384,13 +385,13 @@ impl Abi {
                 ) {
                     ("UID", STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => {
                         function_parameters.push(NamedType {
-                            identifier: param.name.clone(),
+                            identifier: param.name,
                             type_: Type::Bytes32,
                         });
                     }
                     _ => {
                         function_parameters.push(NamedType {
-                            identifier: param.name.clone(),
+                            identifier: param.name,
                             type_: Type::from_intermediate_type(struct_itype, modules_data),
                         });
                         if Self::should_process_struct(struct_itype, modules_data) {
@@ -420,7 +421,7 @@ impl Abi {
                     ("NamedId", STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => {}
                     _ => {
                         function_parameters.push(NamedType {
-                            identifier: param.name.clone(),
+                            identifier: param.name,
                             type_: Type::from_intermediate_type(struct_itype, modules_data),
                         });
                         if Self::should_process_struct(struct_itype, modules_data) {
@@ -468,7 +469,7 @@ impl Abi {
                     .special_attributes
                     .structs
                     .iter()
-                    .find(|s| s.name == struct_.identifier)
+                    .find(|s| *s.name == *struct_.identifier)
                     .unwrap();
 
                 (struct_, parsed_struct)
@@ -484,7 +485,7 @@ impl Abi {
                         child_structs_to_process.insert(field_itype.clone());
                     }
                     NamedType {
-                        identifier: name.clone(),
+                        identifier: *name,
                         type_: Type::from_intermediate_type(field_itype, modules_data),
                     }
                 })
@@ -520,10 +521,10 @@ impl Abi {
 
         for event in events {
             let event_module = modules_data
-                .get(&ModuleId {
-                    address: event.module_id.address().into_bytes().into(),
-                    module_name: event.module_id.name().to_string(),
-                })
+                .get(&ModuleId::new(
+                    event.module_id.address().into_bytes().into(),
+                    event.module_id.name().as_str(),
+                ))
                 .unwrap();
 
             let mut event_struct = event_module
@@ -546,7 +547,7 @@ impl Abi {
                 .special_attributes
                 .structs
                 .iter()
-                .find(|s| s.name.as_str() == event_struct.identifier)
+                .find(|s| *s.name == *event_struct.identifier)
                 .unwrap();
 
             // Collect structs from event fields
@@ -557,7 +558,7 @@ impl Abi {
             }
 
             result.push(Event {
-                identifier: event.identifier.clone(),
+                identifier: event.identifier,
                 fields: event_struct
                     .fields
                     .iter()
@@ -565,7 +566,7 @@ impl Abi {
                     .enumerate()
                     .map(|(index, (f, (identifier, _)))| EventField {
                         named_type: NamedType {
-                            identifier: identifier.clone(),
+                            identifier: *identifier,
                             type_: Type::from_intermediate_type(f, modules_data),
                         },
                         indexed: index < event_special_attributes.indexes as usize,
@@ -588,10 +589,10 @@ impl Abi {
 
         for error_struct in error_structs {
             let error_module = modules_data
-                .get(&ModuleId {
-                    address: error_struct.module_id.address().into_bytes().into(),
-                    module_name: error_struct.module_id.name().to_string(),
-                })
+                .get(&ModuleId::new(
+                    error_struct.module_id.address().into_bytes().into(),
+                    error_struct.module_id.name().as_str(),
+                ))
                 .unwrap();
 
             let error_struct = error_module
@@ -603,7 +604,7 @@ impl Abi {
                 .special_attributes
                 .structs
                 .iter()
-                .find(|s| s.name.as_str() == error_struct.identifier)
+                .find(|s| *s.name == *error_struct.identifier)
                 .unwrap();
 
             // Collect structs from error fields
@@ -616,13 +617,13 @@ impl Abi {
                 });
 
             result.push(Struct_ {
-                identifier: error_struct.identifier.to_string(),
+                identifier: error_struct.identifier,
                 fields: error_struct
                     .fields
                     .iter()
                     .zip(&error_struct_parsed.fields)
                     .map(|(f, (identifier, _))| NamedType {
-                        identifier: identifier.clone(),
+                        identifier: *identifier,
                         type_: Type::from_intermediate_type(f, modules_data),
                     })
                     .collect(),

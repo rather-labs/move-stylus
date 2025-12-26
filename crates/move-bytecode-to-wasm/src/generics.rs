@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::translation::intermediate_types::IntermediateType;
 
 /// This function returns true if there is a type parameter in some of the intermediate types and
@@ -29,11 +31,11 @@ pub fn replace_type_parameters(
         IntermediateType::ITypeParameter(index) => instance_types[*index as usize].clone(),
         // Reference type parameter: &T -> &concrete_type
         IntermediateType::IRef(inner) => {
-            IntermediateType::IRef(Box::new(replace_type_parameters(inner, instance_types)))
+            IntermediateType::IRef(Rc::new(replace_type_parameters(inner, instance_types)))
         }
         // Mutable reference type parameter: &mut T -> &mut concrete_type
         IntermediateType::IMutRef(inner) => {
-            IntermediateType::IMutRef(Box::new(replace_type_parameters(inner, instance_types)))
+            IntermediateType::IMutRef(Rc::new(replace_type_parameters(inner, instance_types)))
         }
         IntermediateType::IGenericStructInstance {
             module_id,
@@ -41,7 +43,7 @@ pub fn replace_type_parameters(
             types,
             vm_handled_struct,
         } => IntermediateType::IGenericStructInstance {
-            module_id: module_id.clone(),
+            module_id: *module_id,
             index: *index,
             types: types
                 .iter()
@@ -54,7 +56,7 @@ pub fn replace_type_parameters(
             index,
             types,
         } => IntermediateType::IGenericEnumInstance {
-            module_id: module_id.clone(),
+            module_id: *module_id,
             index: *index,
             types: types
                 .iter()
@@ -62,7 +64,7 @@ pub fn replace_type_parameters(
                 .collect(),
         },
         IntermediateType::IVector(inner) => {
-            IntermediateType::IVector(Box::new(replace_type_parameters(inner, instance_types)))
+            IntermediateType::IVector(Rc::new(replace_type_parameters(inner, instance_types)))
         }
         // Non-generic type: keep as is
         _ => itype.clone(),

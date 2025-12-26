@@ -166,7 +166,7 @@ pub fn generate_abi(
         return Err("No compiled units found".into());
     }
 
-    let package_module_data = package_module_data(&package, Some(module_name.to_string()), false)
+    let package_module_data = package_module_data(&package, &root_compiled_units, false)
         .map_err(|e| format!("Failed to get package module data: {e:?}"))?;
 
     let abis = generate_abi(

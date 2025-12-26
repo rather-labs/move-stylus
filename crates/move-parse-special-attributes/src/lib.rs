@@ -18,6 +18,7 @@ pub use event::Event;
 use event::EventParseError;
 pub use external_call::error::{ExternalCallFunctionError, ExternalCallStructError};
 pub use function_validation::FunctionValidationError;
+use move_symbol_pool::Symbol;
 pub use reserved_modules::{SF_ADDRESS, SF_RESERVED_STRUCTS};
 pub use struct_validation::StructValidationError;
 // TODO: Create error struct with LOC and error info
@@ -44,8 +45,8 @@ use types::Type;
 
 #[derive(Debug, Clone)]
 pub struct Struct_ {
-    pub name: String,
-    pub fields: Vec<(String, Type)>,
+    pub name: Symbol,
+    pub fields: Vec<(Symbol, Type)>,
     pub positional_fields: bool,
     pub loc: Loc,
     pub has_key: bool,
@@ -53,22 +54,38 @@ pub struct Struct_ {
 
 #[derive(Debug)]
 pub struct TestFunction {
-    pub name: String,
+    pub name: Symbol,
     pub skip: bool,
     pub expect_failure: bool,
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct SpecialAttributes {
-    pub module_name: String,
-    pub events: HashMap<String, Event>,
+    pub module_name: Symbol,
+    pub events: HashMap<Symbol, Event>,
     pub functions: Vec<Function>,
     pub structs: Vec<Struct_>,
-    pub external_calls: HashMap<String, Function>,
-    pub external_struct: HashMap<String, ExternalStruct>,
-    pub external_call_structs: HashSet<String>,
-    pub abi_errors: HashMap<String, AbiError>,
+    pub external_calls: HashMap<Symbol, Function>,
+    pub external_struct: HashMap<Symbol, ExternalStruct>,
+    pub external_call_structs: HashSet<Symbol>,
+    pub abi_errors: HashMap<Symbol, AbiError>,
     pub test_functions: Vec<TestFunction>,
+}
+
+impl Default for SpecialAttributes {
+    fn default() -> Self {
+        Self {
+            module_name: Symbol::from(""),
+            events: HashMap::default(),
+            functions: Vec::default(),
+            structs: Vec::default(),
+            external_calls: HashMap::default(),
+            external_struct: HashMap::default(),
+            external_call_structs: HashSet::default(),
+            abi_errors: HashMap::default(),
+            test_functions: Vec::default(),
+        }
+    }
 }
 
 /// ModuleId represents a unique identifier for a Move module.
@@ -76,20 +93,20 @@ pub struct SpecialAttributes {
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub struct ModuleId {
     pub address: [u8; 32],
-    pub module_name: String,
+    pub module_name: Symbol,
 }
 
 pub fn process_special_attributes(
     path: &Path,
     package_address: [u8; 32],
     deps_structs: &HashMap<ModuleId, Vec<Struct_>>,
-    address_alias_instantiation: &HashMap<String, [u8; 32]>,
+    address_alias_instantiation: &HashMap<Symbol, [u8; 32]>,
 ) -> Result<SpecialAttributes, (MappedFiles, Vec<SpecialAttributeError>)> {
     let (mapped_files, program_res) = Compiler::from_files(
         None,
         vec![path.to_str().unwrap()],
         Vec::new(),
-        BTreeMap::<String, NumericalAddress>::new(),
+        BTreeMap::<Symbol, NumericalAddress>::new(),
     )
     .run::<PASS_PARSER>()
     .unwrap();
@@ -104,34 +121,36 @@ pub fn process_special_attributes(
     // ones) that should have as first argument structs marked with a modifier.
     for source in &ast.source_definitions {
         if let Definition::Module(ref module) = source.def {
-            result.module_name = module.name.0.to_string();
+            result.module_name = module.name.0.value;
             for module_member in &module.members {
                 match module_member {
                     ModuleMember::Struct(s) => {
-                        let struct_name = s.name.value().as_str().to_string();
+                        let struct_name = s.name.value();
 
                         // No matter if it is a struct marked with special attributes, we collect
                         // its information.
-                        let fields: Vec<(String, Type)> = match &s.fields {
+                        let fields: Vec<(Symbol, Type)> = match &s.fields {
                             move_compiler::parser::ast::StructFields::Named(items) => items
                                 .iter()
                                 .map(|(_, field, type_)| {
-                                    let name = field.value();
-                                    (name.to_string(), Type::parse_type(&type_.value))
+                                    (field.value(), Type::parse_type(&type_.value))
                                 })
                                 .collect(),
                             move_compiler::parser::ast::StructFields::Positional(items) => items
                                 .iter()
                                 .enumerate()
                                 .map(|(index, (_, type_))| {
-                                    (format!("pos{index}"), Type::parse_type(&type_.value))
+                                    (
+                                        Symbol::from(format!("pos{index}")),
+                                        Type::parse_type(&type_.value),
+                                    )
                                 })
                                 .collect(),
                             move_compiler::parser::ast::StructFields::Native(_) => todo!(),
                         };
 
                         result.structs.push(Struct_ {
-                            name: struct_name.clone(),
+                            name: struct_name,
                             fields,
                             positional_fields: matches!(
                                 s.fields,
@@ -164,7 +183,7 @@ pub fn process_special_attributes(
                                                         .external_call_structs
                                                         .contains(&struct_name) =>
                                                 {
-                                                    result.external_call_structs.insert(struct_name.clone());
+                                                    result.external_call_structs.insert(struct_name);
                                                     found_modifier = true;
                                                 }
                                                 Ok(_) => {
@@ -182,7 +201,7 @@ pub fn process_special_attributes(
                                                 Ok(external_struct) => {
                                                     result
                                                         .external_struct
-                                                        .insert(struct_name.clone(), external_struct);
+                                                        .insert(struct_name, external_struct);
                                                     found_modifier = true;
                                                 }
                                                 Err(SpecialAttributeError {
@@ -202,7 +221,7 @@ pub fn process_special_attributes(
                                         StructModifier::Event => {
                                             match Event::try_from(s) {
                                                 Ok(event) => {
-                                                    result.events.insert(struct_name.clone(), event);
+                                                    result.events.insert(struct_name, event);
                                                     found_modifier = true;
                                                 }
                                                 Err(SpecialAttributeError {
@@ -222,7 +241,7 @@ pub fn process_special_attributes(
                                         StructModifier::AbiError => {
                                             match AbiError::try_from(s) {
                                                 Ok(abi_error) => {
-                                                    result.abi_errors.insert(struct_name.clone(), abi_error);
+                                                    result.abi_errors.insert(struct_name, abi_error);
                                                     found_modifier = true;
                                                 }
                                                 Err(SpecialAttributeError {
@@ -274,7 +293,7 @@ pub fn process_special_attributes(
     // Members can either be Datatypes (structs or enums) or Functions.
     // imported_members is a HashMap of module id (address + module name) to a vector of tuples,
     // where the first element is the name of the member and the second element is the alias (if any).
-    let mut imported_members: HashMap<ModuleId, Vec<(String, Option<String>)>> = HashMap::new();
+    let mut imported_members: HashMap<ModuleId, Vec<(Symbol, Option<Symbol>)>> = HashMap::new();
     for source in ast.source_definitions.clone() {
         if let Definition::Module(module) = source.def {
             for module_member in module.members {
@@ -292,13 +311,13 @@ pub fn process_special_attributes(
                                 move_compiler::parser::ast::LeadingNameAccess_::GlobalAddress(name) => {
                                     // GlobalAddress is a named address, look it up in address_alias_instantiation
                                     address_alias_instantiation
-                                        .get(name.value.as_str())
+                                        .get(&name.value)
                                         .copied()
                                         .or_else(|| {
                                             found_error = true;
                                             module_errors.push(SpecialAttributeError {
                                                 kind: SpecialAttributeErrorKind::NamedAddressNotFound(
-                                                    name.value.as_str().to_string(),
+                                                    name.value,
                                                 ),
                                                 line_of_code: use_decl.loc,
                                             });
@@ -308,13 +327,13 @@ pub fn process_special_attributes(
                                 move_compiler::parser::ast::LeadingNameAccess_::Name(name) => {
                                     // Name is also a named address, look it up in address_alias_instantiation
                                     address_alias_instantiation
-                                        .get(name.value.as_str())
+                                        .get(&name.value)
                                         .copied()
                                         .or_else(|| {
                                             found_error = true;
                                             module_errors.push(SpecialAttributeError {
                                                 kind: SpecialAttributeErrorKind::NamedAddressNotFound(
-                                                    name.value.as_str().to_string(),
+                                                    name.value,
                                                 ),
                                                 line_of_code: use_decl.loc,
                                             });
@@ -329,14 +348,12 @@ pub fn process_special_attributes(
 
                             let module_id = ModuleId {
                                 address: module_address,
-                                module_name: module_ident.value.module.to_string(),
+                                module_name: module_ident.value.module.0.value,
                             };
 
                             for member in members {
-                                let member_tuple = (
-                                    member.0.value.as_str().to_string(),
-                                    member.1.as_ref().map(|s| s.value.as_str().to_string()),
-                                );
+                                let member_tuple =
+                                    (member.0.value, member.1.as_ref().map(|s| s.value));
                                 imported_members
                                     .entry(module_id.to_owned())
                                     .or_default()
@@ -394,14 +411,14 @@ pub fn process_special_attributes(
                                         modifiers.into_iter().collect::<Vec<FunctionModifier>>();
 
                                     result.test_functions.push(TestFunction {
-                                        name: f.name.to_owned().to_string(),
+                                        name: f.name.0.value,
                                         skip: modifiers.contains(&FunctionModifier::Skip),
                                         expect_failure: modifiers
                                             .contains(&FunctionModifier::ExpectedFailure),
                                     });
 
                                     result.functions.push(Function {
-                                        name: f.name.to_owned().to_string(),
+                                        name: f.name.0.value,
                                         modifiers: vec![],
                                         signature,
                                         visibility,
@@ -422,9 +439,9 @@ pub fn process_special_attributes(
                                         module_errors.extend(errors);
                                     } else if !found_error {
                                         result.external_calls.insert(
-                                            f.name.to_owned().to_string(),
+                                            f.name.0.value,
                                             Function {
-                                                name: f.name.to_owned().to_string(),
+                                                name: f.name.0.value,
                                                 modifiers,
                                                 signature,
                                                 visibility,
@@ -438,7 +455,7 @@ pub fn process_special_attributes(
 
                                     if !found_error {
                                         result.functions.push(Function {
-                                            name: f.name.to_owned().to_string(),
+                                            name: f.name.0.value,
                                             modifiers,
                                             signature,
                                             visibility,
@@ -454,7 +471,7 @@ pub fn process_special_attributes(
                                             .into_iter()
                                             .collect::<Vec<FunctionModifier>>();
                                         result.functions.push(Function {
-                                            name: f.name.to_owned().to_string(),
+                                            name: f.name.0.value,
                                             modifiers,
                                             signature,
                                             visibility,
@@ -464,7 +481,7 @@ pub fn process_special_attributes(
                             }
                         } else if !found_error {
                             result.functions.push(Function {
-                                name: f.name.to_owned().to_string(),
+                                name: f.name.0.value,
                                 modifiers: Vec::new(),
                                 signature,
                                 visibility,

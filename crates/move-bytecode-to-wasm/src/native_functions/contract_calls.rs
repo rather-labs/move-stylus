@@ -78,8 +78,7 @@ pub fn add_external_contract_call_fn(
     let self_ = function_args
         .first()
         .ok_or(NativeFunctionError::ContractCallFunctionNoArgs(
-            module_id.clone(),
-            name,
+            *module_id, name,
         ))?;
 
     // Locals
@@ -555,7 +554,7 @@ pub fn add_external_contract_call_fn(
                 let (parent_struct_itype, parent_struct) =
                     if let Some(instance_types) = instance_types {
                         let itype = IntermediateType::IGenericStructInstance {
-                            module_id: parent_module_id.clone(),
+                            module_id: *parent_module_id,
                             index: *parent_index,
                             types: instance_types.clone(),
                             vm_handled_struct: VmHandledStruct::None,
@@ -568,7 +567,7 @@ pub fn add_external_contract_call_fn(
                         (itype, struct_)
                     } else {
                         let itype = IntermediateType::IStruct {
-                            module_id: parent_module_id.clone(),
+                            module_id: *parent_module_id,
                             index: *parent_index,
                             vm_handled_struct: VmHandledStruct::None,
                         };
@@ -603,7 +602,7 @@ pub fn add_external_contract_call_fn(
                 let (parent_struct_itype, parent_struct) =
                     if let Some(instance_types) = instance_types {
                         let itype = IntermediateType::IGenericStructInstance {
-                            module_id: parent_module_id.clone(),
+                            module_id: *parent_module_id,
                             index: *parent_index,
                             types: instance_types.clone(),
                             vm_handled_struct: VmHandledStruct::None,
@@ -616,7 +615,7 @@ pub fn add_external_contract_call_fn(
                         (itype, struct_)
                     } else {
                         let itype = IntermediateType::IStruct {
-                            module_id: parent_module_id.clone(),
+                            module_id: *parent_module_id,
                             index: *parent_index,
                             vm_handled_struct: VmHandledStruct::None,
                         };

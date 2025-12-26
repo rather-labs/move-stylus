@@ -237,6 +237,7 @@ mod tests {
     use move_binary_format::file_format::StructDefinitionIndex;
     use rstest::rstest;
     use std::collections::HashMap;
+    use std::rc::Rc;
 
     use crate::compilation_context::{ModuleData, ModuleId};
     use crate::runtime::RuntimeFunction;
@@ -404,7 +405,7 @@ mod tests {
         #[case] expected_end_written_bytes: u32,
     ) {
         let enum_ = IEnum::new(
-            "TestEnum".to_string(),
+            "TestEnum",
             0,
             vec![
                 IEnumVariant::new(0, 0, vec![IntermediateType::IU8, IntermediateType::IU16]),
@@ -508,7 +509,7 @@ mod tests {
         #[case] expected_tail_offset: u32,
     ) {
         let enum_ = IEnum::new(
-            "TestEnum".to_string(),
+            "TestEnum",
             0,
             vec![
                 IEnumVariant::new(
@@ -516,7 +517,7 @@ mod tests {
                     0,
                     vec![
                         IntermediateType::IAddress,
-                        IntermediateType::IVector(Box::new(IntermediateType::IU8)),
+                        IntermediateType::IVector(Rc::new(IntermediateType::IU8)),
                         IntermediateType::IU64,
                     ],
                 ),
@@ -524,7 +525,7 @@ mod tests {
                     1,
                     0,
                     vec![
-                        IntermediateType::IVector(Box::new(IntermediateType::IU8)),
+                        IntermediateType::IVector(Rc::new(IntermediateType::IU8)),
                         IntermediateType::IU64,
                         IntermediateType::IAddress,
                     ],
@@ -611,7 +612,7 @@ mod tests {
 
         // Create a simple enum (no fields)
         let nested_enum_1 = IEnum::new(
-            "TestEnum".to_string(),
+            "TestEnum",
             0,
             vec![
                 IEnumVariant::new(0, 0, vec![]),
@@ -623,7 +624,7 @@ mod tests {
 
         // More complex enum
         let nested_enum_2 = IEnum::new(
-            "TestEnum2".to_string(),
+            "TestEnum2",
             0,
             vec![
                 IEnumVariant::new(
@@ -631,7 +632,7 @@ mod tests {
                     0,
                     vec![
                         IntermediateType::IAddress,
-                        IntermediateType::IVector(Box::new(IntermediateType::IU8)),
+                        IntermediateType::IVector(Rc::new(IntermediateType::IU8)),
                         IntermediateType::IU64,
                     ],
                 ),
@@ -639,7 +640,7 @@ mod tests {
                     1,
                     0,
                     vec![
-                        IntermediateType::IVector(Box::new(IntermediateType::IU8)),
+                        IntermediateType::IVector(Rc::new(IntermediateType::IU8)),
                         IntermediateType::IU64,
                         IntermediateType::IAddress,
                     ],
@@ -650,14 +651,14 @@ mod tests {
 
         // Create enum that contains the simple enum
         let enum_ = IEnum::new(
-            "TestEnum3".to_string(),
+            "TestEnum3",
             2,
             vec![
                 IEnumVariant::new(
                     0,
                     2,
                     vec![IntermediateType::IEnum {
-                        module_id: module_id.clone(),
+                        module_id,
                         index: 0,
                     }],
                 ),
@@ -665,7 +666,7 @@ mod tests {
                     1,
                     2,
                     vec![IntermediateType::IEnum {
-                        module_id: module_id.clone(),
+                        module_id,
                         index: 1,
                     }],
                 ),
@@ -752,18 +753,20 @@ mod tests {
         #[case] expected_tail_slot: [u8; 32],
         #[case] expected_tail_offset: u32,
     ) {
+        use std::rc::Rc;
+
         let module_id = ModuleId::default();
 
         // Create a struct without key
         let child_struct_1 = IStruct::new(
             StructDefinitionIndex::new(0),
-            "ChildStruct1".to_string(),
+            "ChildStruct1",
             vec![
                 (None, IntermediateType::IU32), // 4
                 (None, IntermediateType::IU64), // 8
                 (
                     None,
-                    IntermediateType::IVector(Box::new(IntermediateType::IU8)),
+                    IntermediateType::IVector(Rc::new(IntermediateType::IU8)),
                 ), // 32
             ],
             HashMap::new(),
@@ -773,7 +776,7 @@ mod tests {
 
         let child_struct_2 = IStruct::new(
             StructDefinitionIndex::new(1),
-            "ChildStruct2".to_string(),
+            "ChildStruct2",
             vec![
                 (None, IntermediateType::IU32), // 4
                 (None, IntermediateType::IU64), // 8
@@ -786,19 +789,19 @@ mod tests {
         // Struct with key
         let child_struct_3 = IStruct::new(
             StructDefinitionIndex::new(2),
-            "ChildStruct3".to_string(),
+            "ChildStruct3",
             vec![
                 (
                     None,
                     IntermediateType::IStruct {
-                        module_id: module_id.clone(),
+                        module_id,
                         index: 0,
                         vm_handled_struct: VmHandledStruct::None,
                     },
                 ), // 8
                 (
                     None,
-                    IntermediateType::IVector(Box::new(IntermediateType::IU8)),
+                    IntermediateType::IVector(Rc::new(IntermediateType::IU8)),
                 ), // 32
             ],
             HashMap::new(),
@@ -807,14 +810,14 @@ mod tests {
         );
 
         let enum_ = IEnum::new(
-            "TestEnum".to_string(),
+            "TestEnum",
             0,
             vec![
                 IEnumVariant::new(
                     0,
                     0,
                     vec![IntermediateType::IStruct {
-                        module_id: module_id.clone(),
+                        module_id,
                         index: 0,
                         vm_handled_struct: VmHandledStruct::None,
                     }],
@@ -823,7 +826,7 @@ mod tests {
                     1,
                     0,
                     vec![IntermediateType::IStruct {
-                        module_id: module_id.clone(),
+                        module_id,
                         index: 1,
                         vm_handled_struct: VmHandledStruct::None,
                     }],
@@ -832,7 +835,7 @@ mod tests {
                     2,
                     0,
                     vec![IntermediateType::IStruct {
-                        module_id: module_id.clone(),
+                        module_id,
                         index: 2,
                         vm_handled_struct: VmHandledStruct::None,
                     }],

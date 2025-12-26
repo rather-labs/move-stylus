@@ -18,6 +18,7 @@ mod unit_test;
 use std::hash::Hasher;
 
 use error::NativeFunctionError;
+use move_symbol_pool::Symbol;
 use walrus::{FunctionId, Module};
 
 use crate::{
@@ -336,7 +337,7 @@ impl NativeFunction {
                 ) => account::add_native_account_balance_fn(module, compilation_ctx, module_id)?,
                 _ => {
                     return Err(NativeFunctionError::NativeFunctionNotSupported(
-                        module_id.clone(),
+                        *module_id,
                         name.to_string(),
                     ));
                 }
@@ -365,8 +366,10 @@ impl NativeFunction {
 
             let function_information = module_data.functions.get_information_by_identifier(name)?;
 
-            if let Some(special_attributes) =
-                module_data.special_attributes.external_calls.get(name)
+            if let Some(special_attributes) = module_data
+                .special_attributes
+                .external_calls
+                .get(&Symbol::from(name))
             {
                 contract_calls::add_external_contract_call_fn(
                     module,
@@ -379,7 +382,7 @@ impl NativeFunction {
                 )
             } else {
                 Err(NativeFunctionError::NotExternalCall(
-                    module_id.clone(),
+                    *module_id,
                     name.to_owned(),
                 ))
             }
@@ -586,7 +589,7 @@ impl NativeFunction {
 
             _ => {
                 return Err(NativeFunctionError::GenericdNativeFunctionNotSupported(
-                    module_id.clone(),
+                    *module_id,
                     name.to_owned(),
                 ));
             }
@@ -629,7 +632,7 @@ impl NativeFunction {
     ) -> Result<(), NativeFunctionError> {
         if expected != len {
             return Err(NativeFunctionError::WrongNumberOfTypeParameters {
-                module_id: module_id.clone(),
+                module_id: *module_id,
                 function_name: name.to_owned(),
                 expected,
                 found: len,
@@ -651,7 +654,7 @@ impl NativeFunction {
     ) -> Result<String, NativeFunctionError> {
         if generics.is_empty() {
             return Err(NativeFunctionError::GetGenericFunctionNameNoGenerics(
-                module_id.clone(),
+                *module_id,
                 name.to_owned(),
             ));
         }

@@ -65,6 +65,7 @@ use move_binary_format::{
     file_format::{FieldHandleIndex, StructDefinitionIndex},
     internals::ModuleIndex,
 };
+use move_symbol_pool::Symbol;
 use walrus::{InstrSeqBuilder, Module, ValType, ir::BinaryOp};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -78,7 +79,7 @@ pub enum IStructType {
 #[derive(Debug, Clone)]
 pub struct IStruct {
     /// Struct identifier
-    pub identifier: String,
+    pub identifier: Symbol,
 
     /// Field's types ordered by index
     pub fields: Vec<IntermediateType>,
@@ -110,7 +111,7 @@ pub struct IStruct {
 impl IStruct {
     pub fn new(
         index: StructDefinitionIndex,
-        identifier: String,
+        identifier: &str,
         fields: Vec<(Option<FieldHandleIndex>, IntermediateType)>,
         fields_types: HashMap<FieldHandleIndex, IntermediateType>,
         has_key: bool,
@@ -129,7 +130,7 @@ impl IStruct {
 
         Self {
             struct_definition_index: index,
-            identifier,
+            identifier: Symbol::from(identifier),
             heap_size,
             field_offsets,
             fields_types,
@@ -344,7 +345,7 @@ impl IStruct {
 
         Self {
             fields,
-            identifier: self.identifier.clone(),
+            identifier: self.identifier,
             fields_types,
             field_offsets,
             struct_definition_index: StructDefinitionIndex::new(

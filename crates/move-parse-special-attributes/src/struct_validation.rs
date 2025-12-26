@@ -7,34 +7,35 @@ use crate::{
 };
 use move_compiler::diagnostics::codes::{DiagnosticInfo, Severity, custom};
 use move_ir_types::location::Loc;
+use move_symbol_pool::Symbol;
 use std::collections::HashMap;
 
 #[derive(thiserror::Error, Debug)]
 pub enum StructValidationError {
     #[error("Struct '{0}' with key ability must have UID or NamedId as its first field.")]
-    StructWithKeyMissingUidField(String),
+    StructWithKeyMissingUidField(Symbol),
 
     #[error("Struct '{0}' with key ability must have its first field named 'id'.")]
-    StructWithKeyFirstFieldWrongName(String),
+    StructWithKeyFirstFieldWrongName(Symbol),
 
     #[error(
         "Struct '{0}' with key ability cannot have UID or NamedId in fields other than the first."
     )]
-    MoreThanOneUidFields(String),
+    MoreThanOneUidFields(Symbol),
 
     #[error("Struct '{0}' without key ability cannot have UID or NamedId fields.")]
-    StructWithoutKeyHasUidField(String),
+    StructWithoutKeyHasUidField(Symbol),
 
     #[error("Events cannot be nested. Found {0} in struct.")]
-    NestedEvent(String),
+    NestedEvent(Symbol),
 
     #[error("Errors cannot be nested. Found {0} in struct.")]
-    NestedError(String),
+    NestedError(Symbol),
 
     #[error(
         "Struct '{0}' is reserved by the Stylus Framework and cannot be defined in module '{1}'."
     )]
-    FrameworkReservedStruct(String, String),
+    FrameworkReservedStruct(Symbol, Symbol),
 }
 
 impl From<&StructValidationError> for DiagnosticInfo {
@@ -55,8 +56,8 @@ pub fn validate_struct(
     struct_: &crate::Struct_,
     module_name: &str,
     package_address: [u8; 32],
-    events: &HashMap<String, Event>,
-    abi_errors: &HashMap<String, AbiError>,
+    events: &HashMap<Symbol, Event>,
+    abi_errors: &HashMap<Symbol, AbiError>,
 ) -> Vec<SpecialAttributeError> {
     let mut errors = Vec::new();
 
@@ -98,24 +99,20 @@ fn validate_uid_and_named_id_placement(
                 let first_field_type = &struct_.fields[0].1;
                 let is_first_uid_or_named_id = matches!(
                     first_field_type,
-                    Type::UserDataType(name, _) if name == "UID" || name == "NamedId"
+                    Type::UserDataType(name, _) if name.as_str() == "UID" || name.as_str() == "NamedId"
                 );
 
                 if !is_first_uid_or_named_id {
                     errors.push(SpecialAttributeError {
                         kind: SpecialAttributeErrorKind::StructValidation(
-                            StructValidationError::StructWithKeyMissingUidField(
-                                struct_.name.clone(),
-                            ),
+                            StructValidationError::StructWithKeyMissingUidField(struct_.name),
                         ),
                         line_of_code: struct_.loc,
                     });
-                } else if first_field_name != "id" {
+                } else if first_field_name.as_str() != "id" {
                     errors.push(SpecialAttributeError {
                         kind: SpecialAttributeErrorKind::StructValidation(
-                            StructValidationError::StructWithKeyFirstFieldWrongName(
-                                struct_.name.clone(),
-                            ),
+                            StructValidationError::StructWithKeyFirstFieldWrongName(struct_.name),
                         ),
                         line_of_code: struct_.loc,
                     });
@@ -125,11 +122,11 @@ fn validate_uid_and_named_id_placement(
                 for (_, field_type) in struct_.fields.iter().skip(1) {
                     if matches!(
                         field_type,
-                        Type::UserDataType(name, _) if name == "UID" || name == "NamedId"
+                        Type::UserDataType(name, _) if name.as_str() == "UID" || name.as_str() == "NamedId"
                     ) {
                         errors.push(SpecialAttributeError {
                             kind: SpecialAttributeErrorKind::StructValidation(
-                                StructValidationError::MoreThanOneUidFields(struct_.name.clone()),
+                                StructValidationError::MoreThanOneUidFields(struct_.name),
                             ),
                             line_of_code: struct_.loc,
                         });
@@ -142,13 +139,11 @@ fn validate_uid_and_named_id_placement(
             for (_, field_type) in &struct_.fields {
                 if matches!(
                     field_type,
-                    Type::UserDataType(name, _) if name == "UID" || name == "NamedId"
+                    Type::UserDataType(name, _) if name.as_str() == "UID" || name.as_str() == "NamedId"
                 ) {
                     errors.push(SpecialAttributeError {
                         kind: SpecialAttributeErrorKind::StructValidation(
-                            StructValidationError::StructWithoutKeyHasUidField(
-                                struct_.name.clone(),
-                            ),
+                            StructValidationError::StructWithoutKeyHasUidField(struct_.name),
                         ),
                         line_of_code: struct_.loc,
                     });
@@ -174,8 +169,8 @@ fn check_if_stylus_framework_reserved(
         errors.push(SpecialAttributeError {
             kind: SpecialAttributeErrorKind::StructValidation(
                 StructValidationError::FrameworkReservedStruct(
-                    struct_.name.clone(),
-                    module_name.to_string(),
+                    struct_.name,
+                    Symbol::from(module_name),
                 ),
             ),
             line_of_code: struct_.loc,
@@ -189,8 +184,8 @@ fn check_if_stylus_framework_reserved(
 /// Returns a vector of all errors found.
 fn check_for_nested_events_or_errors(
     struct_: &crate::Struct_,
-    events: &HashMap<String, Event>,
-    abi_errors: &HashMap<String, AbiError>,
+    events: &HashMap<Symbol, Event>,
+    abi_errors: &HashMap<Symbol, AbiError>,
 ) -> Vec<SpecialAttributeError> {
     let mut errors = Vec::new();
 
@@ -209,8 +204,8 @@ fn check_for_nested_events_or_errors(
 /// If so, returns a SpecialAttributeError.
 fn check_type_for_nested_events_or_errors(
     ty: &Type,
-    events: &HashMap<String, Event>,
-    abi_errors: &HashMap<String, AbiError>,
+    events: &HashMap<Symbol, Event>,
+    abi_errors: &HashMap<Symbol, AbiError>,
     loc: Loc,
 ) -> Option<SpecialAttributeError> {
     match ty {
@@ -219,7 +214,7 @@ fn check_type_for_nested_events_or_errors(
             if events.contains_key(name) {
                 return Some(SpecialAttributeError {
                     kind: SpecialAttributeErrorKind::StructValidation(
-                        StructValidationError::NestedEvent(name.to_string()),
+                        StructValidationError::NestedEvent(*name),
                     ),
                     line_of_code: loc,
                 });
@@ -227,7 +222,7 @@ fn check_type_for_nested_events_or_errors(
             if abi_errors.contains_key(name) {
                 return Some(SpecialAttributeError {
                     kind: SpecialAttributeErrorKind::StructValidation(
-                        StructValidationError::NestedError(name.to_string()),
+                        StructValidationError::NestedError(*name),
                     ),
                     line_of_code: loc,
                 });

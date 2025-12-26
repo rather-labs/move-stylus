@@ -33,11 +33,9 @@ impl VmHandledType for Bytes {
         // Check if the package is the stylus framework and the module is the bytes module
         if Bytes::validate_identifier(identifier) {
             if module_id.address != STYLUS_FRAMEWORK_ADDRESS
-                || module_id.module_name != SF_MODULE_NAME_SOL_TYPES
+                || module_id.module_name.as_str() != SF_MODULE_NAME_SOL_TYPES
             {
-                return Err(VmHandledTypeError::InvalidFrameworkType(Box::leak(
-                    identifier.clone().into_boxed_str(),
-                )));
+                return Err(VmHandledTypeError::InvalidFrameworkType(*identifier));
             }
             return Ok(true);
         }

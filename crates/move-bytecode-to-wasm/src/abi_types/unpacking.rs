@@ -242,7 +242,7 @@ impl Unpackable for IntermediateType {
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
                 let enum_ = compilation_ctx.get_enum_by_intermediate_type(self)?;
                 if !enum_.is_simple {
-                    return Err(AbiUnpackError::EnumIsNotSimple(enum_.identifier.to_owned()))?;
+                    return Err(AbiUnpackError::EnumIsNotSimple(enum_.identifier))?;
                 }
 
                 IEnum::add_unpack_instructions(
@@ -301,10 +301,7 @@ fn load_struct_storage_id(
                 NativeFunction::NATIVE_COMPUTE_NAMED_ID,
                 module,
                 compilation_ctx,
-                &ModuleId {
-                    address: STYLUS_FRAMEWORK_ADDRESS,
-                    module_name: SF_MODULE_NAME_OBJECT.to_owned(),
-                },
+                &ModuleId::new(STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT),
                 types,
             )
             .map_err(AbiUnpackError::NativeFunction)?;
@@ -312,9 +309,7 @@ fn load_struct_storage_id(
             function_builder.call(compute_named_id_fn);
         }
         _ => {
-            Err(AbiUnpackError::StorageObjectHasNoId(
-                struct_.identifier.clone(),
-            ))?;
+            Err(AbiUnpackError::StorageObjectHasNoId(struct_.identifier))?;
         }
     }
     Ok(())

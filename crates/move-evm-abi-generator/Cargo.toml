@@ -10,6 +10,7 @@ move-bytecode-to-wasm.workspace = true
 move-package.workspace = true
 move-binary-format.workspace = true
 move-core-types.workspace = true
+move-symbol-pool.workspace = true
 serde = "1.0.228"
 serde_json = "1.0.145"
 

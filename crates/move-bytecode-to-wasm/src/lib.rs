@@ -32,6 +32,7 @@ use move_package::{
     source_package::parsed_manifest::PackageName,
 };
 use move_parse_special_attributes::process_special_attributes;
+use move_symbol_pool::Symbol;
 use std::{collections::HashMap, path::PathBuf};
 use translation::{
     TranslationError,
@@ -49,7 +50,7 @@ pub type GlobalFunctionTable<'move_package> =
     HashMap<FunctionId, &'move_package FunctionDefinition>;
 
 pub fn translate_single_module(
-    package: CompiledPackage,
+    package: &CompiledPackage,
     module_name: &str,
 ) -> Result<Module, CompilationError> {
     let mut modules = translate_package(package, Some(module_name.to_string()), false)?;
@@ -60,17 +61,17 @@ pub fn translate_single_module(
 }
 
 pub fn translate_package(
-    package: CompiledPackage,
+    package: &CompiledPackage,
     module_name: Option<String>,
     verbose: bool,
 ) -> Result<HashMap<String, Module>, CompilationError> {
     // HashMap of package name to address
     // This includes all the dependencies of the root package
-    let address_alias_instantiation: HashMap<String, [u8; 32]> = package
+    let address_alias_instantiation: HashMap<Symbol, [u8; 32]> = package
         .compiled_package_info
         .address_alias_instantiation
         .iter()
-        .map(|(key, value)| (key.as_str().to_string(), value.into_bytes()))
+        .map(|(key, value)| (*key, value.into_bytes()))
         .collect();
 
     let root_compiled_units: Vec<&CompiledUnitWithSource> = if let Some(module_name) = module_name {
@@ -116,10 +117,7 @@ pub fn translate_package(
         // Extract package address from CompiledPackage
         let package_address = root_compiled_module_unit.address().into_bytes();
 
-        let root_module_id = ModuleId {
-            address: package_address.into(),
-            module_name: module_name.clone(),
-        };
+        let root_module_id = ModuleId::new(package_address.into(), module_name.as_str());
 
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
 
@@ -169,7 +167,7 @@ pub fn translate_package(
         };
 
         let root_module_data = ModuleData::build_module_data(
-            root_module_id.clone(),
+            root_module_id,
             root_compiled_module,
             &package.deps_compiled_units,
             &root_compiled_units,
@@ -228,36 +226,36 @@ pub fn translate_package(
         validate_stylus_wasm(&mut module)?;
 
         modules.insert(module_name, module);
-        modules_data.insert(root_module_id.clone(), root_module_data);
+        modules_data.insert(root_module_id, root_module_data);
     }
 
     if errors.is_empty() {
         Ok(modules)
     } else {
         Err(CompilationError::CodeError {
-            mapped_files: package.file_map,
+            mapped_files: package.file_map.clone(),
             errors,
         })
     }
 }
 
 #[derive(Debug)]
-pub struct PackageModuleData {
+pub struct PackageModuleData<'move_package> {
     pub modules_paths: HashMap<PathBuf, ModuleId>,
-    pub modules_data: HashMap<ModuleId, ModuleData>,
+    pub modules_data: HashMap<ModuleId, ModuleData<'move_package>>,
 }
 
-pub fn package_module_data(
-    package: &CompiledPackage,
-    module_name: Option<String>,
+pub fn package_module_data<'move_package>(
+    package: &'move_package CompiledPackage,
+    root_compiled_units: &'move_package [&CompiledUnitWithSource],
     verbose: bool,
-) -> Result<PackageModuleData, CompilationError> {
+) -> Result<PackageModuleData<'move_package>, CompilationError> {
     // HashMap of package name to address
-    let address_alias_instantiation: HashMap<String, [u8; 32]> = package
+    let address_alias_instantiation: HashMap<Symbol, [u8; 32]> = package
         .compiled_package_info
         .address_alias_instantiation
         .iter()
-        .map(|(key, value)| (key.as_str().to_string(), value.into_bytes()))
+        .map(|(key, value)| (*key, value.into_bytes()))
         .collect();
 
     let mut modules_data = HashMap::new();
@@ -267,31 +265,18 @@ pub fn package_module_data(
     // This is not used in this function but is used in the others
     let mut function_definitions: GlobalFunctionTable = HashMap::new();
 
-    let root_compiled_units: Vec<&CompiledUnitWithSource> = if let Some(module_name) = module_name {
-        package
-            .root_compiled_units
-            .iter()
-            .filter(move |unit| unit.unit.name.to_string() == module_name)
-            .collect()
-    } else {
-        package.root_compiled_units.iter().collect()
-    };
-
-    for root_compiled_module in &root_compiled_units {
+    for root_compiled_module in root_compiled_units {
         let module_name = root_compiled_module.unit.name.to_string();
         let root_compiled_module_unit = &root_compiled_module.unit.module;
 
         let package_address = root_compiled_module_unit.address().into_bytes();
-        let root_module_id = ModuleId {
-            address: package_address.into(),
-            module_name: module_name.clone(),
-        };
+        let root_module_id = ModuleId::new(package_address.into(), module_name.as_str());
 
         // Process the dependency tree
         if let Err(dependencies_errors) = process_dependency_tree(
             &mut modules_data,
             &package.deps_compiled_units,
-            &root_compiled_units,
+            root_compiled_units,
             &root_compiled_module_unit.immediate_dependencies(),
             &mut function_definitions,
             &address_alias_instantiation,
@@ -326,15 +311,15 @@ pub fn package_module_data(
         };
 
         let root_module_data = ModuleData::build_module_data(
-            root_module_id.clone(),
+            root_module_id,
             root_compiled_module,
             &package.deps_compiled_units,
-            &root_compiled_units,
+            root_compiled_units,
             &mut function_definitions,
             special_attributes,
         )?;
 
-        modules_data.insert(root_module_id.clone(), root_module_data);
+        modules_data.insert(root_module_id, root_module_data);
         modules_paths.insert(root_compiled_module.source_path.clone(), root_module_id);
     }
 
@@ -355,21 +340,18 @@ pub fn package_module_data(
 ///
 /// It builds `ModuleData` for every module in the dependency tree and saves it in a HashMap.
 pub fn process_dependency_tree<'move_package>(
-    dependencies_data: &mut HashMap<ModuleId, ModuleData>,
+    dependencies_data: &mut HashMap<ModuleId, ModuleData<'move_package>>,
     deps_compiled_units: &'move_package [(PackageName, CompiledUnitWithSource)],
     root_compiled_units: &'move_package [&CompiledUnitWithSource],
     dependencies: &[move_core_types::language_storage::ModuleId],
     function_definitions: &mut GlobalFunctionTable<'move_package>,
-    address_alias_instantiation: &HashMap<String, [u8; 32]>,
+    address_alias_instantiation: &HashMap<Symbol, [u8; 32]>,
     verbose: bool,
 ) -> Result<(), DependencyProcessingError> {
     let mut errors = Vec::new();
     for dependency in dependencies {
         let dependency_address = dependency.address().into_bytes();
-        let module_id = ModuleId {
-            module_name: dependency.name().to_string(),
-            address: dependency_address.into(),
-        };
+        let module_id = ModuleId::new(dependency_address.into(), dependency.name().as_str());
 
         // If the HashMap contains the key, we already processed that dependency
         if !dependencies_data.contains_key(&module_id) {
@@ -439,7 +421,7 @@ pub fn process_dependency_tree<'move_package>(
         };
 
         let dependency_module_data = ModuleData::build_module_data(
-            module_id.clone(),
+            module_id,
             dependency_module,
             deps_compiled_units,
             root_compiled_units,
@@ -450,8 +432,7 @@ pub fn process_dependency_tree<'move_package>(
             DependencyProcessingError::ICE(ICEError::new(ICEErrorKind::CompilationContext(e)))
         })?;
 
-        let processed_dependency =
-            dependencies_data.insert(module_id.clone(), dependency_module_data);
+        let processed_dependency = dependencies_data.insert(module_id, dependency_module_data);
 
         if processed_dependency.is_some() {
             Err(DependencyError::DependencyProcessedMoreThanOnce(module_id))?;
@@ -479,7 +460,7 @@ fn build_dependency_structs_map(
         deps_structs.insert(
             move_parse_special_attributes::ModuleId {
                 address: <[u8; 32]>::try_from(md.id.address.as_slice()).unwrap(),
-                module_name: md.id.module_name.clone(),
+                module_name: md.id.module_name,
             },
             md.special_attributes.structs.clone(),
         );

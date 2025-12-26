@@ -1,7 +1,7 @@
 use move_abstract_interpreter::control_flow_graph::{ControlFlowGraph, VMControlFlowGraph};
 use move_binary_format::file_format::{Bytecode, CodeUnit};
 use relooper::{BranchMode, ShapedBlock};
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc};
 
 use super::TranslationError;
 
@@ -10,18 +10,18 @@ pub enum Flow<'code_unit> {
     Simple {
         label: u16,
         instructions: &'code_unit [Bytecode],
-        immediate: Box<Flow<'code_unit>>,
-        next: Box<Flow<'code_unit>>,
+        immediate: Rc<Flow<'code_unit>>,
+        next: Rc<Flow<'code_unit>>,
         branches: HashMap<u16, BranchMode>,
     },
     Loop {
         loop_id: u16,
-        inner: Box<Flow<'code_unit>>,
-        next: Box<Flow<'code_unit>>,
+        inner: Rc<Flow<'code_unit>>,
+        next: Rc<Flow<'code_unit>>,
     },
     IfElse {
-        then_body: Box<Flow<'code_unit>>,
-        else_body: Box<Flow<'code_unit>>,
+        then_body: Rc<Flow<'code_unit>>,
+        else_body: Rc<Flow<'code_unit>>,
     },
     Switch {
         cases: Vec<Flow<'code_unit>>,
@@ -98,8 +98,8 @@ impl<'code_unit> Flow<'code_unit> {
                 Ok(Flow::Simple {
                     label: simple_block.label,
                     instructions: simple_block_ctx,
-                    immediate: Box::new(immediate_flow),
-                    next: Box::new(next_flow),
+                    immediate: Rc::new(immediate_flow),
+                    next: Rc::new(next_flow),
                     branches,
                 })
             }
@@ -115,8 +115,8 @@ impl<'code_unit> Flow<'code_unit> {
 
                 Ok(Flow::Loop {
                     loop_id: loop_block.loop_id,
-                    inner: Box::new(inner_flow),
-                    next: Box::new(next_flow),
+                    inner: Rc::new(inner_flow),
+                    next: Rc::new(next_flow),
                 })
             }
             ShapedBlock::Multiple(multiple_block) => {
@@ -134,8 +134,8 @@ impl<'code_unit> Flow<'code_unit> {
                         let else_arm = Self::build(&multiple_block.handled[1].inner, blocks_ctx)?;
 
                         Ok(Flow::IfElse {
-                            then_body: Box::new(then_arm),
-                            else_body: Box::new(else_arm),
+                            then_body: Rc::new(then_arm),
+                            else_body: Rc::new(else_arm),
                         })
                     }
                     _ => {

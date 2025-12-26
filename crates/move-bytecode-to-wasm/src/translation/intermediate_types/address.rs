@@ -17,14 +17,11 @@ impl IAddress {
     pub fn load_constant_instructions(
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
-        bytes: &mut std::vec::IntoIter<u8>,
+        bytes: &mut std::slice::Iter<'_, u8>,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
-        let bytes: [u8; 32] = bytes
-            .take(32)
-            .collect::<Vec<u8>>()
-            .try_into()
-            .map_err(|_| IntermediateTypeError::CouldNotProcessByteArray)?;
+        let bytes: [u8; Self::HEAP_SIZE as usize] =
+            std::array::from_fn(|_| bytes.next().copied().unwrap_or(0));
 
         // Ensure the first 12 bytes are 0. Abi encoding restricts the address to be 20 bytes
         if !bytes[0..12].iter().all(|b| *b == 0) {

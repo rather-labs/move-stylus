@@ -6,4 +6,5 @@ edition = "2024"
 [dependencies]
 move-compiler.workspace = true
 move-ir-types.workspace = true
+move-symbol-pool.workspace = true
 thiserror = "2.0.17"

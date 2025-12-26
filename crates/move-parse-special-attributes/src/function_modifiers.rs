@@ -3,10 +3,11 @@ use move_compiler::{
     parser::ast::{Attribute_, FunctionSignature},
     shared::Identifier,
 };
+use move_symbol_pool::Symbol;
 
 #[derive(Debug)]
 pub struct Function {
-    pub name: String,
+    pub name: Symbol,
     pub modifiers: Vec<FunctionModifier>,
     pub visibility: Visibility,
     pub signature: Signature,
@@ -29,7 +30,7 @@ impl From<&move_compiler::parser::ast::Visibility> for Visibility {
 
 #[derive(Debug)]
 pub struct Parameter {
-    pub name: String,
+    pub name: Symbol,
     pub type_: Type,
 }
 
@@ -57,7 +58,7 @@ impl Function {
             .parameters
             .iter()
             .map(|(_, n, t)| Parameter {
-                name: n.value().as_str().to_string(),
+                name: n.value(),
                 type_: Type::parse_type(&t.value),
             })
             .collect();
