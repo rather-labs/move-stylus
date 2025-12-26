@@ -14,5 +14,6 @@ mod vec32;
 mod vec64;
 mod vec_external_generic_struct;
 mod vec_external_struct;
+mod vec_struct;
 mod vec_vec128;
 mod vec_vec32;
