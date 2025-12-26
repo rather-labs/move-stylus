@@ -1,14 +1,8 @@
-use crate::common::run_test;
+#![allow(clippy::too_many_arguments)]
 use crate::common::runtime;
-use alloy_primitives::{Address, U256, address, hex, keccak256};
-use alloy_sol_types::{SolCall, SolType, SolValue, abi::TokenSeq, sol};
-use move_test_runner::{
-    constants::{
-        BLOCK_BASEFEE, BLOCK_GAS_LIMIT, BLOCK_NUMBER, BLOCK_TIMESTAMP, GAS_PRICE,
-        MSG_SENDER_ADDRESS, MSG_VALUE,
-    },
-    wasm_runner::{CrossContractCallType, ExecutionData, RuntimeSandbox},
-};
+use alloy_primitives::{Address, U256, address};
+use alloy_sol_types::{SolCall, SolValue, sol};
+use move_test_runner::wasm_runner::{CrossContractCallType, ExecutionData, RuntimeSandbox};
 use rstest::rstest;
 const GET_RESULT_ERROR_CODE: &str = "101";
 const DATA_ABORT_MESSAGE_PTR_OFFSET: usize = 256;
