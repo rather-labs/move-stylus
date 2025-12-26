@@ -1,15 +1,13 @@
 use crate::{
     compilation_context::CompilationContextError,
     error::{CompilationError, ICEError, ICEErrorKind},
+    native_functions::error::NativeFunctionError,
     runtime::error::RuntimeFunctionError,
     translation::intermediate_types::error::IntermediateTypeError,
     vm_handled_types::error::VmHandledTypeError,
 };
 
-use super::{
-    packing::error::AbiPackError, public_function::PublicFunctionValidationError,
-    unpacking::error::AbiUnpackError,
-};
+use super::{packing::error::AbiPackError, public_function::PublicFunctionValidationError};
 
 #[derive(Debug, thiserror::Error)]
 pub enum AbiEncodingError {
@@ -65,6 +63,32 @@ pub enum AbiError {
 
     #[error("invalid selector size")]
     InvalidSelectorSize,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum AbiUnpackError {
+    #[error(
+        "expected stylus::object::UID or stylus::object::NamedId as first field in {0} struct (it has key ability)"
+    )]
+    StorageObjectHasNoId(String),
+
+    #[error(r#"cannot abi unpack enum "{0}", it contains at least one variant with fields"#)]
+    EnumIsNotSimple(String),
+
+    #[error("cannot unpack generic type parameter")]
+    UnpackingGenericTypeParameter,
+
+    #[error("found a reference inside a reference")]
+    RefInsideRef,
+
+    #[error("an error ocurred while generating a native funciton's code")]
+    NativeFunction(#[from] NativeFunctionError),
+
+    #[error("abi encoding error")]
+    AbiEncoding(#[from] AbiEncodingError),
+
+    #[error("an error ocurred while generating a runtime function's code")]
+    RuntimeFunction(#[from] RuntimeFunctionError),
 }
 
 impl From<AbiError> for CompilationError {

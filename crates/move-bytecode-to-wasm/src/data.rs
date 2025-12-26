@@ -42,12 +42,15 @@ pub const DATA_ENUM_STORAGE_SIZE_OFFSET: i32 = 260;
 /// Stores the pointer and length of the calldata (8 bytes)
 pub const DATA_CALLDATA_OFFSET: i32 = 396;
 
+/// When unpacking a storage struct, we will use this piece of memory to save the flag indicating if the struct is frozen.
+pub const DATA_UNPACK_FROZEN_OFFSET: i32 = 404;
+
 /// Amount of memory reserved starting from offset 0.
 ///
 /// # WARNING
 /// This value must be kept in sync to correctly initialize the memory allocator
 /// at the proper offset.
-pub const TOTAL_RESERVED_MEMORY: i32 = 404;
+pub const TOTAL_RESERVED_MEMORY: i32 = 408;
 
 /// Initializes the module's data segment.
 pub fn setup_data_segment(module: &mut Module, memory_id: MemoryId) {

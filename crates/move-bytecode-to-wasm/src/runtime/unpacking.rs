@@ -2,10 +2,10 @@ use super::RuntimeFunction;
 use super::error::RuntimeFunctionError;
 use crate::{
     CompilationContext,
-    abi_types::error::AbiError,
+    abi_types::error::{AbiError, AbiUnpackError},
     abi_types::unpacking::Unpackable,
-    abi_types::unpacking::error::AbiUnpackError,
     data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
+    data::DATA_UNPACK_FROZEN_OFFSET,
     translation::intermediate_types::{IntermediateType, vector::IVector},
     wasm_builder_extensions::WasmBuilderExtension,
 };
@@ -916,16 +916,12 @@ pub fn unpack_storage_struct_function(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
-    let mut function_builder = FunctionBuilder::new(
-        &mut module.types,
-        &[ValType::I32, ValType::I32],
-        &[ValType::I32],
-    );
+    let mut function_builder =
+        FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
     let mut function_body = function_builder.func_body();
 
     // Arguments
     let uid_ptr = module.locals.add(ValType::I32);
-    let unpack_frozen = module.locals.add(ValType::I32);
 
     // Search for the object in the objects mappings
     let locate_storage_data_fn =
@@ -933,7 +929,15 @@ pub fn unpack_storage_struct_function(
 
     function_body
         .local_get(uid_ptr)
-        .local_get(unpack_frozen)
+        .i32_const(DATA_UNPACK_FROZEN_OFFSET)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
         .call(locate_storage_data_fn);
 
     // Read the object
@@ -955,8 +959,106 @@ pub fn unpack_storage_struct_function(
         .local_get(uid_ptr)
         .call(read_and_decode_from_storage_fn);
 
+    // Reset the unpack frozen flag to false.
+    // This is always the default value for the flag.
+    function_body
+        .i32_const(DATA_UNPACK_FROZEN_OFFSET)
+        .i32_const(0)
+        .store(
+            compilation_ctx.memory_id,
+            StoreKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
+
     function_builder.name(RuntimeFunction::UnpackStorageStruct.name().to_owned());
-    Ok(function_builder.finish(vec![uid_ptr, unpack_frozen], &mut module.funcs))
+    Ok(function_builder.finish(vec![uid_ptr], &mut module.funcs))
+}
+
+pub fn unpack_reference_function(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    itype: &IntermediateType,
+) -> Result<FunctionId, RuntimeFunctionError> {
+    let mut function_builder = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32],
+        &[ValType::I32],
+    );
+    let mut function_body = function_builder.func_body();
+
+    // Arguments
+    let reader_pointer = module.locals.add(ValType::I32);
+    let calldata_reader_pointer = module.locals.add(ValType::I32);
+
+    match itype {
+        // If inner is a heap type, forward the pointer
+        IntermediateType::IU128
+        | IntermediateType::IU256
+        | IntermediateType::IAddress
+        | IntermediateType::ISigner
+        | IntermediateType::IVector(_)
+        | IntermediateType::IStruct { .. }
+        | IntermediateType::IGenericStructInstance { .. }
+        | IntermediateType::IEnum { .. }
+        | IntermediateType::IGenericEnumInstance { .. } => {
+            itype.add_unpack_instructions(
+                &mut function_body,
+                module,
+                reader_pointer,
+                calldata_reader_pointer,
+                compilation_ctx,
+            )?;
+        }
+        // For immediates, allocate and store
+        IntermediateType::IU8
+        | IntermediateType::IU16
+        | IntermediateType::IU32
+        | IntermediateType::IU64
+        | IntermediateType::IBool => {
+            let ptr_local = module.locals.add(walrus::ValType::I32);
+
+            let data_size = itype.wasm_memory_data_size()?;
+            function_body
+                .i32_const(data_size)
+                .call(compilation_ctx.allocator)
+                .local_tee(ptr_local);
+
+            itype.add_unpack_instructions(
+                &mut function_body,
+                module,
+                reader_pointer,
+                calldata_reader_pointer,
+                compilation_ctx,
+            )?;
+
+            function_body.store(
+                compilation_ctx.memory_id,
+                itype.store_kind()?,
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+
+            function_body.local_get(ptr_local);
+        }
+
+        IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+            return Err(AbiError::from(AbiUnpackError::RefInsideRef).into());
+        }
+        IntermediateType::ITypeParameter(_) => {
+            return Err(AbiError::from(AbiUnpackError::UnpackingGenericTypeParameter).into());
+        }
+    }
+
+    function_builder.name(RuntimeFunction::UnpackReference.name().to_owned());
+    Ok(function_builder.finish(
+        vec![reader_pointer, calldata_reader_pointer],
+        &mut module.funcs,
+    ))
 }
 
 impl From<AbiError> for RuntimeFunctionError {
@@ -966,7 +1068,6 @@ impl From<AbiError> for RuntimeFunctionError {
         RuntimeFunctionError::CouldNotLink(format!("abi error: {err}"))
     }
 }
-
 #[cfg(test)]
 mod tests {
     use alloy_primitives::{Address, U256, address};
@@ -1502,5 +1603,179 @@ mod tests {
         let data =
             SolType::abi_encode_params(&(address!("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE"),));
         test_heap_uint(&data, int_type.clone(), &data);
+    }
+
+    fn test_unpack_ref(data: &[u8], ref_type: IntermediateType, expected_memory_bytes: &[u8]) {
+        let (mut raw_module, allocator, memory_id) = build_module(Some(data.len() as i32));
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            true,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
+
+        let mut func_body = function_builder.func_body();
+        let args_pointer = raw_module.locals.add(ValType::I32);
+        let calldata_reader_pointer = raw_module.locals.add(ValType::I32);
+
+        func_body.i32_const(0);
+        func_body.local_tee(args_pointer);
+        func_body.local_set(calldata_reader_pointer);
+
+        ref_type
+            .add_unpack_instructions(
+                &mut func_body,
+                &mut raw_module,
+                args_pointer,
+                calldata_reader_pointer,
+                &compilation_ctx,
+            )
+            .unwrap();
+
+        let function = function_builder.finish(vec![], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
+
+        let result_ptr: i32 = entrypoint.call(&mut store, ()).unwrap();
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+        let mut result_memory_data = vec![0; expected_memory_bytes.len()];
+        memory
+            .read(&mut store, result_ptr as usize, &mut result_memory_data)
+            .unwrap();
+
+        assert_eq!(
+            result_memory_data, expected_memory_bytes,
+            "Heap memory at returned pointer does not match expected content"
+        );
+    }
+
+    #[test]
+    fn test_unpack_ref_u8() {
+        type SolType = sol!((uint8,));
+        let int_type = IntermediateType::IRef(Box::new(IntermediateType::IU8));
+
+        let data = SolType::abi_encode_params(&(88u8,));
+
+        let mut expected = Vec::new();
+        expected.extend(&88u8.to_le_bytes());
+
+        test_unpack_ref(&data, int_type.clone(), &expected);
+    }
+
+    #[test]
+    fn test_unpack_ref_u16() {
+        type SolType = sol!((uint16,));
+        let int_type = IntermediateType::IRef(Box::new(IntermediateType::IU16));
+
+        let data = SolType::abi_encode_params(&(88u16,));
+
+        let mut expected = Vec::new();
+        expected.extend(&88u16.to_le_bytes());
+
+        test_unpack_ref(&data, int_type.clone(), &expected);
+    }
+
+    #[test]
+    fn test_unpack_ref_u32() {
+        type SolType = sol!((uint32,));
+        let int_type = IntermediateType::IRef(Box::new(IntermediateType::IU32));
+
+        let data = SolType::abi_encode_params(&(88u32,));
+        test_unpack_ref(&data, int_type.clone(), &88u32.to_le_bytes());
+    }
+
+    #[test]
+    fn test_unpack_ref_u64() {
+        type SolType = sol!((uint64,));
+        let int_type = IntermediateType::IRef(Box::new(IntermediateType::IU64));
+
+        let data = SolType::abi_encode_params(&(88u64,));
+        test_unpack_ref(&data, int_type.clone(), &88u64.to_le_bytes());
+    }
+
+    #[test]
+    fn test_unpack_ref_u128() {
+        type SolType = sol!((uint128,));
+        let int_type = IntermediateType::IRef(Box::new(IntermediateType::IU128));
+
+        let data = SolType::abi_encode_params(&(123u128,));
+        let expected = 123u128.to_le_bytes().to_vec();
+        test_unpack_ref(&data, int_type.clone(), &expected);
+    }
+
+    #[test]
+    fn test_unpack_ref_u256() {
+        type SolType = sol!((uint256,));
+        let int_type = IntermediateType::IRef(Box::new(IntermediateType::IU256));
+
+        let value = U256::from(123u128);
+        let expected = value.to_le_bytes::<32>().to_vec();
+
+        let data = SolType::abi_encode_params(&(value,));
+        test_unpack_ref(&data, int_type.clone(), &expected);
+    }
+
+    #[test]
+    fn test_unpack_ref_vec_u8() {
+        type SolType = sol!((uint8[],));
+        let inner_type = IntermediateType::IU8;
+        let vector_type = IntermediateType::IRef(Box::new(IntermediateType::IVector(Box::new(
+            inner_type.clone(),
+        ))));
+
+        let vec_data = vec![1u8, 2u8, 3u8, 4u8];
+        let data = SolType::abi_encode_params(&(vec_data.clone(),));
+
+        let mut expected = Vec::new();
+        expected.extend(&4u32.to_le_bytes()); // length
+        expected.extend(&4u32.to_le_bytes()); // capacity
+        expected.extend(&1u8.to_le_bytes()); // first elem
+        expected.extend(&2u8.to_le_bytes()); // second elem
+        expected.extend(&3u8.to_le_bytes()); // third elem
+        expected.extend(&4u8.to_le_bytes()); // fourth elem
+        test_unpack_ref(&data, vector_type.clone(), &expected);
+    }
+
+    #[test]
+    fn test_unpack_ref_vec_128() {
+        type SolType = sol!((uint128[],));
+        let inner_type = IntermediateType::IU128;
+        let vector_type = IntermediateType::IRef(Box::new(IntermediateType::IVector(Box::new(
+            inner_type.clone(),
+        ))));
+
+        let vec_data = vec![1u128, 2u128, 3u128];
+        let data = SolType::abi_encode_params(&(vec_data.clone(),));
+
+        let mut expected = Vec::new();
+        expected.extend(&3u32.to_le_bytes()); // length = 2
+        expected.extend(&3u32.to_le_bytes()); // capacity
+
+        // pointers to heap elements
+        expected.extend(&180u32.to_le_bytes());
+        expected.extend(&196u32.to_le_bytes());
+        expected.extend(&212u32.to_le_bytes());
+        expected.extend(&1u128.to_le_bytes());
+        expected.extend(&2u128.to_le_bytes());
+        expected.extend(&3u128.to_le_bytes());
+
+        test_unpack_ref(&data, vector_type.clone(), &expected);
+    }
+
+    #[test]
+    fn test_unpack_ref_address() {
+        type SolType = sol!((address,));
+        let ref_type = IntermediateType::IRef(Box::new(IntermediateType::IAddress));
+
+        let data =
+            SolType::abi_encode_params(&(address!("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"),));
+        test_unpack_ref(&data, ref_type.clone(), &data);
     }
 }

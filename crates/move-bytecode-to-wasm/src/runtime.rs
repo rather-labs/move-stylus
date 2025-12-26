@@ -101,6 +101,7 @@ pub enum RuntimeFunction {
     UnpackString,
     UnpackStruct,
     UnpackStorageStruct,
+    UnpackReference,
 }
 
 impl RuntimeFunction {
@@ -182,6 +183,7 @@ impl RuntimeFunction {
             Self::UnpackString => "unpack_string",
             Self::UnpackStruct => "unpack_struct",
             Self::UnpackStorageStruct => "unpack_storage_struct",
+            Self::UnpackReference => "unpack_reference",
         }
     }
 
@@ -395,6 +397,10 @@ impl RuntimeFunction {
             Self::UnpackStorageStruct => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
                 unpacking::unpack_storage_struct_function(module, compilation_ctx, generics[0])?
+            }
+            Self::UnpackReference => {
+                Self::assert_generics_length(generics.len(), 1, self.name())?;
+                unpacking::unpack_reference_function(module, compilation_ctx, generics[0])?
             }
             _ => {
                 return Err(RuntimeFunctionError::CouldNotLinkGeneric(

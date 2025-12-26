@@ -1,6 +1,8 @@
 use alloy_sol_types::{SolType, sol_data};
-use error::AbiUnpackError;
-use walrus::{InstrSeqBuilder, LocalId, Module, ValType};
+use walrus::{
+    InstrSeqBuilder, LocalId, Module, ValType,
+    ir::{MemArg, StoreKind},
+};
 
 use crate::{
     CompilationContext,
@@ -8,23 +10,17 @@ use crate::{
         ModuleId,
         reserved_modules::{SF_MODULE_NAME_OBJECT, STYLUS_FRAMEWORK_ADDRESS},
     },
+    data::DATA_UNPACK_FROZEN_OFFSET,
     native_functions::NativeFunction,
     runtime::RuntimeFunction,
-    translation::intermediate_types::{
-        IntermediateType,
-        reference::{IMutRef, IRef},
-        structs::IStruct,
-    },
+    translation::intermediate_types::{IntermediateType, structs::IStruct},
     vm_handled_types::{
         VmHandledType, bytes::Bytes, fallback::Calldata, named_id::NamedId, string::String_,
         tx_context::TxContext, uid::Uid,
     },
 };
 
-use super::error::AbiError;
-
-pub(crate) mod error;
-mod unpack_reference;
+use super::error::{AbiError, AbiUnpackError};
 
 pub trait Unpackable {
     /// Adds the instructions to unpack the abi encoded type to WASM function parameters
@@ -149,22 +145,44 @@ impl Unpackable for IntermediateType {
             // The signer must not be unpacked here, since it can't be part of the calldata. It is
             // injected directly by the VM into the stack
             IntermediateType::ISigner => (),
-            IntermediateType::IRef(inner) => IRef::add_unpack_instructions(
-                inner,
-                builder,
-                module,
-                reader_pointer,
-                calldata_base_pointer,
-                compilation_ctx,
-            )?,
-            IntermediateType::IMutRef(inner) => IMutRef::add_unpack_instructions(
-                inner,
-                builder,
-                module,
-                reader_pointer,
-                calldata_base_pointer,
-                compilation_ctx,
-            )?,
+            IntermediateType::IRef(inner) => {
+                // This is the only place where we pass the flag unpack_frozen = true.
+                // This is because we only want to unpack frozen objects from the storage
+                // if the object is passed as an immutable reference to the function arguments.
+                // unpack_frozen = true
+                builder
+                    .i32_const(DATA_UNPACK_FROZEN_OFFSET)
+                    .i32_const(1)
+                    .store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+
+                let unpack_reference_function = RuntimeFunction::UnpackReference.get_generic(
+                    module,
+                    compilation_ctx,
+                    &[inner],
+                )?;
+                builder
+                    .local_get(reader_pointer)
+                    .local_get(calldata_base_pointer)
+                    .call(unpack_reference_function);
+            }
+            IntermediateType::IMutRef(inner) => {
+                let unpack_reference_function = RuntimeFunction::UnpackReference.get_generic(
+                    module,
+                    compilation_ctx,
+                    &[inner],
+                )?;
+                builder
+                    .local_get(reader_pointer)
+                    .local_get(calldata_base_pointer)
+                    .call(unpack_reference_function);
+            }
 
             IntermediateType::IStruct {
                 module_id, index, ..
@@ -210,8 +228,8 @@ impl Unpackable for IntermediateType {
                     let unpack_storage_struct_function = RuntimeFunction::UnpackStorageStruct
                         .get_generic(module, compilation_ctx, &[self])?;
 
-                    // unpack_frozen = false
-                    builder.i32_const(0).call(unpack_storage_struct_function);
+                    // Unpack the storage struct
+                    builder.call(unpack_storage_struct_function);
                 } else {
                     let unpack_struct_function = RuntimeFunction::UnpackStruct.get_generic(
                         module,
@@ -230,7 +248,9 @@ impl Unpackable for IntermediateType {
                 builder.local_get(reader_pointer).call(unpack_enum_function);
             }
             IntermediateType::ITypeParameter(_) => {
-                return Err(AbiUnpackError::UnpackingGenericTypeParameter)?;
+                return Err(AbiError::from(
+                    AbiUnpackError::UnpackingGenericTypeParameter,
+                ));
             }
         }
 
