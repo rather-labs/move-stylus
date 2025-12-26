@@ -1,12 +1,17 @@
 //! This module contains all the functions retaled to transaction information.
 use super::NativeFunction;
+use crate::runtime::RuntimeFunction;
 use crate::{
     CompilationContext,
     compilation_context::ModuleId,
+    data::DATA_CALLDATA_OFFSET,
     hostio::host_functions::{block_basefee, msg_sender, msg_value, tx_gas_price},
     translation::intermediate_types::{address::IAddress, heap_integers::IU256},
 };
-use walrus::{FunctionBuilder, FunctionId, Module, ValType, ir::BinaryOp};
+use walrus::{
+    FunctionBuilder, FunctionId, Module, ValType,
+    ir::{BinaryOp, LoadKind, MemArg},
+};
 
 /// Defines native functions that are wrappers for host functions.
 macro_rules! define_host_fn_native_fn_wrapper {
@@ -91,3 +96,45 @@ define_host_fn_native_fn_wrapper!(
     NativeFunction::NATIVE_GAS_PRICE,
     IU256::HEAP_SIZE
 );
+
+pub fn add_native_data_fn(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    module_id: &ModuleId,
+) -> FunctionId {
+    let bytes_to_vec_fn = RuntimeFunction::BytesToVec
+        .get(module, Some(compilation_ctx))
+        .expect("BytesToVec runtime function should be available");
+
+    let mut function = FunctionBuilder::new(&mut module.types, &[], &[ValType::I32]);
+    let mut builder = function
+        .name(NativeFunction::get_function_name(
+            NativeFunction::NATIVE_DATA,
+            module_id,
+        ))
+        .func_body();
+
+    // Cast the calldata to vector<u8> and return the ptr
+    builder
+        .i32_const(DATA_CALLDATA_OFFSET)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 4,
+            },
+        )
+        .i32_const(DATA_CALLDATA_OFFSET)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .call(bytes_to_vec_fn);
+
+    function.finish(vec![], &mut module.funcs)
+}

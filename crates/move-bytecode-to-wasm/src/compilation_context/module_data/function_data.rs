@@ -43,7 +43,7 @@ impl FunctionData {
         Ok(self
             .information
             .iter()
-            .find(|f| f.function_id.identifier == identifier)
+            .find(|f| *f.function_id.identifier == *identifier)
             .ok_or(ModuleDataError::FunctionByIdentifierNotFound(
                 identifier.to_string(),
             ))?)

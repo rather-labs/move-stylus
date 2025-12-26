@@ -72,14 +72,11 @@ impl IU128 {
     pub fn load_constant_instructions(
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
-        bytes: &mut std::vec::IntoIter<u8>,
+        bytes: &mut std::slice::Iter<'_, u8>,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
-        let bytes: [u8; Self::HEAP_SIZE as usize] = bytes
-            .take(Self::HEAP_SIZE as usize)
-            .collect::<Vec<u8>>()
-            .try_into()
-            .map_err(|_| IntermediateTypeError::CouldNotProcessByteArray)?;
+        let bytes: [u8; Self::HEAP_SIZE as usize] =
+            std::array::from_fn(|_| bytes.next().copied().unwrap_or(0));
 
         let pointer = module.locals.add(ValType::I32);
 
@@ -389,14 +386,11 @@ impl IU256 {
     pub fn load_constant_instructions(
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
-        bytes: &mut std::vec::IntoIter<u8>,
+        bytes: &mut std::slice::Iter<'_, u8>,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
-        let bytes: [u8; Self::HEAP_SIZE as usize] = bytes
-            .take(Self::HEAP_SIZE as usize)
-            .collect::<Vec<u8>>()
-            .try_into()
-            .map_err(|_| IntermediateTypeError::CouldNotProcessByteArray)?;
+        let bytes: [u8; Self::HEAP_SIZE as usize] =
+            std::array::from_fn(|_| bytes.next().copied().unwrap_or(0));
 
         let pointer = module.locals.add(ValType::I32);
 

@@ -152,6 +152,10 @@ macro_rules! test_compilation_context {
             memory_id: $memory_id,
             allocator: $allocator,
             calldata_reader_pointer: $calldata_reader_pointer,
+            empty_signature: $crate::translation::intermediate_types::ISignature {
+                arguments: Vec::new(),
+                returns: Vec::new(),
+            },
         }
     };
 }

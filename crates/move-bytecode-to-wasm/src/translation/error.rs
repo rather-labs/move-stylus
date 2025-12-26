@@ -1,6 +1,7 @@
 use std::rc::Rc;
 
 use move_binary_format::file_format::{Bytecode, SignatureIndex};
+use move_symbol_pool::Symbol;
 use relooper::BranchMode;
 use walrus::{LocalId, ValType};
 
@@ -211,20 +212,20 @@ pub enum TranslationError {
     #[error("{field_id} not found in {struct_identifier}")]
     StructFieldNotFound {
         field_id: usize,
-        struct_identifier: String,
+        struct_identifier: Symbol,
     },
 
     #[error("{field_id} offset not found in {struct_identifier}")]
     StructFieldOffsetNotFound {
         field_id: usize,
-        struct_identifier: String,
+        struct_identifier: Symbol,
     },
 
     #[error("multiple WASM return values not supported, found {0} return values")]
     MultipleWasmReturnValues(usize),
 
     #[error("generic function {0}::{1} has no type instantiations")]
-    GenericFunctionNoTypeInstantiations(ModuleId, String),
+    GenericFunctionNoTypeInstantiations(ModuleId, Symbol),
 }
 
 impl From<TranslationError> for CompilationError {

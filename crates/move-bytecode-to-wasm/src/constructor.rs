@@ -9,14 +9,9 @@ use crate::{
     error::{CompilationError, ICEError, ICEErrorKind},
     hostio::host_functions,
     runtime::{RuntimeFunction, error::RuntimeFunctionError},
-    translation::{intermediate_types::ISignature, table::FunctionTable},
+    translation::table::FunctionTable,
     utils::keccak_string_to_memory,
     vm_handled_types::{VmHandledType, tx_context::TxContext},
-};
-
-static EMPTY_SIGNATURE: ISignature = ISignature {
-    arguments: Vec::new(),
-    returns: Vec::new(),
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -41,11 +36,11 @@ impl From<ConstructorError> for CompilationError {
 }
 
 /// Injects the constructor as a public function in the module, which will be accesible via the entrypoint router.
-pub fn inject_constructor(
+pub fn inject_constructor<'a>(
     function_table: &mut FunctionTable,
     module: &mut Module,
-    compilation_ctx: &CompilationContext,
-    public_functions: &mut Vec<PublicFunction>,
+    compilation_ctx: &'a CompilationContext,
+    public_functions: &mut Vec<PublicFunction<'a>>,
 ) -> Result<(), ConstructorError> {
     if let Some(ref init_id) = compilation_ctx.root_module_data.functions.init {
         let wasm_init_fn = function_table
@@ -59,7 +54,7 @@ pub fn inject_constructor(
         public_functions.push(PublicFunction::new(
             constructor_fn_id,
             "constructor",
-            &EMPTY_SIGNATURE,
+            &compilation_ctx.empty_signature,
             compilation_ctx,
         )?);
     };

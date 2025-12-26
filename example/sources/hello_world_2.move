@@ -4,10 +4,8 @@ use stylus::tx_context::TxContext;
 use stylus::object as object;
 use stylus::object::UID;
 use stylus::event::emit;
-use stylus::fallback;
 use hello_world::stack::Stack;
 use hello_world::stack;
-
 use hello_world::other_mod::{generic_identity, generic_identity_two_types};
 
 // Usage of generic functions
@@ -132,10 +130,11 @@ entry fun receive(ctx: &TxContext) {
 }
 
 #[ext(payable)]
-entry fun fallback(data: &fallback::Calldata, ctx: &TxContext) {
+entry fun fallback(ctx: &TxContext) {
+    let v = ctx.data();
     emit(ReceiveEvent { 
         sender: ctx.sender(), 
-        data_length: data.len(), 
-        data: data.as_vec() 
+        data_length: vector::length(&v) as u32, 
+        data: v
     });
 }

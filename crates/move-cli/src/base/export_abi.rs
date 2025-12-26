@@ -34,10 +34,6 @@ impl ExportAbi {
         let install_dir = config.install_dir.clone();
 
         let package = config.compile_package(&rerooted_path, &mut Vec::new())?;
-
-        let package_modules =
-            package_module_data(&package, None, verbose).map_err(print_error_diagnostic)?;
-
         let root_compiled_units: Vec<&CompiledUnitWithSource> =
             if let Some(module_name) = module_name {
                 package
@@ -48,6 +44,9 @@ impl ExportAbi {
             } else {
                 package.root_compiled_units.iter().collect()
             };
+
+        let package_modules = package_module_data(&package, &root_compiled_units, verbose)
+            .map_err(print_error_diagnostic)?;
 
         // If neither flag is set, default to generating JSON
         let generate_json = self.json || !self.human_readable;

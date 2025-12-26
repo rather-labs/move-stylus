@@ -5,7 +5,6 @@ pub mod bytes;
 pub mod contract_call_result;
 pub mod dynamic_fields;
 pub mod error;
-pub mod fallback;
 pub mod named_id;
 pub mod signer;
 pub mod string;

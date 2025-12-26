@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use move_symbol_pool::Symbol;
 use walrus::{
     ConstExpr, ElementKind, FunctionId as WasmFunctionId, Module, TableId, TypeId, ValType,
     ir::Value,
@@ -19,7 +20,7 @@ use super::{
 /// Identifies a function inside a module
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub struct FunctionId {
-    pub identifier: String,
+    pub identifier: Symbol,
 
     pub module_id: ModuleId,
 
@@ -29,10 +30,11 @@ pub struct FunctionId {
 impl FunctionId {
     /// Returns the generic function ID corresponding to a function ID with type instantiations.
     pub fn get_generic_fn_id(&self) -> Self {
-        // TODO: clone...
-        let mut id = self.clone();
-        id.type_instantiations = None;
-        id
+        Self {
+            identifier: self.identifier,
+            module_id: self.module_id,
+            type_instantiations: None,
+        }
     }
 }
 

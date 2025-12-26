@@ -39,7 +39,8 @@ pub const DATA_ABORT_MESSAGE_PTR_OFFSET: i32 = 256;
 /// It takes 128 bytes (32 * 4 bytes) to store the size of the enum for each offset.
 pub const DATA_ENUM_STORAGE_SIZE_OFFSET: i32 = 260;
 
-/// Stores the pointer and length of the calldata (8 bytes)
+/// Stores the length and pointer to the raw calldata
+/// 8 bytes: [data_length][data_pointer]
 pub const DATA_CALLDATA_OFFSET: i32 = 396;
 
 /// When unpacking a storage struct, we will use this piece of memory to save the flag indicating if the struct is frozen.

@@ -1,3 +1,5 @@
+use move_symbol_pool::Symbol;
+
 use crate::{
     compilation_context::CompilationContextError,
     error::{CompilationError, ICEError, ICEErrorKind},
@@ -56,7 +58,7 @@ pub enum AbiError {
     #[error(
         "expected stylus::object::UID or stylus::object::NamedId as first field in {0} struct (it has key ability)"
     )]
-    ExpectedUIDOrNamedId(String),
+    ExpectedUIDOrNamedId(Symbol),
 
     #[error("unable to get type ABI size")]
     UnableToGetTypeAbiSize,
@@ -70,10 +72,10 @@ pub enum AbiUnpackError {
     #[error(
         "expected stylus::object::UID or stylus::object::NamedId as first field in {0} struct (it has key ability)"
     )]
-    StorageObjectHasNoId(String),
+    StorageObjectHasNoId(Symbol),
 
     #[error(r#"cannot abi unpack enum "{0}", it contains at least one variant with fields"#)]
-    EnumIsNotSimple(String),
+    EnumIsNotSimple(Symbol),
 
     #[error("cannot unpack generic type parameter")]
     UnpackingGenericTypeParameter,

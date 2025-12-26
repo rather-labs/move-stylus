@@ -2,7 +2,9 @@ mod error;
 pub mod module_data;
 pub mod reserved_modules;
 
-use crate::translation::intermediate_types::{IntermediateType, enums::IEnum, structs::IStruct};
+use crate::translation::intermediate_types::{
+    ISignature, IntermediateType, enums::IEnum, structs::IStruct,
+};
 pub use error::CompilationContextError;
 pub use module_data::{ModuleData, ModuleId, UserDefinedType};
 use std::{borrow::Cow, collections::HashMap};
@@ -16,9 +18,11 @@ type Result<T> = std::result::Result<T, CompilationContextError>;
 /// arguments we must know the index of it)
 pub struct CompilationContext<'a> {
     /// Data of the module we are currently compiling
-    pub root_module_data: &'a ModuleData,
+    pub root_module_data: &'a ModuleData<'a>,
 
-    pub deps_data: &'a HashMap<ModuleId, ModuleData>,
+    pub deps_data: &'a HashMap<ModuleId, ModuleData<'a>>,
+
+    pub empty_signature: ISignature,
 
     /// WASM memory id
     pub memory_id: MemoryId,
@@ -46,6 +50,10 @@ impl CompilationContext<'_> {
             memory_id,
             allocator,
             calldata_reader_pointer,
+            empty_signature: ISignature {
+                arguments: Vec::new(),
+                returns: Vec::new(),
+            },
         }
     }
 
@@ -55,7 +63,7 @@ impl CompilationContext<'_> {
         } else if &self.root_module_data.id == module_id {
             Ok(self.root_module_data)
         } else {
-            Err(CompilationContextError::ModuleNotFound(module_id.clone()))
+            Err(CompilationContextError::ModuleNotFound(*module_id))
         }
     }
 

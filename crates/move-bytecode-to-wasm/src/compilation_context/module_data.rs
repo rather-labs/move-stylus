@@ -24,11 +24,10 @@ use function_data::FunctionData;
 use move_binary_format::{
     CompiledModule,
     file_format::{
-        Ability, AbilitySet, Constant, DatatypeHandleIndex, EnumDefInstantiationIndex,
-        EnumDefinitionIndex, FieldHandleIndex, FieldInstantiationIndex, FunctionDefinition,
-        FunctionDefinitionIndex, Signature, SignatureIndex, SignatureToken,
-        StructDefInstantiationIndex, StructDefinitionIndex, VariantHandleIndex,
-        VariantInstantiationHandleIndex, Visibility,
+        Ability, AbilitySet, DatatypeHandleIndex, EnumDefInstantiationIndex, EnumDefinitionIndex,
+        FieldHandleIndex, FieldInstantiationIndex, FunctionDefinition, FunctionDefinitionIndex,
+        Signature, SignatureIndex, SignatureToken, StructDefInstantiationIndex,
+        StructDefinitionIndex, VariantHandleIndex, VariantInstantiationHandleIndex, Visibility,
     },
     internals::ModuleIndex,
 };
@@ -40,6 +39,7 @@ use move_parse_special_attributes::{
     SpecialAttributes,
     function_modifiers::{Function, FunctionModifier},
 };
+use move_symbol_pool::Symbol;
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
@@ -47,7 +47,7 @@ use std::{
 };
 use struct_data::StructData;
 
-use super::{CompilationContextError, Result};
+use super::{CompilationContextError, Result, reserved_modules::SF_MODULE_NAME_TX_CONTEXT};
 
 #[derive(Debug)]
 pub enum UserDefinedType {
@@ -98,17 +98,31 @@ impl From<[u8; 32]> for Address {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub struct ModuleId {
     pub address: Address,
-    pub module_name: String,
+    pub module_name: Symbol,
 }
 
 impl ModuleId {
+    pub fn new(address: Address, module_name: &str) -> Self {
+        Self {
+            address,
+            module_name: Symbol::from(module_name),
+        }
+    }
+
     pub fn hash(&self) -> u64 {
         let mut hasher = get_hasher();
         Hash::hash(self, &mut hasher);
         hasher.finish()
+    }
+}
+
+impl Hash for ModuleId {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.address.as_slice().hash(state);
+        self.module_name.as_str().hash(state);
     }
 }
 
@@ -118,23 +132,30 @@ impl Display for ModuleId {
     }
 }
 
-// TODO: This just makes sense for testing
+#[cfg(test)]
 impl Default for ModuleId {
     fn default() -> Self {
         Self {
             address: Address::from([0; 32]),
-            module_name: "default".to_owned(),
+            module_name: Symbol::from("default"),
         }
     }
 }
 
-#[derive(Debug, Default)]
-pub struct ModuleData {
+#[derive(Debug)]
+pub struct Constant<'move_compiled_unit> {
+    pub type_: IntermediateType,
+    pub data: &'move_compiled_unit [u8],
+}
+
+#[derive(Debug)]
+#[cfg_attr(test, derive(Default))]
+pub struct ModuleData<'move_compiled_unit> {
     /// Module's ID
     pub id: ModuleId,
 
     /// Move's connstant pool
-    pub constants: Vec<Constant>,
+    pub constants: Vec<Constant<'move_compiled_unit>>,
 
     /// Module's functions information
     pub functions: FunctionData,
@@ -157,15 +178,15 @@ pub struct ModuleData {
     pub special_attributes: SpecialAttributes,
 }
 
-impl ModuleData {
+impl ModuleData<'_> {
     pub fn build_module_data<'move_package>(
         module_id: ModuleId,
         move_module: &'move_package CompiledUnitWithSource,
         move_module_dependencies: &'move_package [(PackageName, CompiledUnitWithSource)],
-        root_compiled_units: &'move_package [&CompiledUnitWithSource],
+        root_compiled_units: &[&CompiledUnitWithSource],
         function_definitions: &mut GlobalFunctionTable<'move_package>,
         special_attributes: SpecialAttributes,
-    ) -> Result<Self> {
+    ) -> Result<ModuleData<'move_package>> {
         let move_module_unit = &move_module.unit.module;
 
         let datatype_handles_map = Self::process_datatype_handles(
@@ -211,7 +232,7 @@ impl ModuleData {
         };
 
         let functions = Self::process_function_definitions(
-            module_id.clone(),
+            module_id,
             move_module_unit,
             &datatype_handles_map,
             function_definitions,
@@ -229,9 +250,11 @@ impl ModuleData {
             })
             .collect::<std::result::Result<Vec<Vec<IntermediateType>>, _>>()?;
 
+        let constants = Self::process_constants(move_module_unit, &datatype_handles_map)?;
+
         Ok(ModuleData {
             id: module_id,
-            constants: move_module_unit.constant_pool.clone(), // TODO: Clone
+            constants,
             functions,
             structs,
             enums,
@@ -239,6 +262,25 @@ impl ModuleData {
             datatype_handles_map,
             special_attributes,
         })
+    }
+
+    fn process_constants<'move_package>(
+        module: &'move_package CompiledModule,
+        datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
+    ) -> Result<Vec<Constant<'move_package>>> {
+        let mut constants = Vec::with_capacity(module.constant_pool.len());
+
+        for constant in &module.constant_pool {
+            let constant_type =
+                IntermediateType::try_from_signature_token(&constant.type_, datatype_handles_map)?;
+
+            constants.push(Constant {
+                type_: constant_type,
+                data: &constant.data,
+            });
+        }
+
+        Ok(constants)
     }
 
     fn process_datatype_handles(
@@ -267,7 +309,7 @@ impl ModuleData {
                     datatype_handles_map.insert(
                         idx,
                         UserDefinedType::Struct {
-                            module_id: module_id.clone(), // TODO: clone
+                            module_id: *module_id, // TODO: clone
                             index: position as u16,
                         },
                     );
@@ -277,7 +319,7 @@ impl ModuleData {
                     datatype_handles_map.insert(
                         idx,
                         UserDefinedType::Enum {
-                            module_id: module_id.clone(),
+                            module_id: *module_id,
                             index: position as u16,
                         },
                     );
@@ -289,10 +331,8 @@ impl ModuleData {
                 let module_address = module.address_identifier_at(datatype_module.address);
                 let module_name = module.identifier_at(datatype_module.name);
 
-                let module_id = ModuleId {
-                    address: module_address.into_bytes().into(),
-                    module_name: module_name.to_string(),
-                };
+                let module_id =
+                    ModuleId::new(module_address.into_bytes().into(), module_name.as_str());
 
                 // Find the module where the external data is defined, we first look for it in the
                 // external packages and if we dont't find it, we look for it in the compile units
@@ -343,7 +383,7 @@ impl ModuleData {
                     datatype_handles_map.insert(
                         idx,
                         UserDefinedType::Enum {
-                            module_id: module_id.clone(),
+                            module_id,
                             index: position as u16,
                         },
                     );
@@ -408,9 +448,7 @@ impl ModuleData {
             }
 
             let struct_datatype_handle = module.datatype_handle_at(struct_def.struct_handle);
-            let identifier = module
-                .identifier_at(struct_datatype_handle.name)
-                .to_string();
+            let identifier = module.identifier_at(struct_datatype_handle.name).as_str();
 
             let has_key = struct_datatype_handle
                 .abilities
@@ -419,12 +457,18 @@ impl ModuleData {
 
             let type_ = if Self::is_one_time_witness(module, struct_def.struct_handle) {
                 IStructType::OneTimeWitness
-            } else if let Some(event) = module_special_attributes.events.get(&identifier) {
+            } else if let Some(event) = module_special_attributes
+                .events
+                .get(&Symbol::from(identifier))
+            {
                 IStructType::Event {
                     indexes: event.indexes,
                     is_anonymous: event.is_anonymous,
                 }
-            } else if let Some(_abi_error) = module_special_attributes.abi_errors.get(&identifier) {
+            } else if let Some(_abi_error) = module_special_attributes
+                .abi_errors
+                .get(&Symbol::from(identifier))
+            {
                 IStructType::AbiError
             } else {
                 IStructType::Common
@@ -598,7 +642,7 @@ impl ModuleData {
 
             let enum_datatype_handle = module.datatype_handle_at(enum_def.enum_handle);
             let identifier = module.identifier_at(enum_datatype_handle.name);
-            module_enums.push(IEnum::new(identifier.to_string(), index as u16, variants)?);
+            module_enums.push(IEnum::new(identifier.as_str(), index as u16, variants)?);
         }
 
         Ok((module_enums, variants_to_enum_map))
@@ -731,13 +775,9 @@ impl ModuleData {
                 .into_bytes()
                 .into();
 
-            // TODO: clones and to_string()....
             let function_id = FunctionId {
-                identifier: function_name.to_string(),
-                module_id: ModuleId {
-                    address: function_module_address,
-                    module_name: function_module_name.to_string(),
-                },
+                identifier: Symbol::from(function_name),
+                module_id: ModuleId::new(function_module_address, function_module_name),
                 type_instantiations: None,
             };
 
@@ -767,7 +807,7 @@ impl ModuleData {
             // it.
             // If the function is not defined here, it will be processed when processing the
             // dependency
-            if function_module_name == module_id.module_name
+            if *function_module_name == *module_id.module_name
                 && function_module_address == module_id.address
             {
                 let function_def =
@@ -801,8 +841,12 @@ impl ModuleData {
                 let function_sa = special_attributes
                     .functions
                     .iter()
-                    .find(|f| f.name == function_name)
-                    .or_else(|| special_attributes.external_calls.get(function_name))
+                    .find(|f| *f.name == *function_name)
+                    .or_else(|| {
+                        special_attributes
+                            .external_calls
+                            .get(&Symbol::from(function_name))
+                    })
                     .ok_or(ModuleDataError::FunctionByIdentifierNotFound(
                         function_name.to_string(),
                     ))?;
@@ -868,11 +912,8 @@ impl ModuleData {
                 .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>()?;
 
             let function_id = FunctionId {
-                identifier: function_name.to_string(),
-                module_id: ModuleId {
-                    address: function_module_address,
-                    module_name: function_module_name.to_string(),
-                },
+                identifier: Symbol::from(function_name),
+                module_id: ModuleId::new(function_module_address, function_module_name),
                 type_instantiations: Some(type_instantiations),
             };
 
@@ -901,7 +942,7 @@ impl ModuleData {
     pub fn is_external_call(&self, function_identifier: &str) -> bool {
         self.special_attributes
             .external_calls
-            .contains_key(function_identifier)
+            .contains_key(&Symbol::from(function_identifier))
     }
 
     // The init() function is a special function that is called once when the module is first deployed,
@@ -932,7 +973,7 @@ impl ModuleData {
         const INIT_FUNCTION_NAME: &str = "init";
 
         // Must be named `init`
-        if function_id.identifier != INIT_FUNCTION_NAME {
+        if *function_id.identifier != *INIT_FUNCTION_NAME {
             return Ok(false);
         }
 
@@ -1054,7 +1095,7 @@ impl ModuleData {
         const RECEIVE_FUNCTION_NAME: &str = "receive";
 
         // Must be named `receive`. Otherwise, it is not a receive function.
-        if function_id.identifier != RECEIVE_FUNCTION_NAME {
+        if *function_id.identifier != *RECEIVE_FUNCTION_NAME {
             return Ok(false);
         }
 
@@ -1105,15 +1146,16 @@ impl ModuleData {
         move_module_dependencies: &[(PackageName, CompiledUnitWithSource)],
     ) -> Result<bool> {
         // Fallback function definition (see https://docs.soliditylang.org/en/latest/contracts.html#fallback-function):
-        // A contract can have at most one fallback function, declared using either fallback () external [payable]
-        // or fallback (bytes calldata input) external [payable] returns (bytes memory output) (both without the function keyword).
-        // This function must have external visibility, but it is not required to be payable.
-        // A fallback function can be virtual, can override and can have modifiers.
+        // - A contract can have at most one fallback function, declared using either fallback () external [payable]
+        //   or fallback (bytes calldata input) external [payable] returns (bytes memory output) (both without the function keyword).
+        //   --In our implementation, the calldata is not passed as argument but can be retrieved from TxContext.data()
+        //   --The return value must be empty or a vector<u8> representing the raw bytes of the calldata
+        // - This function must have external visibility, but it is not required to be payable.
 
         const FALLBACK_FUNCTION_NAME: &str = "fallback";
 
         // Must be named `fallback`. Otherwise, it is not a fallback function.
-        if function_id.identifier != FALLBACK_FUNCTION_NAME {
+        if *function_id.identifier != *FALLBACK_FUNCTION_NAME {
             return Ok(false);
         }
 
@@ -1131,48 +1173,17 @@ impl ModuleData {
                 // No arguments: valid
             }
             1 => {
-                // 1 argument: must be either vector<u8> or TxContext
+                // Argument must be &TxContext
                 let first_arg = move_function_arguments
                     .0
                     .first()
                     .and_then(|arg| {
                         IntermediateType::try_from_signature_token(arg, datatype_handles_map).ok()
                     })
-                    .ok_or(CompilationContextError::FallbackFunctionInvalidArgumentType(1))?;
+                    .ok_or(CompilationContextError::FallbackFunctionInvalidArgumentType)?;
 
-                // Check if it's fallback calldata or TxContext
-                if !(is_fallback_calldata(&first_arg, move_module_dependencies)
-                    || is_tx_context_ref(&first_arg, move_module_dependencies))
-                {
-                    return Err(CompilationContextError::FallbackFunctionInvalidArgumentType(1));
-                }
-            }
-            2 => {
-                // 2 arguments: first must be vector<u8>, second must be TxContext
-                let first_arg = move_function_arguments
-                    .0
-                    .first()
-                    .and_then(|arg| {
-                        IntermediateType::try_from_signature_token(arg, datatype_handles_map).ok()
-                    })
-                    .ok_or(CompilationContextError::FallbackFunctionInvalidArgumentType(1))?;
-
-                let second_arg = move_function_arguments
-                    .0
-                    .last()
-                    .and_then(|arg| {
-                        IntermediateType::try_from_signature_token(arg, datatype_handles_map).ok()
-                    })
-                    .ok_or(CompilationContextError::FallbackFunctionInvalidArgumentType(2))?;
-
-                // First argument must be fallback calldata
-                if !is_fallback_calldata(&first_arg, move_module_dependencies) {
-                    return Err(CompilationContextError::FallbackFunctionInvalidArgumentType(1));
-                }
-
-                // Second argument must be TxContext
-                if !is_tx_context_ref(&second_arg, move_module_dependencies) {
-                    return Err(CompilationContextError::FallbackFunctionInvalidArgumentType(2));
+                if !is_tx_context_ref(&first_arg, move_module_dependencies) {
+                    return Err(CompilationContextError::FallbackFunctionInvalidArgumentType);
                 }
             }
             _ => {
@@ -1187,7 +1198,7 @@ impl ModuleData {
                 // No return values: valid
             }
             1 => {
-                // 1 return value: must be fallback calldata
+                // Return value: must be fallback calldata
                 let return_type = move_function_return
                     .0
                     .first()
@@ -1196,7 +1207,7 @@ impl ModuleData {
                     })
                     .ok_or(CompilationContextError::FallbackFunctionInvalidReturnType)?;
 
-                if !is_fallback_calldata(&return_type, move_module_dependencies) {
+                if !is_vector_u8_ref(&return_type) {
                     return Err(CompilationContextError::FallbackFunctionInvalidReturnType);
                 }
             }
@@ -1210,44 +1221,14 @@ impl ModuleData {
     }
 }
 
-fn is_fallback_calldata(
-    argument: &IntermediateType,
-    move_module_dependencies: &[(PackageName, CompiledUnitWithSource)],
-) -> bool {
-    match argument {
-        IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
-            match inner.as_ref() {
-                IntermediateType::IStruct {
-                    module_id, index, ..
-                } if module_id.module_name == "fallback"
-                    && module_id.address == STYLUS_FRAMEWORK_ADDRESS =>
-                {
-                    // TODO: Look for this external module one time and pass it down to this
-                    // function
-                    let external_module_source = &move_module_dependencies
-                        .iter()
-                        .find(|(_, m)| {
-                            m.unit.name().as_str() == "fallback"
-                                && Address::from(m.unit.address.into_bytes())
-                                    == STYLUS_FRAMEWORK_ADDRESS
-                        })
-                        .expect("could not find stylus framework as dependency")
-                        .1
-                        .unit
-                        .module;
-
-                    let struct_ =
-                        external_module_source.struct_def_at(StructDefinitionIndex::new(*index));
-                    let handle = external_module_source.datatype_handle_at(struct_.struct_handle);
-                    let identifier = external_module_source.identifier_at(handle.name);
-                    identifier.as_str() == "Calldata"
-                }
-
-                _ => false,
-            }
-        }
-        _ => false,
-    }
+fn is_vector_u8_ref(argument: &IntermediateType) -> bool {
+    let IntermediateType::IRef(ref_inner) = argument else {
+        return false;
+    };
+    let IntermediateType::IVector(vec_inner) = ref_inner.as_ref() else {
+        return false;
+    };
+    matches!(vec_inner.as_ref(), IntermediateType::IU8)
 }
 
 /// Helper function to check if the argument is a reference to the TxContext.
@@ -1260,7 +1241,7 @@ fn is_tx_context_ref(
             match inner.as_ref() {
                 IntermediateType::IStruct {
                     module_id, index, ..
-                } if module_id.module_name == "tx_context"
+                } if module_id.module_name.as_str() == SF_MODULE_NAME_TX_CONTEXT
                     && module_id.address == STYLUS_FRAMEWORK_ADDRESS =>
                 {
                     // TODO: Look for this external module one time and pass it down to this

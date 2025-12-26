@@ -55,7 +55,7 @@ impl StructData {
     pub fn get_by_identifier(&self, identifier: &str) -> Result<&IStruct> {
         self.structs
             .iter()
-            .find(|s| s.identifier == identifier)
+            .find(|s| *s.identifier == *identifier)
             .ok_or(CompilationContextError::StructByIdentifierNotFound(
                 identifier.to_owned(),
             ))

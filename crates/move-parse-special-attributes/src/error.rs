@@ -8,6 +8,7 @@ use move_compiler::{
     },
 };
 use move_ir_types::location::Loc;
+use move_symbol_pool::Symbol;
 
 use crate::{
     abi_error::AbiErrorParseError,
@@ -52,7 +53,7 @@ pub enum SpecialAttributeErrorKind {
     FrameworkReservedStruct(String, String),
 
     #[error("Named address '{0}' not found in address_alias_instantiation")]
-    NamedAddressNotFound(String),
+    NamedAddressNotFound(Symbol),
 }
 
 #[derive(thiserror::Error, Debug)]

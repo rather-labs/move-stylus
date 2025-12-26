@@ -1,5 +1,7 @@
 use std::rc::Rc;
 
+use move_symbol_pool::Symbol;
+
 use crate::{
     abi_types::error::AbiError,
     compilation_context::{CompilationContextError, ModuleId},
@@ -78,7 +80,7 @@ pub enum NativeFunctionError {
 
     // Emit function section
     #[error(r#"trying to emit log with the struct {0} which is not an event"#)]
-    EmitFunctionNoEvent(String),
+    EmitFunctionNoEvent(Symbol),
 
     #[error(r#"invalid event field {0:?}"#)]
     EmitFunctionInvalidEventField(IntermediateType),
@@ -90,7 +92,7 @@ pub enum NativeFunctionError {
 
     // revert function section
     #[error(r#"trying to revert with the struct "{0}" which is not an error"#)]
-    RevertFunctionNoError(String),
+    RevertFunctionNoError(Symbol),
 }
 
 impl From<AbiError> for NativeFunctionError {
