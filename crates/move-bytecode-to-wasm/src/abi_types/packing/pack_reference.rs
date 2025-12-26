@@ -197,7 +197,7 @@ impl IMutRef {
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     use super::*;
     use crate::test_compilation_context;
@@ -285,7 +285,7 @@ mod tests {
     #[test]
     fn test_pack_ref_u8() {
         type SolType = sol!((uint8,));
-        let ref_type = IntermediateType::IRef(Rc::new(IntermediateType::IU8));
+        let ref_type = IntermediateType::IRef(Arc::new(IntermediateType::IU8));
         let mut heap_data = Vec::new();
         heap_data.extend(&4u32.to_le_bytes()); // Pointer to the u8 data
         heap_data.extend(&88u8.to_le_bytes()); // Actual u8 data
@@ -296,7 +296,7 @@ mod tests {
     #[test]
     fn test_pack_ref_u32() {
         type SolType = sol!((uint32,));
-        let ref_type = IntermediateType::IRef(Rc::new(IntermediateType::IU32));
+        let ref_type = IntermediateType::IRef(Arc::new(IntermediateType::IU32));
         let mut heap_data = Vec::new();
         heap_data.extend(&4u32.to_le_bytes()); // Pointer to the u32 data
         heap_data.extend(&88u32.to_le_bytes()); // Actual u32 data
@@ -307,7 +307,7 @@ mod tests {
     #[test]
     fn test_pack_ref_u64() {
         type SolType = sol!((uint64,));
-        let ref_type = IntermediateType::IRef(Rc::new(IntermediateType::IU64));
+        let ref_type = IntermediateType::IRef(Arc::new(IntermediateType::IU64));
         let mut heap_data = Vec::new();
         heap_data.extend(&4u32.to_le_bytes()); // Pointer to the u64 data
         heap_data.extend(&88u64.to_le_bytes()); // Actual u64 data
@@ -318,7 +318,7 @@ mod tests {
     #[test]
     fn test_pack_ref_u128() {
         type SolType = sol!((uint128,));
-        let ref_type = IntermediateType::IRef(Rc::new(IntermediateType::IU128));
+        let ref_type = IntermediateType::IRef(Arc::new(IntermediateType::IU128));
         let mut heap_data = Vec::new();
         heap_data.extend(&4u32.to_le_bytes()); // Pointer to the u128 data
         heap_data.extend(&88u128.to_le_bytes()); // Actual u128 data
@@ -329,7 +329,7 @@ mod tests {
     #[test]
     fn test_pack_ref_address() {
         type SolType = sol!((address,));
-        let ref_type = IntermediateType::IRef(Rc::new(IntermediateType::IAddress));
+        let ref_type = IntermediateType::IRef(Arc::new(IntermediateType::IAddress));
         let mut heap_data = Vec::new();
         let expected =
             SolType::abi_encode_params(&(address!("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"),));
@@ -342,7 +342,7 @@ mod tests {
     #[should_panic]
     fn test_pack_ref_signer() {
         type SolType = sol!((address,));
-        let ref_type = IntermediateType::IRef(Rc::new(IntermediateType::ISigner));
+        let ref_type = IntermediateType::IRef(Arc::new(IntermediateType::ISigner));
 
         let mut heap_data = Vec::new();
         let expected =
@@ -355,7 +355,7 @@ mod tests {
     #[test]
     fn test_pack_ref_vec_u8() {
         type SolType = sol!((uint8[],));
-        let ref_type = IntermediateType::IRef(Rc::new(IntermediateType::IVector(Rc::new(
+        let ref_type = IntermediateType::IRef(Arc::new(IntermediateType::IVector(Arc::new(
             IntermediateType::IU8,
         ))));
 
@@ -379,7 +379,7 @@ mod tests {
     #[test]
     fn test_pack_ref_vec_u16() {
         type SolType = sol!((uint16[],));
-        let ref_type = IntermediateType::IRef(Rc::new(IntermediateType::IVector(Rc::new(
+        let ref_type = IntermediateType::IRef(Arc::new(IntermediateType::IVector(Arc::new(
             IntermediateType::IU16,
         ))));
 
@@ -403,7 +403,7 @@ mod tests {
     #[test]
     fn test_pack_ref_vec_u32() {
         type SolType = sol!((uint32[],));
-        let ref_type = IntermediateType::IRef(Rc::new(IntermediateType::IVector(Rc::new(
+        let ref_type = IntermediateType::IRef(Arc::new(IntermediateType::IVector(Arc::new(
             IntermediateType::IU32,
         ))));
 
@@ -427,7 +427,7 @@ mod tests {
     #[test]
     fn test_pack_ref_vec_u128() {
         type SolType = sol!((uint128[],));
-        let ref_type = IntermediateType::IRef(Rc::new(IntermediateType::IVector(Rc::new(
+        let ref_type = IntermediateType::IRef(Arc::new(IntermediateType::IVector(Arc::new(
             IntermediateType::IU128,
         ))));
 
@@ -458,8 +458,8 @@ mod tests {
     #[test]
     fn test_pack_ref_vector_vector_u32() {
         type SolType = sol!((uint32[][],));
-        let ref_type = IntermediateType::IRef(Rc::new(IntermediateType::IVector(Rc::new(
-            IntermediateType::IVector(Rc::new(IntermediateType::IU32)),
+        let ref_type = IntermediateType::IRef(Arc::new(IntermediateType::IVector(Arc::new(
+            IntermediateType::IVector(Arc::new(IntermediateType::IU32)),
         ))));
 
         let expected_result = SolType::abi_encode_params(&(vec![vec![1, 2, 3], vec![4, 5, 6]],));
@@ -496,8 +496,8 @@ mod tests {
     #[test]
     fn test_pack_ref_vector_vector_u128() {
         type SolType = sol!((uint128[][],));
-        let ref_type = IntermediateType::IRef(Rc::new(IntermediateType::IVector(Rc::new(
-            IntermediateType::IVector(Rc::new(IntermediateType::IU128)),
+        let ref_type = IntermediateType::IRef(Arc::new(IntermediateType::IVector(Arc::new(
+            IntermediateType::IVector(Arc::new(IntermediateType::IU128)),
         ))));
 
         let expected_result = SolType::abi_encode_params(&(vec![vec![1, 2, 3], vec![4, 5, 6]],));

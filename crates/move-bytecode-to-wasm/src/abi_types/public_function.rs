@@ -303,7 +303,7 @@ impl<'a> PublicFunction<'a> {
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     use alloy_sol_types::{SolType, sol};
     use walrus::{
@@ -869,7 +869,7 @@ mod tests {
             arguments: vec![
                 IntermediateType::IBool,
                 IntermediateType::IU64,
-                IntermediateType::IVector(Rc::new(IntermediateType::ISigner)),
+                IntermediateType::IVector(Arc::new(IntermediateType::ISigner)),
             ],
             returns: vec![],
         };
@@ -909,7 +909,7 @@ mod tests {
             arguments: vec![
                 IntermediateType::IBool,
                 IntermediateType::IU64,
-                IntermediateType::IVector(Rc::new(IntermediateType::IVector(Rc::new(
+                IntermediateType::IVector(Arc::new(IntermediateType::IVector(Arc::new(
                     IntermediateType::ISigner,
                 )))),
             ],

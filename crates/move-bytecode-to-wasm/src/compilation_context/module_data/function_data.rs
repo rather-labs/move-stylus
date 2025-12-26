@@ -1,3 +1,7 @@
+use std::collections::HashMap;
+
+use move_binary_format::file_format::FunctionDefinition;
+
 use crate::{
     compilation_context::CompilationContextError,
     translation::{
@@ -8,7 +12,7 @@ use crate::{
 use super::error::ModuleDataError;
 
 #[derive(Debug, Default)]
-pub struct FunctionData {
+pub struct FunctionData<'move_compiled_unit> {
     /// Module's functions arguments.
     pub arguments: Vec<Vec<IntermediateType>>,
 
@@ -33,9 +37,12 @@ pub struct FunctionData {
 
     /// The fallback function of the module.
     pub fallback: Option<FunctionId>,
+
+    /// Function definition from Move bytecode.
+    pub move_definitions: HashMap<FunctionId, &'move_compiled_unit FunctionDefinition>,
 }
 
-impl FunctionData {
+impl FunctionData<'_> {
     pub fn get_information_by_identifier(
         &self,
         identifier: &str,
@@ -47,5 +54,14 @@ impl FunctionData {
             .ok_or(ModuleDataError::FunctionByIdentifierNotFound(
                 identifier.to_string(),
             ))?)
+    }
+
+    pub fn get_move_definition_by_id(
+        &self,
+        function_id: &FunctionId,
+    ) -> Result<&FunctionDefinition, CompilationContextError> {
+        Ok(self.move_definitions.get(function_id).ok_or(
+            ModuleDataError::FunctionDefinitionByIdNotFound(function_id.clone()),
+        )?)
     }
 }

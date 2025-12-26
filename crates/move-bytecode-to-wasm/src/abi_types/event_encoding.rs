@@ -96,7 +96,7 @@ pub fn struct_fields_sol_name(
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, rc::Rc};
+    use std::{collections::HashMap, sync::Arc};
 
     use move_binary_format::file_format::StructDefinitionIndex;
     use rstest::rstest;
@@ -126,11 +126,11 @@ mod tests {
                 (None, IntermediateType::IAddress),
                 (
                     None,
-                    IntermediateType::IVector(Rc::new(IntermediateType::IU32)),
+                    IntermediateType::IVector(Arc::new(IntermediateType::IU32)),
                 ),
                 (
                     None,
-                    IntermediateType::IVector(Rc::new(IntermediateType::IU128)),
+                    IntermediateType::IVector(Arc::new(IntermediateType::IU128)),
                 ),
                 (None, IntermediateType::IBool),
                 (None, IntermediateType::IU8),

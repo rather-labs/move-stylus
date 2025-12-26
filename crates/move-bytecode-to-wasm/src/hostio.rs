@@ -1,6 +1,5 @@
 #[cfg(test)]
 pub use entrypoint_router::add_entrypoint;
-pub use entrypoint_router::build_entrypoint_router;
 use walrus::{FunctionId, MemoryId, Module, ModuleConfig};
 
 use crate::{

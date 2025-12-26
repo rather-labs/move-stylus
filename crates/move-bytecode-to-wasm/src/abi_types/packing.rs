@@ -487,7 +487,7 @@ impl Packable for IntermediateType {
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     use alloy_primitives::U256;
     use alloy_sol_types::sol;
@@ -713,7 +713,7 @@ mod tests {
             &mut func_body,
             &[
                 IntermediateType::IU16,
-                IntermediateType::IVector(Rc::new(IntermediateType::IVector(Rc::new(
+                IntermediateType::IVector(Arc::new(IntermediateType::IVector(Arc::new(
                     IntermediateType::IU128,
                 )))),
                 IntermediateType::IU256,
