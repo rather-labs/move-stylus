@@ -202,3 +202,287 @@ pub fn unpack_vector_function(
         &mut module.funcs,
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use alloy_primitives::{U256, address};
+    use alloy_sol_types::{SolType, sol};
+    use std::rc::Rc;
+    use walrus::{ConstExpr, FunctionBuilder, ValType, ir::Value};
+
+    use crate::{
+        abi_types::unpacking::Unpackable,
+        test_compilation_context,
+        test_tools::{build_module, setup_wasmtime_module},
+        translation::intermediate_types::IntermediateType,
+    };
+
+    /// Test helper for unpacking vector types
+    fn unpack_vec(data: &[u8], int_type: IntermediateType, expected_result_bytes: &[u8]) {
+        let (mut raw_module, allocator, memory_id) = build_module(Some(data.len() as i32));
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            true,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
+
+        let args_pointer = raw_module.locals.add(ValType::I32);
+        let calldata_reader_pointer = raw_module.locals.add(ValType::I32);
+        let mut func_body = function_builder.func_body();
+        func_body.i32_const(0);
+        func_body.local_tee(args_pointer);
+        func_body.local_set(calldata_reader_pointer);
+
+        int_type
+            .add_unpack_instructions(
+                &mut func_body,
+                &mut raw_module,
+                args_pointer,
+                calldata_reader_pointer,
+                &compilation_ctx,
+            )
+            .unwrap();
+
+        let function = function_builder.finish(vec![], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
+
+        let result: i32 = entrypoint.call(&mut store, ()).unwrap();
+        assert_eq!(result, data.len() as i32);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+        let mut result_memory_data = vec![0; expected_result_bytes.len()];
+        memory
+            .read(&mut store, result as usize, &mut result_memory_data)
+            .unwrap();
+        assert_eq!(result_memory_data, expected_result_bytes);
+    }
+
+    // ============================================================================
+    // Vector Types - Simple Element Types
+    // ============================================================================
+
+    #[test]
+    fn test_unpack_vector_u8_empty() {
+        type SolType = sol!((uint8[],));
+        let int_type = IntermediateType::IVector(Rc::new(IntermediateType::IU8));
+
+        let data = SolType::abi_encode_params::<(Vec<u8>,)>(&(vec![],));
+        let expected_result_bytes =
+            [0u32.to_le_bytes().as_slice(), 0u32.to_le_bytes().as_slice()].concat();
+        unpack_vec(&data, int_type, &expected_result_bytes);
+    }
+
+    #[test]
+    fn test_unpack_vector_u8() {
+        type SolType = sol!((uint8[],));
+        let int_type = IntermediateType::IVector(Rc::new(IntermediateType::IU8));
+
+        let data = SolType::abi_encode_params(&(vec![1, 2, 3],));
+        let expected_result_bytes = [
+            3u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            1u8.to_le_bytes().as_slice(),
+            2u8.to_le_bytes().as_slice(),
+            3u8.to_le_bytes().as_slice(),
+        ]
+        .concat();
+        unpack_vec(&data, int_type, &expected_result_bytes);
+    }
+
+    #[test]
+    fn test_unpack_vector_u16() {
+        type SolType = sol!((uint16[],));
+        let int_type = IntermediateType::IVector(Rc::new(IntermediateType::IU16));
+
+        let data = SolType::abi_encode_params(&(vec![1, 2],));
+        let expected_result_bytes = [
+            2u32.to_le_bytes().as_slice(),
+            2u32.to_le_bytes().as_slice(),
+            1u16.to_le_bytes().as_slice(),
+            2u16.to_le_bytes().as_slice(),
+        ]
+        .concat();
+        unpack_vec(&data, int_type, &expected_result_bytes);
+    }
+
+    #[test]
+    fn test_unpack_vector_u32() {
+        type SolType = sol!((uint32[],));
+        let int_type = IntermediateType::IVector(Rc::new(IntermediateType::IU32));
+
+        let data = SolType::abi_encode_params(&(vec![1, 2, 3],));
+        let expected_result_bytes = [
+            3u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            1u32.to_le_bytes().as_slice(),
+            2u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+        ]
+        .concat();
+        unpack_vec(&data, int_type, &expected_result_bytes);
+    }
+
+    #[test]
+    fn test_unpack_vector_u64() {
+        type SolType = sol!((uint64[],));
+        let int_type = IntermediateType::IVector(Rc::new(IntermediateType::IU64));
+
+        let data = SolType::abi_encode_params(&(vec![1, 2, 3],));
+        let expected_result_bytes = [
+            3u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            1u64.to_le_bytes().as_slice(),
+            2u64.to_le_bytes().as_slice(),
+            3u64.to_le_bytes().as_slice(),
+        ]
+        .concat();
+        unpack_vec(&data, int_type, &expected_result_bytes);
+    }
+
+    // ============================================================================
+    // Vector Types - Heap-Allocated Element Types
+    // ============================================================================
+
+    #[test]
+    fn test_unpack_vector_u128() {
+        type SolType = sol!((uint128[],));
+        let int_type = IntermediateType::IVector(Rc::new(IntermediateType::IU128));
+
+        let data = SolType::abi_encode_params(&(vec![1, 2, 3],));
+        let expected_result_bytes = [
+            3u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            ((data.len() + 20) as u32).to_le_bytes().as_slice(),
+            ((data.len() + 36) as u32).to_le_bytes().as_slice(),
+            ((data.len() + 52) as u32).to_le_bytes().as_slice(),
+            1u128.to_le_bytes().as_slice(),
+            2u128.to_le_bytes().as_slice(),
+            3u128.to_le_bytes().as_slice(),
+        ]
+        .concat();
+        unpack_vec(&data, int_type, &expected_result_bytes);
+    }
+
+    #[test]
+    fn test_unpack_vector_u256() {
+        type SolType = sol!((uint256[],));
+        let int_type = IntermediateType::IVector(Rc::new(IntermediateType::IU256));
+
+        let data =
+            SolType::abi_encode_params(&(vec![U256::from(1), U256::from(2), U256::from(3)],));
+        let expected_result_bytes = [
+            3u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            ((data.len() + 20) as u32).to_le_bytes().as_slice(),
+            ((data.len() + 52) as u32).to_le_bytes().as_slice(),
+            ((data.len() + 84) as u32).to_le_bytes().as_slice(),
+            U256::from(1).to_le_bytes::<32>().as_slice(),
+            U256::from(2).to_le_bytes::<32>().as_slice(),
+            U256::from(3).to_le_bytes::<32>().as_slice(),
+        ]
+        .concat();
+        unpack_vec(&data, int_type, &expected_result_bytes);
+    }
+
+    #[test]
+    fn test_unpack_vector_address() {
+        type SolType = sol!((address[],));
+        let int_type = IntermediateType::IVector(Rc::new(IntermediateType::IAddress));
+
+        let data = SolType::abi_encode_params(&(vec![
+            address!("0x1234567890abcdef1234567890abcdef12345678"),
+            address!("0x1234567890abcdef1234567890abcdef12345678"),
+            address!("0x1234567890abcdef1234567890abcdef12345678"),
+        ],));
+        let expected_result_bytes = [
+            3u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            ((data.len() + 20) as u32).to_le_bytes().as_slice(),
+            ((data.len() + 52) as u32).to_le_bytes().as_slice(),
+            ((data.len() + 84) as u32).to_le_bytes().as_slice(),
+            &[0; 12],
+            address!("0x1234567890abcdef1234567890abcdef12345678").as_slice(),
+            &[0; 12],
+            address!("0x1234567890abcdef1234567890abcdef12345678").as_slice(),
+            &[0; 12],
+            address!("0x1234567890abcdef1234567890abcdef12345678").as_slice(),
+        ]
+        .concat();
+        unpack_vec(&data, int_type, &expected_result_bytes);
+    }
+
+    // ============================================================================
+    // Nested Vector Types
+    // ============================================================================
+
+    #[test]
+    fn test_unpack_vector_vector_u32() {
+        type SolType = sol!((uint32[][],));
+        let int_type = IntermediateType::IVector(Rc::new(IntermediateType::IVector(Rc::new(
+            IntermediateType::IU32,
+        ))));
+
+        let data = SolType::abi_encode_params(&(vec![vec![1, 2, 3], vec![4, 5, 6]],));
+
+        let expected_result_bytes = [
+            2u32.to_le_bytes().as_slice(),
+            2u32.to_le_bytes().as_slice(),
+            ((data.len() + 16) as u32).to_le_bytes().as_slice(),
+            ((data.len() + 36) as u32).to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            1u32.to_le_bytes().as_slice(),
+            2u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            4u32.to_le_bytes().as_slice(),
+            5u32.to_le_bytes().as_slice(),
+            6u32.to_le_bytes().as_slice(),
+        ]
+        .concat();
+        unpack_vec(&data, int_type, &expected_result_bytes);
+    }
+
+    #[test]
+    fn test_unpack_vector_vector_u128() {
+        type SolType = sol!((uint128[][],));
+        let int_type = IntermediateType::IVector(Rc::new(IntermediateType::IVector(Rc::new(
+            IntermediateType::IU128,
+        ))));
+
+        let data = SolType::abi_encode_params(&(vec![vec![1, 2, 3], vec![4, 5, 6]],));
+        let expected_result_bytes = [
+            2u32.to_le_bytes().as_slice(),                        // len
+            2u32.to_le_bytes().as_slice(),                        // capacity
+            ((data.len() + 16) as u32).to_le_bytes().as_slice(),  // first element pointer
+            ((data.len() + 84) as u32).to_le_bytes().as_slice(),  // second element pointer
+            3u32.to_le_bytes().as_slice(),                        // first element length
+            3u32.to_le_bytes().as_slice(),                        // first element capacity
+            ((data.len() + 36) as u32).to_le_bytes().as_slice(), // first element - first value pointer
+            ((data.len() + 52) as u32).to_le_bytes().as_slice(), // first element - second value pointer
+            ((data.len() + 68) as u32).to_le_bytes().as_slice(), // first element - third value pointer
+            1u128.to_le_bytes().as_slice(),                      // first element - first value
+            2u128.to_le_bytes().as_slice(),                      // first element - second value
+            3u128.to_le_bytes().as_slice(),                      // first element - third value
+            3u32.to_le_bytes().as_slice(),                       // second element length
+            3u32.to_le_bytes().as_slice(),                       // second element capacity
+            ((data.len() + 104) as u32).to_le_bytes().as_slice(), // second element - first value pointer
+            ((data.len() + 120) as u32).to_le_bytes().as_slice(), // second element - second value pointer
+            ((data.len() + 136) as u32).to_le_bytes().as_slice(), // second element - third value pointer
+            4u128.to_le_bytes().as_slice(),                       // second element - first value
+            5u128.to_le_bytes().as_slice(),                       // second element - second value
+            6u128.to_le_bytes().as_slice(),                       // second element - third value
+        ]
+        .concat();
+        unpack_vec(&data, int_type, &expected_result_bytes);
+    }
+}

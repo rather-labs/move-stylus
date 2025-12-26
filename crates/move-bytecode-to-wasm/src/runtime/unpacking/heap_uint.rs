@@ -137,3 +137,141 @@ pub fn unpack_address_function(
     function_builder.name(RuntimeFunction::UnpackAddress.name().to_owned());
     Ok(function_builder.finish(vec![reader_pointer], &mut module.funcs))
 }
+
+#[cfg(test)]
+mod tests {
+    use alloy_primitives::{Address, U256, address};
+    use alloy_sol_types::{SolType, sol};
+    use walrus::{ConstExpr, FunctionBuilder, ValType, ir::Value};
+
+    use crate::{
+        abi_types::unpacking::Unpackable,
+        test_compilation_context,
+        test_tools::{build_module, setup_wasmtime_module},
+        translation::intermediate_types::IntermediateType,
+    };
+
+    /// Test helper for unpacking heap-allocated types (u128, u256, address)
+    fn unpack_heap_uint(data: &[u8], int_type: IntermediateType, expected_result_bytes: &[u8]) {
+        let (mut raw_module, allocator, memory_id) = build_module(Some(data.len() as i32));
+        let calldata_reader_pointer_global = raw_module.globals.add_local(
+            ValType::I32,
+            true,
+            false,
+            ConstExpr::Value(Value::I32(0)),
+        );
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
+
+        let args_pointer = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+        func_body.i32_const(0);
+        func_body.local_set(args_pointer);
+
+        int_type
+            .add_unpack_instructions(
+                &mut func_body,
+                &mut raw_module,
+                args_pointer,
+                args_pointer,
+                &compilation_ctx,
+            )
+            .unwrap();
+
+        let function = function_builder.finish(vec![], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
+
+        let global_next_free_memory_pointer = instance
+            .get_global(&mut store, "global_next_free_memory_pointer")
+            .unwrap();
+
+        let result: i32 = entrypoint.call(&mut store, ()).unwrap();
+        assert_eq!(result, data.len() as i32);
+
+        let global_next_free_memory_pointer = global_next_free_memory_pointer
+            .get(&mut store)
+            .i32()
+            .unwrap();
+        assert_eq!(
+            global_next_free_memory_pointer,
+            (expected_result_bytes.len() + data.len()) as i32
+        );
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+        let mut result_memory_data = vec![0; expected_result_bytes.len()];
+        memory
+            .read(&mut store, result as usize, &mut result_memory_data)
+            .unwrap();
+        assert_eq!(result_memory_data, expected_result_bytes);
+    }
+
+    #[test]
+    fn test_unpack_u128() {
+        type IntType = u128;
+        type SolType = sol!((uint128,));
+        let int_type = IntermediateType::IU128;
+
+        let data = SolType::abi_encode_params(&(88,));
+        unpack_heap_uint(&data, int_type.clone(), &88u128.to_le_bytes());
+
+        let data = SolType::abi_encode_params(&(IntType::MAX,));
+        unpack_heap_uint(&data, int_type.clone(), &IntType::MAX.to_le_bytes());
+
+        let data = SolType::abi_encode_params(&(IntType::MIN,));
+        unpack_heap_uint(&data, int_type.clone(), &IntType::MIN.to_le_bytes());
+
+        let data = SolType::abi_encode_params(&(IntType::MAX - 1,));
+        unpack_heap_uint(&data, int_type.clone(), &(IntType::MAX - 1).to_le_bytes());
+    }
+
+    #[test]
+    fn test_unpack_u256() {
+        type IntType = U256;
+        type SolType = sol!((uint256,));
+        let int_type = IntermediateType::IU256;
+
+        let data = SolType::abi_encode_params(&(U256::from(88),));
+        unpack_heap_uint(&data, int_type.clone(), &U256::from(88).to_le_bytes::<32>());
+
+        let data = SolType::abi_encode_params(&(IntType::MAX,));
+        unpack_heap_uint(&data, int_type.clone(), &IntType::MAX.to_le_bytes::<32>());
+
+        let data = SolType::abi_encode_params(&(IntType::MIN,));
+        unpack_heap_uint(&data, int_type.clone(), &IntType::MIN.to_le_bytes::<32>());
+
+        let data = SolType::abi_encode_params(&(IntType::MAX - U256::from(1),));
+        unpack_heap_uint(
+            &data,
+            int_type.clone(),
+            &(IntType::MAX - U256::from(1)).to_le_bytes::<32>(),
+        );
+    }
+
+    #[test]
+    fn test_unpack_address() {
+        type SolType = sol!((address,));
+        let int_type = IntermediateType::IAddress;
+
+        let data = SolType::abi_encode_params(&(Address::ZERO,));
+        unpack_heap_uint(&data, int_type.clone(), &data);
+
+        let data =
+            SolType::abi_encode_params(&(address!("0x1234567890abcdef1234567890abcdef12345678"),));
+        unpack_heap_uint(&data, int_type.clone(), &data);
+
+        let data =
+            SolType::abi_encode_params(&(address!("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"),));
+        unpack_heap_uint(&data, int_type.clone(), &data);
+
+        let data =
+            SolType::abi_encode_params(&(address!("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE"),));
+        unpack_heap_uint(&data, int_type.clone(), &data);
+    }
+}

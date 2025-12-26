@@ -249,6 +249,7 @@ impl Unpackable for IntermediateType {
             }
         }
 
+        // Update the local reader pointer value to the global reader pointer, which is modified when unpacking
         builder
             .global_get(compilation_ctx.calldata_reader_pointer)
             .local_set(reader_pointer);
