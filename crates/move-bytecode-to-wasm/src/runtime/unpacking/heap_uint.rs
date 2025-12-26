@@ -4,10 +4,7 @@ use crate::{
     runtime::{RuntimeFunction, RuntimeFunctionError},
 };
 use alloy_sol_types::{SolType, sol_data};
-use walrus::{
-    FunctionBuilder, FunctionId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
-};
+use walrus::{FunctionBuilder, FunctionId, Module, ValType, ir::BinaryOp};
 
 pub fn unpack_u128_function(
     module: &mut Module,
@@ -103,27 +100,11 @@ pub fn unpack_address_function(
         .call(compilation_ctx.allocator)
         .local_set(unpacked_pointer);
 
-    for i in 0..4 {
-        function_body
-            .local_get(unpacked_pointer)
-            .local_get(reader_pointer)
-            .load(
-                compilation_ctx.memory_id,
-                LoadKind::I64 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: i * 8,
-                },
-            )
-            .store(
-                compilation_ctx.memory_id,
-                StoreKind::I64 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: i * 8,
-                },
-            );
-    }
+    function_body
+        .local_get(unpacked_pointer)
+        .local_get(reader_pointer)
+        .i32_const(32)
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
     // Increment reader pointer
     function_body
