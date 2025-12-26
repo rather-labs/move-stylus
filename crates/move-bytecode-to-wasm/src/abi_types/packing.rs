@@ -10,8 +10,6 @@ use crate::{
     runtime::RuntimeFunction,
     translation::intermediate_types::{
         IntermediateType,
-        address::IAddress,
-        heap_integers::{IU128, IU256},
         reference::{IMutRef, IRef},
         vector::IVector,
     },
@@ -21,7 +19,6 @@ use crate::{
 use super::error::{AbiEncodingError, AbiError};
 
 pub mod error;
-mod pack_heap_int;
 mod pack_reference;
 mod pack_string;
 mod pack_struct;
@@ -247,28 +244,30 @@ impl Packable for IntermediateType {
                     .local_get(writer_pointer)
                     .call(pack_u64_function);
             }
-            IntermediateType::IU128 => IU128::add_pack_instructions(
-                builder,
-                module,
-                local,
-                writer_pointer,
-                compilation_ctx.memory_id,
-            )?,
-            IntermediateType::IU256 => IU256::add_pack_instructions(
-                builder,
-                module,
-                local,
-                writer_pointer,
-                compilation_ctx.memory_id,
-            )?,
-            IntermediateType::ISigner => return Err(AbiPackError::FoundSignerType)?,
-            IntermediateType::IAddress => IAddress::add_pack_instructions(
-                builder,
-                module,
-                local,
-                writer_pointer,
-                compilation_ctx.memory_id,
-            ),
+            IntermediateType::IU128 => {
+                let pack_u128_function =
+                    RuntimeFunction::PackU128.get(module, Some(compilation_ctx))?;
+                builder
+                    .local_get(local)
+                    .local_get(writer_pointer)
+                    .call(pack_u128_function);
+            }
+            IntermediateType::IU256 => {
+                let pack_u256_function =
+                    RuntimeFunction::PackU256.get(module, Some(compilation_ctx))?;
+                builder
+                    .local_get(local)
+                    .local_get(writer_pointer)
+                    .call(pack_u256_function);
+            }
+            IntermediateType::IAddress => {
+                let pack_address_function =
+                    RuntimeFunction::PackAddress.get(module, Some(compilation_ctx))?;
+                builder
+                    .local_get(local)
+                    .local_get(writer_pointer)
+                    .call(pack_address_function);
+            }
             IntermediateType::IVector(inner) => IVector::add_pack_instructions(
                 inner,
                 builder,
@@ -322,6 +321,7 @@ impl Packable for IntermediateType {
                     .local_get(writer_pointer)
                     .call(pack_enum_function);
             }
+            IntermediateType::ISigner => return Err(AbiPackError::FoundSignerType)?,
             IntermediateType::ITypeParameter(_) => {
                 return Err(AbiPackError::PackingGenericTypeParameter)?;
             }

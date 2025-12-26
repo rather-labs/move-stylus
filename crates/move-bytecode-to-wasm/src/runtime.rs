@@ -107,6 +107,9 @@ pub enum RuntimeFunction {
     PackEnum,
     PackU32,
     PackU64,
+    PackU128,
+    PackU256,
+    PackAddress,
 }
 
 impl RuntimeFunction {
@@ -193,6 +196,9 @@ impl RuntimeFunction {
             Self::PackEnum => "pack_enum",
             Self::PackU32 => "pack_u32",
             Self::PackU64 => "pack_u64",
+            Self::PackU128 => "pack_u128",
+            Self::PackU256 => "pack_u256",
+            Self::PackAddress => "pack_address",
         }
     }
 
@@ -339,6 +345,11 @@ impl RuntimeFunction {
                 (Self::PackEnum, Some(ctx)) => packing::enums::pack_enum_function(module, ctx)?,
                 (Self::PackU32, Some(ctx)) => packing::uint::pack_u32_function(module, ctx)?,
                 (Self::PackU64, Some(ctx)) => packing::uint::pack_u64_function(module, ctx)?,
+                (Self::PackU128, Some(ctx)) => packing::heap_uint::pack_u128_function(module, ctx)?,
+                (Self::PackU256, Some(ctx)) => packing::heap_uint::pack_u256_function(module, ctx)?,
+                (Self::PackAddress, Some(ctx)) => {
+                    packing::heap_uint::pack_address_function(module, ctx)?
+                }
                 // Error
                 _ => return Err(RuntimeFunctionError::CouldNotLink(self.name().to_owned())),
             };
