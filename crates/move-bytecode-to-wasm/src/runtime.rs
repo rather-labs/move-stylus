@@ -309,15 +309,23 @@ impl RuntimeFunction {
                     abi::validate_pointer_32_bit(module, ctx)
                 }
                 // ABI unpacking
-                (Self::UnpackBytes, Some(ctx)) => unpacking::unpack_bytes_function(module, ctx)?,
-                (Self::UnpackU32, Some(ctx)) => unpacking::unpack_u32_function(module, ctx)?,
-                (Self::UnpackU64, Some(ctx)) => unpacking::unpack_u64_function(module, ctx)?,
-                (Self::UnpackU128, Some(ctx)) => unpacking::unpack_u128_function(module, ctx)?,
-                (Self::UnpackU256, Some(ctx)) => unpacking::unpack_u256_function(module, ctx)?,
-                (Self::UnpackAddress, Some(ctx)) => {
-                    unpacking::unpack_address_function(module, ctx)?
+                (Self::UnpackBytes, Some(ctx)) => {
+                    unpacking::bytes::unpack_bytes_function(module, ctx)?
                 }
-                (Self::UnpackString, Some(ctx)) => unpacking::unpack_string_function(module, ctx)?,
+                (Self::UnpackU32, Some(ctx)) => unpacking::uint::unpack_u32_function(module, ctx)?,
+                (Self::UnpackU64, Some(ctx)) => unpacking::uint::unpack_u64_function(module, ctx)?,
+                (Self::UnpackU128, Some(ctx)) => {
+                    unpacking::heap_uint::unpack_u128_function(module, ctx)?
+                }
+                (Self::UnpackU256, Some(ctx)) => {
+                    unpacking::heap_uint::unpack_u256_function(module, ctx)?
+                }
+                (Self::UnpackAddress, Some(ctx)) => {
+                    unpacking::heap_uint::unpack_address_function(module, ctx)?
+                }
+                (Self::UnpackString, Some(ctx)) => {
+                    unpacking::string::unpack_string_function(module, ctx)?
+                }
                 // Error
                 _ => return Err(RuntimeFunctionError::CouldNotLink(self.name().to_owned())),
             };
@@ -384,23 +392,31 @@ impl RuntimeFunction {
             }
             Self::UnpackVector => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
-                unpacking::unpack_vector_function(module, compilation_ctx, generics[0])?
+                unpacking::vector::unpack_vector_function(module, compilation_ctx, generics[0])?
             }
             Self::UnpackEnum => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
-                unpacking::unpack_enum_function(module, compilation_ctx, generics[0])?
+                unpacking::enums::unpack_enum_function(module, compilation_ctx, generics[0])?
             }
             Self::UnpackStruct => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
-                unpacking::unpack_struct_function(module, compilation_ctx, generics[0])?
+                unpacking::structs::unpack_struct_function(module, compilation_ctx, generics[0])?
             }
             Self::UnpackStorageStruct => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
-                unpacking::unpack_storage_struct_function(module, compilation_ctx, generics[0])?
+                unpacking::structs::unpack_storage_struct_function(
+                    module,
+                    compilation_ctx,
+                    generics[0],
+                )?
             }
             Self::UnpackReference => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
-                unpacking::unpack_reference_function(module, compilation_ctx, generics[0])?
+                unpacking::reference::unpack_reference_function(
+                    module,
+                    compilation_ctx,
+                    generics[0],
+                )?
             }
             _ => {
                 return Err(RuntimeFunctionError::CouldNotLinkGeneric(
