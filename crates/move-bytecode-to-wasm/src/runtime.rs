@@ -110,6 +110,7 @@ pub enum RuntimeFunction {
     PackU128,
     PackU256,
     PackAddress,
+    PackString,
 }
 
 impl RuntimeFunction {
@@ -199,6 +200,7 @@ impl RuntimeFunction {
             Self::PackU128 => "pack_u128",
             Self::PackU256 => "pack_u256",
             Self::PackAddress => "pack_address",
+            Self::PackString => "pack_string",
         }
     }
 
@@ -349,6 +351,9 @@ impl RuntimeFunction {
                 (Self::PackU256, Some(ctx)) => packing::heap_uint::pack_u256_function(module, ctx)?,
                 (Self::PackAddress, Some(ctx)) => {
                     packing::heap_uint::pack_address_function(module, ctx)?
+                }
+                (Self::PackString, Some(ctx)) => {
+                    packing::string::pack_string_function(module, ctx)?
                 }
                 // Error
                 _ => return Err(RuntimeFunctionError::CouldNotLink(self.name().to_owned())),

@@ -20,7 +20,6 @@ use super::error::{AbiEncodingError, AbiError};
 
 pub mod error;
 mod pack_reference;
-mod pack_string;
 mod pack_struct;
 mod pack_vector;
 
@@ -367,14 +366,13 @@ impl Packable for IntermediateType {
             IntermediateType::IStruct {
                 module_id, index, ..
             } if String_::is_vm_type(module_id, *index, compilation_ctx)? => {
-                String_::add_pack_instructions(
-                    builder,
-                    module,
-                    local,
-                    writer_pointer,
-                    calldata_reference_pointer,
-                    compilation_ctx,
-                )?;
+                let pack_string_function =
+                    RuntimeFunction::PackString.get(module, Some(compilation_ctx))?;
+                builder
+                    .local_get(local)
+                    .local_get(writer_pointer)
+                    .local_get(calldata_reference_pointer)
+                    .call(pack_string_function);
             }
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
                 let struct_ = compilation_ctx.get_struct_by_intermediate_type(self)?;
