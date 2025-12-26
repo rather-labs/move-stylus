@@ -319,13 +319,12 @@ impl Packable for IntermediateType {
                 if !enum_.is_simple {
                     return Err(AbiPackError::EnumIsNotSimple(enum_.identifier))?;
                 }
-                enum_.add_pack_instructions(
-                    builder,
-                    module,
-                    local,
-                    writer_pointer,
-                    compilation_ctx,
-                )?
+                let pack_enum_function =
+                    RuntimeFunction::PackEnum.get(module, Some(compilation_ctx))?;
+                builder
+                    .local_get(local)
+                    .local_get(writer_pointer)
+                    .call(pack_enum_function);
             }
             IntermediateType::ITypeParameter(_) => {
                 return Err(AbiPackError::PackingGenericTypeParameter)?;

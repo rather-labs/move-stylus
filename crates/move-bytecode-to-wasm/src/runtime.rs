@@ -18,6 +18,7 @@ mod enums;
 mod equality;
 pub mod error;
 mod integers;
+mod packing;
 mod storage;
 mod swap;
 mod unpacking;
@@ -102,6 +103,8 @@ pub enum RuntimeFunction {
     UnpackStruct,
     UnpackStorageStruct,
     UnpackReference,
+    // ABI packing
+    PackEnum,
 }
 
 impl RuntimeFunction {
@@ -184,6 +187,8 @@ impl RuntimeFunction {
             Self::UnpackStruct => "unpack_struct",
             Self::UnpackStorageStruct => "unpack_storage_struct",
             Self::UnpackReference => "unpack_reference",
+            // ABI packing
+            Self::PackEnum => "pack_enum",
         }
     }
 
@@ -326,6 +331,8 @@ impl RuntimeFunction {
                 (Self::UnpackString, Some(ctx)) => {
                     unpacking::string::unpack_string_function(module, ctx)?
                 }
+                // ABI packing
+                (Self::PackEnum, Some(ctx)) => packing::enums::pack_enum_function(module, ctx)?,
                 // Error
                 _ => return Err(RuntimeFunctionError::CouldNotLink(self.name().to_owned())),
             };
