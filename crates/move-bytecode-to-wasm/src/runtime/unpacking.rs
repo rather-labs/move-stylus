@@ -16,10 +16,10 @@ mod tests {
     use wasmtime::WasmResults;
 
     use crate::{
+        abi_types::unpacking::Unpackable,
         test_compilation_context,
         test_tools::{build_module, setup_wasmtime_module},
         translation::intermediate_types::IntermediateType,
-        abi_types::unpacking::Unpackable
     };
 
     // ============================================================================
