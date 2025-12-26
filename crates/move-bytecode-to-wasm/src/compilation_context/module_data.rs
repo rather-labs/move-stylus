@@ -157,7 +157,7 @@ pub struct ModuleData<'move_compiled_unit> {
     pub constants: Vec<Constant<'move_compiled_unit>>,
 
     /// Module's functions information
-    pub functions: FunctionData,
+    pub functions: FunctionData<'move_compiled_unit>,
 
     /// Module's structs information
     pub structs: StructData,
@@ -727,7 +727,7 @@ impl ModuleData<'_> {
         datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
         move_module_dependencies: &'move_package [(PackageName, CompiledUnitWithSource)],
         special_attributes: &SpecialAttributes,
-    ) -> Result<FunctionData> {
+    ) -> Result<FunctionData<'move_package>> {
         // Return types of functions in intermediate types. Used to fill the stack type
         let mut functions_returns = Vec::new();
         let mut functions_arguments = Vec::new();
@@ -794,7 +794,7 @@ impl ModuleData<'_> {
                     datatype_handles_map,
                 )?);
 
-                move_definitions.insert(function_id.clone(), function_def.clone());
+                move_definitions.insert(function_id.clone(), function_def);
 
                 function_calls.push(function_id);
                 continue;
@@ -884,7 +884,7 @@ impl ModuleData<'_> {
                     datatype_handles_map,
                 )?);
 
-                move_definitions.insert(function_id.clone(), function_def.clone());
+                move_definitions.insert(function_id.clone(), function_def);
             }
 
             function_calls.push(function_id);

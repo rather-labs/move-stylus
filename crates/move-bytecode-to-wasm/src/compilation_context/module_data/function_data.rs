@@ -12,7 +12,7 @@ use crate::{
 use super::error::ModuleDataError;
 
 #[derive(Debug, Default)]
-pub struct FunctionData {
+pub struct FunctionData<'move_compiled_unit> {
     /// Module's functions arguments.
     pub arguments: Vec<Vec<IntermediateType>>,
 
@@ -39,10 +39,10 @@ pub struct FunctionData {
     pub fallback: Option<FunctionId>,
 
     /// Function definition from Move bytecode.
-    pub move_definitions: HashMap<FunctionId, FunctionDefinition>,
+    pub move_definitions: HashMap<FunctionId, &'move_compiled_unit FunctionDefinition>,
 }
 
-impl FunctionData {
+impl FunctionData<'_> {
     pub fn get_information_by_identifier(
         &self,
         identifier: &str,
