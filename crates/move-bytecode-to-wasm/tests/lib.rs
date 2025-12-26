@@ -13,8 +13,8 @@ pub mod operations_equality;
 pub mod primitives;
 pub mod receive;
 pub mod references;
-/*
 pub mod stdlib;
 pub mod storage;
+/*
 pub mod structs;
 */
