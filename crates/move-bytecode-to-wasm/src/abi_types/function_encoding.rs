@@ -44,8 +44,7 @@ mod tests {
 
     #[test]
     fn test_move_signature_to_abi_selector() {
-        let (raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
+        let (_, allocator_func, memory_id, calldata_reader_pointer_global) = build_module(None);
         let mut compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 

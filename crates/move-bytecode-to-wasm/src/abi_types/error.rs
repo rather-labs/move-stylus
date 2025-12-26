@@ -83,6 +83,11 @@ pub enum AbiUnpackError {
     #[error("found a reference inside a reference")]
     RefInsideRef,
 
+    #[error(
+        "found heap type unpacking a reference. this should be handled in the add_unpack_instructions function"
+    )]
+    HeapTypeInsideReference,
+
     #[error("an error ocurred while generating a native funciton's code")]
     NativeFunction(#[from] NativeFunctionError),
 

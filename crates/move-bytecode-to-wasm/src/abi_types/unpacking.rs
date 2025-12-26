@@ -145,43 +145,54 @@ impl Unpackable for IntermediateType {
             // The signer must not be unpacked here, since it can't be part of the calldata. It is
             // injected directly by the VM into the stack
             IntermediateType::ISigner => (),
-            IntermediateType::IRef(inner) => {
-                // This is the only place where we pass the flag unpack_frozen = true.
-                // This is because we only want to unpack frozen objects from the storage
-                // if the object is passed as an immutable reference to the function arguments.
-                // unpack_frozen = true
-                builder
-                    .i32_const(DATA_UNPACK_FROZEN_OFFSET)
-                    .i32_const(1)
-                    .store(
-                        compilation_ctx.memory_id,
-                        StoreKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
+            IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
+                if matches!(self, IntermediateType::IRef(_)) {
+                    // This is the only place where we pass the flag unpack_frozen = true.
+                    // This is because we only want to unpack frozen objects from the storage
+                    // if the object is passed as an immutable reference to the function arguments.
+                    builder
+                        .i32_const(DATA_UNPACK_FROZEN_OFFSET)
+                        .i32_const(1)
+                        .store(
+                            compilation_ctx.memory_id,
+                            StoreKind::I32 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        );
+                }
 
-                let unpack_reference_function = RuntimeFunction::UnpackReference.get_generic(
-                    module,
-                    compilation_ctx,
-                    &[inner],
-                )?;
-                builder
-                    .local_get(reader_pointer)
-                    .local_get(calldata_base_pointer)
-                    .call(unpack_reference_function);
-            }
-            IntermediateType::IMutRef(inner) => {
-                let unpack_reference_function = RuntimeFunction::UnpackReference.get_generic(
-                    module,
-                    compilation_ctx,
-                    &[inner],
-                )?;
-                builder
-                    .local_get(reader_pointer)
-                    .local_get(calldata_base_pointer)
-                    .call(unpack_reference_function);
+                match inner.as_ref() {
+                    IntermediateType::IU128
+                    | IntermediateType::IU256
+                    | IntermediateType::IAddress
+                    | IntermediateType::ISigner
+                    | IntermediateType::IVector(_)
+                    | IntermediateType::IStruct { .. }
+                    | IntermediateType::IGenericStructInstance { .. }
+                    | IntermediateType::IEnum { .. }
+                    | IntermediateType::IGenericEnumInstance { .. } => {
+                        // For heap-allocated types, directly invoke the unpack function of the referenced inner type
+                        inner.add_unpack_instructions(
+                            builder,
+                            module,
+                            reader_pointer,
+                            calldata_base_pointer,
+                            compilation_ctx,
+                        )?;
+                    }
+                    _ => {
+                        // For stack types, call the unpack reference runtime fn,
+                        // which has the instructions to allocate a middle pointer to the unpacked value
+                        let unpack_reference_function = RuntimeFunction::UnpackReference
+                            .get_generic(module, compilation_ctx, &[inner])?;
+                        builder
+                            .local_get(reader_pointer)
+                            .local_get(calldata_base_pointer)
+                            .call(unpack_reference_function);
+                    }
+                }
             }
 
             IntermediateType::IStruct {

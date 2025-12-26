@@ -24,24 +24,6 @@ pub fn unpack_reference_function(
     let calldata_reader_pointer = module.locals.add(ValType::I32);
 
     match itype {
-        // If inner is a heap type, forward the pointer
-        IntermediateType::IU128
-        | IntermediateType::IU256
-        | IntermediateType::IAddress
-        | IntermediateType::ISigner
-        | IntermediateType::IVector(_)
-        | IntermediateType::IStruct { .. }
-        | IntermediateType::IGenericStructInstance { .. }
-        | IntermediateType::IEnum { .. }
-        | IntermediateType::IGenericEnumInstance { .. } => {
-            itype.add_unpack_instructions(
-                &mut function_body,
-                module,
-                reader_pointer,
-                calldata_reader_pointer,
-                compilation_ctx,
-            )?;
-        }
         // For immediates, allocate and store
         IntermediateType::IU8
         | IntermediateType::IU16
@@ -74,6 +56,21 @@ pub fn unpack_reference_function(
             );
 
             function_body.local_get(ptr_local);
+        }
+
+        IntermediateType::IU128
+        | IntermediateType::IU256
+        | IntermediateType::IAddress
+        | IntermediateType::ISigner
+        | IntermediateType::IVector(_)
+        | IntermediateType::IStruct { .. }
+        | IntermediateType::IGenericStructInstance { .. }
+        | IntermediateType::IEnum { .. }
+        | IntermediateType::IGenericEnumInstance { .. } => {
+            // Heap types are handled in the add_unpack_instructions function so this case should be unreachable
+            return Err(RuntimeFunctionError::from(AbiError::from(
+                AbiUnpackError::HeapTypeInsideReference,
+            )));
         }
 
         IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
