@@ -19,6 +19,7 @@ mod equality;
 pub mod error;
 mod integers;
 mod storage;
+mod string;
 mod swap;
 mod vector;
 
