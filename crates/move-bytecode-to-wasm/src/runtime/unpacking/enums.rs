@@ -15,9 +15,15 @@ pub fn unpack_enum_function(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
-    let mut function_builder =
-        FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
-    let mut function_body = function_builder.func_body();
+    let name = RuntimeFunction::UnpackEnum.get_generic_function_name(compilation_ctx, &[itype])?;
+    if let Some(function) = module.funcs.by_name(&name) {
+        return Ok(function);
+    }
+
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
+    let mut builder = function
+        .name(RuntimeFunction::UnpackEnum.name().to_owned())
+        .func_body();
 
     let enum_ = compilation_ctx.get_enum_by_intermediate_type(itype)?;
     if !enum_.is_simple {
@@ -33,14 +39,14 @@ pub fn unpack_enum_function(
 
     // Save the variant to check it later
     let variant_number = module.locals.add(ValType::I32);
-    function_body
+    builder
         .local_get(reader_pointer)
         .i32_const(encoded_size)
         .call(unpack_u32_function)
         .local_tee(variant_number);
 
     // Trap if the variant number is higher that the quantity of variants the enum contains
-    function_body
+    builder
         .i32_const(enum_.variants.len() as i32 - 1)
         .binop(BinaryOp::I32GtU)
         .if_else(
@@ -53,7 +59,7 @@ pub fn unpack_enum_function(
 
     // The enum should occupy only 4 bytes since only the variant number is saved
     let enum_ptr = module.locals.add(ValType::I32);
-    function_body
+    builder
         .i32_const(4)
         .call(compilation_ctx.allocator)
         .local_tee(enum_ptr)
@@ -67,8 +73,7 @@ pub fn unpack_enum_function(
             },
         );
 
-    function_body.local_get(enum_ptr);
+    builder.local_get(enum_ptr);
 
-    function_builder.name(RuntimeFunction::UnpackEnum.name().to_owned());
-    Ok(function_builder.finish(vec![reader_pointer], &mut module.funcs))
+    Ok(function.finish(vec![reader_pointer], &mut module.funcs))
 }

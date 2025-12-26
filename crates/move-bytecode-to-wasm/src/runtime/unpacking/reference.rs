@@ -12,12 +12,20 @@ pub fn unpack_reference_function(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
-    let mut function_builder = FunctionBuilder::new(
+    let name =
+        RuntimeFunction::UnpackReference.get_generic_function_name(compilation_ctx, &[itype])?;
+    if let Some(function) = module.funcs.by_name(&name) {
+        return Ok(function);
+    }
+
+    let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32],
         &[ValType::I32],
     );
-    let mut function_body = function_builder.func_body();
+    let mut builder = function
+        .name(RuntimeFunction::UnpackReference.name().to_owned())
+        .func_body();
 
     // Arguments
     let reader_pointer = module.locals.add(ValType::I32);
@@ -33,20 +41,20 @@ pub fn unpack_reference_function(
             let ptr_local = module.locals.add(walrus::ValType::I32);
 
             let data_size = itype.wasm_memory_data_size()?;
-            function_body
+            builder
                 .i32_const(data_size)
                 .call(compilation_ctx.allocator)
                 .local_tee(ptr_local);
 
             itype.add_unpack_instructions(
-                &mut function_body,
+                &mut builder,
                 module,
                 reader_pointer,
                 calldata_reader_pointer,
                 compilation_ctx,
             )?;
 
-            function_body.store(
+            builder.store(
                 compilation_ctx.memory_id,
                 itype.store_kind()?,
                 MemArg {
@@ -55,7 +63,7 @@ pub fn unpack_reference_function(
                 },
             );
 
-            function_body.local_get(ptr_local);
+            builder.local_get(ptr_local);
         }
 
         IntermediateType::IU128
@@ -85,8 +93,7 @@ pub fn unpack_reference_function(
         }
     }
 
-    function_builder.name(RuntimeFunction::UnpackReference.name().to_owned());
-    Ok(function_builder.finish(
+    Ok(function.finish(
         vec![reader_pointer, calldata_reader_pointer],
         &mut module.funcs,
     ))

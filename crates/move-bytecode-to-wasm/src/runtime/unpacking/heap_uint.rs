@@ -13,9 +13,10 @@ pub fn unpack_u128_function(
     // Big-endian to Little-endian
     let swap_i128_bytes_function =
         RuntimeFunction::SwapI128Bytes.get(module, Some(compilation_ctx))?;
-    let mut function_builder =
-        FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
-    let mut function_body = function_builder.func_body();
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
+    let mut builder = function
+        .name(RuntimeFunction::UnpackU128.name().to_owned())
+        .func_body();
 
     let reader_pointer = module.locals.add(ValType::I32);
     let encoded_size =
@@ -23,27 +24,26 @@ pub fn unpack_u128_function(
 
     // The data is padded 16 bytes to the right
     let unpacked_pointer = module.locals.add(ValType::I32);
-    function_body
+    builder
         .local_get(reader_pointer)
         .i32_const(16)
         .binop(BinaryOp::I32Add);
-    function_body
+    builder
         .i32_const(16)
         .call(compilation_ctx.allocator)
         .local_tee(unpacked_pointer)
         .call(swap_i128_bytes_function);
 
     // Increment reader pointer
-    function_body
+    builder
         .local_get(reader_pointer)
         .i32_const(encoded_size)
         .binop(BinaryOp::I32Add)
         .global_set(compilation_ctx.calldata_reader_pointer);
 
-    function_body.local_get(unpacked_pointer);
+    builder.local_get(unpacked_pointer);
 
-    function_builder.name(RuntimeFunction::UnpackU128.name().to_owned());
-    Ok(function_builder.finish(vec![reader_pointer], &mut module.funcs))
+    Ok(function.finish(vec![reader_pointer], &mut module.funcs))
 }
 
 pub fn unpack_u256_function(
@@ -53,70 +53,70 @@ pub fn unpack_u256_function(
     // Big-endian to Little-endian
     let swap_i256_bytes_function =
         RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx))?;
-    let mut function_builder =
-        FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
-    let mut function_body = function_builder.func_body();
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
+    let mut builder = function
+        .name(RuntimeFunction::UnpackU256.name().to_owned())
+        .func_body();
 
     let reader_pointer = module.locals.add(ValType::I32);
     let encoded_size =
         sol_data::Uint::<256>::ENCODED_SIZE.ok_or(AbiError::UnableToGetTypeAbiSize)? as i32;
 
-    function_body.local_get(reader_pointer);
+    builder.local_get(reader_pointer);
     let unpacked_pointer = module.locals.add(ValType::I32);
-    function_body
+    builder
         .i32_const(32)
         .call(compilation_ctx.allocator)
         .local_tee(unpacked_pointer)
         .call(swap_i256_bytes_function);
 
     // Increment reader pointer
-    function_body
+    builder
         .local_get(reader_pointer)
         .i32_const(encoded_size)
         .binop(BinaryOp::I32Add)
         .global_set(compilation_ctx.calldata_reader_pointer);
 
-    function_body.local_get(unpacked_pointer);
+    builder.local_get(unpacked_pointer);
 
-    function_builder.name(RuntimeFunction::UnpackU256.name().to_owned());
-    Ok(function_builder.finish(vec![reader_pointer], &mut module.funcs))
+    Ok(function.finish(vec![reader_pointer], &mut module.funcs))
 }
 
 pub fn unpack_address_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
 ) -> Result<FunctionId, RuntimeFunctionError> {
-    let mut function_builder =
-        FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
-    let mut function_body = function_builder.func_body();
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
+    let mut builder = function
+        .name(RuntimeFunction::UnpackAddress.name().to_owned())
+        .func_body();
 
     let reader_pointer = module.locals.add(ValType::I32);
     let encoded_size =
         sol_data::Address::ENCODED_SIZE.ok_or(AbiError::UnableToGetTypeAbiSize)? as i32;
 
     let unpacked_pointer = module.locals.add(ValType::I32);
-    function_body
+    builder
         .i32_const(32)
         .call(compilation_ctx.allocator)
         .local_set(unpacked_pointer);
 
-    function_body
+    builder
         .local_get(unpacked_pointer)
         .local_get(reader_pointer)
         .i32_const(32)
         .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
     // Increment reader pointer
-    function_body
+    builder
         .local_get(reader_pointer)
         .i32_const(encoded_size)
         .binop(BinaryOp::I32Add)
         .global_set(compilation_ctx.calldata_reader_pointer);
 
-    function_body.local_get(unpacked_pointer);
+    builder.local_get(unpacked_pointer);
 
-    function_builder.name(RuntimeFunction::UnpackAddress.name().to_owned());
-    Ok(function_builder.finish(vec![reader_pointer], &mut module.funcs))
+    Ok(function.finish(vec![reader_pointer], &mut module.funcs))
 }
 
 #[cfg(test)]

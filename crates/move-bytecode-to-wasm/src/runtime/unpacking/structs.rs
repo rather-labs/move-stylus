@@ -82,12 +82,20 @@ pub fn unpack_struct_function(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
-    let mut function_builder = FunctionBuilder::new(
+    let name =
+        RuntimeFunction::UnpackStruct.get_generic_function_name(compilation_ctx, &[itype])?;
+    if let Some(function) = module.funcs.by_name(&name) {
+        return Ok(function);
+    }
+
+    let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32],
         &[ValType::I32],
     );
-    let mut function_body = function_builder.func_body();
+    let mut builder = function
+        .name(RuntimeFunction::UnpackStruct.name().to_owned())
+        .func_body();
 
     // Arguments
     let reader_pointer = module.locals.add(ValType::I32);
@@ -109,11 +117,9 @@ pub fn unpack_struct_function(
         // Validate that the pointer fits in 32 bits
         let validate_pointer_fn =
             RuntimeFunction::ValidatePointer32Bit.get(module, Some(compilation_ctx))?;
-        function_body
-            .local_get(reader_pointer)
-            .call(validate_pointer_fn);
+        builder.local_get(reader_pointer).call(validate_pointer_fn);
 
-        function_body
+        builder
             .local_get(reader_pointer)
             .load(
                 compilation_ctx.memory_id,
@@ -130,7 +136,7 @@ pub fn unpack_struct_function(
             .local_tee(data_reader_pointer)
             .local_set(calldata_ptr);
     } else {
-        function_body
+        builder
             .local_get(reader_pointer)
             .local_set(data_reader_pointer)
             .local_get(calldata_reader_pointer)
@@ -139,7 +145,7 @@ pub fn unpack_struct_function(
 
     // Allocate space for the struct
     let struct_ptr = module.locals.add(ValType::I32);
-    function_body
+    builder
         .i32_const(struct_.heap_size as i32)
         .call(compilation_ctx.allocator)
         .local_set(struct_ptr);
@@ -149,7 +155,7 @@ pub fn unpack_struct_function(
     for field in &struct_.fields {
         // Unpack field
         field.add_unpack_instructions(
-            &mut function_body,
+            &mut builder,
             module,
             data_reader_pointer,
             calldata_ptr,
@@ -169,16 +175,16 @@ pub fn unpack_struct_function(
                 let store_kind = field.store_kind()?;
 
                 // Save the actual value
-                function_body.local_set(val);
+                builder.local_set(val);
 
                 // Create a pointer for the value
-                function_body
+                builder
                     .i32_const(data_size)
                     .call(compilation_ctx.allocator)
                     .local_tee(field_ptr);
 
                 // Store the actual value behind the middle_ptr
-                function_body.local_get(val).store(
+                builder.local_get(val).store(
                     compilation_ctx.memory_id,
                     store_kind,
                     MemArg {
@@ -188,18 +194,15 @@ pub fn unpack_struct_function(
                 );
             }
             _ => {
-                function_body.local_set(field_ptr);
+                builder.local_set(field_ptr);
             }
         }
 
-        function_body
-            .local_get(struct_ptr)
-            .local_get(field_ptr)
-            .store(
-                compilation_ctx.memory_id,
-                StoreKind::I32 { atomic: false },
-                MemArg { align: 0, offset },
-            );
+        builder.local_get(struct_ptr).local_get(field_ptr).store(
+            compilation_ctx.memory_id,
+            StoreKind::I32 { atomic: false },
+            MemArg { align: 0, offset },
+        );
 
         offset += 4;
     }
@@ -215,16 +218,15 @@ pub fn unpack_struct_function(
         struct_.solidity_abi_encode_size(compilation_ctx)? as i32
     };
 
-    function_body
+    builder
         .local_get(reader_pointer)
         .i32_const(advancement)
         .binop(BinaryOp::I32Add)
         .global_set(compilation_ctx.calldata_reader_pointer);
 
-    function_body.local_get(struct_ptr);
+    builder.local_get(struct_ptr);
 
-    function_builder.name(RuntimeFunction::UnpackStruct.name().to_owned());
-    Ok(function_builder.finish(
+    Ok(function.finish(
         vec![reader_pointer, calldata_reader_pointer],
         &mut module.funcs,
     ))
@@ -235,9 +237,16 @@ pub fn unpack_storage_struct_function(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
-    let mut function_builder =
-        FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
-    let mut function_body = function_builder.func_body();
+    let name = RuntimeFunction::UnpackStorageStruct
+        .get_generic_function_name(compilation_ctx, &[itype])?;
+    if let Some(function) = module.funcs.by_name(&name) {
+        return Ok(function);
+    }
+
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
+    let mut builder = function
+        .name(RuntimeFunction::UnpackStorageStruct.name().to_owned())
+        .func_body();
 
     // Arguments
     let uid_ptr = module.locals.add(ValType::I32);
@@ -246,7 +255,7 @@ pub fn unpack_storage_struct_function(
     let locate_storage_data_fn =
         RuntimeFunction::LocateStorageData.get(module, Some(compilation_ctx))?;
 
-    function_body
+    builder
         .local_get(uid_ptr)
         .i32_const(DATA_UNPACK_FROZEN_OFFSET)
         .load(
@@ -265,7 +274,7 @@ pub fn unpack_storage_struct_function(
 
     // Copy the slot number into a local to avoid overwriting it later
     let slot_ptr = module.locals.add(ValType::I32);
-    function_body
+    builder
         .i32_const(32)
         .call(compilation_ctx.allocator)
         .local_tee(slot_ptr)
@@ -273,14 +282,14 @@ pub fn unpack_storage_struct_function(
         .i32_const(32)
         .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
-    function_body
+    builder
         .local_get(slot_ptr)
         .local_get(uid_ptr)
         .call(read_and_decode_from_storage_fn);
 
     // Reset the unpack frozen flag to false.
     // This is always the default value for the flag.
-    function_body
+    builder
         .i32_const(DATA_UNPACK_FROZEN_OFFSET)
         .i32_const(0)
         .store(
@@ -292,6 +301,5 @@ pub fn unpack_storage_struct_function(
             },
         );
 
-    function_builder.name(RuntimeFunction::UnpackStorageStruct.name().to_owned());
-    Ok(function_builder.finish(vec![uid_ptr], &mut module.funcs))
+    Ok(function.finish(vec![uid_ptr], &mut module.funcs))
 }
