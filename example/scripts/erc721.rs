@@ -141,6 +141,12 @@ async fn main() -> eyre::Result<()> {
     assert!(res);
     println!(" IERC721Metadata supported: {res}");
 
+    let res = example
+        .tokenURI(U256::from(12345))
+        .call()
+        .await?;
+    assert_eq!(res, "https://examplerc721.com/token/12345");
+    println!(" Token URI: {res}");
     // ==================== Mint ====================
     println!("\n╔══════════════════════════════════════╗");
     println!("║              Minting                 ║");

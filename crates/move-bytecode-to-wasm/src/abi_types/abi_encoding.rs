@@ -43,6 +43,10 @@ where
 
     let function_name = case_callback(function_name);
 
+    println!(
+        "Function signature: {}({})",
+        function_name, parameter_strings
+    );
     selector(format!("{function_name}({parameter_strings})"))
 }
 

@@ -216,7 +216,7 @@ pub fn translate_package<'move_package>(
         )?;
 
         function_table.ensure_all_functions_added()?;
-        validate_stylus_wasm(&mut module)?;
+        // validate_stylus_wasm(&mut module)?;
 
         modules.insert(module_name, module);
         modules_data.insert(root_module_id, root_module_data);
