@@ -3,14 +3,16 @@ module test::string_utf8;
 use std::string::{String, utf8};
 
 entry fun pack_utf8(): String {
-     utf8(b"hello world")
+     // utf8(b"hello world")
+
+        utf8(b"Привет мир")
 }
 
 
 entry fun pack_utf8_2(): (String, String) {
     (
-        utf8(b"hello world"),
-        utf8(b"test string"),
+        utf8(b"Привет мир"),
+        utf8(b"こんにちは 世界"),
     )
 }
 

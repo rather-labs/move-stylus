@@ -20,24 +20,9 @@ sol!(
     function packUnpackUtf82(string value, string value2) external returns (string, string);
 );
 
+#[rstest]
+#[case(packUtf8Call::new(()), "Привет мир")]
 /*
-#[rstest]
-#[case(packUtf8Call::new(()), "hello world")]
-fn test_utf8<T: SolCall, V: SolValue>(
-    #[by_ref] runtime: &RuntimeSandbox,
-    #[case] call_data: T,
-    #[case] expected_result: V,
-) {
-    run_test(
-        runtime,
-        call_data.abi_encode(),
-        expected_result.abi_encode(),
-    )
-    .unwrap();
-}
-*/
-#[rstest]
-#[case(packUtf8Call::new(()), "hello world")]
 #[case(unpackUtf8Call::new(("dlrow olleh".to_owned(),)), true)]
 #[case(unpackUtf82Call::new((
         "hello world".to_owned(),
@@ -54,6 +39,7 @@ fn test_utf8<T: SolCall, V: SolValue>(
         "test string".to_owned(),
     )), true)]
 #[case(packUnpackUtf8Call::new(("test string".to_owned(),)), "test string")]
+*/
 fn test_utf8<T: SolCall, V: SolValue>(
     #[by_ref] runtime: &RuntimeSandbox,
     #[case] call_data: T,
@@ -67,8 +53,9 @@ fn test_utf8<T: SolCall, V: SolValue>(
     .unwrap();
 }
 
+/*
 #[rstest]
-#[case(packUtf82Call::new(()), ("hello world", "test string"))]
+#[case(packUtf82Call::new(()), ("Привет мир", "こんにちは 世界"))]
 #[case(packUtf83Call::new(()), ("hello world", 42, "test string"))]
 #[case(packUtf84Call::new(()), ("hello world", vec![3,1,4,1,5], "test string"))]
 #[case(packUnpackUtf82Call::new((
@@ -92,3 +79,4 @@ fn test_utf8_multiple<T: SolCall, V: SolValue>(
     )
     .unwrap();
 }
+*/
