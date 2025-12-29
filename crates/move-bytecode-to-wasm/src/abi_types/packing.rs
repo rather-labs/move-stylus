@@ -11,7 +11,6 @@ use crate::{
     translation::intermediate_types::{
         IntermediateType,
         reference::{IMutRef, IRef},
-        vector::IVector,
     },
     vm_handled_types::{VmHandledType, string::String_},
 };
@@ -21,7 +20,6 @@ use super::error::{AbiEncodingError, AbiError};
 pub mod error;
 mod pack_reference;
 mod pack_struct;
-mod pack_vector;
 
 pub trait Packable {
     /// Adds the instructions to pack the value into memory according to Solidity's ABI encoding.
@@ -267,15 +265,15 @@ impl Packable for IntermediateType {
                     .local_get(writer_pointer)
                     .call(pack_address_function);
             }
-            IntermediateType::IVector(inner) => IVector::add_pack_instructions(
-                inner,
-                builder,
-                module,
-                local,
-                writer_pointer,
-                calldata_reference_pointer,
-                compilation_ctx,
-            )?,
+            IntermediateType::IVector(inner) => {
+                let pack_vector_function =
+                    RuntimeFunction::PackVector.get_generic(module, compilation_ctx, &[inner])?;
+                builder
+                    .local_get(local)
+                    .local_get(writer_pointer)
+                    .local_get(calldata_reference_pointer)
+                    .call(pack_vector_function);
+            }
             IntermediateType::IRef(inner) => IRef::add_pack_instructions(
                 inner,
                 builder,

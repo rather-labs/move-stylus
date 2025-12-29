@@ -111,6 +111,7 @@ pub enum RuntimeFunction {
     PackU256,
     PackAddress,
     PackString,
+    PackVector,
 }
 
 impl RuntimeFunction {
@@ -201,6 +202,7 @@ impl RuntimeFunction {
             Self::PackU256 => "pack_u256",
             Self::PackAddress => "pack_address",
             Self::PackString => "pack_string",
+            Self::PackVector => "pack_vector",
         }
     }
 
@@ -446,6 +448,10 @@ impl RuntimeFunction {
                     compilation_ctx,
                     generics[0],
                 )?
+            }
+            Self::PackVector => {
+                Self::assert_generics_length(generics.len(), 1, self.name())?;
+                packing::vector::pack_vector_function(module, compilation_ctx, generics[0])?
             }
             _ => {
                 return Err(RuntimeFunctionError::CouldNotLinkGeneric(
