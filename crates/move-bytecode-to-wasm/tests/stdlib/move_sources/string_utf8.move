@@ -5,7 +5,9 @@ use std::string::{String, utf8};
 entry fun pack_utf8(): String {
      // utf8(b"hello world")
 
-        utf8(b"Привет мир")
+ //       utf8(b"Привет мир")
+    utf8(b"こんにちは 世界")
+    //utf8(b"こ")
 }
 
 

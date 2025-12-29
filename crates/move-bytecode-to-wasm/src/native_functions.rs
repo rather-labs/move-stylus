@@ -343,7 +343,7 @@ impl NativeFunction {
                     Self::NATIVE_INTERNAL_CHECK_UTF8,
                     STANDARD_LIB_ADDRESS,
                     STDLIB_MODULE_NAME_STRING,
-                ) => string::add_internal_check_utf8(module, compilation_ctx, module_id),
+                ) => string::add_internal_check_utf8(module, compilation_ctx, module_id)?,
                 _ => {
                     return Err(NativeFunctionError::NativeFunctionNotSupported(
                         *module_id,

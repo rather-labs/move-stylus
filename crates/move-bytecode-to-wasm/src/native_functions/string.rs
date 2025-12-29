@@ -4,17 +4,17 @@ use walrus::{
 };
 
 use crate::{
-    CompilationContext, compilation_context::ModuleId,
+    CompilationContext, compilation_context::ModuleId, runtime::RuntimeFunction,
     wasm_builder_extensions::WasmBuilderExtension,
 };
 
-use super::NativeFunction;
+use super::{NativeFunction, error::NativeFunctionError};
 
 pub fn add_internal_check_utf8(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     module_id: &ModuleId,
-) -> FunctionId {
+) -> Result<FunctionId, NativeFunctionError> {
     // Function declaration
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
     let mut builder = function
@@ -31,6 +31,8 @@ pub fn add_internal_check_utf8(
     let length = module.locals.add(ValType::I32);
     let i = module.locals.add(ValType::I32);
     let current_char = module.locals.add(ValType::I32);
+
+    let swap_i32_fn = RuntimeFunction::SwapI32Bytes.get(module, None)?;
 
     let (print_i32, _, print_m, _, print_s, _) = crate::declare_host_debug_functions!(module);
 
@@ -154,13 +156,15 @@ pub fn add_internal_check_utf8(
                                     offset: 0,
                                 },
                             )
+                            .call(swap_i32_fn)
+                            .i32_const(16)
+                            .binop(BinaryOp::I32ShrU)
                             .local_set(current_char);
 
                         // 2:  if (0xC080 == c) continue;   // Accept 0xC080 as representation for '\0'
                         else_.i32_const(99903).call(print_i32);
                         else_
-                            //.i32_const(0xC080)
-                            .i32_const(0x80C0)
+                            .i32_const(0xC080)
                             .local_get(current_char)
                             .binop(BinaryOp::I32Eq)
                             .if_else(
@@ -184,13 +188,11 @@ pub fn add_internal_check_utf8(
                         //         if ((c & 0xE0C0) == 0xC080) { i +=2; continue; }
                         //      }
                         else_
-                            // .i32_const(0xC280)
-                            .i32_const(0x80C2)
+                            .i32_const(0xC280)
                             .local_get(current_char)
                             .binop(BinaryOp::I32LeU)
                             .local_get(current_char)
-                            // .i32_const(0xDFBF)
-                            .i32_const(0xBFDF)
+                            .i32_const(0xDFBF)
                             .binop(BinaryOp::I32LeU)
                             .binop(BinaryOp::I32And)
                             .if_else(
@@ -199,11 +201,9 @@ pub fn add_internal_check_utf8(
                                     then_.i32_const(99905).call(print_i32);
                                     then_
                                         .local_get(current_char)
-                                        // .i32_const(0xE0C0)
-                                        .i32_const(0xC0E0)
+                                        .i32_const(0xE0C0)
                                         .binop(BinaryOp::I32And)
-                                        // .i32_const(0xC080)
-                                        .i32_const(0x80C0)
+                                        .i32_const(0xC080)
                                         .binop(BinaryOp::I32Eq)
                                         .if_else(
                                             None,
@@ -238,18 +238,21 @@ pub fn add_internal_check_utf8(
                                     offset: 0,
                                 },
                             )
+                            .call(swap_i32_fn)
+                            .i32_const(8)
+                            .binop(BinaryOp::I32ShrU)
                             .local_set(current_char);
 
                         else_.i32_const(99908).call(print_i32);
+                        else_.local_get(current_char).call(print_i32);
+
                         // 4:  if (0xEDA080 <= c && c <= 0xEDBFBF) return 0; // Reject UTF-16 surrogates
                         else_
-                            // .i32_const(0xEDA080)
-                            .i32_const(0x80A0ED)
+                            .i32_const(0xEDA080)
                             .local_get(current_char)
                             .binop(BinaryOp::I32LeU)
                             .local_get(current_char)
-                            // .i32_const(0xEDBFBF)
-                            .i32_const(0xBFBFED)
+                            .i32_const(0xEDBFBF)
                             .binop(BinaryOp::I32LeU)
                             .binop(BinaryOp::I32And)
                             .if_else(
@@ -267,13 +270,11 @@ pub fn add_internal_check_utf8(
                         //       if ((c & 0xF0C0C0) == 0xE08080) { i+=3; continue; }
                         //  }
                         else_
-                            // .i32_const(0xE0A080)
-                            .i32_const(0x80A0E0)
+                            .i32_const(0xE0A080)
                             .local_get(current_char)
                             .binop(BinaryOp::I32LeU)
                             .local_get(current_char)
-                            // .i32_const(0xEFBFBF)
-                            .i32_const(0xBFBFEF)
+                            .i32_const(0xEFBFBF)
                             .binop(BinaryOp::I32LeU)
                             .binop(BinaryOp::I32And)
                             .if_else(
@@ -281,11 +282,9 @@ pub fn add_internal_check_utf8(
                                 |then_| {
                                     then_
                                         .local_get(current_char)
-                                        // .i32_const(0xF0C0C0)
-                                        .i32_const(0xC0C0F0)
+                                        .i32_const(0xF0C0C0)
                                         .binop(BinaryOp::I32And)
-                                        //.i32_const(0xE08080)
-                                        .i32_const(0x8080E0)
+                                        .i32_const(0xE08080)
                                         .binop(BinaryOp::I32Eq)
                                         .if_else(
                                             None,
@@ -308,13 +307,11 @@ pub fn add_internal_check_utf8(
                                     //          else { return 0; }
                                     //     }
                                     else_
-                                        // .i32_const(0xF0908080_u32 as i32)
-                                        .i32_const(0x808090F0_u32 as i32)
+                                        .i32_const(0xF0908080_u32 as i32)
                                         .local_get(current_char)
                                         .binop(BinaryOp::I32LeU)
                                         .local_get(current_char)
-                                        //.i32_const(0xF48FBFBF_u32 as i32)
-                                        .i32_const(0xBFBF8FF4_u32 as i32)
+                                        .i32_const(0xF48FBFBF_u32 as i32)
                                         .binop(BinaryOp::I32LeU)
                                         .binop(BinaryOp::I32And)
                                         .if_else(
@@ -322,11 +319,9 @@ pub fn add_internal_check_utf8(
                                             |then_| {
                                                 then_
                                                     .local_get(current_char)
-                                                    //.i32_const(0xF8C0C0C0_u32 as i32)
-                                                    .i32_const(0xC0C0C0F8_u32 as i32)
+                                                    .i32_const(0xF8C0C0C0_u32 as i32)
                                                     .binop(BinaryOp::I32And)
-                                                    //.i32_const(0xF0808080_u32 as i32)
-                                                    .i32_const(0x808080F0_u32 as i32)
+                                                    .i32_const(0xF0808080_u32 as i32)
                                                     .binop(BinaryOp::I32Eq)
                                                     .if_else(
                                                         None,
@@ -354,5 +349,5 @@ pub fn add_internal_check_utf8(
         })
         .return_();
 
-    function.finish(vec![vec_ptr], &mut module.funcs)
+    Ok(function.finish(vec![vec_ptr], &mut module.funcs))
 }

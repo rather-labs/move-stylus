@@ -21,8 +21,8 @@ sol!(
 );
 
 #[rstest]
-#[case(packUtf8Call::new(()), "Привет мир")]
-/*
+// #[case(packUtf8Call::new(()), "Привет мир")]
+#[case(packUtf8Call::new(()), "こんにちは 世界")]
 #[case(unpackUtf8Call::new(("dlrow olleh".to_owned(),)), true)]
 #[case(unpackUtf82Call::new((
         "hello world".to_owned(),
@@ -39,7 +39,6 @@ sol!(
         "test string".to_owned(),
     )), true)]
 #[case(packUnpackUtf8Call::new(("test string".to_owned(),)), "test string")]
-*/
 fn test_utf8<T: SolCall, V: SolValue>(
     #[by_ref] runtime: &RuntimeSandbox,
     #[case] call_data: T,
@@ -53,7 +52,6 @@ fn test_utf8<T: SolCall, V: SolValue>(
     .unwrap();
 }
 
-/*
 #[rstest]
 #[case(packUtf82Call::new(()), ("Привет мир", "こんにちは 世界"))]
 #[case(packUtf83Call::new(()), ("hello world", 42, "test string"))]
@@ -79,4 +77,3 @@ fn test_utf8_multiple<T: SolCall, V: SolValue>(
     )
     .unwrap();
 }
-*/
