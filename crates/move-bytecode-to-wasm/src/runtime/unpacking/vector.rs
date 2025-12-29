@@ -149,11 +149,11 @@ pub fn unpack_vector_function(
             loop_block.local_get(writer_pointer);
             // This will leave in the stack [pointer/value i32/i64, length i32]
             inner.add_unpack_instructions(
+                None,
                 loop_block,
                 module,
                 data_reader_pointer,
                 calldata_base_pointer_,
-                false,
                 compilation_ctx,
             )?;
 
@@ -237,11 +237,11 @@ mod tests {
 
         int_type
             .add_unpack_instructions(
+                None,
                 &mut func_body,
                 &mut raw_module,
                 args_pointer,
                 calldata_reader_pointer,
-                false,
                 &compilation_ctx,
             )
             .unwrap();

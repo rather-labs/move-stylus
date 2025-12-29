@@ -30,11 +30,11 @@ pub trait Unpackable {
     /// The stack at the end contains the value(or pointer to the value) as **i32/i64**
     fn add_unpack_instructions(
         &self,
+        parent_type: Option<&IntermediateType>,
         function_builder: &mut InstrSeqBuilder,
         module: &mut Module,
         reader_pointer: LocalId,
         calldata_base_pointer: LocalId,
-        unpack_frozen: bool,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), AbiError>;
 }
@@ -67,11 +67,11 @@ pub fn build_unpack_instructions<T: Unpackable>(
     // Static types are stored in-place, but dynamic types are referenced to the call data
     for signature_token in function_arguments_signature.iter() {
         signature_token.add_unpack_instructions(
+            None,
             function_builder,
             module,
             reader_pointer,
             calldata_base_pointer,
-            true,
             compilation_ctx,
         )?;
     }
@@ -82,11 +82,11 @@ pub fn build_unpack_instructions<T: Unpackable>(
 impl Unpackable for IntermediateType {
     fn add_unpack_instructions(
         &self,
+        parent_type: Option<&IntermediateType>,
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
         reader_pointer: LocalId,
         calldata_base_pointer: LocalId,
-        unpack_frozen: bool,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), AbiError> {
         match self {
@@ -145,11 +145,6 @@ impl Unpackable for IntermediateType {
             // injected directly by the VM into the stack
             IntermediateType::ISigner => (),
             IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
-                // If the inner type is a storage struct, we need to pass the flag unpack_frozen.
-                // - If the reference is immutable, we need to unpack frozen objects, so we push a 1 to the stack.
-                // - If the reference is mutable, we don't need to unpack frozen objects, so we push a 0 to the stack.
-                requires_unpack_frozen(self, inner.as_ref(), compilation_ctx);
-
                 match inner.as_ref() {
                     IntermediateType::IU128
                     | IntermediateType::IU256
@@ -162,11 +157,11 @@ impl Unpackable for IntermediateType {
                     | IntermediateType::IGenericEnumInstance { .. } => {
                         // For heap-allocated types, directly invoke the unpack function of the referenced inner type
                         inner.add_unpack_instructions(
+                            Some(self),
                             builder,
                             module,
                             reader_pointer,
                             calldata_base_pointer,
-                            unpack_frozen,
                             compilation_ctx,
                         )?;
                     }
@@ -219,7 +214,9 @@ impl Unpackable for IntermediateType {
                         &struct_,
                     )?;
 
-                    if unpack_frozen {
+                    // If the inner type is a storage struct, we need to pass the flag unpack_frozen.
+                    // If the parent type is an immutable reference, we need to unpack frozen objects, so we push a 1 to the stack. Else we push a 0 to the stack.
+                    if parent_type.is_some_and(|p| matches!(p, IntermediateType::IRef(_))) {
                         builder.i32_const(1);
                     } else {
                         builder.i32_const(0);
@@ -313,16 +310,6 @@ fn load_struct_storage_id(
     Ok(())
 }
 
-pub fn requires_unpack_frozen(
-    outer_type: &IntermediateType,
-    inner_type: &IntermediateType,
-    compilation_ctx: &CompilationContext,
-) -> bool {
-    compilation_ctx
-        .get_struct_by_intermediate_type(inner_type)
-        .is_ok_and(|s| s.has_key)
-        && matches!(outer_type, IntermediateType::IRef(_))
-}
 #[cfg(test)]
 mod tests {
     use alloy_sol_types::{SolType, sol};

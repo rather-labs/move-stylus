@@ -460,11 +460,11 @@ pub fn add_external_contract_call_fn(
 
                         // Unpack the value
                         result_type.add_unpack_instructions(
+                            None,
                             block,
                             module,
                             return_data_abi_encoded_ptr,
                             calldata_reader_pointer,
-                            false,
                             compilation_ctx,
                         )?;
 

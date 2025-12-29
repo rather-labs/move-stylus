@@ -45,11 +45,11 @@ pub fn unpack_reference_function(
                 .local_tee(ptr_local);
 
             itype.add_unpack_instructions(
+                None,
                 &mut builder,
                 module,
                 reader_pointer,
                 calldata_reader_pointer,
-                false,
                 compilation_ctx,
             )?;
 
@@ -126,25 +126,17 @@ mod tests {
         let args_pointer = raw_module.locals.add(ValType::I32);
         let calldata_reader_pointer = raw_module.locals.add(ValType::I32);
 
-        let inner = match &ref_type {
-            IntermediateType::IRef(inner) => inner,
-            IntermediateType::IMutRef(inner) => inner,
-            _ => return,
-        };
-        let unpack_frozen =
-            crate::abi_types::unpacking::requires_unpack_frozen(&ref_type, inner, &compilation_ctx);
-
         func_body.i32_const(0);
         func_body.local_tee(args_pointer);
         func_body.local_set(calldata_reader_pointer);
 
         ref_type
             .add_unpack_instructions(
+                Some(&ref_type),
                 &mut func_body,
                 &mut raw_module,
                 args_pointer,
                 calldata_reader_pointer,
-                unpack_frozen,
                 &compilation_ctx,
             )
             .unwrap();

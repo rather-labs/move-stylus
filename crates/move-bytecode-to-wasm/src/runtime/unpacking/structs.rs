@@ -151,17 +151,13 @@ pub fn unpack_struct_function(
     let mut offset = 0;
     let field_ptr = module.locals.add(ValType::I32);
     for field in &struct_.fields {
-        // If the field is a storage struct, we need to pass the flag unpack_frozen.
-        let unpack_frozen =
-            crate::abi_types::unpacking::requires_unpack_frozen(itype, field, compilation_ctx);
-
         // Unpack field
         field.add_unpack_instructions(
+            Some(itype),
             &mut builder,
             module,
             data_reader_pointer,
             calldata_ptr,
-            unpack_frozen,
             compilation_ctx,
         )?;
 

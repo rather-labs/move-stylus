@@ -125,11 +125,11 @@ mod tests {
 
         int_type
             .add_unpack_instructions(
+                None,
                 &mut func_body,
                 &mut raw_module,
                 args_pointer,
                 args_pointer,
-                false,
                 &compilation_ctx,
             )
             .unwrap();
