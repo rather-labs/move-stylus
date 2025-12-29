@@ -300,6 +300,24 @@ pub fn add_internal_check_utf8(
                                         );
                                 },
                                 |else_| {
+                                    // ================
+                                    // 4 bytes
+                                    // ================
+                                    else_
+                                        .local_get(vec_ptr)
+                                        .local_get(i)
+                                        .binop(BinaryOp::I32Add)
+                                        .load(
+                                            compilation_ctx.memory_id,
+                                            LoadKind::I32 { atomic: false },
+                                            MemArg {
+                                                align: 0,
+                                                offset: 0,
+                                            },
+                                        )
+                                        .call(swap_i32_fn)
+                                        .local_set(current_char);
+
                                     else_.i32_const(999010).call(print_i32);
                                     // 4 bytes
                                     // 6:  if (0xF0908080 <= c && c <= 0xF48FBFBF) {
