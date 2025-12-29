@@ -8,7 +8,7 @@ declare_fixture!("string_utf8", "tests/stdlib/move_sources/string_utf8.move");
 
 sol!(
     #[allow(missing_docs)]
-    function packUtf8() external returns (string);
+    function packUtf8(uint8[] string_bytes) external returns (string);
     function packUtf82() external returns (string, string);
     function packUtf83() external returns (string, uint16, string);
     function packUtf84() external returns (string, uint16[], string);
@@ -21,8 +21,16 @@ sol!(
 );
 
 #[rstest]
-// #[case(packUtf8Call::new(()), "Привет мир")]
-#[case(packUtf8Call::new(()), "こんにちは 世界")]
+// 1-byte UTF-8
+#[case(packUtf8Call::new((b"hello world".to_vec(),)), "hello world")]
+// 2-byte UTF-8
+#[case(packUtf8Call::new(("Привет мир".as_bytes().to_vec(),)), "Привет мир")]
+// 3-byte UTF-8
+#[case(packUtf8Call::new(("こんにちは 世界".as_bytes().to_vec(),)), "こんにちは 世界")]
+// 4-byte UTF-8
+#[case(packUtf8Call::new(("🐱😊😎😿😻".as_bytes().to_vec(),)), "🐱😊😎😿😻")]
+// Mixed UTF-8
+#[case(packUtf8Call::new(("Hello, 世界! 👋".as_bytes().to_vec(),)), "Hello, 世界! 👋")]
 #[case(unpackUtf8Call::new(("dlrow olleh".to_owned(),)), true)]
 #[case(unpackUtf82Call::new((
         "hello world".to_owned(),
