@@ -112,6 +112,7 @@ pub enum RuntimeFunction {
     PackAddress,
     PackString,
     PackVector,
+    PackStruct,
 }
 
 impl RuntimeFunction {
@@ -203,6 +204,7 @@ impl RuntimeFunction {
             Self::PackAddress => "pack_address",
             Self::PackString => "pack_string",
             Self::PackVector => "pack_vector",
+            Self::PackStruct => "pack_struct",
         }
     }
 
@@ -452,6 +454,10 @@ impl RuntimeFunction {
             Self::PackVector => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
                 packing::vector::pack_vector_function(module, compilation_ctx, generics[0])?
+            }
+            Self::PackStruct => {
+                Self::assert_generics_length(generics.len(), 1, self.name())?;
+                packing::structs::pack_struct_function(module, compilation_ctx, generics[0])?
             }
             _ => {
                 return Err(RuntimeFunctionError::CouldNotLinkGeneric(

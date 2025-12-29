@@ -19,7 +19,6 @@ use super::error::{AbiEncodingError, AbiError};
 
 pub mod error;
 mod pack_reference;
-mod pack_struct;
 
 pub trait Packable {
     /// Adds the instructions to pack the value into memory according to Solidity's ABI encoding.
@@ -294,17 +293,15 @@ impl Packable for IntermediateType {
             )?,
 
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
-                let struct_ = compilation_ctx.get_struct_by_intermediate_type(self)?;
+                let pack_struct_function =
+                    RuntimeFunction::PackStruct.get_generic(module, compilation_ctx, &[self])?;
 
-                struct_.add_pack_instructions(
-                    builder,
-                    module,
-                    local,
-                    writer_pointer,
-                    calldata_reference_pointer,
-                    compilation_ctx,
-                    None,
-                )?
+                builder
+                    .local_get(local)
+                    .local_get(writer_pointer)
+                    .local_get(calldata_reference_pointer)
+                    .i32_const(0) // is_nested = false
+                    .call(pack_struct_function);
             }
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
                 let enum_ = compilation_ctx.get_enum_by_intermediate_type(self)?;
@@ -373,17 +370,15 @@ impl Packable for IntermediateType {
                     .call(pack_string_function);
             }
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
-                let struct_ = compilation_ctx.get_struct_by_intermediate_type(self)?;
+                let pack_struct_function =
+                    RuntimeFunction::PackStruct.get_generic(module, compilation_ctx, &[self])?;
 
-                struct_.add_pack_instructions(
-                    builder,
-                    module,
-                    local,
-                    writer_pointer,
-                    calldata_reference_pointer,
-                    compilation_ctx,
-                    Some(calldata_reference_pointer),
-                )?;
+                builder
+                    .local_get(local)
+                    .local_get(writer_pointer)
+                    .local_get(calldata_reference_pointer)
+                    .i32_const(1) // is_nested = true
+                    .call(pack_struct_function);
             }
             _ => self.add_pack_instructions(
                 builder,

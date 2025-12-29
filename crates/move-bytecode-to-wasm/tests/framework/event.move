@@ -62,8 +62,6 @@ public struct TestEvent4 has copy, drop {
     e: NestedStruct,
 }
 
-
-
 #[allow(unused_field)]
 #[ext(event, indexes = 3)]
 public struct TestEvent5 has copy, drop {

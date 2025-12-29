@@ -11,6 +11,7 @@ use crate::{
     abi_types::{event_encoding::move_signature_to_event_signature_hash, packing::Packable},
     compilation_context::ModuleId,
     hostio::host_functions::{emit_log, native_keccak256},
+    runtime::RuntimeFunction,
     translation::intermediate_types::{
         IntermediateType,
         structs::{IStruct, IStructType},
@@ -392,15 +393,14 @@ pub fn add_emit_log_fn(
         // Use the allocator to get a pointer to the end of the calldata
 
         if data_struct.solidity_abi_encode_is_dynamic(compilation_ctx)? {
-            data_struct.add_pack_instructions(
-                &mut builder,
-                module,
-                data_struct_ptr,
-                writer_pointer,
-                abi_encoded_data_calldata_reference_pointer,
-                compilation_ctx,
-                Some(abi_encoded_data_calldata_reference_pointer),
-            )?;
+            let pack_struct_function =
+                RuntimeFunction::PackStruct.get_generic(module, compilation_ctx, &[itype])?;
+            builder
+                .local_get(data_struct_ptr)
+                .local_get(writer_pointer)
+                .local_get(abi_encoded_data_calldata_reference_pointer)
+                .i32_const(1) // is_nested = true
+                .call(pack_struct_function);
 
             // Move 32 bytes back the encoded
 
@@ -424,15 +424,15 @@ pub fn add_emit_log_fn(
 
             builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
         } else {
-            data_struct.add_pack_instructions(
-                &mut builder,
-                module,
-                data_struct_ptr,
-                writer_pointer,
-                abi_encoded_data_calldata_reference_pointer,
-                compilation_ctx,
-                None,
-            )?;
+            let pack_struct_function =
+                RuntimeFunction::PackStruct.get_generic(module, compilation_ctx, &[itype])?;
+
+            builder
+                .local_get(data_struct_ptr)
+                .local_get(writer_pointer)
+                .local_get(abi_encoded_data_calldata_reference_pointer)
+                .i32_const(0) // is_nested = false
+                .call(pack_struct_function);
 
             builder
                 .i32_const(0)
