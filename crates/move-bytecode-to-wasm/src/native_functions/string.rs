@@ -110,36 +110,26 @@ pub fn add_internal_check_utf8(
                         //         else { return 0; }
                         //      }
 
+                        // =============================
+                        //  1 byte character (ASCII)
+                        // =============================
                         // 1:  if (c <= 0x7F) continue (ascii);
-                        // 1 byte block
-                        else_.block(None, |one_byte_block| {
-                            let one_byte_block_id = one_byte_block.id();
+                        else_.local_get(current_char).i32_const(0x7F).if_else(
+                            None,
+                            |then_| {
+                                then_
+                                    .local_get(i)
+                                    .i32_const(1)
+                                    .binop(BinaryOp::I32Add)
+                                    .local_set(i)
+                                    .br(loop_id);
+                            },
+                            |_| {},
+                        );
 
-                            one_byte_block
-                                .local_get(current_char)
-                                .i32_const(0x7F)
-                                // .binop(BinaryOp::I32LeU)
-                                .binop(BinaryOp::I32GtU) // Invert the condition for br_if
-                                .br_if(one_byte_block_id);
-
-                            one_byte_block
-                                .local_get(i)
-                                .i32_const(1)
-                                .binop(BinaryOp::I32Add)
-                                .local_set(i)
-                                .br(loop_id);
-                        });
-
-                        // Multi-byte character
-                        // (byte & 0xE0) == 0xC0) -> 2-byte character
-                        else_.i32_const(99901).call(print_i32);
-
-                        // Two byte character block
-                        // 2:  if (0xC080 == c) continue;   // Accept 0xC080 as representation for '\0'
-                        // 3:  if (0xC280 <= c && c <= 0xDFBF) {
-                        //         if ((c & 0xE0C0) == 0xC080) { continue; }
-                        //         else { continue; }
-                        //     }
+                        // ===================
+                        //  2 bytes character
+                        // ===================
 
                         // First we load the 2-byte character
                         else_
@@ -161,7 +151,7 @@ pub fn add_internal_check_utf8(
                             .binop(BinaryOp::I32ShrU)
                             .local_set(current_char);
 
-                        // 2:  if (0xC080 == c) continue;   // Accept 0xC080 as representation for '\0'
+                        // 2:  if (0xC080 == c) continue;   (Accept 0xC080 as representation for '\0')
                         else_.i32_const(99903).call(print_i32);
                         else_
                             .i32_const(0xC080)
@@ -170,7 +160,6 @@ pub fn add_internal_check_utf8(
                             .if_else(
                                 None,
                                 |then_| {
-                                    // It's the representation for '\0', continue
                                     then_
                                         .local_get(i)
                                         .i32_const(2)
@@ -222,9 +211,9 @@ pub fn add_internal_check_utf8(
                                 |_| {},
                             );
 
-                        // ==========
-                        // 3 bytes
-                        // ==========
+                        // ===================
+                        //  3 bytes character
+                        // ===================
                         else_.i32_const(99907).call(print_i32);
                         else_
                             .local_get(vec_ptr)
@@ -246,7 +235,8 @@ pub fn add_internal_check_utf8(
                         else_.i32_const(99908).call(print_i32);
                         else_.local_get(current_char).call(print_i32);
 
-                        // 4:  if (0xEDA080 <= c && c <= 0xEDBFBF) return 0; // Reject UTF-16 surrogates
+                        // 4:  if (0xEDA080 <= c && c <= 0xEDBFBF) return 0; (Reject UTF-16
+                        //     surrogates)
                         else_
                             .i32_const(0xEDA080)
                             .local_get(current_char)
@@ -299,65 +289,65 @@ pub fn add_internal_check_utf8(
                                             |_| {},
                                         );
                                 },
-                                |else_| {
-                                    // ================
-                                    // 4 bytes
-                                    // ================
-                                    else_
-                                        .local_get(vec_ptr)
-                                        .local_get(i)
-                                        .binop(BinaryOp::I32Add)
-                                        .load(
-                                            compilation_ctx.memory_id,
-                                            LoadKind::I32 { atomic: false },
-                                            MemArg {
-                                                align: 0,
-                                                offset: 0,
-                                            },
-                                        )
-                                        .call(swap_i32_fn)
-                                        .local_set(current_char);
+                                |_| {},
+                            );
 
-                                    else_.i32_const(999010).call(print_i32);
-                                    // 4 bytes
-                                    // 6:  if (0xF0908080 <= c && c <= 0xF48FBFBF) {
-                                    //          if ((c & 0xF8C0C0C0) == 0xF0808080) { i+=4; continue; }
-                                    //          else { return 0; }
-                                    //     }
-                                    else_
-                                        .i32_const(0xF0908080_u32 as i32)
+                        // ===================
+                        //  4 bytes character
+                        // ===================
+                        else_
+                            .local_get(vec_ptr)
+                            .local_get(i)
+                            .binop(BinaryOp::I32Add)
+                            .load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I32 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            )
+                            .call(swap_i32_fn)
+                            .local_set(current_char);
+
+                        else_.i32_const(999010).call(print_i32);
+                        // 4 bytes
+                        // 6:  if (0xF0908080 <= c && c <= 0xF48FBFBF) {
+                        //          if ((c & 0xF8C0C0C0) == 0xF0808080) { i+=4; continue; }
+                        //          else { return 0; }
+                        //     }
+                        else_
+                            .i32_const(0xF0908080_u32 as i32)
+                            .local_get(current_char)
+                            .binop(BinaryOp::I32LeU)
+                            .local_get(current_char)
+                            .i32_const(0xF48FBFBF_u32 as i32)
+                            .binop(BinaryOp::I32LeU)
+                            .binop(BinaryOp::I32And)
+                            .if_else(
+                                None,
+                                |then_| {
+                                    then_
                                         .local_get(current_char)
-                                        .binop(BinaryOp::I32LeU)
-                                        .local_get(current_char)
-                                        .i32_const(0xF48FBFBF_u32 as i32)
-                                        .binop(BinaryOp::I32LeU)
+                                        .i32_const(0xF8C0C0C0_u32 as i32)
                                         .binop(BinaryOp::I32And)
+                                        .i32_const(0xF0808080_u32 as i32)
+                                        .binop(BinaryOp::I32Eq)
                                         .if_else(
                                             None,
                                             |then_| {
                                                 then_
-                                                    .local_get(current_char)
-                                                    .i32_const(0xF8C0C0C0_u32 as i32)
-                                                    .binop(BinaryOp::I32And)
-                                                    .i32_const(0xF0808080_u32 as i32)
-                                                    .binop(BinaryOp::I32Eq)
-                                                    .if_else(
-                                                        None,
-                                                        |then_| {
-                                                            then_
-                                                                .local_get(i)
-                                                                .i32_const(4)
-                                                                .binop(BinaryOp::I32Add)
-                                                                .local_set(i)
-                                                                .br(loop_id);
-                                                        },
-                                                        |_| {},
-                                                    );
+                                                    .local_get(i)
+                                                    .i32_const(4)
+                                                    .binop(BinaryOp::I32Add)
+                                                    .local_set(i)
+                                                    .br(loop_id);
                                             },
-                                            |else_| {
-                                                else_.i32_const(999011).call(print_i32);
-                                            },
+                                            |_| {},
                                         );
+                                },
+                                |else_| {
+                                    else_.i32_const(999011).call(print_i32);
                                 },
                             );
 
