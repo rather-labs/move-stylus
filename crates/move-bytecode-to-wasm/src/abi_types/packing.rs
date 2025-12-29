@@ -1,5 +1,5 @@
 use alloy_sol_types::{SolType, sol_data};
-use error::AbiPackError;
+
 use walrus::{
     InstrSeqBuilder, LocalId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg},
@@ -7,18 +7,13 @@ use walrus::{
 
 use crate::{
     CompilationContext,
+    abi_types::error::AbiPackError,
     runtime::RuntimeFunction,
-    translation::intermediate_types::{
-        IntermediateType,
-        reference::{IMutRef, IRef},
-    },
+    translation::intermediate_types::IntermediateType,
     vm_handled_types::{VmHandledType, string::String_},
 };
 
 use super::error::{AbiEncodingError, AbiError};
-
-pub mod error;
-mod pack_reference;
 
 pub trait Packable {
     /// Adds the instructions to pack the value into memory according to Solidity's ABI encoding.
@@ -273,25 +268,18 @@ impl Packable for IntermediateType {
                     .local_get(calldata_reference_pointer)
                     .call(pack_vector_function);
             }
-            IntermediateType::IRef(inner) => IRef::add_pack_instructions(
-                inner,
-                builder,
-                module,
-                local,
-                writer_pointer,
-                calldata_reference_pointer,
-                compilation_ctx,
-            )?,
-            IntermediateType::IMutRef(inner) => IMutRef::add_pack_instructions(
-                inner,
-                builder,
-                module,
-                local,
-                writer_pointer,
-                calldata_reference_pointer,
-                compilation_ctx,
-            )?,
-
+            IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
+                let pack_reference_function = RuntimeFunction::PackReference.get_generic(
+                    module,
+                    compilation_ctx,
+                    &[inner],
+                )?;
+                builder
+                    .local_get(local)
+                    .local_get(writer_pointer)
+                    .local_get(calldata_reference_pointer)
+                    .call(pack_reference_function);
+            }
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
                 let pack_struct_function =
                     RuntimeFunction::PackStruct.get_generic(module, compilation_ctx, &[self])?;

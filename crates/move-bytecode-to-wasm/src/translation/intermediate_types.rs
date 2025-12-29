@@ -3,7 +3,6 @@ pub mod boolean;
 pub mod enums;
 pub mod error;
 pub mod heap_integers;
-pub mod reference;
 pub mod signer;
 pub mod simple_integers;
 pub mod structs;
