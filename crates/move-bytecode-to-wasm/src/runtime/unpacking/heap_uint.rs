@@ -154,6 +154,7 @@ mod tests {
                 &mut raw_module,
                 args_pointer,
                 args_pointer,
+                false,
                 &compilation_ctx,
             )
             .unwrap();

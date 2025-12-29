@@ -153,6 +153,7 @@ pub fn unpack_vector_function(
                 module,
                 data_reader_pointer,
                 calldata_base_pointer_,
+                false,
                 compilation_ctx,
             )?;
 
@@ -240,6 +241,7 @@ mod tests {
                 &mut raw_module,
                 args_pointer,
                 calldata_reader_pointer,
+                false,
                 &compilation_ctx,
             )
             .unwrap();

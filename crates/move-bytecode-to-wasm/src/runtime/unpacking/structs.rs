@@ -1,7 +1,7 @@
 use crate::{
     CompilationContext,
     abi_types::unpacking::Unpackable,
-    data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_UNPACK_FROZEN_OFFSET},
+    data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
     runtime::{RuntimeFunction, RuntimeFunctionError},
     translation::intermediate_types::IntermediateType,
 };
@@ -93,9 +93,7 @@ pub fn unpack_struct_function(
         &[ValType::I32, ValType::I32],
         &[ValType::I32],
     );
-    let mut builder = function
-        .name(RuntimeFunction::UnpackStruct.name().to_owned())
-        .func_body();
+    let mut builder = function.name(name).func_body();
 
     // Arguments
     let reader_pointer = module.locals.add(ValType::I32);
@@ -153,12 +151,17 @@ pub fn unpack_struct_function(
     let mut offset = 0;
     let field_ptr = module.locals.add(ValType::I32);
     for field in &struct_.fields {
+        // If the field is a storage struct, we need to pass the flag unpack_frozen.
+        let unpack_frozen =
+            crate::abi_types::unpacking::requires_unpack_frozen(itype, field, compilation_ctx);
+
         // Unpack field
         field.add_unpack_instructions(
             &mut builder,
             module,
             data_reader_pointer,
             calldata_ptr,
+            unpack_frozen,
             compilation_ctx,
         )?;
 
@@ -243,13 +246,16 @@ pub fn unpack_storage_struct_function(
         return Ok(function);
     }
 
-    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
-    let mut builder = function
-        .name(RuntimeFunction::UnpackStorageStruct.name().to_owned())
-        .func_body();
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32],
+        &[ValType::I32],
+    );
+    let mut builder = function.name(name).func_body();
 
     // Arguments
     let uid_ptr = module.locals.add(ValType::I32);
+    let unpack_frozen = module.locals.add(ValType::I32);
 
     // Search for the object in the objects mappings
     let locate_storage_data_fn =
@@ -257,15 +263,7 @@ pub fn unpack_storage_struct_function(
 
     builder
         .local_get(uid_ptr)
-        .i32_const(DATA_UNPACK_FROZEN_OFFSET)
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
+        .local_get(unpack_frozen)
         .call(locate_storage_data_fn);
 
     // Read the object
@@ -287,19 +285,5 @@ pub fn unpack_storage_struct_function(
         .local_get(uid_ptr)
         .call(read_and_decode_from_storage_fn);
 
-    // Reset the unpack frozen flag to false.
-    // This is always the default value for the flag.
-    builder
-        .i32_const(DATA_UNPACK_FROZEN_OFFSET)
-        .i32_const(0)
-        .store(
-            compilation_ctx.memory_id,
-            StoreKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        );
-
-    Ok(function.finish(vec![uid_ptr], &mut module.funcs))
+    Ok(function.finish(vec![uid_ptr, unpack_frozen], &mut module.funcs))
 }

@@ -21,9 +21,7 @@ pub fn unpack_enum_function(
     }
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
-    let mut builder = function
-        .name(RuntimeFunction::UnpackEnum.name().to_owned())
-        .func_body();
+    let mut builder = function.name(name).func_body();
 
     let enum_ = compilation_ctx.get_enum_by_intermediate_type(itype)?;
     if !enum_.is_simple {

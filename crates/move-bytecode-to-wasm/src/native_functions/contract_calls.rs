@@ -464,6 +464,7 @@ pub fn add_external_contract_call_fn(
                             module,
                             return_data_abi_encoded_ptr,
                             calldata_reader_pointer,
+                            false,
                             compilation_ctx,
                         )?;
 

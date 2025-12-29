@@ -23,9 +23,7 @@ pub fn unpack_reference_function(
         &[ValType::I32, ValType::I32],
         &[ValType::I32],
     );
-    let mut builder = function
-        .name(RuntimeFunction::UnpackReference.name().to_owned())
-        .func_body();
+    let mut builder = function.name(name).func_body();
 
     // Arguments
     let reader_pointer = module.locals.add(ValType::I32);
@@ -51,6 +49,7 @@ pub fn unpack_reference_function(
                 module,
                 reader_pointer,
                 calldata_reader_pointer,
+                false,
                 compilation_ctx,
             )?;
 
@@ -127,6 +126,14 @@ mod tests {
         let args_pointer = raw_module.locals.add(ValType::I32);
         let calldata_reader_pointer = raw_module.locals.add(ValType::I32);
 
+        let inner = match &ref_type {
+            IntermediateType::IRef(inner) => inner,
+            IntermediateType::IMutRef(inner) => inner,
+            _ => return,
+        };
+        let unpack_frozen =
+            crate::abi_types::unpacking::requires_unpack_frozen(&ref_type, inner, &compilation_ctx);
+
         func_body.i32_const(0);
         func_body.local_tee(args_pointer);
         func_body.local_set(calldata_reader_pointer);
@@ -137,6 +144,7 @@ mod tests {
                 &mut raw_module,
                 args_pointer,
                 calldata_reader_pointer,
+                unpack_frozen,
                 &compilation_ctx,
             )
             .unwrap();

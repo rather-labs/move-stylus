@@ -1,8 +1,5 @@
 use alloy_sol_types::{SolType, sol_data};
-use walrus::{
-    InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{MemArg, StoreKind},
-};
+use walrus::{InstrSeqBuilder, LocalId, Module, ValType};
 
 use crate::{
     CompilationContext,
@@ -10,7 +7,6 @@ use crate::{
         ModuleId,
         reserved_modules::{SF_MODULE_NAME_OBJECT, STYLUS_FRAMEWORK_ADDRESS},
     },
-    data::DATA_UNPACK_FROZEN_OFFSET,
     native_functions::NativeFunction,
     runtime::RuntimeFunction,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
@@ -38,6 +34,7 @@ pub trait Unpackable {
         module: &mut Module,
         reader_pointer: LocalId,
         calldata_base_pointer: LocalId,
+        unpack_frozen: bool,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), AbiError>;
 }
@@ -74,6 +71,7 @@ pub fn build_unpack_instructions<T: Unpackable>(
             module,
             reader_pointer,
             calldata_base_pointer,
+            true,
             compilation_ctx,
         )?;
     }
@@ -88,6 +86,7 @@ impl Unpackable for IntermediateType {
         module: &mut Module,
         reader_pointer: LocalId,
         calldata_base_pointer: LocalId,
+        unpack_frozen: bool,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), AbiError> {
         match self {
@@ -146,22 +145,10 @@ impl Unpackable for IntermediateType {
             // injected directly by the VM into the stack
             IntermediateType::ISigner => (),
             IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
-                if matches!(self, IntermediateType::IRef(_)) {
-                    // This is the only place where we pass the flag unpack_frozen = true.
-                    // This is because we only want to unpack frozen objects from the storage
-                    // if the object is passed as an immutable reference to the function arguments.
-                    builder
-                        .i32_const(DATA_UNPACK_FROZEN_OFFSET)
-                        .i32_const(1)
-                        .store(
-                            compilation_ctx.memory_id,
-                            StoreKind::I32 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        );
-                }
+                // If the inner type is a storage struct, we need to pass the flag unpack_frozen.
+                // - If the reference is immutable, we need to unpack frozen objects, so we push a 1 to the stack.
+                // - If the reference is mutable, we don't need to unpack frozen objects, so we push a 0 to the stack.
+                requires_unpack_frozen(self, inner.as_ref(), compilation_ctx);
 
                 match inner.as_ref() {
                     IntermediateType::IU128
@@ -179,6 +166,7 @@ impl Unpackable for IntermediateType {
                             module,
                             reader_pointer,
                             calldata_base_pointer,
+                            unpack_frozen,
                             compilation_ctx,
                         )?;
                     }
@@ -230,6 +218,12 @@ impl Unpackable for IntermediateType {
                         compilation_ctx,
                         &struct_,
                     )?;
+
+                    if unpack_frozen {
+                        builder.i32_const(1);
+                    } else {
+                        builder.i32_const(0);
+                    }
 
                     let unpack_storage_struct_function = RuntimeFunction::UnpackStorageStruct
                         .get_generic(module, compilation_ctx, &[self])?;
@@ -319,6 +313,16 @@ fn load_struct_storage_id(
     Ok(())
 }
 
+pub fn requires_unpack_frozen(
+    outer_type: &IntermediateType,
+    inner_type: &IntermediateType,
+    compilation_ctx: &CompilationContext,
+) -> bool {
+    compilation_ctx
+        .get_struct_by_intermediate_type(inner_type)
+        .is_ok_and(|s| s.has_key)
+        && matches!(outer_type, IntermediateType::IRef(_))
+}
 #[cfg(test)]
 mod tests {
     use alloy_sol_types::{SolType, sol};
