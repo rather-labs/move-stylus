@@ -103,15 +103,7 @@ impl<'a> PublicFunction<'a> {
                 Some(IntermediateType::IRef(inner)) if **inner == IntermediateType::ISigner => {
                     Signer::inject(block, module, compilation_ctx);
                 }
-                _ => {
-                    // If there's no signer, reduce args length by 4 bytes to exclude selector,
-                    // otherwise we reuse the selector's 4 bytes (32 bits) for the signer pointer
-                    block
-                        .local_get(data_len)
-                        .i32_const(4)
-                        .binop(BinaryOp::I32Sub)
-                        .local_set(data_len);
-                }
+                _ => {}
             }
 
             // Wrap function to unpack/pack arguments
