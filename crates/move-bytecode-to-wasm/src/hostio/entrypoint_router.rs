@@ -92,23 +92,10 @@ pub fn build_entrypoint_router(
                             .local_set(function_selector);
                     }
 
-                    // Update args_len to 4
+                    // Set args_len to 4
                     then.i32_const(4).local_set(args_len);
 
-                    // Store the new args_len to memory
-                    then.i32_const(4)
-                        .call(compilation_ctx.allocator)
-                        .local_get(args_len)
-                        .store(
-                            compilation_ctx.memory_id,
-                            StoreKind::I32 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        );
-
-                    // Allocate buffer with selector prefix
+                    // Allocate memory for the receive function selector, which is the only calldata needed.
                     then.local_get(args_len)
                         .call(compilation_ctx.allocator)
                         .local_tee(args_pointer)
@@ -158,7 +145,7 @@ pub fn build_entrypoint_router(
             .iter()
             .find(|f| f.function_name.as_str() == "fallback")
         {
-            // Wrap function to pack/unpack parameters
+            // Wrap function to unpack/pack arguments
             inner_result = fallback_fn.wrap_public_function(
                 module,
                 return_block,
