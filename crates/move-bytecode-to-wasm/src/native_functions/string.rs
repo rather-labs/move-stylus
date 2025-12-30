@@ -370,7 +370,8 @@ mod tests {
     #[case::utf_16_surrogate_2(b"\xED\xBF\xBF".to_vec(), false)]
     #[case::out_of_range(b"\xF4\x90\x80\x80".to_vec(), false)]
     fn test_utf8_strings(#[case] string: Vec<u8>, #[case] expected: bool) {
-        let (mut raw_module, allocator_func, memory_id) = build_module(None);
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer) =
+            build_module(None);
         let module_id = ModuleId::default();
 
         let mut function_builder =
@@ -383,7 +384,8 @@ mod tests {
         // Pointer for the allocated string
         func_body.i32_const(0);
 
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer);
         let check_utf8_f =
             add_internal_check_utf8(&mut raw_module, &compilation_ctx, &module_id).unwrap();
 
