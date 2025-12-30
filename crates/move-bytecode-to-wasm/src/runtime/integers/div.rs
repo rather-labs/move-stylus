@@ -493,7 +493,7 @@ mod tests {
     };
     use alloy_primitives::U256;
     use rstest::rstest;
-    use walrus::{ConstExpr, FunctionBuilder, ValType, ir::Value};
+    use walrus::{FunctionBuilder, ValType};
 
     use super::*;
 
@@ -521,7 +521,8 @@ mod tests {
     #[case(u128::MAX, 100, 1)]
     fn test_get_bit(#[case] a: u128, #[case] n: i32, #[case] expected: i64) {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE));
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(TYPE_HEAP_SIZE));
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[ValType::I64]);
@@ -532,12 +533,6 @@ mod tests {
 
         func_body.i32_const(0).i32_const(n).i32_const(128);
 
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            true,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         let shift_64bits_right_f = get_bit(&mut raw_module, &compilation_ctx);
@@ -572,7 +567,8 @@ mod tests {
     #[case(u64::MAX as u128, (u64::MAX as u128) << 1)]
     fn test_shift_1bit_left_u128(#[case] a: u128, #[case] expected: u128) {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE));
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(TYPE_HEAP_SIZE));
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[]);
@@ -584,12 +580,6 @@ mod tests {
         // arguments for shift_64bits_right (a_ptr, size in heap)
         func_body.i32_const(0).i32_const(16);
 
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            false,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         let shift_64bits_right_f = shift_1bit_left(&mut raw_module, &compilation_ctx);
@@ -627,7 +617,8 @@ mod tests {
     #[case(U256::from(u128::MAX), U256::from(u128::MAX) << 1)]
     fn test_shift_1bit_left_u256(#[case] a: U256, #[case] expected: U256) {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE));
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(TYPE_HEAP_SIZE));
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[]);
@@ -639,12 +630,6 @@ mod tests {
         // arguments for shift_64bits_right (a_ptr, size in heap)
         func_body.i32_const(0).i32_const(32);
 
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            false,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         let shift_64bits_right_f = shift_1bit_left(&mut raw_module, &compilation_ctx);
@@ -684,7 +669,8 @@ mod tests {
     #[case(10, 0, 0)]
     fn test_div_u128(#[case] n1: u128, #[case] n2: u128, #[case] quotient: u128) {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE * 2));
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(TYPE_HEAP_SIZE * 2));
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -704,12 +690,6 @@ mod tests {
             .i32_const(128)
             .i32_const(1);
 
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            false,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         let heap_integers_add_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
@@ -760,7 +740,8 @@ mod tests {
     )]
     fn test_mod_u128(#[case] n1: u128, #[case] n2: u128, #[case] remainder: u128) {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE * 2));
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(TYPE_HEAP_SIZE * 2));
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -780,12 +761,6 @@ mod tests {
             .i32_const(128)
             .i32_const(0);
 
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            false,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         let heap_integers_add_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
@@ -855,7 +830,8 @@ mod tests {
     )]
     fn test_div_u256(#[case] n1: U256, #[case] n2: U256, #[case] quotient: U256) {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE * 2));
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(TYPE_HEAP_SIZE * 2));
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -875,12 +851,6 @@ mod tests {
             .i32_const(256)
             .i32_const(1);
 
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            false,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         let heap_integers_add_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
@@ -949,7 +919,8 @@ mod tests {
     #[case(U256::from(10), U256::from(0), U256::from(0))]
     fn test_mod_u256(#[case] n1: U256, #[case] n2: U256, #[case] remainder: U256) {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE * 2));
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(TYPE_HEAP_SIZE * 2));
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -969,12 +940,6 @@ mod tests {
             .i32_const(256)
             .i32_const(0);
 
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            false,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         let heap_integers_add_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();

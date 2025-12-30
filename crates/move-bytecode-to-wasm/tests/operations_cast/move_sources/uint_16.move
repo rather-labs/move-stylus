@@ -1,0 +1,17 @@
+module 0x01::cast_uint_16;
+
+entry fun cast_down(x: u32): u16 {
+    x as u16
+}
+
+entry fun cast_up(x: u8): u16 {
+    x as u16
+}
+
+entry fun cast_from_u128(x: u128): u16 {
+    x as u16
+}
+
+entry fun cast_from_u256(x: u256): u16 {
+    x as u16
+}

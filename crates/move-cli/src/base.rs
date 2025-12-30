@@ -18,6 +18,7 @@ use move_package::{
     compilation::compiled_package::CompiledPackage, source_package::layout::SourcePackageLayout,
 };
 use std::{
+    collections::HashMap,
     path::{Path, PathBuf},
     process::Command,
 };
@@ -47,7 +48,9 @@ pub fn translate_package_cli(
     std::fs::create_dir_all(&build_directory)
         .map_err(|e| ICEError::new(ICEErrorKind::Unexpected(e.into())))?;
 
-    let mut modules = translate_package(package, None, verbose)?;
+    let mut modules_data = HashMap::new();
+
+    let mut modules = translate_package(package, None, &mut modules_data, verbose)?;
 
     for (module_name, module) in modules.iter_mut() {
         let wasm_file_path = build_directory.join(format!("{module_name}.wasm"));

@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::sync::Arc;
 
 use walrus::{
     InstrSeqBuilder, Module, ValType,
@@ -242,9 +242,9 @@ pub fn unpack_variant_ref(
 
         // Push the reference to the unpacked field
         if is_mut_ref {
-            types_stack.push(IntermediateType::IMutRef(Rc::new(field.clone())));
+            types_stack.push(IntermediateType::IMutRef(Arc::new(field.clone())));
         } else {
-            types_stack.push(IntermediateType::IRef(Rc::new(field.clone())));
+            types_stack.push(IntermediateType::IRef(Arc::new(field.clone())));
         }
 
         offset += 4;

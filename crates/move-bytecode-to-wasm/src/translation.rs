@@ -15,6 +15,7 @@ pub mod table;
 use std::{
     collections::{HashMap, HashSet},
     rc::Rc,
+    sync::Arc,
 };
 
 use walrus::{
@@ -31,7 +32,7 @@ use move_binary_format::{
 };
 
 use crate::{
-    CompilationContext, GlobalFunctionTable,
+    CompilationContext,
     abi_types::error_encoding::build_abort_error_message,
     compilation_context::{ModuleData, ModuleId},
     data::DATA_ABORT_MESSAGE_PTR_OFFSET,
@@ -1185,13 +1186,13 @@ fn translate_instruction(
             let local = function_locals[*local_id as usize];
             let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
             builder.local_get(local);
-            types_stack.push(IntermediateType::IRef(Rc::new(local_type.clone())));
+            types_stack.push(IntermediateType::IRef(Arc::new(local_type.clone())));
         }
         Bytecode::MutBorrowLoc(local_id) => {
             let local = function_locals[*local_id as usize];
             let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
             builder.local_get(local);
-            types_stack.push(IntermediateType::IMutRef(Rc::new(local_type.clone())));
+            types_stack.push(IntermediateType::IMutRef(Arc::new(local_type.clone())));
         }
         Bytecode::ImmBorrowField(field_id) => {
             let struct_ = module_data.structs.get_by_field_handle_idx(field_id)?;
@@ -1240,7 +1241,7 @@ fn translate_instruction(
                 module_data,
             )?;
 
-            types_stack.push(IntermediateType::IRef(Rc::new(field_type)));
+            types_stack.push(IntermediateType::IRef(Arc::new(field_type)));
         }
         Bytecode::ImmBorrowFieldGeneric(field_id) => {
             let (struct_field_id, instantiation_types) = module_data
@@ -1326,13 +1327,13 @@ fn translate_instruction(
                 module_data,
             )?;
 
-            types_stack.push(IntermediateType::IRef(Rc::new(field_type)));
+            types_stack.push(IntermediateType::IRef(Arc::new(field_type)));
         }
         Bytecode::MutBorrowField(field_id) => {
             let struct_ = module_data.structs.get_by_field_handle_idx(field_id)?;
 
             // Check if in the types stack we have the correct type
-            types_stack.pop_expecting(&IntermediateType::IMutRef(Rc::new(
+            types_stack.pop_expecting(&IntermediateType::IMutRef(Arc::new(
                 IntermediateType::IStruct {
                     module_id: module_data.id,
                     index: struct_.index(),
@@ -1349,7 +1350,7 @@ fn translate_instruction(
                 module_data,
             )?;
 
-            types_stack.push(IntermediateType::IMutRef(Rc::new(field_type)));
+            types_stack.push(IntermediateType::IMutRef(Arc::new(field_type)));
         }
         Bytecode::MutBorrowFieldGeneric(field_id) => {
             let (struct_field_id, instantiation_types) = module_data
@@ -1387,7 +1388,7 @@ fn translate_instruction(
             };
 
             // Check if in the types stack we have the correct type
-            types_stack.pop_expecting(&IntermediateType::IMutRef(Rc::new(
+            types_stack.pop_expecting(&IntermediateType::IMutRef(Arc::new(
                 IntermediateType::IGenericStructInstance {
                     module_id: module_data.id,
                     index: struct_.index(),
@@ -1411,7 +1412,7 @@ fn translate_instruction(
                 module_data,
             )?;
 
-            types_stack.push(IntermediateType::IMutRef(Rc::new(field_type)));
+            types_stack.push(IntermediateType::IMutRef(Arc::new(field_type)));
         }
         Bytecode::VecUnpack(signature_index, length) => {
             let expected_vec_inner =
@@ -1419,7 +1420,7 @@ fn translate_instruction(
 
             let expected_vec_inner = get_expected_vec_inner(expected_vec_inner, mapped_function)?;
 
-            types_stack.pop_expecting(&IntermediateType::IVector(Rc::new(
+            types_stack.pop_expecting(&IntermediateType::IVector(Arc::new(
                 expected_vec_inner.clone(),
             )))?;
 
@@ -1541,7 +1542,7 @@ fn translate_instruction(
                 n -= 1;
             }
 
-            types_stack.push(IntermediateType::IVector(Rc::new(expected_vec_inner)));
+            types_stack.push(IntermediateType::IVector(Arc::new(expected_vec_inner)));
         }
         Bytecode::VecPopBack(signature_index) => {
             let ty = types_stack.pop()?;
@@ -1697,8 +1698,8 @@ fn translate_instruction(
                     )
                 );
             } else {
-                types_stack.pop_expecting(&IntermediateType::IRef(Rc::new(
-                    IntermediateType::IVector(Rc::new(elem_ir_type)),
+                types_stack.pop_expecting(&IntermediateType::IRef(Arc::new(
+                    IntermediateType::IVector(Arc::new(elem_ir_type)),
                 )))?;
             };
 
@@ -2710,9 +2711,9 @@ fn translate_instruction(
                 index: enum_.index,
             };
             let expected_type = if is_mut_ref {
-                IntermediateType::IMutRef(Rc::new(enum_type))
+                IntermediateType::IMutRef(Arc::new(enum_type))
             } else {
-                IntermediateType::IRef(Rc::new(enum_type))
+                IntermediateType::IRef(Arc::new(enum_type))
             };
             types_stack.pop_expecting(&expected_type)?;
 
@@ -2763,9 +2764,9 @@ fn translate_instruction(
                 types,
             };
             let expected_type = if is_mut_ref {
-                IntermediateType::IMutRef(Rc::new(generic_enum_type))
+                IntermediateType::IMutRef(Arc::new(generic_enum_type))
             } else {
-                IntermediateType::IRef(Rc::new(generic_enum_type))
+                IntermediateType::IRef(Arc::new(generic_enum_type))
             };
             types_stack.pop_expecting(&expected_type)?;
 
@@ -3123,7 +3124,7 @@ fn get_storage_structs_with_named_ids(
 pub(crate) fn translate_and_link_functions(
     function_id: &FunctionId,
     function_table: &mut FunctionTable,
-    function_definitions: &GlobalFunctionTable,
+    modules_data: &HashMap<ModuleId, ModuleData>,
     module: &mut walrus::Module,
     compilation_ctx: &CompilationContext,
     dynamic_fields_global_variables: &mut Vec<(GlobalId, IntermediateType)>,
@@ -3176,9 +3177,11 @@ pub(crate) fn translate_and_link_functions(
         function_table.add(module, function_id.clone(), function_information)?;
     }
 
-    let function_definition = function_definitions
-        .get(&function_id.get_generic_fn_id())
-        .ok_or_else(|| TranslationError::FunctionDefinitionNotFound(function_id.clone()))?;
+    let function_definition = modules_data
+        .get(&function_id.module_id)
+        .unwrap_or(compilation_ctx.root_module_data)
+        .functions
+        .get_move_definition_by_id(&function_id.get_generic_fn_id())?;
 
     // If the function contains code we translate it
     // If it does not it means is a native function, we do nothing, it is linked and called
@@ -3201,7 +3204,7 @@ pub(crate) fn translate_and_link_functions(
             translate_and_link_functions(
                 function_id,
                 function_table,
-                function_definitions,
+                modules_data,
                 module,
                 compilation_ctx,
                 dynamic_fields_global_variables,

@@ -9,7 +9,7 @@ use crate::{
     vm_handled_types::error::VmHandledTypeError,
 };
 
-use super::public_function::PublicFunctionValidationError;
+use super::{packing::error::AbiPackError, public_function::PublicFunctionValidationError};
 
 #[derive(Debug, thiserror::Error)]
 pub enum AbiEncodingError {
@@ -117,6 +117,11 @@ pub enum AbiPackError {
 
     #[error("signer type cannot be packed as it has no ABI representation")]
     FoundSignerType,
+    
+    #[error(
+        "found heap type unpacking a reference. this should be handled in the add_unpack_instructions function"
+    )]
+    UnhandledHeapTypeReference,
 
     #[error("an error ocurred while generating a native funciton's code")]
     NativeFunction(#[from] NativeFunctionError),

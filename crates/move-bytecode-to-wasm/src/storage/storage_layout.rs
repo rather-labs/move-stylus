@@ -237,7 +237,7 @@ mod tests {
     use move_binary_format::file_format::StructDefinitionIndex;
     use rstest::rstest;
     use std::collections::HashMap;
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     use crate::compilation_context::{ModuleData, ModuleId};
     use crate::runtime::RuntimeFunction;
@@ -275,11 +275,7 @@ mod tests {
         let root = Box::leak(Box::new(module_data));
         let deps = Box::leak(Box::new(HashMap::new()));
         // Create module with memory_id and allocator that will be shared
-        let (mut module, allocator, memory_id) = build_module(None);
-        let calldata_reader_pointer_global =
-            module
-                .globals
-                .add_local(ValType::I32, false, false, ConstExpr::Value(Value::I32(0)));
+        let (module, allocator, memory_id, calldata_reader_pointer_global) = build_module(None);
         let ctx = CompilationContext::new(
             root,
             deps,
@@ -527,7 +523,7 @@ mod tests {
                     0,
                     vec![
                         IntermediateType::IAddress,
-                        IntermediateType::IVector(Rc::new(IntermediateType::IU8)),
+                        IntermediateType::IVector(Arc::new(IntermediateType::IU8)),
                         IntermediateType::IU64,
                     ],
                 ),
@@ -535,7 +531,7 @@ mod tests {
                     1,
                     0,
                     vec![
-                        IntermediateType::IVector(Rc::new(IntermediateType::IU8)),
+                        IntermediateType::IVector(Arc::new(IntermediateType::IU8)),
                         IntermediateType::IU64,
                         IntermediateType::IAddress,
                     ],
@@ -642,7 +638,7 @@ mod tests {
                     0,
                     vec![
                         IntermediateType::IAddress,
-                        IntermediateType::IVector(Rc::new(IntermediateType::IU8)),
+                        IntermediateType::IVector(Arc::new(IntermediateType::IU8)),
                         IntermediateType::IU64,
                     ],
                 ),
@@ -650,7 +646,7 @@ mod tests {
                     1,
                     0,
                     vec![
-                        IntermediateType::IVector(Rc::new(IntermediateType::IU8)),
+                        IntermediateType::IVector(Arc::new(IntermediateType::IU8)),
                         IntermediateType::IU64,
                         IntermediateType::IAddress,
                     ],
@@ -763,8 +759,6 @@ mod tests {
         #[case] expected_tail_slot: [u8; 32],
         #[case] expected_tail_offset: u32,
     ) {
-        use std::rc::Rc;
-
         let module_id = ModuleId::default();
 
         // Create a struct without key
@@ -776,7 +770,7 @@ mod tests {
                 (None, IntermediateType::IU64), // 8
                 (
                     None,
-                    IntermediateType::IVector(Rc::new(IntermediateType::IU8)),
+                    IntermediateType::IVector(Arc::new(IntermediateType::IU8)),
                 ), // 32
             ],
             HashMap::new(),
@@ -811,7 +805,7 @@ mod tests {
                 ), // 8
                 (
                     None,
-                    IntermediateType::IVector(Rc::new(IntermediateType::IU8)),
+                    IntermediateType::IVector(Arc::new(IntermediateType::IU8)),
                 ), // 32
             ],
             HashMap::new(),

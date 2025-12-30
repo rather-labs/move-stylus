@@ -25,7 +25,7 @@ pub fn move_signature_to_abi_selector(
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, rc::Rc};
+    use std::{collections::HashMap, sync::Arc};
 
     use move_binary_format::file_format::StructDefinitionIndex;
 
@@ -45,13 +45,7 @@ mod tests {
 
     #[test]
     fn test_move_signature_to_abi_selector() {
-        let (mut raw_module, allocator_func, memory_id) = build_module(None);
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            true,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
+        let (_, allocator_func, memory_id, calldata_reader_pointer_global) = build_module(None);
         let mut compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 
@@ -71,7 +65,7 @@ mod tests {
             IntermediateType::ISigner,
             IntermediateType::IAddress,
             IntermediateType::IU64,
-            IntermediateType::IVector(Rc::new(IntermediateType::IBool)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IBool)),
         ];
         assert_eq!(
             move_signature_to_abi_selector("set_owner", signature, &compilation_ctx).unwrap(),
@@ -79,8 +73,8 @@ mod tests {
         );
 
         let signature: &[IntermediateType] = &[
-            IntermediateType::IVector(Rc::new(IntermediateType::IU128)),
-            IntermediateType::IVector(Rc::new(IntermediateType::IBool)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IU128)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IBool)),
         ];
         assert_eq!(
             move_signature_to_abi_selector("test_array", signature, &compilation_ctx).unwrap(),
@@ -88,10 +82,10 @@ mod tests {
         );
 
         let signature: &[IntermediateType] = &[
-            IntermediateType::IVector(Rc::new(IntermediateType::IVector(Rc::new(
+            IntermediateType::IVector(Arc::new(IntermediateType::IVector(Arc::new(
                 IntermediateType::IU128,
             )))),
-            IntermediateType::IVector(Rc::new(IntermediateType::IBool)),
+            IntermediateType::IVector(Arc::new(IntermediateType::IBool)),
         ];
         assert_eq!(
             move_signature_to_abi_selector("test_array", signature, &compilation_ctx).unwrap(),
@@ -105,11 +99,11 @@ mod tests {
                 (None, IntermediateType::IAddress),
                 (
                     None,
-                    IntermediateType::IVector(Rc::new(IntermediateType::IU32)),
+                    IntermediateType::IVector(Arc::new(IntermediateType::IU32)),
                 ),
                 (
                     None,
-                    IntermediateType::IVector(Rc::new(IntermediateType::IU128)),
+                    IntermediateType::IVector(Arc::new(IntermediateType::IU128)),
                 ),
                 (None, IntermediateType::IBool),
                 (None, IntermediateType::IU8),
@@ -155,7 +149,7 @@ mod tests {
                 index: 0,
                 vm_handled_struct: VmHandledStruct::None,
             },
-            IntermediateType::IVector(Rc::new(IntermediateType::IStruct {
+            IntermediateType::IVector(Arc::new(IntermediateType::IStruct {
                 module_id: ModuleId::default(),
                 index: 1,
                 vm_handled_struct: VmHandledStruct::None,

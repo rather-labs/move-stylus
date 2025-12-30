@@ -12,36 +12,24 @@ pub fn unpack_reference_function(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
-    let mut function_builder = FunctionBuilder::new(
+    let name =
+        RuntimeFunction::UnpackReference.get_generic_function_name(compilation_ctx, &[itype])?;
+    if let Some(function) = module.funcs.by_name(&name) {
+        return Ok(function);
+    }
+
+    let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32],
         &[ValType::I32],
     );
-    let mut function_body = function_builder.func_body();
+    let mut builder = function.name(name).func_body();
 
     // Arguments
     let reader_pointer = module.locals.add(ValType::I32);
     let calldata_reader_pointer = module.locals.add(ValType::I32);
 
     match itype {
-        // If inner is a heap type, forward the pointer
-        IntermediateType::IU128
-        | IntermediateType::IU256
-        | IntermediateType::IAddress
-        | IntermediateType::ISigner
-        | IntermediateType::IVector(_)
-        | IntermediateType::IStruct { .. }
-        | IntermediateType::IGenericStructInstance { .. }
-        | IntermediateType::IEnum { .. }
-        | IntermediateType::IGenericEnumInstance { .. } => {
-            itype.add_unpack_instructions(
-                &mut function_body,
-                module,
-                reader_pointer,
-                calldata_reader_pointer,
-                compilation_ctx,
-            )?;
-        }
         // For immediates, allocate and store
         IntermediateType::IU8
         | IntermediateType::IU16
@@ -51,20 +39,21 @@ pub fn unpack_reference_function(
             let ptr_local = module.locals.add(walrus::ValType::I32);
 
             let data_size = itype.wasm_memory_data_size()?;
-            function_body
+            builder
                 .i32_const(data_size)
                 .call(compilation_ctx.allocator)
                 .local_tee(ptr_local);
 
             itype.add_unpack_instructions(
-                &mut function_body,
+                None,
+                &mut builder,
                 module,
                 reader_pointer,
                 calldata_reader_pointer,
                 compilation_ctx,
             )?;
 
-            function_body.store(
+            builder.store(
                 compilation_ctx.memory_id,
                 itype.store_kind()?,
                 MemArg {
@@ -73,7 +62,22 @@ pub fn unpack_reference_function(
                 },
             );
 
-            function_body.local_get(ptr_local);
+            builder.local_get(ptr_local);
+        }
+
+        IntermediateType::IU128
+        | IntermediateType::IU256
+        | IntermediateType::IAddress
+        | IntermediateType::ISigner
+        | IntermediateType::IVector(_)
+        | IntermediateType::IStruct { .. }
+        | IntermediateType::IGenericStructInstance { .. }
+        | IntermediateType::IEnum { .. }
+        | IntermediateType::IGenericEnumInstance { .. } => {
+            // Heap types are handled in the add_unpack_instructions function so this case should be unreachable
+            return Err(RuntimeFunctionError::from(AbiError::from(
+                AbiUnpackError::UnhandledHeapTypeReference,
+            )));
         }
 
         IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -88,8 +92,7 @@ pub fn unpack_reference_function(
         }
     }
 
-    function_builder.name(RuntimeFunction::UnpackReference.name().to_owned());
-    Ok(function_builder.finish(
+    Ok(function.finish(
         vec![reader_pointer, calldata_reader_pointer],
         &mut module.funcs,
     ))
@@ -99,8 +102,8 @@ pub fn unpack_reference_function(
 mod tests {
     use alloy_primitives::{U256, address};
     use alloy_sol_types::{SolType, sol};
-    use std::rc::Rc;
-    use walrus::{ConstExpr, FunctionBuilder, ValType, ir::Value};
+    use std::sync::Arc;
+    use walrus::{FunctionBuilder, ValType};
 
     use crate::{
         abi_types::unpacking::Unpackable,
@@ -111,13 +114,8 @@ mod tests {
 
     /// Test helper for unpacking reference types
     fn unpack_ref(data: &[u8], ref_type: IntermediateType, expected_memory_bytes: &[u8]) {
-        let (mut raw_module, allocator, memory_id) = build_module(Some(data.len() as i32));
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            true,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(data.len() as i32));
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
 
@@ -134,6 +132,7 @@ mod tests {
 
         ref_type
             .add_unpack_instructions(
+                Some(&ref_type),
                 &mut func_body,
                 &mut raw_module,
                 args_pointer,
@@ -168,7 +167,7 @@ mod tests {
     #[test]
     fn test_unpack_ref_u8() {
         type SolType = sol!((uint8,));
-        let int_type = IntermediateType::IRef(Rc::new(IntermediateType::IU8));
+        let int_type = IntermediateType::IRef(Arc::new(IntermediateType::IU8));
 
         let data = SolType::abi_encode_params(&(88u8,));
         let expected = 88u8.to_le_bytes().to_vec();
@@ -178,7 +177,7 @@ mod tests {
     #[test]
     fn test_unpack_ref_u16() {
         type SolType = sol!((uint16,));
-        let int_type = IntermediateType::IRef(Rc::new(IntermediateType::IU16));
+        let int_type = IntermediateType::IRef(Arc::new(IntermediateType::IU16));
 
         let data = SolType::abi_encode_params(&(88u16,));
         let expected = 88u16.to_le_bytes().to_vec();
@@ -188,7 +187,7 @@ mod tests {
     #[test]
     fn test_unpack_ref_u32() {
         type SolType = sol!((uint32,));
-        let int_type = IntermediateType::IRef(Rc::new(IntermediateType::IU32));
+        let int_type = IntermediateType::IRef(Arc::new(IntermediateType::IU32));
 
         let data = SolType::abi_encode_params(&(88u32,));
         unpack_ref(&data, int_type.clone(), &88u32.to_le_bytes());
@@ -197,7 +196,7 @@ mod tests {
     #[test]
     fn test_unpack_ref_u64() {
         type SolType = sol!((uint64,));
-        let int_type = IntermediateType::IRef(Rc::new(IntermediateType::IU64));
+        let int_type = IntermediateType::IRef(Arc::new(IntermediateType::IU64));
 
         let data = SolType::abi_encode_params(&(88u64,));
         unpack_ref(&data, int_type.clone(), &88u64.to_le_bytes());
@@ -210,7 +209,7 @@ mod tests {
     #[test]
     fn test_unpack_ref_u128() {
         type SolType = sol!((uint128,));
-        let int_type = IntermediateType::IRef(Rc::new(IntermediateType::IU128));
+        let int_type = IntermediateType::IRef(Arc::new(IntermediateType::IU128));
 
         let data = SolType::abi_encode_params(&(123u128,));
         let expected = 123u128.to_le_bytes().to_vec();
@@ -220,7 +219,7 @@ mod tests {
     #[test]
     fn test_unpack_ref_u256() {
         type SolType = sol!((uint256,));
-        let int_type = IntermediateType::IRef(Rc::new(IntermediateType::IU256));
+        let int_type = IntermediateType::IRef(Arc::new(IntermediateType::IU256));
 
         let value = U256::from(123u128);
         let expected = value.to_le_bytes::<32>().to_vec();
@@ -232,7 +231,7 @@ mod tests {
     #[test]
     fn test_unpack_ref_address() {
         type SolType = sol!((address,));
-        let ref_type = IntermediateType::IRef(Rc::new(IntermediateType::IAddress));
+        let ref_type = IntermediateType::IRef(Arc::new(IntermediateType::IAddress));
 
         let data =
             SolType::abi_encode_params(&(address!("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"),));
@@ -246,7 +245,7 @@ mod tests {
     #[test]
     fn test_unpack_ref_vec_u8() {
         type SolType = sol!((uint8[],));
-        let vector_type = IntermediateType::IRef(Rc::new(IntermediateType::IVector(Rc::new(
+        let vector_type = IntermediateType::IRef(Arc::new(IntermediateType::IVector(Arc::new(
             IntermediateType::IU8,
         ))));
 
@@ -266,7 +265,7 @@ mod tests {
     #[test]
     fn test_unpack_ref_vec_u128() {
         type SolType = sol!((uint128[],));
-        let vector_type = IntermediateType::IRef(Rc::new(IntermediateType::IVector(Rc::new(
+        let vector_type = IntermediateType::IRef(Arc::new(IntermediateType::IVector(Arc::new(
             IntermediateType::IU128,
         ))));
 

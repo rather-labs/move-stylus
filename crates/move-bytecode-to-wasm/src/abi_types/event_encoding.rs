@@ -96,7 +96,7 @@ pub fn struct_fields_sol_name(
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, rc::Rc};
+    use std::{collections::HashMap, sync::Arc};
 
     use move_binary_format::file_format::StructDefinitionIndex;
     use rstest::rstest;
@@ -116,13 +116,7 @@ mod tests {
 
     #[test]
     fn test_move_signature_to_event_signature_hash_nested() {
-        let (mut raw_module, allocator_func, memory_id) = build_module(None);
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            true,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
+        let (_, allocator_func, memory_id, calldata_reader_pointer_global) = build_module(None);
         let mut compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 
@@ -133,11 +127,11 @@ mod tests {
                 (None, IntermediateType::IAddress),
                 (
                     None,
-                    IntermediateType::IVector(Rc::new(IntermediateType::IU32)),
+                    IntermediateType::IVector(Arc::new(IntermediateType::IU32)),
                 ),
                 (
                     None,
-                    IntermediateType::IVector(Rc::new(IntermediateType::IU128)),
+                    IntermediateType::IVector(Arc::new(IntermediateType::IU128)),
                 ),
                 (None, IntermediateType::IBool),
                 (None, IntermediateType::IU8),
@@ -232,13 +226,7 @@ mod tests {
         #[case] event_struct: &IStruct,
         #[case] expected: AbiEventSignatureHash,
     ) {
-        let (mut raw_module, allocator_func, memory_id) = build_module(None);
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            true,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
+        let (_, allocator_func, memory_id, calldata_reader_pointer_global) = build_module(None);
         let mut compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 

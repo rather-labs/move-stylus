@@ -19,12 +19,14 @@ pub fn unpack_string_function(
     let validate_pointer_fn =
         RuntimeFunction::ValidatePointer32Bit.get(module, Some(compilation_ctx))?;
 
-    let mut function_builder = FunctionBuilder::new(
+    let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32],
         &[ValType::I32],
     );
-    let mut function_body = function_builder.func_body();
+    let mut builder = function
+        .name(RuntimeFunction::UnpackString.name().to_owned())
+        .func_body();
 
     // Arguments
     let reader_pointer = module.locals.add(ValType::I32);
@@ -34,11 +36,9 @@ pub fn unpack_string_function(
 
     // The ABI encoded value of a dynamic type is a reference to the location of the
     // values in the call data.
-    function_body
-        .local_get(reader_pointer)
-        .call(validate_pointer_fn);
+    builder.local_get(reader_pointer).call(validate_pointer_fn);
 
-    function_body
+    builder
         .local_get(reader_pointer)
         .load(
             compilation_ctx.memory_id,
@@ -55,21 +55,21 @@ pub fn unpack_string_function(
         .local_set(data_reader_pointer); // This references the vector actual data
 
     // Advance the reader pointer by 32
-    function_body
+    builder
         .local_get(reader_pointer)
         .i32_const(32)
         .binop(BinaryOp::I32Add)
         .global_set(compilation_ctx.calldata_reader_pointer);
 
     // Validate that the data reader pointer fits in 32 bits
-    function_body
+    builder
         .local_get(data_reader_pointer)
         .call(validate_pointer_fn);
 
     // Vector length: current number of elements in the vector
     let length = module.locals.add(ValType::I32);
 
-    function_body
+    builder
         .local_get(data_reader_pointer)
         .load(
             compilation_ctx.memory_id,
@@ -84,7 +84,7 @@ pub fn unpack_string_function(
         .local_set(length);
 
     // Increment data reader pointer
-    function_body
+    builder
         .local_get(data_reader_pointer)
         .i32_const(32)
         .binop(BinaryOp::I32Add)
@@ -96,27 +96,25 @@ pub fn unpack_string_function(
     // Allocate space for the vector
     // Each u8 element takes 1 byte
     IVector::allocate_vector_with_header(
-        &mut function_body,
+        &mut builder,
         compilation_ctx,
         vector_pointer,
         length,
         length,
         1,
     );
-    function_body
-        .local_get(vector_pointer)
-        .local_set(writer_pointer);
+    builder.local_get(vector_pointer).local_set(writer_pointer);
 
     // Set writer pointer to the start of the vector data
-    function_body
+    builder
         .skip_vec_header(writer_pointer)
         .local_set(writer_pointer);
 
     // Copy elements
     let i = module.locals.add(ValType::I32);
-    function_body.i32_const(0).local_set(i);
+    builder.i32_const(0).local_set(i);
 
-    function_body.loop_(None, |loop_block| {
+    builder.loop_(None, |loop_block| {
         let loop_block_id = loop_block.id();
 
         loop_block.local_get(writer_pointer);
@@ -170,13 +168,13 @@ pub fn unpack_string_function(
 
     let struct_ptr = module.locals.add(ValType::I32);
     // Create the struct pointing to the vector
-    function_body
+    builder
         .i32_const(4)
         .call(compilation_ctx.allocator)
         .local_tee(struct_ptr);
 
     // Save the vector pointer as the first value
-    function_body.local_get(vector_pointer).store(
+    builder.local_get(vector_pointer).store(
         compilation_ctx.memory_id,
         StoreKind::I32 { atomic: false },
         MemArg {
@@ -186,10 +184,9 @@ pub fn unpack_string_function(
     );
 
     // Return the String struct
-    function_body.local_get(struct_ptr);
+    builder.local_get(struct_ptr);
 
-    function_builder.name(RuntimeFunction::UnpackString.name().to_owned());
-    Ok(function_builder.finish(
+    Ok(function.finish(
         vec![reader_pointer, calldata_reader_pointer],
         &mut module.funcs,
     ))

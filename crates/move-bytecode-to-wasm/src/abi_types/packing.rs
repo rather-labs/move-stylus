@@ -461,7 +461,7 @@ impl Packable for IntermediateType {
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     use alloy_primitives::U256;
     use alloy_sol_types::sol;
@@ -503,13 +503,8 @@ mod tests {
 
     #[test]
     fn test_build_pack_instructions() {
-        let (mut raw_module, allocator_func, memory_id) = build_module(None);
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            true,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 
@@ -574,13 +569,8 @@ mod tests {
     #[test]
     fn test_build_pack_instructions_memory_offset() {
         // Memory offset starts at 100
-        let (mut raw_module, allocator_func, memory_id) = build_module(Some(100));
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            true,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(100));
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 
@@ -672,13 +662,8 @@ mod tests {
         .concat();
         let data_len = data.len() as i32;
 
-        let (mut raw_module, allocator_func, memory_id) = build_module(Some(data_len));
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            true,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(data_len));
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 
@@ -702,7 +687,7 @@ mod tests {
             &mut func_body,
             &[
                 IntermediateType::IU16,
-                IntermediateType::IVector(Rc::new(IntermediateType::IVector(Rc::new(
+                IntermediateType::IVector(Arc::new(IntermediateType::IVector(Arc::new(
                     IntermediateType::IU128,
                 )))),
                 IntermediateType::IU256,

@@ -1,8 +1,5 @@
 use alloy_sol_types::{SolType, sol_data};
-use walrus::{
-    InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{MemArg, StoreKind},
-};
+use walrus::{InstrSeqBuilder, LocalId, Module, ValType};
 
 use crate::{
     CompilationContext,
@@ -10,7 +7,6 @@ use crate::{
         ModuleId,
         reserved_modules::{SF_MODULE_NAME_OBJECT, STYLUS_FRAMEWORK_ADDRESS},
     },
-    data::DATA_UNPACK_FROZEN_OFFSET,
     native_functions::NativeFunction,
     runtime::RuntimeFunction,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
@@ -34,6 +30,7 @@ pub trait Unpackable {
     /// The stack at the end contains the value(or pointer to the value) as **i32/i64**
     fn add_unpack_instructions(
         &self,
+        parent_type: Option<&IntermediateType>,
         function_builder: &mut InstrSeqBuilder,
         module: &mut Module,
         reader_pointer: LocalId,
@@ -70,6 +67,7 @@ pub fn build_unpack_instructions<T: Unpackable>(
     // Static types are stored in-place, but dynamic types are referenced to the call data
     for signature_token in function_arguments_signature.iter() {
         signature_token.add_unpack_instructions(
+            None,
             function_builder,
             module,
             reader_pointer,
@@ -84,6 +82,7 @@ pub fn build_unpack_instructions<T: Unpackable>(
 impl Unpackable for IntermediateType {
     fn add_unpack_instructions(
         &self,
+        parent_type: Option<&IntermediateType>,
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
         reader_pointer: LocalId,
@@ -100,7 +99,7 @@ impl Unpackable for IntermediateType {
                     IntermediateType::IU8 => sol_data::Uint::<8>::ENCODED_SIZE,
                     IntermediateType::IU16 => sol_data::Uint::<16>::ENCODED_SIZE,
                     IntermediateType::IU32 => sol_data::Uint::<32>::ENCODED_SIZE,
-                    _ => unreachable!(),
+                    _ => None,
                 }
                 .ok_or(AbiError::UnableToGetTypeAbiSize)?;
 
@@ -145,43 +144,38 @@ impl Unpackable for IntermediateType {
             // The signer must not be unpacked here, since it can't be part of the calldata. It is
             // injected directly by the VM into the stack
             IntermediateType::ISigner => (),
-            IntermediateType::IRef(inner) => {
-                // This is the only place where we pass the flag unpack_frozen = true.
-                // This is because we only want to unpack frozen objects from the storage
-                // if the object is passed as an immutable reference to the function arguments.
-                // unpack_frozen = true
-                builder
-                    .i32_const(DATA_UNPACK_FROZEN_OFFSET)
-                    .i32_const(1)
-                    .store(
-                        compilation_ctx.memory_id,
-                        StoreKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
-
-                let unpack_reference_function = RuntimeFunction::UnpackReference.get_generic(
-                    module,
-                    compilation_ctx,
-                    &[inner],
-                )?;
-                builder
-                    .local_get(reader_pointer)
-                    .local_get(calldata_base_pointer)
-                    .call(unpack_reference_function);
-            }
-            IntermediateType::IMutRef(inner) => {
-                let unpack_reference_function = RuntimeFunction::UnpackReference.get_generic(
-                    module,
-                    compilation_ctx,
-                    &[inner],
-                )?;
-                builder
-                    .local_get(reader_pointer)
-                    .local_get(calldata_base_pointer)
-                    .call(unpack_reference_function);
+            IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
+                match inner.as_ref() {
+                    IntermediateType::IU128
+                    | IntermediateType::IU256
+                    | IntermediateType::IAddress
+                    | IntermediateType::ISigner
+                    | IntermediateType::IVector(_)
+                    | IntermediateType::IStruct { .. }
+                    | IntermediateType::IGenericStructInstance { .. }
+                    | IntermediateType::IEnum { .. }
+                    | IntermediateType::IGenericEnumInstance { .. } => {
+                        // For heap-allocated types, directly invoke the unpack function of the referenced inner type
+                        inner.add_unpack_instructions(
+                            Some(self),
+                            builder,
+                            module,
+                            reader_pointer,
+                            calldata_base_pointer,
+                            compilation_ctx,
+                        )?;
+                    }
+                    _ => {
+                        // For stack types, call the unpack reference runtime fn,
+                        // which has the instructions to allocate a middle pointer to the unpacked value
+                        let unpack_reference_function = RuntimeFunction::UnpackReference
+                            .get_generic(module, compilation_ctx, &[inner])?;
+                        builder
+                            .local_get(reader_pointer)
+                            .local_get(calldata_base_pointer)
+                            .call(unpack_reference_function);
+                    }
+                }
             }
 
             IntermediateType::IStruct {
@@ -219,6 +213,14 @@ impl Unpackable for IntermediateType {
                         compilation_ctx,
                         &struct_,
                     )?;
+
+                    // If the inner type is a storage struct, we need to pass the flag unpack_frozen.
+                    // If the parent type is an immutable reference, we need to unpack frozen objects, so we push a 1 to the stack. Else we push a 0 to the stack.
+                    if parent_type.is_some_and(|p| matches!(p, IntermediateType::IRef(_))) {
+                        builder.i32_const(1);
+                    } else {
+                        builder.i32_const(0);
+                    }
 
                     let unpack_storage_struct_function = RuntimeFunction::UnpackStorageStruct
                         .get_generic(module, compilation_ctx, &[self])?;
@@ -332,13 +334,8 @@ mod tests {
 
     #[test]
     fn test_build_unpack_instructions() {
-        let (mut raw_module, allocator_func, memory_id) = build_module(None);
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            true,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 
@@ -397,13 +394,8 @@ mod tests {
 
     #[test]
     fn test_build_unpack_instructions_reversed() {
-        let (mut raw_module, allocator_func, memory_id) = build_module(None);
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            true,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 
@@ -469,13 +461,8 @@ mod tests {
 
     #[test]
     fn test_build_unpack_instructions_offset_memory() {
-        let (mut raw_module, allocator_func, memory_id) = build_module(None);
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            true,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 

@@ -26,7 +26,7 @@ use constructor::inject_constructor;
 use error::{
     CodeError, CompilationError, DependencyError, DependencyProcessingError, ICEError, ICEErrorKind,
 };
-use move_binary_format::file_format::FunctionDefinition;
+use hostio::entrypoint_router::build_entrypoint_router;
 use move_package::{
     compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource},
     source_package::parsed_manifest::PackageName,
@@ -35,9 +35,7 @@ use move_parse_special_attributes::process_special_attributes;
 use move_symbol_pool::Symbol;
 use std::{collections::HashMap, path::PathBuf};
 use translation::{
-    TranslationError,
-    intermediate_types::IntermediateType,
-    table::{FunctionId, FunctionTable},
+    TranslationError, intermediate_types::IntermediateType, table::FunctionTable,
     translate_and_link_functions,
 };
 
@@ -46,25 +44,26 @@ use wasm_validation::validate_stylus_wasm;
 
 pub use translation::functions::MappedFunction;
 
-pub type GlobalFunctionTable<'move_package> =
-    HashMap<FunctionId, &'move_package FunctionDefinition>;
-
-pub fn translate_single_module(
-    package: &CompiledPackage,
+pub fn translate_single_module<'move_compiled_package>(
+    package: &'move_compiled_package CompiledPackage,
     module_name: &str,
+    modules_data: &mut HashMap<ModuleId, ModuleData<'move_compiled_package>>,
 ) -> Result<Module, CompilationError> {
-    let mut modules = translate_package(package, Some(module_name.to_string()), false)?;
+    let mut modules =
+        translate_package(package, Some(module_name.to_string()), modules_data, false)?;
 
     Ok(modules
         .remove(module_name)
         .ok_or_else(|| ICEError::new(ICEErrorKind::ModuleNotCompiled(module_name.to_string())))?)
 }
 
-pub fn translate_package(
-    package: &CompiledPackage,
+pub fn translate_package<'move_package>(
+    package: &'move_package CompiledPackage,
     module_name: Option<String>,
+    modules_data: &mut HashMap<ModuleId, ModuleData<'move_package>>,
     verbose: bool,
 ) -> Result<HashMap<String, Module>, CompilationError> {
+    println!("module data: {:?}", modules_data.keys());
     // HashMap of package name to address
     // This includes all the dependencies of the root package
     let address_alias_instantiation: HashMap<Symbol, [u8; 32]> = package
@@ -74,15 +73,16 @@ pub fn translate_package(
         .map(|(key, value)| (*key, value.into_bytes()))
         .collect();
 
-    let root_compiled_units: Vec<&CompiledUnitWithSource> = if let Some(module_name) = module_name {
-        package
-            .root_compiled_units
-            .iter()
-            .filter(move |unit| unit.unit.name.to_string() == module_name)
-            .collect()
-    } else {
-        package.root_compiled_units.iter().collect()
-    };
+    let root_compiled_units: Vec<&'move_package CompiledUnitWithSource> =
+        if let Some(module_name) = module_name {
+            package
+                .root_compiled_units
+                .iter()
+                .filter(move |unit| unit.unit.name.to_string() == module_name)
+                .collect()
+        } else {
+            package.root_compiled_units.iter().collect()
+        };
 
     if root_compiled_units.is_empty() {
         return Err(CompilationError::NoFilesFound);
@@ -91,15 +91,10 @@ pub fn translate_package(
     let mut modules = HashMap::new();
 
     // Contains the module data for all the root package and its dependencies
-    let mut modules_data: HashMap<ModuleId, ModuleData> = HashMap::new();
-
-    // Contains all a reference for all functions definitions in case we need to process them and
-    // statically link them
-    let mut function_definitions: GlobalFunctionTable = HashMap::new();
+    // let mut modules_data: HashMap<ModuleId, ModuleData> = HashMap::new();
 
     let mut errors = Vec::new();
 
-    // TODO: a lot of clones, we must create a symbol pool
     for root_compiled_module in &root_compiled_units {
         // This is used to keep track of dynamic fields were retrieved from storage as mutable.
         // This vector is used at the end of the entrypoint function to commit the possible changes
@@ -130,11 +125,10 @@ pub fn translate_package(
 
         // Process the dependency tree
         if let Err(dependencies_errors) = process_dependency_tree(
-            &mut modules_data,
+            modules_data,
             &package.deps_compiled_units,
             &root_compiled_units,
             &root_compiled_module_unit.immediate_dependencies(),
-            &mut function_definitions,
             &address_alias_instantiation,
             verbose,
         ) {
@@ -151,7 +145,7 @@ pub fn translate_package(
 
         // Build a HashMap of structs by module id from all dependencies.
         // This allows proper validation of entry function return values, ensuring they do not return imported structs with the key ability.
-        let deps_structs = build_dependency_structs_map(&modules_data);
+        let deps_structs = build_dependency_structs_map(modules_data);
 
         let special_attributes = match process_special_attributes(
             &root_compiled_module.source_path,
@@ -171,7 +165,6 @@ pub fn translate_package(
             root_compiled_module,
             &package.deps_compiled_units,
             &root_compiled_units,
-            &mut function_definitions,
             special_attributes,
         )?;
 
@@ -182,7 +175,7 @@ pub fn translate_package(
 
         let compilation_ctx = CompilationContext::new(
             &root_module_data,
-            &modules_data,
+            modules_data,
             memory_id,
             allocator_func,
             calldata_reader_pointer_global,
@@ -195,7 +188,7 @@ pub fn translate_package(
             translate_and_link_functions(
                 &function_information.function_id,
                 &mut function_table,
-                &function_definitions,
+                modules_data,
                 &mut module,
                 &compilation_ctx,
                 &mut dynamic_fields_global_variables,
@@ -225,7 +218,7 @@ pub fn translate_package(
             &mut public_functions,
         )?;
 
-        hostio::build_entrypoint_router(
+        build_entrypoint_router(
             &mut module,
             &public_functions,
             &compilation_ctx,
@@ -272,9 +265,6 @@ pub fn package_module_data<'move_package>(
     let mut modules_paths = HashMap::new();
     let mut errors = Vec::new();
 
-    // This is not used in this function but is used in the others
-    let mut function_definitions: GlobalFunctionTable = HashMap::new();
-
     for root_compiled_module in root_compiled_units {
         let module_name = root_compiled_module.unit.name.to_string();
         let root_compiled_module_unit = &root_compiled_module.unit.module;
@@ -288,7 +278,6 @@ pub fn package_module_data<'move_package>(
             &package.deps_compiled_units,
             root_compiled_units,
             &root_compiled_module_unit.immediate_dependencies(),
-            &mut function_definitions,
             &address_alias_instantiation,
             verbose,
         ) {
@@ -325,7 +314,6 @@ pub fn package_module_data<'move_package>(
             root_compiled_module,
             &package.deps_compiled_units,
             root_compiled_units,
-            &mut function_definitions,
             special_attributes,
         )?;
 
@@ -352,9 +340,8 @@ pub fn package_module_data<'move_package>(
 pub fn process_dependency_tree<'move_package>(
     dependencies_data: &mut HashMap<ModuleId, ModuleData<'move_package>>,
     deps_compiled_units: &'move_package [(PackageName, CompiledUnitWithSource)],
-    root_compiled_units: &'move_package [&CompiledUnitWithSource],
+    root_compiled_units: &[&'move_package CompiledUnitWithSource],
     dependencies: &[move_core_types::language_storage::ModuleId],
-    function_definitions: &mut GlobalFunctionTable<'move_package>,
     address_alias_instantiation: &HashMap<Symbol, [u8; 32]>,
     verbose: bool,
 ) -> Result<(), DependencyProcessingError> {
@@ -393,7 +380,6 @@ pub fn process_dependency_tree<'move_package>(
                 deps_compiled_units,
                 root_compiled_units,
                 immediate_dependencies,
-                function_definitions,
                 address_alias_instantiation,
                 verbose,
             )
@@ -435,7 +421,6 @@ pub fn process_dependency_tree<'move_package>(
             dependency_module,
             deps_compiled_units,
             root_compiled_units,
-            function_definitions,
             special_attributes,
         )
         .map_err(|e| {

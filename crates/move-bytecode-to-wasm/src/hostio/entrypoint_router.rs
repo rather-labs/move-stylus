@@ -393,13 +393,8 @@ mod tests {
 
     #[test]
     fn test_build_entrypoint_router_noop() {
-        let (mut raw_module, allocator_func, memory_id) = build_module(None);
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            true,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         let signature = ISignature {
@@ -440,13 +435,8 @@ mod tests {
     #[test]
     // #[should_panic(expected = "unreachable")]
     fn test_build_entrypoint_router_no_data() {
-        let (mut raw_module, allocator_func, memory_id) = build_module(None);
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            true,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         let signature = ISignature {
@@ -471,13 +461,8 @@ mod tests {
 
     #[test]
     fn test_build_entrypoint_router_no_match() {
-        let (mut raw_module, allocator_func, memory_id) = build_module(None);
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            true,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         let signature = ISignature {

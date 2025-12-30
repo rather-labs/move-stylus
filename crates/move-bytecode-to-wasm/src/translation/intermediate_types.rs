@@ -13,7 +13,7 @@ use std::{
     borrow::Cow,
     collections::HashMap,
     hash::{Hash, Hasher},
-    rc::Rc,
+    sync::Arc,
 };
 
 use crate::{
@@ -67,9 +67,9 @@ pub enum IntermediateType {
     IU256,
     IAddress,
     ISigner,
-    IVector(Rc<IntermediateType>),
-    IRef(Rc<IntermediateType>),
-    IMutRef(Rc<IntermediateType>),
+    IVector(Arc<IntermediateType>),
+    IRef(Arc<IntermediateType>),
+    IMutRef(Arc<IntermediateType>),
 
     /// Type parameter, used for generic enums and structs
     /// The u16 is the index of the type parameter in the signature
@@ -210,15 +210,15 @@ impl IntermediateType {
             SignatureToken::Signer => Ok(Self::ISigner),
             SignatureToken::Vector(token) => {
                 let itoken = Self::try_from_signature_token(token.as_ref(), handles_map)?;
-                Ok(IntermediateType::IVector(Rc::new(itoken)))
+                Ok(IntermediateType::IVector(Arc::new(itoken)))
             }
             SignatureToken::Reference(token) => {
                 let itoken = Self::try_from_signature_token(token.as_ref(), handles_map)?;
-                Ok(IntermediateType::IRef(Rc::new(itoken)))
+                Ok(IntermediateType::IRef(Arc::new(itoken)))
             }
             SignatureToken::MutableReference(token) => {
                 let itoken = Self::try_from_signature_token(token.as_ref(), handles_map)?;
-                Ok(IntermediateType::IMutRef(Rc::new(itoken)))
+                Ok(IntermediateType::IMutRef(Arc::new(itoken)))
             }
             SignatureToken::Datatype(datatype_index) => {
                 if let Some(udt) = handles_map.get(datatype_index) {

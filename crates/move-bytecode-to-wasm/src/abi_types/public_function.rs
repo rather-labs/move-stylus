@@ -303,7 +303,7 @@ impl<'a> PublicFunction<'a> {
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     use alloy_sol_types::{SolType, sol};
     use walrus::{
@@ -520,14 +520,9 @@ mod tests {
 
     #[test]
     fn test_build_public_function() {
-        let (mut raw_module, allocator, memory_id) = build_module(None);
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
 
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            true,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
         let mut function_builder = FunctionBuilder::new(
@@ -625,13 +620,8 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_build_public_function_with_signer() {
-        let (mut raw_module, allocator, memory_id) = build_module(None);
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            true,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
 
@@ -715,13 +705,8 @@ mod tests {
 
     #[test]
     fn test_build_entrypoint_router_no_match() {
-        let (mut raw_module, allocator_func, memory_id) = build_module(None);
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            true,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 
@@ -795,13 +780,8 @@ mod tests {
     // injects a mock address as signer and execute the function
     #[test]
     fn public_function_with_signature() {
-        let (mut raw_module, allocator, memory_id) = build_module(None);
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            true,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
 
@@ -831,13 +811,8 @@ mod tests {
 
     #[test]
     fn test_fail_public_function_signature() {
-        let (mut raw_module, allocator, memory_id) = build_module(None);
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            true,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
 
@@ -875,13 +850,8 @@ mod tests {
 
     #[test]
     fn test_fail_public_function_signature_complex_type() {
-        let (mut raw_module, allocator, memory_id) = build_module(None);
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            true,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
 
@@ -899,7 +869,7 @@ mod tests {
             arguments: vec![
                 IntermediateType::IBool,
                 IntermediateType::IU64,
-                IntermediateType::IVector(Rc::new(IntermediateType::ISigner)),
+                IntermediateType::IVector(Arc::new(IntermediateType::ISigner)),
             ],
             returns: vec![],
         };
@@ -920,13 +890,8 @@ mod tests {
 
     #[test]
     fn test_fail_public_function_signature_complex_type_2() {
-        let (mut raw_module, allocator, memory_id) = build_module(None);
-        let calldata_reader_pointer_global = raw_module.globals.add_local(
-            ValType::I32,
-            true,
-            false,
-            ConstExpr::Value(Value::I32(0)),
-        );
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
 
@@ -944,7 +909,7 @@ mod tests {
             arguments: vec![
                 IntermediateType::IBool,
                 IntermediateType::IU64,
-                IntermediateType::IVector(Rc::new(IntermediateType::IVector(Rc::new(
+                IntermediateType::IVector(Arc::new(IntermediateType::IVector(Arc::new(
                     IntermediateType::ISigner,
                 )))),
             ],

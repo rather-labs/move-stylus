@@ -1,4 +1,4 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{collections::HashMap, sync::Arc};
 
 use move_binary_format::file_format::FieldHandleIndex;
 use walrus::{
@@ -645,7 +645,7 @@ fn add_encode_indexed_vector_instructions(
 
             if !enum_.is_simple {
                 return Err(NativeFunctionError::EmitFunctionInvalidEventField(
-                    IntermediateType::IVector(Rc::new(inner.clone())),
+                    IntermediateType::IVector(Arc::new(inner.clone())),
                 ));
             }
 
@@ -713,7 +713,7 @@ fn add_encode_indexed_vector_instructions(
         }
         _ => {
             return Err(NativeFunctionError::EmitFunctionInvalidEventField(
-                IntermediateType::IVector(Rc::new(inner.clone())),
+                IntermediateType::IVector(Arc::new(inner.clone())),
             ));
         }
     }
