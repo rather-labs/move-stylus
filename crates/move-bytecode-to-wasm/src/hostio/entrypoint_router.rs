@@ -200,9 +200,11 @@ pub fn build_entrypoint_router(
 
     // --- SHARED EXIT LOGIC ---
 
-    // Load the abort message pointer from DATA_ABORT_MESSAGE_PTR_OFFSET
-    // If not null, an abort occurred and we need to return the error message
+    // 1. Check for Global Abort
     router_builder.block(None, |abort_block| {
+        // Load the abort message pointer from DATA_ABORT_MESSAGE_PTR_OFFSET
+        // If not null, an abort occurred and we need to return the error message
+
         let abort_block_id = abort_block.id();
 
         // Load the ptr
@@ -245,26 +247,35 @@ pub fn build_entrypoint_router(
             .binop(BinaryOp::I32Add)
             .local_set(args_pointer);
 
-        // Set status to 1
+        // Set status to 1 (error)
         abort_block.i32_const(1).local_set(status);
     });
 
+    // 2. Write return data
+    router_builder
+        .local_get(args_pointer)
+        .local_get(args_len)
+        .call(write_return_data_function);
+
+    // 3. Conditionally commit changes to storage (iff status == 0)
     let commit_changes_to_storage_function = RuntimeFunction::get_commit_changes_to_storage_fn(
         module,
         compilation_ctx,
         dynamic_fields_global_variables,
     )?;
 
-    // Write return data
     router_builder
-        .local_get(args_pointer)
-        .local_get(args_len)
-        .call(write_return_data_function);
+        .local_get(status)
+        .unop(UnaryOp::I32Eqz)
+        .if_else(
+            None,
+            |then| {
+                then.call(commit_changes_to_storage_function);
+            },
+            |_| {},
+        );
 
-    // Commit changes to storage
-    router_builder.call(commit_changes_to_storage_function);
-
-    // Return
+    // 4. Return
     router_builder.local_get(status).return_();
 
     let router = router.finish(vec![args_len], &mut module.funcs);
