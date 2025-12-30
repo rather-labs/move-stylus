@@ -112,7 +112,6 @@ mod tests {
     };
 
     use super::*;
-    use walrus::{ConstExpr, ValType, ir::Value};
 
     #[test]
     fn test_move_signature_to_event_signature_hash_nested() {

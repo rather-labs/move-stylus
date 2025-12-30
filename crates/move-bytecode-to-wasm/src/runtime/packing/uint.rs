@@ -86,7 +86,7 @@ pub fn pack_u64_function(
 #[cfg(test)]
 mod tests {
     use alloy_sol_types::{SolType, sol};
-    use walrus::{ConstExpr, FunctionBuilder, ValType, ir::Value};
+    use walrus::{FunctionBuilder, ValType};
 
     use crate::{
         abi_types::packing::Packable,

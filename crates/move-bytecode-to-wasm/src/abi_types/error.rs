@@ -9,10 +9,10 @@ use crate::{
     vm_handled_types::error::VmHandledTypeError,
 };
 
-use super::{packing::error::AbiPackError, public_function::PublicFunctionValidationError};
+use super::public_function::PublicFunctionValidationError;
 
 #[derive(Debug, thiserror::Error)]
-pub enum AbiEncodingError {
+pub enum AbiOperationError {
     #[error("found a reference inside a reference")]
     RefInsideRef,
 
@@ -27,21 +27,43 @@ pub enum AbiEncodingError {
 
     #[error("cannot check if generic type parameter is dynamic at compile time")]
     GenericTypeParameterIsDynamic,
+
+    #[error(
+        "expected stylus::object::UID or stylus::object::NamedId as first field in {0} struct (it has key ability)"
+    )]
+    StorageObjectHasNoId(Symbol),
+
+    #[error(r#"cannot abi unpack/pack enum "{0}", it contains at least one variant with fields"#)]
+    EnumIsNotSimple(Symbol),
+
+    #[error("cannot unpack generic type parameter")]
+    UnpackingGenericTypeParameter,
+
+    #[error("cannot pack generic type parameter")]
+    PackingGenericTypeParameter,
+
+    #[error(
+        "found heap type unpacking a reference. this should be handled in the add_unpack_instructions function"
+    )]
+    UnhandledHeapTypeReference,
 }
 
 #[derive(thiserror::Error, Debug)]
 pub enum AbiError {
     #[error("there was an error performing abi unpack operation")]
-    Unpack(#[from] AbiUnpackError),
+    Unpack(AbiOperationError),
 
     #[error("there was an error performing abi pack operation")]
-    Pack(#[from] AbiPackError),
+    Pack(AbiOperationError),
 
     #[error("abi encoding error")]
-    AbiEncoding(#[from] AbiEncodingError),
+    AbiEncoding(AbiOperationError),
 
     #[error("there was an error validating a public function")]
     PublicFunction(#[from] PublicFunctionValidationError),
+
+    #[error("an error ocurred while generating a native funciton's code")]
+    NativeFunction(#[from] NativeFunctionError),
 
     #[error("an error ocurred while generating a runtime function's code")]
     RuntimeFunction(#[from] RuntimeFunctionError),
@@ -65,72 +87,6 @@ pub enum AbiError {
 
     #[error("invalid selector size")]
     InvalidSelectorSize,
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum AbiUnpackError {
-    #[error(
-        "expected stylus::object::UID or stylus::object::NamedId as first field in {0} struct (it has key ability)"
-    )]
-    StorageObjectHasNoId(Symbol),
-
-    #[error(r#"cannot abi unpack enum "{0}", it contains at least one variant with fields"#)]
-    EnumIsNotSimple(Symbol),
-
-    #[error("cannot unpack generic type parameter")]
-    UnpackingGenericTypeParameter,
-
-    #[error("found a reference inside a reference")]
-    RefInsideRef,
-
-    #[error("an error ocurred while generating a native funciton's code")]
-    NativeFunction(#[from] NativeFunctionError),
-
-    #[error("abi encoding error")]
-    AbiEncoding(#[from] AbiEncodingError),
-
-    #[error("an error ocurred while generating a runtime function's code")]
-    RuntimeFunction(#[from] RuntimeFunctionError),
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum AbiPackError {
-    #[error(
-        "expected stylus::object::UID or stylus::object::NamedId as first field in {0} struct (it has key ability)"
-    )]
-    StorageObjectHasNoId(String),
-
-    #[error(r#"cannot abi pack enum "{0}", it contains at least one variant with fields"#)]
-    EnumIsNotSimple(Symbol),
-
-    #[error("cannot pack generic type parameter")]
-    PackingGenericTypeParameter,
-
-    #[error("cannnot know the size of a generic type parameter at compile time")]
-    GenericTypeParameterSize,
-
-    #[error("cannot check if generic type parameter is dynamic at compile time")]
-    GenericTypeParameterIsDynamic,
-
-    #[error("found a reference inside a reference")]
-    RefInsideRef,
-
-    #[error("signer type cannot be packed as it has no ABI representation")]
-    FoundSignerType,
-    
-    #[error(
-        "found heap type unpacking a reference. this should be handled in the add_unpack_instructions function"
-    )]
-    UnhandledHeapTypeReference,
-
-    #[error("an error ocurred while generating a native funciton's code")]
-    NativeFunction(#[from] NativeFunctionError),
-
-    #[error("abi encoding error")]
-    AbiEncoding(#[from] AbiEncodingError),
-
-    #[error("an error ocurred while generating a runtime function's code")]
-    RuntimeFunction(#[from] RuntimeFunctionError),
 }
 
 impl From<AbiError> for CompilationError {

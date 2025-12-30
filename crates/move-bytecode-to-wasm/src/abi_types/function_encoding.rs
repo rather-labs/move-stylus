@@ -41,7 +41,6 @@ mod tests {
 
     use super::abi_encoding::selector;
     use super::*;
-    use walrus::{ConstExpr, ValType, ir::Value};
 
     #[test]
     fn test_move_signature_to_abi_selector() {

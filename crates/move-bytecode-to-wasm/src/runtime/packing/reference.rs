@@ -1,6 +1,6 @@
 use crate::{
     CompilationContext,
-    abi_types::error::{AbiError, AbiPackError},
+    abi_types::error::{AbiError, AbiOperationError},
     abi_types::packing::Packable,
     runtime::{RuntimeFunction, RuntimeFunctionError},
     translation::intermediate_types::IntermediateType,
@@ -106,10 +106,12 @@ pub fn pack_reference_function(
             )?;
         }
         IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-            Err(AbiError::Pack(AbiPackError::RefInsideRef))?;
+            Err(AbiError::Pack(AbiOperationError::RefInsideRef))?;
         }
         IntermediateType::ITypeParameter(_) => {
-            Err(AbiError::Pack(AbiPackError::PackingGenericTypeParameter))?;
+            Err(AbiError::Pack(
+                AbiOperationError::PackingGenericTypeParameter,
+            ))?;
         }
     }
 
@@ -134,7 +136,7 @@ mod tests {
     use crate::translation::intermediate_types::IntermediateType;
     use alloy_primitives::address;
     use alloy_sol_types::{SolType, sol};
-    use walrus::{ConstExpr, FunctionBuilder, ValType, ir::Value};
+    use walrus::{FunctionBuilder, ValType};
 
     fn test_pack(data: &[u8], ref_type: IntermediateType, expected_calldata_bytes: &[u8]) {
         let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =

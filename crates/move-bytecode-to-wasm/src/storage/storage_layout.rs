@@ -248,8 +248,8 @@ mod tests {
         structs::{IStruct, IStructType},
     };
     use walrus::{
-        ConstExpr, Module, ValType,
-        ir::{LoadKind, MemArg, Value},
+        Module, ValType,
+        ir::{LoadKind, MemArg},
     };
 
     // Helper to create a compilation context for tests

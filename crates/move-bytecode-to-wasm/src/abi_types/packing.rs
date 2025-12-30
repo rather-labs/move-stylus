@@ -7,13 +7,11 @@ use walrus::{
 
 use crate::{
     CompilationContext,
-    abi_types::error::AbiPackError,
+    abi_types::error::{AbiError, AbiOperationError},
     runtime::RuntimeFunction,
     translation::intermediate_types::IntermediateType,
     vm_handled_types::{VmHandledType, string::String_},
 };
-
-use super::error::{AbiEncodingError, AbiError};
 
 pub trait Packable {
     /// Adds the instructions to pack the value into memory according to Solidity's ABI encoding.
@@ -294,7 +292,9 @@ impl Packable for IntermediateType {
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
                 let enum_ = compilation_ctx.get_enum_by_intermediate_type(self)?;
                 if !enum_.is_simple {
-                    return Err(AbiPackError::EnumIsNotSimple(enum_.identifier))?;
+                    return Err(AbiError::Pack(AbiOperationError::EnumIsNotSimple(
+                        enum_.identifier,
+                    )))?;
                 }
                 let pack_enum_function =
                     RuntimeFunction::PackEnum.get(module, Some(compilation_ctx))?;
@@ -303,9 +303,13 @@ impl Packable for IntermediateType {
                     .local_get(writer_pointer)
                     .call(pack_enum_function);
             }
-            IntermediateType::ISigner => return Err(AbiPackError::FoundSignerType)?,
+            IntermediateType::ISigner => {
+                return Err(AbiError::Pack(AbiOperationError::FoundSignerType))?;
+            }
             IntermediateType::ITypeParameter(_) => {
-                return Err(AbiPackError::PackingGenericTypeParameter)?;
+                return Err(AbiError::Pack(
+                    AbiOperationError::PackingGenericTypeParameter,
+                ))?;
             }
         }
 
@@ -421,7 +425,9 @@ impl Packable for IntermediateType {
                 struct_.solidity_abi_encode_size(compilation_ctx)?
             }
             IntermediateType::ITypeParameter(_) => {
-                return Err(AbiEncodingError::GenericTypeParameterSize)?;
+                return Err(AbiError::AbiEncoding(
+                    AbiOperationError::GenericTypeParameterSize,
+                ))?;
             }
         };
 
@@ -447,7 +453,9 @@ impl Packable for IntermediateType {
                 struct_.solidity_abi_encode_is_dynamic(compilation_ctx)?
             }
             IntermediateType::ITypeParameter(_) => {
-                return Err(AbiEncodingError::GenericTypeParameterIsDynamic)?;
+                return Err(AbiError::AbiEncoding(
+                    AbiOperationError::GenericTypeParameterIsDynamic,
+                ))?;
             }
             // References are dynamic if the inner type is dynamic!
             IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
@@ -465,7 +473,7 @@ mod tests {
 
     use alloy_primitives::U256;
     use alloy_sol_types::sol;
-    use walrus::{ConstExpr, FunctionBuilder, ValType, ir::Value};
+    use walrus::{FunctionBuilder, ValType};
     use wasmtime::{Caller, Engine, Extern, Linker};
 
     use crate::{

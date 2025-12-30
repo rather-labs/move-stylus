@@ -48,7 +48,7 @@ use std::collections::HashMap;
 use crate::{
     CompilationContext,
     abi_types::{
-        error::{AbiEncodingError, AbiError},
+        error::{AbiError, AbiOperationError},
         packing::Packable,
     },
     compilation_context::ModuleData,
@@ -262,12 +262,16 @@ impl IStruct {
                         return Ok(true);
                     }
                 }
-                IntermediateType::ISigner => return Err(AbiEncodingError::FoundSignerType)?,
+                IntermediateType::ISigner => {
+                    return Err(AbiError::AbiEncoding(AbiOperationError::FoundSignerType))?;
+                }
                 IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                    return Err(AbiEncodingError::RefInsideRef)?;
+                    return Err(AbiError::AbiEncoding(AbiOperationError::RefInsideRef))?;
                 }
                 IntermediateType::ITypeParameter(_) => {
-                    return Err(AbiEncodingError::GenericTypeParameterIsDynamic)?;
+                    return Err(AbiError::AbiEncoding(
+                        AbiOperationError::GenericTypeParameterIsDynamic,
+                    ))?;
                 }
             }
         }
@@ -306,12 +310,16 @@ impl IStruct {
                         size += field.encoded_size(compilation_ctx)?;
                     }
                 }
-                IntermediateType::ISigner => return Err(AbiEncodingError::FoundSignerType)?,
+                IntermediateType::ISigner => {
+                    return Err(AbiError::AbiEncoding(AbiOperationError::FoundSignerType))?;
+                }
                 IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                    return Err(AbiEncodingError::RefInsideRef)?;
+                    return Err(AbiError::AbiEncoding(AbiOperationError::RefInsideRef))?;
                 }
                 IntermediateType::ITypeParameter(_) => {
-                    return Err(AbiEncodingError::FoundGenericTypeParameter)?;
+                    return Err(AbiError::AbiEncoding(
+                        AbiOperationError::FoundGenericTypeParameter,
+                    ))?;
                 }
             }
         }

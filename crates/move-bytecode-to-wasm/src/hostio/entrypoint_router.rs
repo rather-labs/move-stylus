@@ -228,8 +228,6 @@ mod tests {
         translation::intermediate_types::ISignature, utils::display_module,
     };
 
-    use walrus::{ConstExpr, ir::Value};
-
     use super::*;
 
     fn add_noop_function<'a>(

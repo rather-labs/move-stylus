@@ -185,7 +185,7 @@ mod tests {
 
     use alloy_primitives::{U256, address};
     use alloy_sol_types::{SolType, sol};
-    use walrus::{ConstExpr, FunctionBuilder, ValType, ir::Value};
+    use walrus::{FunctionBuilder, ValType};
 
     use crate::{
         abi_types::packing::Packable,
