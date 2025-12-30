@@ -72,7 +72,7 @@ pub fn build_entrypoint_router(
             },
         );
 
-    // Define the EXIT block - all routing logic happens inside this block
+    // Define the return block - all routing logic happens inside this block
     let mut inner_result = Ok(());
     router_builder.block(None, |return_block| {
         let return_block_id = return_block.id();
@@ -172,14 +172,14 @@ pub fn build_entrypoint_router(
         // Extract the pointer to the error message if inner_result is Ok
         if inner_result.is_ok() {
             let ptr = inner_result.unwrap();
-            // Set final_ptr to skip header (ptr + 4)
+            // Set args_pointer to skip header (ptr + 4)
             return_block
                 .local_get(ptr)
                 .i32_const(4)
                 .binop(BinaryOp::I32Add)
                 .local_set(args_pointer);
 
-            // Set final_len from the error message length
+            // Set args_len from the error message length
             return_block
                 .local_get(ptr)
                 .load(
@@ -193,7 +193,7 @@ pub fn build_entrypoint_router(
                 .local_set(args_len);
         }
 
-        // Set final_status to 1 (error)
+        // Set status to 1 (error)
         return_block.i32_const(1).local_set(status);
         // Fall through to end of block...
     });

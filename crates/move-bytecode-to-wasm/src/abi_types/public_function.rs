@@ -87,16 +87,19 @@ impl<'a> PublicFunction<'a> {
         router_builder.block(None, |block| {
             let block_id = block.id();
 
-            block.local_get(function_selector);
-            block.i32_const(i32::from_le_bytes(self.function_selector));
-            block.binop(BinaryOp::I32Ne);
-            block.br_if(block_id);
+            // If the function selector does not match, jump to the end of the block
+            block
+                .local_get(function_selector)
+                .i32_const(i32::from_le_bytes(self.function_selector))
+                .binop(BinaryOp::I32Ne)
+                .br_if(block_id);
 
             // Offset args pointer by 4 bytes to exclude selector
-            block.local_get(args_pointer);
-            block.i32_const(4);
-            block.binop(BinaryOp::I32Add);
-            block.local_set(args_pointer);
+            block
+                .local_get(args_pointer)
+                .i32_const(4)
+                .binop(BinaryOp::I32Add)
+                .local_set(args_pointer);
 
             // If the first argument's type is signer, we inject the tx.origin into the stack as a
             // first parameter
@@ -110,21 +113,22 @@ impl<'a> PublicFunction<'a> {
                 _ => {
                     // If there's no signer, reduce args length by 4 bytes to exclude selector,
                     // otherwise we reuse the selector's 4 bytes (32 bits) for the signer pointer
-                    block.local_get(args_len);
-                    block.i32_const(4);
-                    block.binop(BinaryOp::I32Sub);
-                    block.local_set(args_len);
+                    block
+                        .local_get(args_len)
+                        .i32_const(4)
+                        .binop(BinaryOp::I32Sub)
+                        .local_set(args_len);
                 }
             }
 
             // Wrap function to pack/unpack parameters
             inner_result = self.wrap_public_function(module, block, args_pointer, compilation_ctx);
 
-            // Stack: [return_data_pointer] [return_data_length]
             // Set final locals and break to exit
-            block.local_set(args_len);
-            block.local_set(args_pointer);
-            block.br(return_block_id);
+            block
+                .local_set(args_len)
+                .local_set(args_pointer)
+                .br(return_block_id);
         });
 
         inner_result
@@ -141,6 +145,7 @@ impl<'a> PublicFunction<'a> {
         args_pointer: LocalId,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), AbiError> {
+        // Unpack function arguments
         build_unpack_instructions(
             block,
             module,
@@ -149,9 +154,10 @@ impl<'a> PublicFunction<'a> {
             compilation_ctx,
         )?;
 
+        // Call the function
         block.call(self.function_id);
 
-        // Unpack function return values
+        // Unpack function multi-value returns
         add_unpack_function_return_values_instructions(
             block,
             module,
@@ -160,7 +166,7 @@ impl<'a> PublicFunction<'a> {
         )?;
 
         if self.signature.returns.is_empty() {
-            // Push 0 for both data_ptr and data_len
+            // Push 0 for both return data pointer and return data length
             block.i32_const(0).i32_const(0);
         } else {
             // Pack return values and push the result pointer and length directly
