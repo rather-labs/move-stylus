@@ -76,7 +76,7 @@ pub fn unpack_reference_function(
         | IntermediateType::IGenericEnumInstance { .. } => {
             // Heap types are handled in the add_unpack_instructions function so this case should be unreachable
             return Err(RuntimeFunctionError::from(AbiError::from(
-                AbiUnpackError::HeapTypeInsideReference,
+                AbiUnpackError::UnhandledHeapTypeReference,
             )));
         }
 

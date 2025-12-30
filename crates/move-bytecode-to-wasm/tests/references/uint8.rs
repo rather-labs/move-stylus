@@ -21,6 +21,7 @@ sol!(
     function miscellaneous1() external returns (uint8[]);
     function freezeRef(uint8 x) external returns (uint8);
     function identityU8Ref(uint8 x) external returns (uint8);
+    function unpackRefU8Misc(uint8 x, uint8 y, uint8 z) external returns (uint8);
 );
 
 #[rstest]
@@ -32,6 +33,7 @@ sol!(
 #[case(writeMutRefCall::new((2,)), 1)]
 #[case(freezeRefCall::new((3,)), 3)]
 #[case(identityU8RefCall::new((4,)), 4)]
+#[case(unpackRefU8MiscCall::new((5, 6, 7)), 18)]
 fn test_uint_8_ref<T: SolCall>(
     #[by_ref] runtime: &RuntimeSandbox,
     #[case] call_data: T,
