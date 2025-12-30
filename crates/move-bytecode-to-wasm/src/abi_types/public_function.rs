@@ -1,13 +1,12 @@
 use move_symbol_pool::Symbol;
 use walrus::{
-    FunctionId, GlobalId, InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg},
+    FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
+    ir::{BinaryOp, InstrSeqId, LoadKind, MemArg},
 };
 
 use crate::{
     CompilationContext,
     data::DATA_ABORT_MESSAGE_PTR_OFFSET,
-    runtime::RuntimeFunction,
     translation::{
         functions::add_unpack_function_return_values_instructions,
         intermediate_types::{ISignature, IntermediateType},
@@ -78,24 +77,19 @@ impl<'a> PublicFunction<'a> {
         &self,
         router_builder: &mut InstrSeqBuilder,
         module: &mut Module,
-        selector_variable: LocalId,
+        function_selector: LocalId,
         args_pointer: LocalId,
         args_len: LocalId,
-        write_return_data_function: FunctionId,
+        status: LocalId,
+        return_block_id: InstrSeqId,
         compilation_ctx: &CompilationContext,
-        dynamic_fields_global_variables: &Vec<(GlobalId, IntermediateType)>,
     ) -> Result<(), AbiError> {
         let mut inner_result = Ok(());
-        let commit_changes_to_storage_function = RuntimeFunction::get_commit_changes_to_storage_fn(
-            module,
-            compilation_ctx,
-            dynamic_fields_global_variables,
-        )?;
 
         router_builder.block(None, |block| {
             let block_id = block.id();
 
-            block.local_get(selector_variable);
+            block.local_get(function_selector);
             block.i32_const(i32::from_le_bytes(self.function_selector));
             block.binop(BinaryOp::I32Ne);
             block.br_if(block_id);
@@ -129,20 +123,11 @@ impl<'a> PublicFunction<'a> {
             inner_result = self.wrap_public_function(module, block, args_pointer, compilation_ctx);
 
             // Stack: [return_data_pointer] [return_data_length] [status]
-            let status = module.locals.add(ValType::I32);
+            // Set final locals and break to exit
             block.local_set(status);
-
-            // Write return data to memory
-            // Stack: [return_data_pointer] [return_data_length]
-            block.call(write_return_data_function);
-
-            // TODO: This is repeated for every function, we should move this and the return below
-            // outside this into the main body of the entrypoint so we don't needlesly repeat code
-            block.call(commit_changes_to_storage_function);
-
-            // Return status
-            block.local_get(status);
-            block.return_();
+            block.local_set(args_len);
+            block.local_set(args_pointer);
+            block.br(return_block_id);
         });
 
         inner_result
@@ -313,7 +298,6 @@ mod tests {
     use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store, TypedFunc};
 
     use crate::{
-        hostio::host_functions,
         test_compilation_context,
         test_tools::build_module,
         translation::{functions::prepare_function_return, intermediate_types::IntermediateType},
@@ -464,11 +448,11 @@ mod tests {
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         // Build mock router
-        let (write_return_data_function, _) = host_functions::write_result(module);
 
         let selector = module.locals.add(ValType::I32);
         let args_pointer = module.locals.add(ValType::I32);
         let args_len = module.locals.add(ValType::I32);
+        let status = module.locals.add(ValType::I32);
 
         let mut mock_router_builder = FunctionBuilder::new(&mut module.types, &[], &[ValType::I32]);
 
@@ -479,40 +463,45 @@ mod tests {
         mock_router_body.call(allocator_func);
         mock_router_body.drop();
 
-        mock_router_body.i32_const(0);
-        mock_router_body.local_set(args_pointer);
+        mock_router_body.i32_const(0).local_set(args_pointer);
 
-        mock_router_body.i32_const(data_len);
-        mock_router_body.local_set(args_len);
+        mock_router_body.i32_const(data_len).local_set(args_len);
+
+        mock_router_body.i32_const(-1).local_set(status);
 
         // Load selector from first 4 bytes of args
-        mock_router_body.local_get(args_pointer);
-        mock_router_body.load(
-            memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        );
-        mock_router_body.local_set(selector);
-
-        public_function
-            .build_router_block(
-                &mut mock_router_body,
-                module,
-                selector,
-                args_pointer,
-                args_len,
-                write_return_data_function,
-                &compilation_ctx,
-                &vec![],
+        mock_router_body
+            .local_get(args_pointer)
+            .load(
+                memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
             )
-            .unwrap();
+            .local_set(selector);
 
-        // if no match, return -1
-        mock_router_body.i32_const(-1);
-        mock_router_body.return_();
+        mock_router_body.block(None, |return_block| {
+            let return_block_id = return_block.id();
+
+            public_function
+                .build_router_block(
+                    return_block,
+                    module,
+                    selector,
+                    args_pointer,
+                    args_len,
+                    status,
+                    return_block_id,
+                    &compilation_ctx,
+                )
+                .unwrap();
+        });
+
+        // After the block: if a match was found, status was set and we broke out
+        // Return the status (0 for success, non-zero for error)
+        mock_router_body.local_get(status).return_();
 
         let mock_entrypoint = mock_router_builder.finish(vec![], &mut module.funcs);
         module.exports.add("mock_entrypoint", mock_entrypoint);
