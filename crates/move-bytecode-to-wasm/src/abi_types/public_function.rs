@@ -1,12 +1,11 @@
 use move_symbol_pool::Symbol;
 use walrus::{
     FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{BinaryOp, InstrSeqId, LoadKind, MemArg},
+    ir::{BinaryOp, InstrSeqId},
 };
 
 use crate::{
     CompilationContext,
-    data::DATA_ABORT_MESSAGE_PTR_OFFSET,
     translation::{
         functions::add_unpack_function_return_values_instructions,
         intermediate_types::{ISignature, IntermediateType},
@@ -80,7 +79,6 @@ impl<'a> PublicFunction<'a> {
         function_selector: LocalId,
         args_pointer: LocalId,
         args_len: LocalId,
-        status: LocalId,
         return_block_id: InstrSeqId,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), AbiError> {
@@ -122,9 +120,8 @@ impl<'a> PublicFunction<'a> {
             // Wrap function to pack/unpack parameters
             inner_result = self.wrap_public_function(module, block, args_pointer, compilation_ctx);
 
-            // Stack: [return_data_pointer] [return_data_length] [status]
+            // Stack: [return_data_pointer] [return_data_length]
             // Set final locals and break to exit
-            block.local_set(status);
             block.local_set(args_len);
             block.local_set(args_pointer);
             block.br(return_block_id);
@@ -144,7 +141,6 @@ impl<'a> PublicFunction<'a> {
         args_pointer: LocalId,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), AbiError> {
-        let status = module.locals.add(ValType::I32);
         let data_ptr = module.locals.add(ValType::I32);
         let data_len = module.locals.add(ValType::I32);
 
@@ -178,60 +174,8 @@ impl<'a> PublicFunction<'a> {
             block.local_get(data_len_).local_set(data_len);
         }
 
-        // Load the abort message pointer from DATA_ABORT_MESSAGE_PTR_OFFSET
-        // If not null, an abort occurred and we need to return the error message
-        block.block(None, |abort_block| {
-            let abort_block_id = abort_block.id();
-
-            // Load the ptr
-            let ptr = module.locals.add(ValType::I32);
-            abort_block
-                .i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)
-                .load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                )
-                .local_tee(ptr);
-
-            // Check if the ptr is null
-            abort_block.i32_const(0).binop(BinaryOp::I32Eq);
-
-            // If the ptr is null, jump to the end of the block, skipping the error message loading
-            abort_block.br_if(abort_block_id);
-
-            // Load the abort message length from the ptr and set data_len
-            abort_block
-                .local_get(ptr)
-                .load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                )
-                .local_set(data_len);
-
-            // Load the abort message pointer and set data_ptr
-            abort_block
-                .local_get(ptr)
-                .i32_const(4)
-                .binop(BinaryOp::I32Add)
-                .local_set(data_ptr);
-
-            // Set status to 1
-            abort_block.i32_const(1).local_set(status);
-        });
-
-        // [data_ptr][data_len][status]
-        block
-            .local_get(data_ptr)
-            .local_get(data_len)
-            .local_get(status);
+        // [data_ptr][data_len]
+        block.local_get(data_ptr).local_get(data_len);
 
         Ok(())
     }
@@ -467,7 +411,7 @@ mod tests {
 
         mock_router_body.i32_const(data_len).local_set(args_len);
 
-        mock_router_body.i32_const(-1).local_set(status);
+        mock_router_body.i32_const(0).local_set(status);
 
         // Load selector from first 4 bytes of args
         mock_router_body
@@ -492,11 +436,12 @@ mod tests {
                     selector,
                     args_pointer,
                     args_len,
-                    status,
                     return_block_id,
                     &compilation_ctx,
                 )
                 .unwrap();
+
+            return_block.i32_const(-1).local_set(status);
         });
 
         // After the block: if a match was found, status was set and we broke out

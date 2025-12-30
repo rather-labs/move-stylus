@@ -6,7 +6,7 @@ use walrus::{
 use crate::{
     CompilationContext,
     abi_types::{error_encoding::build_abort_error_message, public_function::PublicFunction},
-    data::DATA_CALLDATA_OFFSET,
+    data::{DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_CALLDATA_OFFSET},
     runtime::RuntimeFunction,
     translation::intermediate_types::IntermediateType,
 };
@@ -43,6 +43,9 @@ pub fn build_entrypoint_router(
         .call(compilation_ctx.allocator)
         .local_tee(args_pointer)
         .call(read_args_function);
+
+    // Set status to 0 (success) as default
+    router_builder.i32_const(0).local_set(status);
 
     // Save calldata length and pointer into the data section
     router_builder
@@ -126,7 +129,7 @@ pub fn build_entrypoint_router(
             );
 
         // Try to route call based on selector for all public functions. Any successful match
-        // will set final_ptr, final_len, final_status and break to exit_label.
+        // will set args_pointer, args_len and break to exit_label.
         for function in functions {
             inner_result = function.build_router_block(
                 return_block,
@@ -134,7 +137,6 @@ pub fn build_entrypoint_router(
                 function_selector,
                 args_pointer,
                 args_len,
-                status,
                 return_block_id,
                 compilation_ctx,
             );
@@ -153,12 +155,12 @@ pub fn build_entrypoint_router(
                 compilation_ctx,
             );
 
-            // Stack: [return_data_pointer] [return_data_length] [status]
+            // Stack: [args_pointer] [args_len]
             // Set final locals and break to exit
-            return_block.local_set(status);
-            return_block.local_set(args_len);
-            return_block.local_set(args_pointer);
-            return_block.br(return_block_id);
+            return_block
+                .local_set(args_len)
+                .local_set(args_pointer)
+                .br(return_block_id);
         }
 
         // --- NO MATCH CASE ---
@@ -196,7 +198,57 @@ pub fn build_entrypoint_router(
         // Fall through to end of block...
     });
 
-    // --- SHARED EXIT LOGIC (Only occurs once) ---
+    // --- SHARED EXIT LOGIC ---
+
+    // Load the abort message pointer from DATA_ABORT_MESSAGE_PTR_OFFSET
+    // If not null, an abort occurred and we need to return the error message
+    router_builder.block(None, |abort_block| {
+        let abort_block_id = abort_block.id();
+
+        // Load the ptr
+        let ptr = module.locals.add(ValType::I32);
+        abort_block
+            .i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .local_tee(ptr);
+
+        // Check if the ptr is null
+        abort_block.i32_const(0).binop(BinaryOp::I32Eq);
+
+        // If the ptr is null, jump to the end of the block, skipping the error message loading
+        abort_block.br_if(abort_block_id);
+
+        // Load the abort message length from the ptr and set data_len
+        abort_block
+            .local_get(ptr)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .local_set(args_len);
+
+        // Load the abort message pointer and set data_ptr
+        abort_block
+            .local_get(ptr)
+            .i32_const(4)
+            .binop(BinaryOp::I32Add)
+            .local_set(args_pointer);
+
+        // Set status to 1
+        abort_block.i32_const(1).local_set(status);
+    });
+
     let commit_changes_to_storage_function = RuntimeFunction::get_commit_changes_to_storage_fn(
         module,
         compilation_ctx,
