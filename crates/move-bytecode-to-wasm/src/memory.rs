@@ -140,7 +140,7 @@ mod tests {
 
     #[test]
     fn test_memory_allocator() {
-        let (mut raw_module, _, _) = build_module(None);
+        let (mut raw_module, _, _, _) = build_module(None);
 
         let engine = Engine::default();
         let module = WasmModule::from_binary(&engine, &raw_module.emit_wasm()).unwrap();

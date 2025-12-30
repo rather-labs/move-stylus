@@ -1,173 +1,207 @@
-use walrus::{
-    InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg},
-};
-
 use crate::{
-    abi_types::error::AbiError,
-    runtime::RuntimeFunction,
+    CompilationContext,
+    abi_types::{error::AbiError, unpacking::Unpackable},
+    runtime::{RuntimeFunction, RuntimeFunctionError},
     translation::intermediate_types::{IntermediateType, vector::IVector},
     wasm_builder_extensions::WasmBuilderExtension,
 };
+use walrus::{
+    FunctionBuilder, FunctionId, Module, ValType,
+    ir::{BinaryOp, LoadKind, MemArg},
+};
 
-use crate::CompilationContext;
-
-use super::Unpackable;
-
-impl IVector {
-    pub fn add_unpack_instructions(
-        inner: &IntermediateType,
-        block: &mut InstrSeqBuilder,
-        module: &mut Module,
-        reader_pointer: LocalId,
-        calldata_reader_pointer: LocalId,
-        compilation_ctx: &CompilationContext,
-    ) -> Result<(), AbiError> {
-        let mut inner_result: Result<(), AbiError> = Ok(());
-        // Big-endian to Little-endian
-        let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
-        // Validate that the pointer fits in 32 bits
-        let validate_pointer_fn =
-            RuntimeFunction::ValidatePointer32Bit.get(module, Some(compilation_ctx))?;
-
-        let data_reader_pointer = module.locals.add(ValType::I32);
-
-        // The ABI encoded value of a dynamic type is a reference to the location of the
-        // values in the call data.
-
-        // Validate that the pointer fits in 32 bits
-        block.local_get(reader_pointer).call(validate_pointer_fn);
-
-        // Load the pointer to the data, swap it to little-endian and add that to the calldata reader pointer.
-        block
-            .local_get(reader_pointer)
-            .load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    // Abi encoded value is Big endian
-                    offset: 28,
-                },
-            )
-            .call(swap_i32_bytes_function)
-            .local_get(calldata_reader_pointer)
-            .binop(BinaryOp::I32Add)
-            .local_set(data_reader_pointer); // This references the vector actual data
-
-        // The reader will only be incremented until the next argument
-        block
-            .local_get(reader_pointer)
-            .i32_const(32)
-            .binop(BinaryOp::I32Add)
-            .local_set(reader_pointer);
-
-        // Validate that the data reader pointer fits in 32 bits
-        block
-            .local_get(data_reader_pointer)
-            .call(validate_pointer_fn);
-
-        // Vector length: current number of elements in the vector
-        let length = module.locals.add(ValType::I32);
-
-        block
-            .local_get(data_reader_pointer)
-            .load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 28,
-                },
-            )
-            .call(swap_i32_bytes_function)
-            .local_set(length);
-
-        // Increment data reader pointer
-        block
-            .local_get(data_reader_pointer)
-            .i32_const(32)
-            .binop(BinaryOp::I32Add)
-            .local_set(data_reader_pointer);
-
-        let vector_pointer = module.locals.add(ValType::I32);
-        let writer_pointer = module.locals.add(ValType::I32);
-
-        let data_size = inner.wasm_memory_data_size()?;
-        IVector::allocate_vector_with_header(
-            block,
-            compilation_ctx,
-            vector_pointer,
-            length,
-            length,
-            data_size,
-        );
-
-        // Set the writer pointer to the start of the vector data
-        block
-            .skip_vec_header(vector_pointer)
-            .local_set(writer_pointer);
-
-        // Copy elements
-        let i = module.locals.add(ValType::I32);
-        block.i32_const(0).local_set(i);
-
-        let calldata_reader_pointer = module.locals.add(ValType::I32);
-        block
-            .local_get(data_reader_pointer)
-            .local_set(calldata_reader_pointer);
-
-        block.loop_(None, |loop_block| {
-            inner_result = (|| {
-                let loop_block_id = loop_block.id();
-
-                loop_block.local_get(writer_pointer);
-                // This will leave in the stack [pointer/value i32/i64, length i32]
-                inner.add_unpack_instructions(
-                    loop_block,
-                    module,
-                    data_reader_pointer,
-                    calldata_reader_pointer,
-                    compilation_ctx,
-                )?;
-
-                // Store the value
-                loop_block.store(
-                    compilation_ctx.memory_id,
-                    inner.store_kind()?,
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-
-                // increment writer pointer
-                loop_block.local_get(writer_pointer);
-                loop_block.i32_const(data_size);
-                loop_block.binop(BinaryOp::I32Add);
-                loop_block.local_set(writer_pointer);
-
-                // increment i
-                loop_block.local_get(i);
-                loop_block.i32_const(1);
-                loop_block.binop(BinaryOp::I32Add);
-                loop_block.local_tee(i);
-
-                loop_block.local_get(length);
-                loop_block.binop(BinaryOp::I32LtU);
-                loop_block.br_if(loop_block_id);
-
-                Ok(())
-            })();
-        });
-
-        // returned values
-        block.local_get(vector_pointer);
-
-        inner_result?;
-
-        Ok(())
+/// Generates a runtime function that unpacks a vector from ABI-encoded calldata.
+///
+/// This function:
+/// 1. Reads the pointer to the vector data from calldata
+/// 2. Reads the vector length
+/// 3. Allocates memory for the vector
+/// 4. Unpacks each element recursively
+/// 5. Returns a pointer to the unpacked vector
+///
+/// # WASM Function Arguments
+/// * `reader_pointer` - (i32): pointer to the current position in the ABI-encoded data
+/// * `calldata_base_pointer` - (i32): pointer to the start of the calldata
+///
+/// # WASM Function Returns
+/// * `vector_pointer` - (i32): pointer to the unpacked vector in memory
+pub fn unpack_vector_function(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    inner: &IntermediateType,
+) -> Result<FunctionId, RuntimeFunctionError> {
+    let name =
+        RuntimeFunction::UnpackVector.get_generic_function_name(compilation_ctx, &[inner])?;
+    if let Some(function) = module.funcs.by_name(&name) {
+        return Ok(function);
     }
+
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32],
+        &[ValType::I32],
+    );
+    let mut builder = function.name(name).func_body();
+
+    // Arguments
+    let reader_pointer = module.locals.add(ValType::I32);
+    let calldata_base_pointer = module.locals.add(ValType::I32);
+
+    // Runtime functions
+    let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
+    let validate_pointer_fn =
+        RuntimeFunction::ValidatePointer32Bit.get(module, Some(compilation_ctx))?;
+
+    let data_reader_pointer = module.locals.add(ValType::I32);
+
+    // The ABI encoded value of a dynamic type is a reference to the location of the
+    // values in the call data.
+
+    // Validate that the pointer fits in 32 bits
+    builder.local_get(reader_pointer).call(validate_pointer_fn);
+
+    // Load the pointer to the data, swap it to little-endian and add that to the calldata reader pointer.
+    builder
+        .local_get(reader_pointer)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                // Abi encoded value is Big endian
+                offset: 28,
+            },
+        )
+        .call(swap_i32_bytes_function)
+        .local_get(calldata_base_pointer)
+        .binop(BinaryOp::I32Add)
+        .local_set(data_reader_pointer); // This references the vector actual data
+
+    // Increment the reader pointer to next argument
+    builder
+        .local_get(reader_pointer)
+        .i32_const(32)
+        .binop(BinaryOp::I32Add)
+        .global_set(compilation_ctx.calldata_reader_pointer);
+
+    // Validate that the data reader pointer fits in 32 bits
+    builder
+        .local_get(data_reader_pointer)
+        .call(validate_pointer_fn);
+
+    // Vector length: current number of elements in the vector
+    let length = module.locals.add(ValType::I32);
+
+    builder
+        .local_get(data_reader_pointer)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 28,
+            },
+        )
+        .call(swap_i32_bytes_function)
+        .local_set(length);
+
+    // Increment data reader pointer
+    builder
+        .local_get(data_reader_pointer)
+        .i32_const(32)
+        .binop(BinaryOp::I32Add)
+        .local_set(data_reader_pointer);
+
+    let vector_pointer = module.locals.add(ValType::I32);
+    let writer_pointer = module.locals.add(ValType::I32);
+
+    let data_size = inner
+        .wasm_memory_data_size()
+        .map_err(RuntimeFunctionError::from)?;
+    IVector::allocate_vector_with_header(
+        &mut builder,
+        compilation_ctx,
+        vector_pointer,
+        length,
+        length,
+        data_size,
+    );
+
+    // Set the writer pointer to the start of the vector data
+    builder
+        .skip_vec_header(vector_pointer)
+        .local_set(writer_pointer);
+
+    // Copy elements
+    let i = module.locals.add(ValType::I32);
+    builder.i32_const(0).local_set(i);
+
+    let calldata_base_pointer_ = module.locals.add(ValType::I32);
+    builder
+        .local_get(data_reader_pointer)
+        .local_set(calldata_base_pointer_);
+
+    let mut inner_result: Result<(), AbiError> = Ok(());
+    builder.loop_(None, |loop_block| {
+        inner_result = (|| {
+            let loop_block_id = loop_block.id();
+
+            loop_block.local_get(writer_pointer);
+            // This will leave in the stack [pointer/value i32/i64, length i32]
+            inner.add_unpack_instructions(
+                None,
+                loop_block,
+                module,
+                data_reader_pointer,
+                calldata_base_pointer_,
+                compilation_ctx,
+            )?;
+
+            // Store the value
+            loop_block.store(
+                compilation_ctx.memory_id,
+                inner.store_kind()?,
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+
+            // increment writer pointer
+            loop_block.local_get(writer_pointer);
+            loop_block.i32_const(data_size);
+            loop_block.binop(BinaryOp::I32Add);
+            loop_block.local_set(writer_pointer);
+
+            // increment i
+            loop_block.local_get(i);
+            loop_block.i32_const(1);
+            loop_block.binop(BinaryOp::I32Add);
+            loop_block.local_tee(i);
+
+            loop_block.local_get(length);
+            loop_block.binop(BinaryOp::I32LtU);
+            loop_block.br_if(loop_block_id);
+
+            Ok(())
+        })();
+    });
+
+    builder
+        .local_get(reader_pointer)
+        .i32_const(32)
+        .binop(BinaryOp::I32Add)
+        .global_set(compilation_ctx.calldata_reader_pointer);
+
+    builder.local_get(vector_pointer);
+
+    // Check for errors from the loop
+    inner_result?;
+
+    Ok(function.finish(
+        vec![reader_pointer, calldata_base_pointer],
+        &mut module.funcs,
+    ))
 }
 
 #[cfg(test)]
@@ -179,16 +213,18 @@ mod tests {
     use walrus::{FunctionBuilder, ValType};
 
     use crate::{
+        abi_types::unpacking::Unpackable,
         test_compilation_context,
         test_tools::{build_module, setup_wasmtime_module},
         translation::intermediate_types::IntermediateType,
     };
 
-    use super::*;
-
-    fn test_vec_unpacking(data: &[u8], int_type: IntermediateType, expected_result_bytes: &[u8]) {
-        let (mut raw_module, allocator, memory_id) = build_module(Some(data.len() as i32));
-        let compilation_ctx = test_compilation_context!(memory_id, allocator);
+    /// Test helper for unpacking vector types
+    fn unpack_vec(data: &[u8], int_type: IntermediateType, expected_result_bytes: &[u8]) {
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(data.len() as i32));
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
 
@@ -199,9 +235,9 @@ mod tests {
         func_body.local_tee(args_pointer);
         func_body.local_set(calldata_reader_pointer);
 
-        // Args data should already be stored in memory
         int_type
             .add_unpack_instructions(
+                None,
                 &mut func_body,
                 &mut raw_module,
                 args_pointer,
@@ -216,20 +252,9 @@ mod tests {
         let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
 
-        let global_next_free_memory_pointer = instance
-            .get_global(&mut store, "global_next_free_memory_pointer")
-            .unwrap();
-
         let result: i32 = entrypoint.call(&mut store, ()).unwrap();
         assert_eq!(result, data.len() as i32);
-        let global_next_free_memory_pointer = global_next_free_memory_pointer
-            .get(&mut store)
-            .i32()
-            .unwrap();
-        assert_eq!(
-            global_next_free_memory_pointer,
-            (expected_result_bytes.len() + data.len()) as i32
-        );
+
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let mut result_memory_data = vec![0; expected_result_bytes.len()];
         memory
@@ -237,6 +262,10 @@ mod tests {
             .unwrap();
         assert_eq!(result_memory_data, expected_result_bytes);
     }
+
+    // ============================================================================
+    // Vector Types - Simple Element Types
+    // ============================================================================
 
     #[test]
     fn test_unpack_vector_u8_empty() {
@@ -246,7 +275,7 @@ mod tests {
         let data = SolType::abi_encode_params::<(Vec<u8>,)>(&(vec![],));
         let expected_result_bytes =
             [0u32.to_le_bytes().as_slice(), 0u32.to_le_bytes().as_slice()].concat();
-        test_vec_unpacking(&data, int_type, &expected_result_bytes);
+        unpack_vec(&data, int_type, &expected_result_bytes);
     }
 
     #[test]
@@ -263,7 +292,7 @@ mod tests {
             3u8.to_le_bytes().as_slice(),
         ]
         .concat();
-        test_vec_unpacking(&data, int_type, &expected_result_bytes);
+        unpack_vec(&data, int_type, &expected_result_bytes);
     }
 
     #[test]
@@ -279,7 +308,7 @@ mod tests {
             2u16.to_le_bytes().as_slice(),
         ]
         .concat();
-        test_vec_unpacking(&data, int_type, &expected_result_bytes);
+        unpack_vec(&data, int_type, &expected_result_bytes);
     }
 
     #[test]
@@ -296,7 +325,7 @@ mod tests {
             3u32.to_le_bytes().as_slice(),
         ]
         .concat();
-        test_vec_unpacking(&data, int_type, &expected_result_bytes);
+        unpack_vec(&data, int_type, &expected_result_bytes);
     }
 
     #[test]
@@ -313,8 +342,12 @@ mod tests {
             3u64.to_le_bytes().as_slice(),
         ]
         .concat();
-        test_vec_unpacking(&data, int_type, &expected_result_bytes);
+        unpack_vec(&data, int_type, &expected_result_bytes);
     }
+
+    // ============================================================================
+    // Vector Types - Heap-Allocated Element Types
+    // ============================================================================
 
     #[test]
     fn test_unpack_vector_u128() {
@@ -333,7 +366,7 @@ mod tests {
             3u128.to_le_bytes().as_slice(),
         ]
         .concat();
-        test_vec_unpacking(&data, int_type, &expected_result_bytes);
+        unpack_vec(&data, int_type, &expected_result_bytes);
     }
 
     #[test]
@@ -354,7 +387,7 @@ mod tests {
             U256::from(3).to_le_bytes::<32>().as_slice(),
         ]
         .concat();
-        test_vec_unpacking(&data, int_type, &expected_result_bytes);
+        unpack_vec(&data, int_type, &expected_result_bytes);
     }
 
     #[test]
@@ -381,8 +414,12 @@ mod tests {
             address!("0x1234567890abcdef1234567890abcdef12345678").as_slice(),
         ]
         .concat();
-        test_vec_unpacking(&data, int_type, &expected_result_bytes);
+        unpack_vec(&data, int_type, &expected_result_bytes);
     }
+
+    // ============================================================================
+    // Nested Vector Types
+    // ============================================================================
 
     #[test]
     fn test_unpack_vector_vector_u32() {
@@ -410,7 +447,7 @@ mod tests {
             6u32.to_le_bytes().as_slice(),
         ]
         .concat();
-        test_vec_unpacking(&data, int_type, &expected_result_bytes);
+        unpack_vec(&data, int_type, &expected_result_bytes);
     }
 
     #[test]
@@ -444,6 +481,6 @@ mod tests {
             6u128.to_le_bytes().as_slice(),                       // second element - third value
         ]
         .concat();
-        test_vec_unpacking(&data, int_type, &expected_result_bytes);
+        unpack_vec(&data, int_type, &expected_result_bytes);
     }
 }

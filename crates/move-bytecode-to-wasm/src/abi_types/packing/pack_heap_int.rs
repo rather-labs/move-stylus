@@ -142,11 +142,13 @@ mod tests {
     };
 
     fn test_uint(int_type: impl Packable, data: &[u8], expected_result: &[u8]) {
-        let (mut raw_module, alloc_function, memory_id) = build_module(None);
+        let (mut raw_module, alloc_function, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
-        let compilation_ctx = test_compilation_context!(memory_id, alloc_function);
+        let compilation_ctx =
+            test_compilation_context!(memory_id, alloc_function, calldata_reader_pointer_global);
 
         let local = raw_module.locals.add(ValType::I32);
         let writer_pointer = raw_module.locals.add(ValType::I32);
