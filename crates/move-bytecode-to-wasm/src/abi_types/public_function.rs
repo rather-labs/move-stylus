@@ -1,6 +1,6 @@
 use move_symbol_pool::Symbol;
 use walrus::{
-    FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
+    FunctionId, InstrSeqBuilder, LocalId, Module,
     ir::{BinaryOp, InstrSeqId},
 };
 
@@ -141,9 +141,6 @@ impl<'a> PublicFunction<'a> {
         args_pointer: LocalId,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), AbiError> {
-        let data_ptr = module.locals.add(ValType::I32);
-        let data_len = module.locals.add(ValType::I32);
-
         build_unpack_instructions(
             block,
             module,
@@ -163,19 +160,14 @@ impl<'a> PublicFunction<'a> {
         )?;
 
         if self.signature.returns.is_empty() {
-            // Set data_ptr and data_len to 0
-            block.i32_const(0).local_set(data_ptr);
-            block.i32_const(0).local_set(data_len);
+            // Push 0 for both data_ptr and data_len
+            block.i32_const(0).i32_const(0);
         } else {
-            // Set data_ptr and data_len to the result of packing the return values
-            let (data_ptr_, data_len_) =
+            // Pack return values and push the result pointer and length directly
+            let (data_ptr, data_len) =
                 build_pack_instructions(block, &self.signature.returns, module, compilation_ctx)?;
-            block.local_get(data_ptr_).local_set(data_ptr);
-            block.local_get(data_len_).local_set(data_len);
+            block.local_get(data_ptr).local_get(data_len);
         }
-
-        // [data_ptr][data_len]
-        block.local_get(data_ptr).local_get(data_len);
 
         Ok(())
     }
@@ -236,7 +228,7 @@ mod tests {
 
     use alloy_sol_types::{SolType, sol};
     use walrus::{
-        ConstExpr, FunctionBuilder, MemoryId,
+        ConstExpr, FunctionBuilder, MemoryId, ValType,
         ir::{LoadKind, MemArg, Value},
     };
     use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store, TypedFunc};
