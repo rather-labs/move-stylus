@@ -254,11 +254,11 @@ mod tests {
     #[test]
     fn test_pack_vector_u8() {
         type SolType = sol!((uint8[],));
-        let int_type = IntermediateType::IVector(Arc::new(IntermediateType::IU8));
+        let vector_type = IntermediateType::IVector(Arc::new(IntermediateType::IU8));
 
         let expected_result = SolType::abi_encode_params(&(vec![1, 2, 3],));
         test_vec_packing(
-            int_type.clone(),
+            vector_type.clone(),
             &[
                 3u32.to_le_bytes().as_slice(),
                 6u32.to_le_bytes().as_slice(),
@@ -276,11 +276,11 @@ mod tests {
     #[test]
     fn test_pack_vector_u16() {
         type SolType = sol!((uint16[],));
-        let int_type = IntermediateType::IVector(Arc::new(IntermediateType::IU16));
+        let vector_type = IntermediateType::IVector(Arc::new(IntermediateType::IU16));
 
         let expected_result = SolType::abi_encode_params(&(vec![1, 2, 3],));
         test_vec_packing(
-            int_type.clone(),
+            vector_type.clone(),
             &[
                 3u32.to_le_bytes().as_slice(),
                 6u32.to_le_bytes().as_slice(),
@@ -299,11 +299,11 @@ mod tests {
     #[test]
     fn test_pack_vector_u32() {
         type SolType = sol!((uint32[],));
-        let int_type = IntermediateType::IVector(Arc::new(IntermediateType::IU32));
+        let vector_type = IntermediateType::IVector(Arc::new(IntermediateType::IU32));
 
         let expected_result = SolType::abi_encode_params(&(vec![1, 2, 3],));
         test_vec_packing(
-            int_type.clone(),
+            vector_type.clone(),
             &[
                 3u32.to_le_bytes().as_slice(),
                 6u32.to_le_bytes().as_slice(),
@@ -322,11 +322,11 @@ mod tests {
     #[test]
     fn test_pack_vector_u64() {
         type SolType = sol!((uint64[],));
-        let int_type = IntermediateType::IVector(Arc::new(IntermediateType::IU64));
+        let vector_type = IntermediateType::IVector(Arc::new(IntermediateType::IU64));
 
         let expected_result = SolType::abi_encode_params(&(vec![1, 2, 3],));
         test_vec_packing(
-            int_type.clone(),
+            vector_type.clone(),
             &[
                 3u32.to_le_bytes().as_slice(),
                 6u32.to_le_bytes().as_slice(),
@@ -345,11 +345,11 @@ mod tests {
     #[test]
     fn test_pack_vector_u128() {
         type SolType = sol!((uint128[],));
-        let int_type = IntermediateType::IVector(Arc::new(IntermediateType::IU128));
+        let vector_type = IntermediateType::IVector(Arc::new(IntermediateType::IU128));
 
         let expected_result = SolType::abi_encode_params(&(vec![1, 2, 3],));
         test_vec_packing(
-            int_type.clone(),
+            vector_type.clone(),
             &[
                 3u32.to_le_bytes().as_slice(),
                 6u32.to_le_bytes().as_slice(),
@@ -371,12 +371,12 @@ mod tests {
     #[test]
     fn test_pack_vector_u256() {
         type SolType = sol!((uint256[],));
-        let int_type = IntermediateType::IVector(Arc::new(IntermediateType::IU256));
+        let vector_type = IntermediateType::IVector(Arc::new(IntermediateType::IU256));
 
         let expected_result =
             SolType::abi_encode_params(&(vec![U256::from(1), U256::from(2), U256::from(3)],));
         test_vec_packing(
-            int_type.clone(),
+            vector_type.clone(),
             &[
                 3u32.to_le_bytes().as_slice(),
                 6u32.to_le_bytes().as_slice(),
@@ -398,7 +398,7 @@ mod tests {
     #[test]
     fn test_pack_vector_address() {
         type SolType = sol!((address[],));
-        let int_type = IntermediateType::IVector(Arc::new(IntermediateType::IAddress));
+        let vector_type = IntermediateType::IVector(Arc::new(IntermediateType::IAddress));
 
         let expected_result = SolType::abi_encode_params(&(vec![
             address!("0x1234567890abcdef1234567890abcdef12345678"),
@@ -406,7 +406,7 @@ mod tests {
             address!("0x1234567890abcdef1234567890abcdef12345678"),
         ],));
         test_vec_packing(
-            int_type.clone(),
+            vector_type.clone(),
             &[
                 3u32.to_le_bytes().as_slice(),
                 6u32.to_le_bytes().as_slice(),
@@ -431,7 +431,7 @@ mod tests {
     #[test]
     fn test_pack_vector_vector_u32() {
         type SolType = sol!((uint32[][],));
-        let int_type = IntermediateType::IVector(Arc::new(IntermediateType::IVector(Arc::new(
+        let vector_type = IntermediateType::IVector(Arc::new(IntermediateType::IVector(Arc::new(
             IntermediateType::IU32,
         ))));
 
@@ -462,13 +462,13 @@ mod tests {
             0u32.to_le_bytes().as_slice(),
         ]
         .concat();
-        test_vec_packing(int_type.clone(), &data, &expected_result);
+        test_vec_packing(vector_type.clone(), &data, &expected_result);
     }
 
     #[test]
     fn test_pack_vector_vector_u128() {
         type SolType = sol!((uint128[][],));
-        let int_type = IntermediateType::IVector(Arc::new(IntermediateType::IVector(Arc::new(
+        let vector_type = IntermediateType::IVector(Arc::new(IntermediateType::IVector(Arc::new(
             IntermediateType::IU128,
         ))));
 
@@ -504,6 +504,6 @@ mod tests {
             6u128.to_le_bytes().as_slice(),
         ]
         .concat();
-        test_vec_packing(int_type.clone(), &data, &expected_result);
+        test_vec_packing(vector_type.clone(), &data, &expected_result);
     }
 }
