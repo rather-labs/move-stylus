@@ -1,16 +1,24 @@
 //! This module contains aux functions used in unit tests in this module
 #![allow(dead_code)]
-use walrus::{FunctionId, MemoryId, Module, ModuleConfig, ValType};
+use walrus::{ConstExpr, FunctionId, GlobalId, MemoryId, Module, ModuleConfig, ValType, ir::Value};
 use wasmtime::{Caller, Engine, Instance, Linker, Module as WasmModule, Store, TypedFunc};
 
 use crate::memory::setup_module_memory;
 
-pub fn build_module(initial_memory_offset: Option<i32>) -> (Module, FunctionId, MemoryId) {
+pub fn build_module(
+    initial_memory_offset: Option<i32>,
+) -> (Module, FunctionId, MemoryId, GlobalId) {
     let config = ModuleConfig::new();
     let mut module = Module::with_config(config);
+
     let (allocator_func, memory_id) = setup_module_memory(&mut module, initial_memory_offset);
 
-    (module, allocator_func, memory_id)
+    let calldata_reader_pointer =
+        module
+            .globals
+            .add_local(ValType::I32, true, false, ConstExpr::Value(Value::I32(0)));
+
+    (module, allocator_func, memory_id, calldata_reader_pointer)
 }
 
 pub fn setup_wasmtime_module<T, U>(
@@ -144,12 +152,13 @@ pub fn inject_host_debug_functions(module: &mut Module) {
 
 #[macro_export]
 macro_rules! test_compilation_context {
-    ($memory_id: ident, $allocator: ident) => {
+    ($memory_id: ident, $allocator: ident, $calldata_reader_pointer: ident) => {
         $crate::CompilationContext {
             root_module_data: &$crate::ModuleData::default(),
             deps_data: &std::collections::HashMap::new(),
             memory_id: $memory_id,
             allocator: $allocator,
+            calldata_reader_pointer: $calldata_reader_pointer,
             empty_signature: $crate::translation::intermediate_types::ISignature {
                 arguments: Vec::new(),
                 returns: Vec::new(),

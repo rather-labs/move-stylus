@@ -275,8 +275,14 @@ mod tests {
         let root = Box::leak(Box::new(module_data));
         let deps = Box::leak(Box::new(HashMap::new()));
         // Create module with memory_id and allocator that will be shared
-        let (module, allocator, memory_id) = build_module(None);
-        let ctx = CompilationContext::new(root, deps, memory_id, allocator);
+        let (module, allocator, memory_id, calldata_reader_pointer_global) = build_module(None);
+        let ctx = CompilationContext::new(
+            root,
+            deps,
+            memory_id,
+            allocator,
+            calldata_reader_pointer_global,
+        );
         (ctx, module)
     }
 

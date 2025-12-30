@@ -62,3 +62,7 @@ entry fun freeze_ref(y: u8): u8 {
     let x_frozen_ref: &u8 = freeze(x_mut_ref);
     *x_frozen_ref
 }
+
+entry fun unpack_ref_u8_misc(x: &u8, y: &u8, z: &u8): u8 {
+  *x + *y + *z
+}

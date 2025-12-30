@@ -265,7 +265,7 @@ mod tests {
     use crate::test_tools::{build_module, setup_wasmtime_module};
     use alloy_primitives::U256;
     use rstest::rstest;
-    use walrus::FunctionBuilder;
+    use walrus::{FunctionBuilder, ValType};
 
     use super::*;
 
@@ -298,7 +298,8 @@ mod tests {
     #[case(1, u128::MAX, 0)]
     fn test_heap_sub_u128(#[case] n1: u128, #[case] n2: u128, #[case] expected: u128) {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE * 2));
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(TYPE_HEAP_SIZE * 2));
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -318,7 +319,8 @@ mod tests {
             .i32_const(0)
             .i32_const(TYPE_HEAP_SIZE);
 
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         let heap_integers_add_f = heap_integers_sub(&mut raw_module, &compilation_ctx);
         // Shift left
         func_body.call(heap_integers_add_f);
@@ -417,7 +419,8 @@ mod tests {
     #[case(U256::from(1), U256::MAX, U256::from(0))]
     fn test_heap_sub_u256(#[case] n1: U256, #[case] n2: U256, #[case] expected: U256) {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE * 2));
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(TYPE_HEAP_SIZE * 2));
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -437,7 +440,8 @@ mod tests {
             .i32_const(0)
             .i32_const(TYPE_HEAP_SIZE);
 
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         let heap_integers_add_f = heap_integers_sub(&mut raw_module, &compilation_ctx);
         // Shift left
         func_body.call(heap_integers_add_f);
@@ -478,7 +482,7 @@ mod tests {
     #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
     #[case(1, u32::MAX as i32, -1)]
     fn test_sub_u32(#[case] n1: i32, #[case] n2: i32, #[case] expected: i32) {
-        let (mut raw_module, _, _) = build_module(None);
+        let (mut raw_module, _, _, _) = build_module(None);
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -532,7 +536,7 @@ mod tests {
     #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
     #[case(1, u64::MAX as i64, -1)]
     fn test_sub_u64(#[case] n1: i64, #[case] n2: i64, #[case] expected: i64) {
-        let (mut raw_module, _, _) = build_module(None);
+        let (mut raw_module, _, _, _) = build_module(None);
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,

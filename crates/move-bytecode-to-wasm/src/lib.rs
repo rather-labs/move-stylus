@@ -39,7 +39,7 @@ use translation::{
     translate_and_link_functions,
 };
 
-use walrus::{GlobalId, Module, RefType};
+use walrus::{ConstExpr, GlobalId, Module, RefType, ValType, ir::Value};
 use wasm_validation::validate_stylus_wasm;
 
 pub use translation::functions::MappedFunction;
@@ -168,8 +168,18 @@ pub fn translate_package<'move_package>(
             special_attributes,
         )?;
 
-        let compilation_ctx =
-            CompilationContext::new(&root_module_data, modules_data, memory_id, allocator_func);
+        let calldata_reader_pointer_global =
+            module
+                .globals
+                .add_local(ValType::I32, true, false, ConstExpr::Value(Value::I32(0)));
+
+        let compilation_ctx = CompilationContext::new(
+            &root_module_data,
+            modules_data,
+            memory_id,
+            allocator_func,
+            calldata_reader_pointer_global,
+        );
 
         let mut public_functions = Vec::new();
         for function_information in root_module_data.functions.information.iter().filter(|fi| {

@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
 use crate::{
-    compilation_context::CompilationContextError, storage::error::StorageError,
-    translation::intermediate_types::error::IntermediateTypeError,
+    abi_types::error::AbiError, compilation_context::CompilationContextError,
+    storage::error::StorageError, translation::intermediate_types::error::IntermediateTypeError,
 };
 
 #[derive(thiserror::Error, Debug)]
@@ -33,6 +33,9 @@ pub enum RuntimeFunctionError {
         expected: usize,
         found: usize,
     },
+
+    #[error("abi error ocurred while generating a runtime function's code")]
+    Abi(#[source] Rc<AbiError>),
 }
 
 impl From<IntermediateTypeError> for RuntimeFunctionError {
@@ -44,5 +47,11 @@ impl From<IntermediateTypeError> for RuntimeFunctionError {
 impl From<StorageError> for RuntimeFunctionError {
     fn from(err: StorageError) -> Self {
         RuntimeFunctionError::Storage(Rc::new(err))
+    }
+}
+
+impl From<AbiError> for RuntimeFunctionError {
+    fn from(err: AbiError) -> Self {
+        RuntimeFunctionError::Abi(Rc::new(err))
     }
 }
