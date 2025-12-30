@@ -52,10 +52,12 @@ where
 
     // Print current memory
     let memory_data = memory.data(&mut store);
+    /*
     println!(
         "Current memory: {:?}",
         memory_data.iter().take(64).collect::<Vec<_>>()
     );
+    */
 
     (linker, instance, store, entrypoint)
 }
