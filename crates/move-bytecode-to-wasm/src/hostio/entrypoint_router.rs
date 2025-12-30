@@ -130,6 +130,13 @@ pub fn build_entrypoint_router(
                 },
             );
 
+        // Offset args pointer by 4 bytes to exclude selector
+        return_block
+            .local_get(data_pointer)
+            .i32_const(4)
+            .binop(BinaryOp::I32Add)
+            .local_set(data_pointer);
+
         // Try to route call based on selector for all public functions. Any successful match
         // will set data_pointer, data_len and break to exit_label.
         for function in functions {
@@ -149,6 +156,13 @@ pub fn build_entrypoint_router(
             .iter()
             .find(|f| f.function_name.as_str() == "fallback")
         {
+            // Restore the data pointer to the start of the calldata, as the fallback function has no selector
+            return_block
+                .local_get(data_pointer)
+                .i32_const(4)
+                .binop(BinaryOp::I32Sub)
+                .local_set(data_pointer);
+
             // Wrap function to unpack/pack arguments
             inner_result = fallback_fn.wrap_public_function(
                 module,

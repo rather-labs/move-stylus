@@ -94,13 +94,6 @@ impl<'a> PublicFunction<'a> {
                 .binop(BinaryOp::I32Ne)
                 .br_if(block_id);
 
-            // Offset args pointer by 4 bytes to exclude selector
-            block
-                .local_get(data_pointer)
-                .i32_const(4)
-                .binop(BinaryOp::I32Add)
-                .local_set(data_pointer);
-
             // If the first argument's type is signer, we inject the tx.origin into the stack as a
             // first argument
             match self.signature.arguments.first() {
