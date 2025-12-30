@@ -373,6 +373,78 @@ mod tests {
         assert_eq!(result_memory_data, expected.to_le_bytes().to_vec());
     }
 
+    #[test]
+    fn test_heap_add_u128_fuzz() {
+        const TYPE_HEAP_SIZE: i32 = 16;
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(TYPE_HEAP_SIZE * 2));
+        let mut function_builder = FunctionBuilder::new(
+            &mut raw_module.types,
+            &[ValType::I32, ValType::I32],
+            &[ValType::I32],
+        );
+        let n1_ptr = raw_module.locals.add(ValType::I32);
+        let n2_ptr = raw_module.locals.add(ValType::I32);
+        let mut func_body = function_builder.func_body();
+        // arguments for heap_integers_add (n1_ptr, n2_ptr, where to store the result and
+        // size in heap)
+        // func_body
+        func_body
+            .i32_const(0)
+            .i32_const(TYPE_HEAP_SIZE)
+            .i32_const(0)
+            .i32_const(TYPE_HEAP_SIZE);
+
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+
+        let heap_integers_add_f = heap_integers_add(&mut raw_module, &compilation_ctx);
+        func_body.call(heap_integers_add_f);
+        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type()
+            .for_each(|&(a, b): &(u128, u128)| {
+                let data = [a.to_le_bytes(), b.to_le_bytes()].concat();
+
+                memory.write(&mut *store.borrow_mut(), 0, &data).unwrap();
+
+                let expected = a.overflowing_add(b).0;
+
+                let result: Result<i32, _> = entrypoint
+                    .0
+                    .call(&mut *store.0.borrow_mut(), (0, TYPE_HEAP_SIZE));
+
+                match result {
+                    Ok(pointer) => {
+                        let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
+                        memory
+                            .read(
+                                &mut *store.0.borrow_mut(),
+                                pointer as usize,
+                                &mut result_memory_data,
+                            )
+                            .unwrap();
+
+                        assert_eq!(result_memory_data, expected.to_le_bytes().to_vec());
+                    }
+                    Err(_) => {
+                        // In case of overflow we expect a trap
+                        assert!(a.checked_add(b).is_none());
+                    }
+                }
+            });
+    }
+
     #[rstest]
     #[case(U256::from(1), U256::from(1), U256::from(2))]
     #[case(
@@ -470,69 +542,80 @@ mod tests {
         assert_eq!(result_memory_data, expected.to_le_bytes::<32>().to_vec());
     }
 
-    /*
     #[test]
     fn test_heap_add_u256_fuzz() {
+        const TYPE_HEAP_SIZE: i32 = 32;
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(TYPE_HEAP_SIZE * 2));
+        let mut function_builder = FunctionBuilder::new(
+            &mut raw_module.types,
+            &[ValType::I32, ValType::I32],
+            &[ValType::I32],
+        );
+        let n1_ptr = raw_module.locals.add(ValType::I32);
+        let n2_ptr = raw_module.locals.add(ValType::I32);
+        let mut func_body = function_builder.func_body();
+        // arguments for heap_integers_add (n1_ptr, n2_ptr, where to store the result and
+        // size in heap)
+        // func_body
+        func_body
+            .i32_const(0)
+            .i32_const(TYPE_HEAP_SIZE)
+            .i32_const(0)
+            .i32_const(TYPE_HEAP_SIZE);
+
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+
+        let heap_integers_add_f = heap_integers_add(&mut raw_module, &compilation_ctx);
+        func_body.call(heap_integers_add_f);
+        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
         bolero::check!()
             .with_type()
-            .for_each(|&(a, b): &(U256, U256)| {
-                const TYPE_HEAP_SIZE: i32 = 32;
-                let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-                    build_module(Some(TYPE_HEAP_SIZE * 2));
-                let mut function_builder = FunctionBuilder::new(
-                    &mut raw_module.types,
-                    &[ValType::I32, ValType::I32],
-                    &[ValType::I32],
-                );
-                let n1_ptr = raw_module.locals.add(ValType::I32);
-                let n2_ptr = raw_module.locals.add(ValType::I32);
-                let mut func_body = function_builder.func_body();
-                // arguments for heap_integers_add (n1_ptr, n2_ptr, where to store the result and
-                // size in heap)
-                // func_body
-                func_body
-                    .i32_const(0)
-                    .i32_const(TYPE_HEAP_SIZE)
-                    .i32_const(0)
-                    .i32_const(TYPE_HEAP_SIZE);
+            .for_each(|&(a, b): &([u8; 32], [u8; 32])| {
+                let a = U256::from_be_bytes(a);
+                let b = U256::from_be_bytes(b);
 
-                let compilation_ctx = test_compilation_context!(
-                    memory_id,
-                    allocator_func,
-                    calldata_reader_pointer_global
-                );
-
-                let heap_integers_add_f = heap_integers_add(&mut raw_module, &compilation_ctx);
-                func_body.call(heap_integers_add_f);
-                let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
-                raw_module.exports.add("test_function", function);
                 let data = [a.to_le_bytes::<32>(), b.to_le_bytes::<32>()].concat();
 
-                let (_, instance, mut store, entrypoint) =
-                    setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
+                memory.write(&mut *store.borrow_mut(), 0, &data).unwrap();
 
-                let pointer: i32 = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
-                let memory = instance.get_memory(&mut store, "memory").unwrap();
-                let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
+                let expected = a.overflowing_add(b).0;
 
-                memory
-                    .read(&mut store, pointer as usize, &mut result_memory_data)
-                    .unwrap();
+                let result: Result<i32, _> = entrypoint
+                    .0
+                    .call(&mut *store.0.borrow_mut(), (0, TYPE_HEAP_SIZE));
 
-                let expected = a.overflowing_add(b);
+                match result {
+                    Ok(pointer) => {
+                        let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
+                        memory
+                            .read(
+                                &mut *store.0.borrow_mut(),
+                                pointer as usize,
+                                &mut result_memory_data,
+                            )
+                            .unwrap();
 
-                match expected {
-                    (res, false) => {
-                        assert_eq!(result_memory_data, res.to_le_bytes::<32>().to_vec());
+                        assert_eq!(result_memory_data, expected.to_le_bytes::<32>().to_vec());
                     }
-                    (_, true) => {
+                    Err(_) => {
                         // In case of overflow we expect a trap
                         assert!(a.checked_add(b).is_none());
                     }
                 }
             });
     }
-    */
 
     #[rstest]
     #[case(42, 42, 84)]
