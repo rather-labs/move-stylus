@@ -102,6 +102,7 @@ pub enum RuntimeFunction {
     UnpackStruct,
     UnpackStorageStruct,
     UnpackReference,
+    InjectSigner,
 }
 
 impl RuntimeFunction {
@@ -184,6 +185,7 @@ impl RuntimeFunction {
             Self::UnpackStruct => "unpack_struct",
             Self::UnpackStorageStruct => "unpack_storage_struct",
             Self::UnpackReference => "unpack_reference",
+            Self::InjectSigner => "inject_signer",
         }
     }
 
@@ -326,6 +328,7 @@ impl RuntimeFunction {
                 (Self::UnpackString, Some(ctx)) => {
                     unpacking::string::unpack_string_function(module, ctx)?
                 }
+                (Self::InjectSigner, Some(ctx)) => unpacking::signer::inject_signer(module, ctx),
                 // Error
                 _ => return Err(RuntimeFunctionError::CouldNotLink(self.name().to_owned())),
             };
