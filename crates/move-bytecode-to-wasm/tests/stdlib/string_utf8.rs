@@ -12,12 +12,10 @@ sol!(
     function packUtf82() external returns (string, string);
     function packUtf83() external returns (string, uint16, string);
     function packUtf84() external returns (string, uint16[], string);
-    function unpackUtf8(string value) external returns (bool);
-    function unpackUtf82(string value, string value2) external returns (bool);
+    function unpackUtf8(string value) external returns (bool); function unpackUtf82(string value, string value2) external returns (bool);
     function unpackUtf83(string value, uint16 n, string value2) external returns (bool);
     function unpackUtf84(string value, uint16[] n, string value2) external returns (bool);
-    function packUnpackUtf8(string value) external returns (string);
-    function packUnpackUtf82(string value, string value2) external returns (string, string);
+    function packUnpackUtf8(string value) external returns (string); function packUnpackUtf82(string value, string value2) external returns (string, string);
 );
 
 #[rstest]
