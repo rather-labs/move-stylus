@@ -31,26 +31,28 @@ pub fn build_entrypoint_router(
     let mut router = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
     let mut router_builder = router.func_body();
 
+    // Arguments
+    let data_len = module.locals.add(ValType::I32); // Length of the calldata
+
     // Locals
-    let args_len = module.locals.add(ValType::I32); // Length of the arguments
-    let args_pointer = module.locals.add(ValType::I32); // Pointer to the arguments
+    let data_pointer = module.locals.add(ValType::I32); // Pointer to the calldata
     let function_selector = module.locals.add(ValType::I32); // Selector of the function to call
     let status = module.locals.add(ValType::I32); // Status of the function call
 
-    // Load function args to memory
+    // Read the calldata from the host and store it in the memory
     router_builder
-        .local_get(args_len)
+        .local_get(data_len)
         .call(compilation_ctx.allocator)
-        .local_tee(args_pointer)
+        .local_tee(data_pointer)
         .call(read_args_function);
 
     // Set status to 0 (success) as default
     router_builder.i32_const(0).local_set(status);
 
-    // Save calldata length and pointer into the data section
+    // Save the calldata length and pointer into the data section
     router_builder
         .i32_const(DATA_CALLDATA_OFFSET)
-        .local_get(args_len)
+        .local_get(data_len)
         .store(
             compilation_ctx.memory_id,
             StoreKind::I32 { atomic: false },
@@ -62,7 +64,7 @@ pub fn build_entrypoint_router(
 
     router_builder
         .i32_const(DATA_CALLDATA_OFFSET)
-        .local_get(args_pointer)
+        .local_get(data_pointer)
         .store(
             compilation_ctx.memory_id,
             StoreKind::I32 { atomic: false },
@@ -77,15 +79,15 @@ pub fn build_entrypoint_router(
     router_builder.block(None, |return_block| {
         let return_block_id = return_block.id();
 
-        // If args_len == 0, there isn't even a function selector present in the calldata, so we attempt to default to "receive" by injecting its selector into the argument data.
-        // Otherwise (args_len != 0), read selector directly from the args (the standard case).
+        // If data_len == 0, there isn't even a function selector present in the calldata, so we attempt to default to "receive" by injecting its selector into the argument data.
+        // Otherwise (data_len != 0), read selector directly from the args (the standard case).
         return_block
-            .local_get(args_len)
+            .local_get(data_len)
             .unop(UnaryOp::I32Eqz)
             .if_else(
                 None,
                 |then| {
-                    // args_len == 0: try receive
+                    // data_len == 0: try receive
                     // If no receive function, the selector_variable remains uninitialized and will not match any function
                     if let Some(receive_fn) = functions
                         .iter()
@@ -95,13 +97,13 @@ pub fn build_entrypoint_router(
                             .local_set(function_selector);
                     }
 
-                    // Set args_len to 4
-                    then.i32_const(4).local_set(args_len);
+                    // Set data_len to 4
+                    then.i32_const(4).local_set(data_len);
 
                     // Allocate memory for the receive function selector, which is the only calldata needed.
-                    then.local_get(args_len)
+                    then.local_get(data_len)
                         .call(compilation_ctx.allocator)
-                        .local_tee(args_pointer)
+                        .local_tee(data_pointer)
                         .local_get(function_selector)
                         .store(
                             compilation_ctx.memory_id,
@@ -115,7 +117,7 @@ pub fn build_entrypoint_router(
                 |else_| {
                     // Load selector from memory
                     else_
-                        .local_get(args_pointer)
+                        .local_get(data_pointer)
                         .load(
                             compilation_ctx.memory_id,
                             LoadKind::I32 { atomic: false },
@@ -129,14 +131,14 @@ pub fn build_entrypoint_router(
             );
 
         // Try to route call based on selector for all public functions. Any successful match
-        // will set args_pointer, args_len and break to exit_label.
+        // will set data_pointer, data_len and break to exit_label.
         for function in functions {
             inner_result = function.build_router_block(
                 return_block,
                 module,
                 function_selector,
-                args_pointer,
-                args_len,
+                data_pointer,
+                data_len,
                 return_block_id,
                 compilation_ctx,
             );
@@ -151,15 +153,15 @@ pub fn build_entrypoint_router(
             inner_result = fallback_fn.wrap_public_function(
                 module,
                 return_block,
-                args_pointer,
+                data_pointer,
                 compilation_ctx,
             );
 
-            // Stack: [args_pointer] [args_len]
+            // Stack: [data_pointer] [data_len]
             // Set final locals and break to exit
             return_block
-                .local_set(args_len)
-                .local_set(args_pointer)
+                .local_set(data_len)
+                .local_set(data_pointer)
                 .br(return_block_id);
         }
 
@@ -172,14 +174,14 @@ pub fn build_entrypoint_router(
         // Extract the pointer to the error message if inner_result is Ok
         if inner_result.is_ok() {
             let ptr = inner_result.unwrap();
-            // Set args_pointer to skip header (ptr + 4)
+            // Set data_pointer to skip header (ptr + 4)
             return_block
                 .local_get(ptr)
                 .i32_const(4)
                 .binop(BinaryOp::I32Add)
-                .local_set(args_pointer);
+                .local_set(data_pointer);
 
-            // Set args_len from the error message length
+            // Set data_len from the error message length
             return_block
                 .local_get(ptr)
                 .load(
@@ -190,7 +192,7 @@ pub fn build_entrypoint_router(
                         offset: 0,
                     },
                 )
-                .local_set(args_len);
+                .local_set(data_len);
         }
 
         // Set status to 1 (error)
@@ -227,7 +229,7 @@ pub fn build_entrypoint_router(
         // If the ptr is null, jump to the end of the block, skipping the error message loading
         abort_block.br_if(abort_block_id);
 
-        // Load the abort message length from the ptr and set data_len
+        // Load the abort message length from the ptr and set return data length
         abort_block
             .local_get(ptr)
             .load(
@@ -238,14 +240,14 @@ pub fn build_entrypoint_router(
                     offset: 0,
                 },
             )
-            .local_set(args_len);
+            .local_set(data_len);
 
         // Load the abort message pointer and set data_ptr
         abort_block
             .local_get(ptr)
             .i32_const(4)
             .binop(BinaryOp::I32Add)
-            .local_set(args_pointer);
+            .local_set(data_pointer);
 
         // Set status to 1 (error)
         abort_block.i32_const(1).local_set(status);
@@ -253,8 +255,8 @@ pub fn build_entrypoint_router(
 
     // 2. Write return data
     router_builder
-        .local_get(args_pointer)
-        .local_get(args_len)
+        .local_get(data_pointer)
+        .local_get(data_len)
         .call(write_return_data_function);
 
     // 3. Conditionally commit changes to storage (iff status == 0)
@@ -278,7 +280,7 @@ pub fn build_entrypoint_router(
     // 4. Return
     router_builder.local_get(status).return_();
 
-    let router = router.finish(vec![args_len], &mut module.funcs);
+    let router = router.finish(vec![data_len], &mut module.funcs);
     add_entrypoint(module, router);
 
     Ok(())

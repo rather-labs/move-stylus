@@ -77,8 +77,8 @@ impl<'a> PublicFunction<'a> {
         router_builder: &mut InstrSeqBuilder,
         module: &mut Module,
         function_selector: LocalId,
-        args_pointer: LocalId,
-        args_len: LocalId,
+        data_pointer: LocalId,
+        data_len: LocalId,
         return_block_id: InstrSeqId,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), AbiError> {
@@ -96,13 +96,13 @@ impl<'a> PublicFunction<'a> {
 
             // Offset args pointer by 4 bytes to exclude selector
             block
-                .local_get(args_pointer)
+                .local_get(data_pointer)
                 .i32_const(4)
                 .binop(BinaryOp::I32Add)
-                .local_set(args_pointer);
+                .local_set(data_pointer);
 
             // If the first argument's type is signer, we inject the tx.origin into the stack as a
-            // first parameter
+            // first argument
             match self.signature.arguments.first() {
                 Some(IntermediateType::ISigner) => {
                     Signer::inject(block, module, compilation_ctx);
@@ -114,30 +114,30 @@ impl<'a> PublicFunction<'a> {
                     // If there's no signer, reduce args length by 4 bytes to exclude selector,
                     // otherwise we reuse the selector's 4 bytes (32 bits) for the signer pointer
                     block
-                        .local_get(args_len)
+                        .local_get(data_len)
                         .i32_const(4)
                         .binop(BinaryOp::I32Sub)
-                        .local_set(args_len);
+                        .local_set(data_len);
                 }
             }
 
-            // Wrap function to pack/unpack parameters
-            inner_result = self.wrap_public_function(module, block, args_pointer, compilation_ctx);
+            // Wrap function to unpack/pack arguments
+            inner_result = self.wrap_public_function(module, block, data_pointer, compilation_ctx);
 
-            // Set final locals and break to exit
+            // Set the return data length and pointer to the locals and break to the return block
             block
-                .local_set(args_len)
-                .local_set(args_pointer)
+                .local_set(data_len)
+                .local_set(data_pointer)
                 .br(return_block_id);
         });
 
         inner_result
     }
 
-    /// Wraps the function unpacking input parameters from memory and packing output parameters to memory
+    /// Wraps the function unpacking arguments from memory and packing returns to memory
     ///
-    /// Input parameters are read from memory and unpacked as *abi encoded* values
-    /// Output parameters are packed as *abi encoded* values and written to memory
+    /// Arguments are read from memory and unpacked as *abi encoded* values
+    /// Returns are packed as *abi encoded* values and written to memory
     pub fn wrap_public_function(
         &self,
         module: &mut Module,
