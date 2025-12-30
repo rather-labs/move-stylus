@@ -34,10 +34,6 @@ pub fn add_internal_check_utf8(
 
     let swap_i32_fn = RuntimeFunction::SwapI32Bytes.get(module, None)?;
 
-    let (print_i32, _, print_m, _, print_s, _) = crate::declare_host_debug_functions!(module);
-
-    builder.local_get(vec_ptr).i32_const(128).call(print_m);
-
     // Load vector's length
     builder
         .local_get(vec_ptr)
@@ -85,11 +81,6 @@ pub fn add_internal_check_utf8(
                                 },
                             )
                             .local_tee(current_char);
-
-                        else_.call(print_s);
-                        else_.local_get(i).call(print_i32);
-                        else_.local_get(current_char).call(print_i32);
-                        else_.call(print_s);
 
                         // This code is based off
                         // https://stackoverflow.com/questions/66715611/check-for-valid-utf-8-encoding-in-c#answer-66723102
@@ -149,7 +140,6 @@ pub fn add_internal_check_utf8(
                             .local_set(current_char);
 
                         // 2:  if (0xC080 == c) continue;   (Accept 0xC080 as representation for '\0')
-                        else_.i32_const(99903).call(print_i32);
                         else_
                             .i32_const(0xC080)
                             .local_get(current_char)
@@ -167,9 +157,6 @@ pub fn add_internal_check_utf8(
                                 |_| {},
                             );
 
-                        else_.i32_const(99904).call(print_i32);
-                        else_.local_get(current_char).call(print_i32);
-                        else_.i32_const(0xC280).call(print_i32);
                         // 3:  if (0xC280 <= c && c <= 0xDFBF) && ((c & 0xE0C0) == 0xC080) {
                         //         i +=2;
                         //         continue;
@@ -193,7 +180,6 @@ pub fn add_internal_check_utf8(
                             .if_else(
                                 None,
                                 |then_| {
-                                    then_.i32_const(99905).call(print_i32);
                                     then_
                                         .local_get(i)
                                         .i32_const(2)
@@ -207,7 +193,6 @@ pub fn add_internal_check_utf8(
                         // ===================
                         //  3 bytes character
                         // ===================
-                        else_.i32_const(99907).call(print_i32);
                         else_
                             .local_get(vec_ptr)
                             .local_get(i)
@@ -225,9 +210,6 @@ pub fn add_internal_check_utf8(
                             .binop(BinaryOp::I32ShrU)
                             .local_set(current_char);
 
-                        else_.i32_const(99908).call(print_i32);
-                        else_.local_get(current_char).call(print_i32);
-
                         // 4:  if (0xEDA080 <= c && c <= 0xEDBFBF) return 0; (Reject UTF-16
                         //     surrogates)
                         else_
@@ -242,13 +224,11 @@ pub fn add_internal_check_utf8(
                                 None,
                                 // Invalid UTF-8 byte sequence (UTF-16 surrogate)
                                 |then_| {
-                                    then_.i32_const(888803).call(print_i32);
                                     then_.i32_const(0).return_();
                                 },
                                 |_| {},
                             );
 
-                        else_.i32_const(99909).call(print_i32);
                         // 5:  if (0xE0A080 <= c && c <= 0xEFBFBF) && ((c & 0xF0C0C0) == 0xE08080) {
                         //       i+=3;
                         //       continue;
@@ -300,8 +280,6 @@ pub fn add_internal_check_utf8(
                             )
                             .call(swap_i32_fn)
                             .local_set(current_char);
-
-                        else_.i32_const(999010).call(print_i32);
 
                         // 6:  if (0xF0908080 <= c && c <= 0xF48FBFBF) && ((c & 0xF8C0C0C0) == 0xF0808080) {
                         //        i+=4;
