@@ -14,9 +14,10 @@ pub fn pack_u128_function(
     // Little-endian to Big-endian
     let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None)?;
 
-    let mut function_builder =
-        FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
-    let mut function_body = function_builder.func_body();
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
+    let mut builder = function
+        .name(RuntimeFunction::PackU128.name().to_owned())
+        .func_body();
 
     let value_pointer = module.locals.add(ValType::I32);
     let writer_pointer = module.locals.add(ValType::I32);
@@ -24,10 +25,10 @@ pub fn pack_u128_function(
     // Pack 2 i64 values, loading from right to left, storing left to right
     for i in 0..2 {
         // Get writer pointer on stack
-        function_body.local_get(writer_pointer);
+        builder.local_get(writer_pointer);
 
         // Load from value pointer (right to left)
-        function_body.local_get(value_pointer).load(
+        builder.local_get(value_pointer).load(
             compilation_ctx.memory_id,
             LoadKind::I64 { atomic: false },
             MemArg {
@@ -37,10 +38,10 @@ pub fn pack_u128_function(
         );
 
         // Little-endian to Big-endian
-        function_body.call(swap_i64_bytes_function);
+        builder.call(swap_i64_bytes_function);
 
         // Store at writer pointer (left to right, left-padded to 32 bytes)
-        function_body.store(
+        builder.store(
             compilation_ctx.memory_id,
             StoreKind::I64 { atomic: false },
             MemArg {
@@ -51,8 +52,7 @@ pub fn pack_u128_function(
         );
     }
 
-    function_builder.name(RuntimeFunction::PackU128.name().to_owned());
-    Ok(function_builder.finish(vec![value_pointer, writer_pointer], &mut module.funcs))
+    Ok(function.finish(vec![value_pointer, writer_pointer], &mut module.funcs))
 }
 
 pub fn pack_u256_function(
@@ -62,9 +62,10 @@ pub fn pack_u256_function(
     // Little-endian to Big-endian
     let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None)?;
 
-    let mut function_builder =
-        FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
-    let mut function_body = function_builder.func_body();
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
+    let mut builder = function
+        .name(RuntimeFunction::PackU256.name().to_owned())
+        .func_body();
 
     let value_pointer = module.locals.add(ValType::I32);
     let writer_pointer = module.locals.add(ValType::I32);
@@ -72,10 +73,10 @@ pub fn pack_u256_function(
     // Pack 4 i64 values, loading from right to left, storing left to right
     for i in 0..4 {
         // Get writer pointer on stack
-        function_body.local_get(writer_pointer);
+        builder.local_get(writer_pointer);
 
         // Load from value pointer (right to left)
-        function_body.local_get(value_pointer).load(
+        builder.local_get(value_pointer).load(
             compilation_ctx.memory_id,
             LoadKind::I64 { atomic: false },
             MemArg {
@@ -85,10 +86,10 @@ pub fn pack_u256_function(
         );
 
         // Little-endian to Big-endian
-        function_body.call(swap_i64_bytes_function);
+        builder.call(swap_i64_bytes_function);
 
         // Store at writer pointer (left to right)
-        function_body.store(
+        builder.store(
             compilation_ctx.memory_id,
             StoreKind::I64 { atomic: false },
             MemArg {
@@ -98,50 +99,29 @@ pub fn pack_u256_function(
         );
     }
 
-    function_builder.name(RuntimeFunction::PackU256.name().to_owned());
-    Ok(function_builder.finish(vec![value_pointer, writer_pointer], &mut module.funcs))
+    Ok(function.finish(vec![value_pointer, writer_pointer], &mut module.funcs))
 }
 
 pub fn pack_address_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
 ) -> Result<FunctionId, RuntimeFunctionError> {
-    let mut function_builder =
-        FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
-    let mut function_body = function_builder.func_body();
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
+    let mut builder = function
+        .name(RuntimeFunction::PackAddress.name().to_owned())
+        .func_body();
 
     let value_pointer = module.locals.add(ValType::I32);
     let writer_pointer = module.locals.add(ValType::I32);
 
     // Address is packed as a u160, but endianness is not relevant
-    // Pack 4 i64 values without byte swapping
-    for i in 0..4 {
-        // Get writer pointer on stack
-        function_body.local_get(writer_pointer);
+    builder
+        .local_get(writer_pointer)
+        .local_get(value_pointer)
+        .i32_const(32)
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
-        // Load from value pointer
-        function_body.local_get(value_pointer).load(
-            compilation_ctx.memory_id,
-            LoadKind::I64 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: i * 8,
-            },
-        );
-
-        // Store at writer pointer (no byte swapping for address)
-        function_body.store(
-            compilation_ctx.memory_id,
-            StoreKind::I64 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: i * 8,
-            },
-        );
-    }
-
-    function_builder.name(RuntimeFunction::PackAddress.name().to_owned());
-    Ok(function_builder.finish(vec![value_pointer, writer_pointer], &mut module.funcs))
+    Ok(function.finish(vec![value_pointer, writer_pointer], &mut module.funcs))
 }
 
 #[cfg(test)]
