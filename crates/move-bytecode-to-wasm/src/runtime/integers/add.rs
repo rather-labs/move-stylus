@@ -408,6 +408,11 @@ mod tests {
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
 
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
         let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
         let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
 
@@ -442,6 +447,8 @@ mod tests {
                         assert!(a.checked_add(b).is_none());
                     }
                 }
+
+                reset_memory.call(&mut *store.borrow_mut(), ()).unwrap();
             });
     }
 
@@ -577,6 +584,11 @@ mod tests {
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
 
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
         let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
         let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
 
@@ -614,6 +626,8 @@ mod tests {
                         assert!(a.checked_add(b).is_none());
                     }
                 }
+
+                reset_memory.call(&mut *store.borrow_mut(), ()).unwrap();
             });
     }
 
@@ -682,9 +696,14 @@ mod tests {
         let function = function_builder.finish(vec![n1_l, n2_l], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
-        let (_, _, store, entrypoint) =
+        let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
 
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
         let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
         let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
 
@@ -692,11 +711,9 @@ mod tests {
             .with_type::<(u32, u32)>()
             .cloned()
             .for_each(|(a, b): (u32, u32)| {
-                let store = store.clone();
-                let entrypoint = entrypoint.clone();
-
                 let expected = a.wrapping_add(b);
-                let result: Result<u32, _> = entrypoint.0.call(&mut *store.0.borrow_mut(), (a, b));
+                let mut store = store.borrow_mut();
+                let result: Result<u32, _> = entrypoint.0.call(&mut *store, (a, b));
 
                 match result {
                     Ok(res) => assert_eq!(expected, res),
@@ -705,6 +722,8 @@ mod tests {
                         assert!(a.checked_add(b).is_none());
                     }
                 }
+
+                reset_memory.call(&mut *store, ()).unwrap();
             });
     }
 
@@ -775,9 +794,14 @@ mod tests {
         let function = function_builder.finish(vec![n1_l, n2_l], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
-        let (_, _, store, entrypoint) =
+        let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
 
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
         let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
         let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
 
@@ -785,11 +809,10 @@ mod tests {
             .with_type::<(u64, u64)>()
             .cloned()
             .for_each(|(a, b): (u64, u64)| {
-                let store = store.clone();
-                let entrypoint = entrypoint.clone();
-
                 let expected = a.wrapping_add(b);
-                let result: Result<u64, _> = entrypoint.0.call(&mut *store.0.borrow_mut(), (a, b));
+                let mut store = store.borrow_mut();
+
+                let result: Result<u64, _> = entrypoint.0.call(&mut *store, (a, b));
 
                 match result {
                     Ok(res) => assert_eq!(expected, res),
@@ -798,6 +821,8 @@ mod tests {
                         assert!(a.checked_add(b).is_none());
                     }
                 }
+
+                reset_memory.call(&mut *store, ()).unwrap();
             });
     }
 }
