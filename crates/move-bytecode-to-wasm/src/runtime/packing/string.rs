@@ -5,7 +5,7 @@ use crate::{
 };
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
+    ir::{BinaryOp, LoadKind, MemArg},
 };
 
 pub fn pack_string_function(
@@ -31,7 +31,6 @@ pub fn pack_string_function(
     let vector_pointer = module.locals.add(ValType::I32);
     let len = module.locals.add(ValType::I32);
     let reference_value = module.locals.add(ValType::I32);
-    let i = module.locals.add(ValType::I32);
 
     // String in Move has the following layout:
     // public struct String has copy, drop, store {
@@ -109,71 +108,11 @@ pub fn pack_string_function(
         .binop(BinaryOp::I32Add)
         .local_set(data_pointer);
 
-    // Outer block: if the vector length is 0, we skip to the end
-    builder.block(None, |outer_block| {
-        let outer_block_id = outer_block.id();
-
-        // Check if length == 0
-        outer_block
-            .local_get(len)
-            .i32_const(0)
-            .binop(BinaryOp::I32Eq)
-            .br_if(outer_block_id);
-
-        // Loop through the vector values
-        outer_block.i32_const(0).local_set(i);
-        outer_block.loop_(None, |loop_block| {
-            let loop_block_id = loop_block.id();
-
-            // Load byte from vector and store at data_pointer
-            loop_block
-                .local_get(data_pointer)
-                .local_get(vector_pointer)
-                .load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                )
-                .store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I32_8 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-
-            // Increment the vector pointer by 1 byte
-            loop_block
-                .local_get(vector_pointer)
-                .i32_const(1)
-                .binop(BinaryOp::I32Add)
-                .local_set(vector_pointer);
-
-            // Increment the data pointer by 1 byte
-            loop_block
-                .local_get(data_pointer)
-                .i32_const(1)
-                .binop(BinaryOp::I32Add)
-                .local_set(data_pointer);
-
-            // Increment i
-            loop_block
-                .local_get(i)
-                .i32_const(1)
-                .binop(BinaryOp::I32Add)
-                .local_tee(i);
-
-            // Continue loop if i < len
-            loop_block
-                .local_get(len)
-                .binop(BinaryOp::I32LtU)
-                .br_if(loop_block_id);
-        });
-    });
+    builder
+        .local_get(data_pointer)
+        .local_get(vector_pointer)
+        .local_get(len)
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
     Ok(function.finish(
         vec![string_pointer, writer_pointer, calldata_reference_pointer],

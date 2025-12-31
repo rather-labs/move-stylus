@@ -31,7 +31,8 @@ pub fn pack_struct_function(
 
     let mut builder: walrus::InstrSeqBuilder<'_> = function.name(name).func_body();
 
-    // For event structs, create a new struct with only data fields (excluding indexed fields)
+    // If the struct is an event we need to exclue the indexed fields as those are not part of the data.
+    // Else we use the original struct.
     let struct_ = {
         let struct_ = compilation_ctx.get_struct_by_intermediate_type(itype)?;
         if let IStructType::Event { indexes, .. } = struct_.type_ {
