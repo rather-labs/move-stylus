@@ -77,117 +77,115 @@ pub fn build_entrypoint_router(
     // Define the return block - all routing logic happens inside this block
     let mut inner_result = Ok(());
     router_builder.block(None, |return_block| {
-        let return_block_id = return_block.id();
+        inner_result = (|| {
+            let return_block_id = return_block.id();
 
-        // If data_len == 0, there isn't even a function selector present in the calldata, so we attempt to default to "receive" by injecting its selector into the argument data.
-        // Otherwise (data_len != 0), read selector directly from the args (the standard case).
-        return_block
-            .local_get(data_len)
-            .unop(UnaryOp::I32Eqz)
-            .if_else(
-                None,
-                |then| {
-                    // data_len == 0: try receive
-                    // If no receive function, the selector_variable remains uninitialized and will not match any function
-                    if let Some(receive_fn) = functions
-                        .iter()
-                        .find(|f| f.function_name.as_str() == "receive")
-                    {
-                        then.i32_const(i32::from_le_bytes(receive_fn.function_selector))
+            // If data_len == 0, there isn't even a function selector present in the calldata, so we attempt to default to "receive" by injecting its selector into the argument data.
+            // Otherwise (data_len != 0), read selector directly from the args (the standard case).
+            return_block
+                .local_get(data_len)
+                .unop(UnaryOp::I32Eqz)
+                .if_else(
+                    None,
+                    |then| {
+                        // data_len == 0: try receive
+                        // If no receive function, the selector_variable remains uninitialized and will not match any function
+                        if let Some(receive_fn) = functions
+                            .iter()
+                            .find(|f| f.function_name.as_str() == "receive")
+                        {
+                            then.i32_const(i32::from_le_bytes(receive_fn.function_selector))
+                                .local_set(function_selector);
+                        }
+
+                        // Set data_len to 4
+                        then.i32_const(4).local_set(data_len);
+
+                        // Allocate memory for the receive function selector, which is the only calldata needed.
+                        then.local_get(data_len)
+                            .call(compilation_ctx.allocator)
+                            .local_tee(data_pointer)
+                            .local_get(function_selector)
+                            .store(
+                                compilation_ctx.memory_id,
+                                StoreKind::I32 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            );
+                    },
+                    |else_| {
+                        // Load selector from memory
+                        else_
+                            .local_get(data_pointer)
+                            .load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I32 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            )
                             .local_set(function_selector);
-                    }
+                    },
+                );
 
-                    // Set data_len to 4
-                    then.i32_const(4).local_set(data_len);
-
-                    // Allocate memory for the receive function selector, which is the only calldata needed.
-                    then.local_get(data_len)
-                        .call(compilation_ctx.allocator)
-                        .local_tee(data_pointer)
-                        .local_get(function_selector)
-                        .store(
-                            compilation_ctx.memory_id,
-                            StoreKind::I32 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        );
-                },
-                |else_| {
-                    // Load selector from memory
-                    else_
-                        .local_get(data_pointer)
-                        .load(
-                            compilation_ctx.memory_id,
-                            LoadKind::I32 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        )
-                        .local_set(function_selector);
-                },
-            );
-
-        // Offset args pointer by 4 bytes to exclude selector
-        return_block
-            .local_get(data_pointer)
-            .i32_const(4)
-            .binop(BinaryOp::I32Add)
-            .local_set(data_pointer);
-
-        // Try to route call based on selector for all public functions. Any successful match
-        // will set data_pointer, data_len and break to exit_label.
-        for function in functions {
-            inner_result = function.build_router_block(
-                return_block,
-                module,
-                function_selector,
-                data_pointer,
-                data_len,
-                return_block_id,
-                compilation_ctx,
-            );
-        }
-
-        // If no function matched we might be in the fallback case:
-        if let Some(fallback_fn) = functions
-            .iter()
-            .find(|f| f.function_name.as_str() == "fallback")
-        {
-            // Restore the data pointer to the start of the calldata, as the fallback function has no selector
+            // Offset args pointer by 4 bytes to exclude selector
             return_block
                 .local_get(data_pointer)
                 .i32_const(4)
-                .binop(BinaryOp::I32Sub)
+                .binop(BinaryOp::I32Add)
                 .local_set(data_pointer);
 
-            // Wrap function to unpack/pack arguments
-            inner_result = fallback_fn.wrap_public_function(
-                module,
-                return_block,
-                data_pointer,
-                compilation_ctx,
-            );
+            // Try to route call based on selector for all public functions. Any successful match
+            // will set data_pointer, data_len and break to exit_label.
+            for function in functions {
+                inner_result = function.build_router_block(
+                    return_block,
+                    module,
+                    function_selector,
+                    data_pointer,
+                    data_len,
+                    return_block_id,
+                    compilation_ctx,
+                );
+            }
 
-            // Stack: [data_pointer] [data_len]
-            // Set final locals and break to exit
-            return_block
-                .local_set(data_len)
-                .local_set(data_pointer)
-                .br(return_block_id);
-        }
+            // If no function matched we might be in the fallback case:
+            if let Some(fallback_fn) = functions
+                .iter()
+                .find(|f| f.function_name.as_str() == "fallback")
+            {
+                // Restore the data pointer to the start of the calldata, as the fallback function has no selector
+                return_block
+                    .local_get(data_pointer)
+                    .i32_const(4)
+                    .binop(BinaryOp::I32Sub)
+                    .local_set(data_pointer);
 
-        // --- NO MATCH CASE ---
-        // If execution reaches here, no function matched.
-        // We set up the error message and fall through to the common return.
-        return_block.i64_const(ERROR_NO_FUNCTION_MATCH);
-        let inner_result = build_abort_error_message(return_block, module, compilation_ctx);
+                // Wrap function to unpack/pack arguments
+                inner_result = fallback_fn.wrap_public_function(
+                    module,
+                    return_block,
+                    data_pointer,
+                    compilation_ctx,
+                );
 
-        // Extract the pointer to the error message if inner_result is Ok
-        if inner_result.is_ok() {
-            let ptr = inner_result.unwrap();
+                // Stack: [data_pointer] [data_len]
+                // Set final locals and break to exit
+                return_block
+                    .local_set(data_len)
+                    .local_set(data_pointer)
+                    .br(return_block_id);
+            }
+
+            // --- NO MATCH CASE ---
+            // If execution reaches here, no function matched.
+            // We set up the error message and fall through to the common return.
+            return_block.i64_const(ERROR_NO_FUNCTION_MATCH);
+            let ptr = build_abort_error_message(return_block, module, compilation_ctx)?;
+
             // Set data_pointer to skip header (ptr + 4)
             return_block
                 .local_get(ptr)
@@ -207,13 +205,15 @@ pub fn build_entrypoint_router(
                     },
                 )
                 .local_set(data_len);
-        }
 
-        // Set status to 1 (error)
-        return_block.i32_const(1).local_set(status);
-        // Fall through to end of block...
+            // Set status to 1 (error)
+            return_block.i32_const(1).local_set(status);
+            // Fall through to end of block...
+            Ok(())
+        })();
     });
 
+    inner_result?;
     // --- SHARED EXIT LOGIC ---
 
     // 1. Check for Global Abort
