@@ -318,7 +318,7 @@ impl NativeFunction {
                     object::add_native_fresh_id_fn(module, compilation_ctx, module_id)
                 }
                 (Self::NATIVE_DATA, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TX_CONTEXT) => {
-                    transaction::add_native_data_fn(module, compilation_ctx, module_id)
+                    transaction::add_native_data_fn(module, compilation_ctx, module_id)?
                 }
                 (
                     Self::NATIVE_HAS_CHILD_OBJECT,
