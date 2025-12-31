@@ -11,11 +11,11 @@ impl VmHandledType for Signer {
         block: &mut InstrSeqBuilder,
         module: &mut Module,
         compilation_ctx: &CompilationContext,
-    ) {
-        let inject_signer_fn = RuntimeFunction::InjectSigner
-            .get(module, Some(compilation_ctx))
-            .expect("failed to link inject_signer runtime function");
+    ) -> Result<(), VmHandledTypeError> {
+        let inject_signer_fn = RuntimeFunction::InjectSigner.get(module, Some(compilation_ctx))?;
+
         block.call(inject_signer_fn);
+        Ok(())
     }
 
     fn is_vm_type(

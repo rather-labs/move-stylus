@@ -17,8 +17,9 @@ impl VmHandledType for TxContext {
         block: &mut InstrSeqBuilder,
         _module: &mut Module,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), VmHandledTypeError> {
         block.i32_const(4).call(compilation_ctx.allocator);
+        Ok(())
     }
 
     fn is_vm_type(

@@ -82,7 +82,7 @@ impl<'a> PublicFunction<'a> {
         return_block_id: InstrSeqId,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), AbiError> {
-        let mut inner_result = Ok(());
+        let mut inner_result: Result<(), AbiError> = Ok(());
 
         router_builder.block(None, |block| {
             let block_id = block.id();
@@ -98,16 +98,21 @@ impl<'a> PublicFunction<'a> {
             // first argument
             match self.signature.arguments.first() {
                 Some(IntermediateType::ISigner) => {
-                    Signer::inject(block, module, compilation_ctx);
+                    inner_result =
+                        Signer::inject(block, module, compilation_ctx).map_err(AbiError::from);
                 }
                 Some(IntermediateType::IRef(inner)) if **inner == IntermediateType::ISigner => {
-                    Signer::inject(block, module, compilation_ctx);
+                    inner_result =
+                        Signer::inject(block, module, compilation_ctx).map_err(AbiError::from);
                 }
                 _ => {}
             }
 
-            // Wrap function to unpack/pack arguments
-            inner_result = self.wrap_public_function(module, block, data_pointer, compilation_ctx);
+            // Wrap function to unpack/pack arguments (only if signer injection succeeded)
+            if inner_result.is_ok() {
+                inner_result =
+                    self.wrap_public_function(module, block, data_pointer, compilation_ctx);
+            }
 
             // Set the return data length and pointer to the locals and break to the return block
             block
