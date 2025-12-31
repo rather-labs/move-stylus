@@ -6,6 +6,7 @@ use crate::{
     compilation_context::ModuleId,
     data::DATA_CALLDATA_OFFSET,
     hostio::host_functions::{block_basefee, msg_sender, msg_value, tx_gas_price},
+    native_functions::error::NativeFunctionError,
     translation::intermediate_types::{address::IAddress, heap_integers::IU256},
 };
 use walrus::{
@@ -101,10 +102,10 @@ pub fn add_native_data_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     module_id: &ModuleId,
-) -> FunctionId {
+) -> Result<FunctionId, NativeFunctionError> {
     let bytes_to_vec_fn = RuntimeFunction::BytesToVec
         .get(module, Some(compilation_ctx))
-        .expect("BytesToVec runtime function should be available");
+        .map_err(NativeFunctionError::from)?;
 
     let mut function = FunctionBuilder::new(&mut module.types, &[], &[ValType::I32]);
     let mut builder = function
@@ -136,5 +137,5 @@ pub fn add_native_data_fn(
         )
         .call(bytes_to_vec_fn);
 
-    function.finish(vec![], &mut module.funcs)
+    Ok(function.finish(vec![], &mut module.funcs))
 }

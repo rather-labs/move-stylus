@@ -180,7 +180,7 @@ impl Unpackable for IntermediateType {
             IntermediateType::IStruct {
                 module_id, index, ..
             } if TxContext::is_vm_type(module_id, *index, compilation_ctx)? => {
-                TxContext::inject(builder, module, compilation_ctx);
+                TxContext::inject(builder, module, compilation_ctx)?;
             }
             IntermediateType::IStruct {
                 module_id, index, ..

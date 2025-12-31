@@ -297,7 +297,7 @@ impl NativeFunction {
                     Self::NATIVE_NEW_TX_CONTEXT,
                     STYLUS_FRAMEWORK_ADDRESS,
                     SF_MODULE_TEST_SCENARIO,
-                ) => unit_test::add_new_tx_context_fn(module, module_id, compilation_ctx),
+                ) => unit_test::add_new_tx_context_fn(module, module_id, compilation_ctx)?,
 
                 (Self::NATIVE_SENDER, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TX_CONTEXT) => {
                     transaction::add_native_sender_fn(module, compilation_ctx, module_id)
@@ -318,7 +318,7 @@ impl NativeFunction {
                     object::add_native_fresh_id_fn(module, compilation_ctx, module_id)
                 }
                 (Self::NATIVE_DATA, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TX_CONTEXT) => {
-                    transaction::add_native_data_fn(module, compilation_ctx, module_id)
+                    transaction::add_native_data_fn(module, compilation_ctx, module_id)?
                 }
                 (
                     Self::NATIVE_HAS_CHILD_OBJECT,

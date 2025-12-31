@@ -17,8 +17,9 @@ impl VmHandledType for ContractCallResult {
         _block: &mut InstrSeqBuilder,
         _module: &mut Module,
         _compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), VmHandledTypeError> {
         // Contract call result is not injected
+        Ok(())
     }
 
     fn is_vm_type(
@@ -51,8 +52,9 @@ impl VmHandledType for ContractCallEmptyResult {
         _block: &mut InstrSeqBuilder,
         _module: &mut Module,
         _compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), VmHandledTypeError> {
         // Contract call result is not injected
+        Ok(())
     }
 
     fn is_vm_type(

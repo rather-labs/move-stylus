@@ -103,6 +103,7 @@ pub enum RuntimeFunction {
     UnpackStruct,
     UnpackStorageStruct,
     UnpackReference,
+    InjectSigner,
     // ABI packing
     PackEnum,
     PackU32,
@@ -196,6 +197,7 @@ impl RuntimeFunction {
             Self::UnpackStruct => "unpack_struct",
             Self::UnpackStorageStruct => "unpack_storage_struct",
             Self::UnpackReference => "unpack_reference",
+            Self::InjectSigner => "inject_signer",
             // ABI packing
             Self::PackEnum => "pack_enum",
             Self::PackU32 => "pack_u32",
@@ -349,6 +351,7 @@ impl RuntimeFunction {
                 (Self::UnpackString, Some(ctx)) => {
                     unpacking::string::unpack_string_function(module, ctx)?
                 }
+                (Self::InjectSigner, Some(ctx)) => unpacking::signer::inject_signer(module, ctx),
                 // ABI packing
                 (Self::PackEnum, Some(ctx)) => packing::enums::pack_enum_function(module, ctx)?,
                 (Self::PackU32, Some(ctx)) => packing::uint::pack_u32_function(module, ctx)?,

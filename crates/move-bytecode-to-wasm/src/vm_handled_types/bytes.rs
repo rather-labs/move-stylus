@@ -16,8 +16,9 @@ impl VmHandledType for Bytes {
         _block: &mut InstrSeqBuilder,
         _module: &mut Module,
         _compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), VmHandledTypeError> {
         // no-op
+        Ok(())
     }
 
     fn is_vm_type(

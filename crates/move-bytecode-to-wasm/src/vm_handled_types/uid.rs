@@ -17,8 +17,9 @@ impl VmHandledType for Uid {
         _block: &mut InstrSeqBuilder,
         _module: &mut Module,
         _compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), VmHandledTypeError> {
         // UID is not injected, is created with a native function
+        Ok(())
     }
 
     fn is_vm_type(
