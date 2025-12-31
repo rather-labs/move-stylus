@@ -386,6 +386,7 @@ mod tests {
         let n1_ptr = raw_module.locals.add(ValType::I32);
         let n2_ptr = raw_module.locals.add(ValType::I32);
         let mut func_body = function_builder.func_body();
+
         // arguments for heap_integers_add (n1_ptr, n2_ptr, where to store the result and
         // size in heap)
         // func_body
