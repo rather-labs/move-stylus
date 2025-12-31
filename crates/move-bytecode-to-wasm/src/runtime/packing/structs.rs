@@ -68,11 +68,7 @@ pub fn pack_struct_function(
     let struct_size = struct_.solidity_abi_encode_size(compilation_ctx)? as i32;
     let pack_u32_function = RuntimeFunction::PackU32.get(module, Some(compilation_ctx))?;
 
-    // If base_calldata_reference_ptr is Some(_), means we are packing an struct inside a
-    // struct and that the struct is dynamic.
-    // base_calldata_reference_pointer is the reference pointer to the original value, and it
-    // is used to calculate the offset where the struct will be allocated in the parent struct.
-    // The calculated offset will be written in the place where the struct should be.
+    // If is_nested is 1, means we are packing an struct inside a struct and that the struct is dynamic.
     builder.local_get(is_nested).if_else(
         None,
         |then| {
