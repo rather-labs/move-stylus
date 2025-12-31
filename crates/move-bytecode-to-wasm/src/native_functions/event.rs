@@ -390,11 +390,9 @@ pub fn add_emit_log_fn(
             .local_tee(writer_pointer)
             .local_set(abi_encoded_data_calldata_reference_pointer);
 
-        // Use the allocator to get a pointer to the end of the calldata
-
+        let pack_struct_function =
+            RuntimeFunction::PackStruct.get_generic(module, compilation_ctx, &[itype])?;
         if data_struct.solidity_abi_encode_is_dynamic(compilation_ctx)? {
-            let pack_struct_function =
-                RuntimeFunction::PackStruct.get_generic(module, compilation_ctx, &[itype])?;
             builder
                 .local_get(data_struct_ptr)
                 .local_get(writer_pointer)
@@ -424,9 +422,6 @@ pub fn add_emit_log_fn(
 
             builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
         } else {
-            let pack_struct_function =
-                RuntimeFunction::PackStruct.get_generic(module, compilation_ctx, &[itype])?;
-
             builder
                 .local_get(data_struct_ptr)
                 .local_get(writer_pointer)
