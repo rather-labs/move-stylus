@@ -1,6 +1,7 @@
 use crate::{
     CompilationContext,
     runtime::{RuntimeFunction, RuntimeFunctionError},
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
@@ -92,9 +93,7 @@ pub fn pack_string_function(
 
     // Set the vector pointer to point to the first element (skip vector header)
     builder
-        .local_get(vector_pointer)
-        .i32_const(8)
-        .binop(BinaryOp::I32Add)
+        .skip_vec_header(vector_pointer)
         .local_set(vector_pointer);
 
     // Write the length at data_pointer
