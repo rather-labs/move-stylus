@@ -590,7 +590,7 @@ impl RuntimeSandbox {
 
         linker
             .func_wrap("", "print_i32", |param: i32| {
-                println!("--- i32 ---> {param}");
+                println!("--- i32 ---> Dec: {param} Hex: {param:#x} Bin: {param:#b}");
             })
             .unwrap();
 
