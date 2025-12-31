@@ -1,131 +1,127 @@
+use crate::{
+    CompilationContext,
+    runtime::{RuntimeFunction, RuntimeFunctionError},
+};
 use walrus::{
-    InstrSeqBuilder, LocalId, MemoryId, Module,
+    FunctionBuilder, FunctionId, Module, ValType,
     ir::{LoadKind, MemArg, StoreKind},
 };
 
-use crate::{
-    abi_types::error::AbiError,
-    runtime::RuntimeFunction,
-    translation::intermediate_types::{
-        address::IAddress,
-        heap_integers::{IU128, IU256},
-    },
-};
+pub fn pack_u128_function(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) -> Result<FunctionId, RuntimeFunctionError> {
+    // Little-endian to Big-endian
+    let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None)?;
 
-impl IU128 {
-    pub fn add_pack_instructions(
-        block: &mut InstrSeqBuilder,
-        module: &mut Module,
-        local: LocalId,
-        writer_pointer: LocalId,
-        memory: MemoryId,
-    ) -> Result<(), AbiError> {
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
+    let mut builder = function
+        .name(RuntimeFunction::PackU128.name().to_owned())
+        .func_body();
+
+    let value_pointer = module.locals.add(ValType::I32);
+    let writer_pointer = module.locals.add(ValType::I32);
+
+    // Pack 2 i64 values, loading from right to left, storing left to right
+    for i in 0..2 {
+        // Get writer pointer on stack
+        builder.local_get(writer_pointer);
+
+        // Load from value pointer (right to left)
+        builder.local_get(value_pointer).load(
+            compilation_ctx.memory_id,
+            LoadKind::I64 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 8 - i * 8,
+            },
+        );
+
         // Little-endian to Big-endian
-        let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None)?;
+        builder.call(swap_i64_bytes_function);
 
-        for i in 0..2 {
-            block.local_get(writer_pointer);
-            block.local_get(local);
-
-            // Load from right to left
-            block.load(
-                memory,
-                LoadKind::I64 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 8 - i * 8,
-                },
-            );
-            block.call(swap_i64_bytes_function);
-
-            // Store from left to right
-            block.store(
-                memory,
-                StoreKind::I64 { atomic: false },
-                MemArg {
-                    align: 0,
-                    // Abi is left-padded to 32 bytes
-                    offset: 16 + i * 8,
-                },
-            );
-        }
-
-        Ok(())
+        // Store at writer pointer (left to right, left-padded to 32 bytes)
+        builder.store(
+            compilation_ctx.memory_id,
+            StoreKind::I64 { atomic: false },
+            MemArg {
+                align: 0,
+                // ABI is left-padded to 32 bytes
+                offset: 16 + i * 8,
+            },
+        );
     }
+
+    Ok(function.finish(vec![value_pointer, writer_pointer], &mut module.funcs))
 }
 
-impl IU256 {
-    pub fn add_pack_instructions(
-        block: &mut InstrSeqBuilder,
-        module: &mut Module,
-        local: LocalId,
-        writer_pointer: LocalId,
-        memory: MemoryId,
-    ) -> Result<(), AbiError> {
+pub fn pack_u256_function(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) -> Result<FunctionId, RuntimeFunctionError> {
+    // Little-endian to Big-endian
+    let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None)?;
+
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
+    let mut builder = function
+        .name(RuntimeFunction::PackU256.name().to_owned())
+        .func_body();
+
+    let value_pointer = module.locals.add(ValType::I32);
+    let writer_pointer = module.locals.add(ValType::I32);
+
+    // Pack 4 i64 values, loading from right to left, storing left to right
+    for i in 0..4 {
+        // Get writer pointer on stack
+        builder.local_get(writer_pointer);
+
+        // Load from value pointer (right to left)
+        builder.local_get(value_pointer).load(
+            compilation_ctx.memory_id,
+            LoadKind::I64 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 24 - i * 8,
+            },
+        );
+
         // Little-endian to Big-endian
-        let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None)?;
+        builder.call(swap_i64_bytes_function);
 
-        for i in 0..4 {
-            block.local_get(writer_pointer);
-            block.local_get(local);
-
-            // Load from right to left
-            block.load(
-                memory,
-                LoadKind::I64 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 24 - i * 8,
-                },
-            );
-            block.call(swap_i64_bytes_function);
-
-            // Store from left to right
-            block.store(
-                memory,
-                StoreKind::I64 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: i * 8,
-                },
-            );
-        }
-
-        Ok(())
+        // Store at writer pointer (left to right)
+        builder.store(
+            compilation_ctx.memory_id,
+            StoreKind::I64 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: i * 8,
+            },
+        );
     }
+
+    Ok(function.finish(vec![value_pointer, writer_pointer], &mut module.funcs))
 }
 
-impl IAddress {
-    /// Address is packed as a u160, but endianness is not relevant
-    pub fn add_pack_instructions(
-        block: &mut InstrSeqBuilder,
-        _module: &mut Module,
-        local: LocalId,
-        writer_pointer: LocalId,
-        memory: MemoryId,
-    ) {
-        for i in 0..4 {
-            block.local_get(writer_pointer);
-            block.local_get(local);
+pub fn pack_address_function(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) -> Result<FunctionId, RuntimeFunctionError> {
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
+    let mut builder = function
+        .name(RuntimeFunction::PackAddress.name().to_owned())
+        .func_body();
 
-            block.load(
-                memory,
-                LoadKind::I64 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: i * 8,
-                },
-            );
-            block.store(
-                memory,
-                StoreKind::I64 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: i * 8,
-                },
-            );
-        }
-    }
+    let value_pointer = module.locals.add(ValType::I32);
+    let writer_pointer = module.locals.add(ValType::I32);
+
+    // Address is packed as a u160, but endianness is not relevant
+    builder
+        .local_get(writer_pointer)
+        .local_get(value_pointer)
+        .i32_const(32)
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
+    Ok(function.finish(vec![value_pointer, writer_pointer], &mut module.funcs))
 }
 
 #[cfg(test)]
