@@ -51,13 +51,13 @@ pub enum AbiOperationError {
 #[derive(thiserror::Error, Debug)]
 pub enum AbiError {
     #[error("there was an error performing abi unpack operation")]
-    Unpack(AbiOperationError),
+    Unpack(#[source] AbiOperationError),
 
     #[error("there was an error performing abi pack operation")]
-    Pack(AbiOperationError),
+    Pack(#[source] AbiOperationError),
 
     #[error("abi encoding error")]
-    AbiEncoding(AbiOperationError),
+    AbiEncoding(#[source] AbiOperationError),
 
     #[error("there was an error validating a public function")]
     PublicFunction(#[from] PublicFunctionValidationError),
