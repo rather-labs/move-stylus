@@ -1,6 +1,6 @@
 use crate::{
     CompilationContext,
-    abi_types::error::{AbiError, AbiUnpackError},
+    abi_types::error::{AbiError, AbiOperationError},
     abi_types::unpacking::Unpackable,
     runtime::{RuntimeFunction, RuntimeFunctionError},
     translation::intermediate_types::IntermediateType,
@@ -75,19 +75,19 @@ pub fn unpack_reference_function(
         | IntermediateType::IEnum { .. }
         | IntermediateType::IGenericEnumInstance { .. } => {
             // Heap types are handled in the add_unpack_instructions function so this case should be unreachable
-            return Err(RuntimeFunctionError::from(AbiError::from(
-                AbiUnpackError::UnhandledHeapTypeReference,
+            return Err(RuntimeFunctionError::from(AbiError::Unpack(
+                AbiOperationError::UnhandledHeapTypeReference,
             )));
         }
 
         IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-            return Err(RuntimeFunctionError::from(AbiError::from(
-                AbiUnpackError::RefInsideRef,
+            return Err(RuntimeFunctionError::from(AbiError::Unpack(
+                AbiOperationError::RefInsideRef,
             )));
         }
         IntermediateType::ITypeParameter(_) => {
-            return Err(RuntimeFunctionError::from(AbiError::from(
-                AbiUnpackError::UnpackingGenericTypeParameter,
+            return Err(RuntimeFunctionError::from(AbiError::Unpack(
+                AbiOperationError::UnpackingGenericTypeParameter,
             )));
         }
     }

@@ -1,66 +1,86 @@
+use crate::{
+    CompilationContext,
+    runtime::{RuntimeFunction, RuntimeFunctionError},
+};
 use walrus::{
-    InstrSeqBuilder, LocalId, MemoryId, Module,
+    FunctionBuilder, FunctionId, Module, ValType,
     ir::{MemArg, StoreKind},
 };
 
-use crate::{abi_types::error::AbiError, runtime::RuntimeFunction};
-
-pub fn pack_i32_type_instructions(
-    block: &mut InstrSeqBuilder,
+pub fn pack_u32_function(
     module: &mut Module,
-    memory: MemoryId,
-    local: LocalId,
-    writer_pointer: LocalId,
-) -> Result<(), AbiError> {
-    block.local_get(writer_pointer);
-
-    // Load the local value to the stack
-    block.local_get(local);
-
+    compilation_ctx: &CompilationContext,
+) -> Result<FunctionId, RuntimeFunctionError> {
     // Little-endian to Big-endian
     let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
-    block.call(swap_i32_bytes_function);
 
-    block.store(
-        memory,
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
+    let mut builder = function
+        .name(RuntimeFunction::PackU32.name().to_owned())
+        .func_body();
+
+    let value = module.locals.add(ValType::I32);
+    let writer_pointer = module.locals.add(ValType::I32);
+
+    // Get writer pointer on stack
+    builder.local_get(writer_pointer);
+
+    // Load the value to the stack
+    builder.local_get(value);
+
+    // Little-endian to Big-endian
+    builder.call(swap_i32_bytes_function);
+
+    // Store at writer pointer (left-padded to 32 bytes)
+    builder.store(
+        compilation_ctx.memory_id,
         StoreKind::I32 { atomic: false },
         MemArg {
             align: 0,
-            // Abi is left-padded to 32 bytes
+            // ABI is left-padded to 32 bytes
             offset: 28,
         },
     );
 
-    Ok(())
+    Ok(function.finish(vec![value, writer_pointer], &mut module.funcs))
 }
 
-pub fn pack_i64_type_instructions(
-    block: &mut InstrSeqBuilder,
+pub fn pack_u64_function(
     module: &mut Module,
-    memory: MemoryId,
-    local: LocalId,
-    writer_pointer: LocalId,
-) -> Result<(), AbiError> {
-    block.local_get(writer_pointer);
-
-    // Load the local value to the stack
-    block.local_get(local);
-
+    compilation_ctx: &CompilationContext,
+) -> Result<FunctionId, RuntimeFunctionError> {
     // Little-endian to Big-endian
     let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None)?;
-    block.call(swap_i64_bytes_function);
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I64, ValType::I32], &[]);
 
-    block.store(
-        memory,
+    let mut builder = function
+        .name(RuntimeFunction::PackU64.name().to_owned())
+        .func_body();
+
+    let value = module.locals.add(ValType::I64);
+    let writer_pointer = module.locals.add(ValType::I32);
+
+    // Get writer pointer on stack
+    builder.local_get(writer_pointer);
+
+    // Load the value to the stack
+    builder.local_get(value);
+
+    // Little-endian to Big-endian
+    builder.call(swap_i64_bytes_function);
+
+    // Store at writer pointer (left-padded to 32 bytes)
+    builder.store(
+        compilation_ctx.memory_id,
         StoreKind::I64 { atomic: false },
         MemArg {
             align: 0,
-            // Abi is left-padded to 32 bytes
+            // ABI is left-padded to 32 bytes
             offset: 24,
         },
     );
 
-    Ok(())
+    Ok(function.finish(vec![value, writer_pointer], &mut module.funcs))
 }
 
 #[cfg(test)]

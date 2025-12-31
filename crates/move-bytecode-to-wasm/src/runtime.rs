@@ -18,6 +18,7 @@ mod enums;
 mod equality;
 pub mod error;
 mod integers;
+mod packing;
 mod storage;
 mod swap;
 mod unpacking;
@@ -102,6 +103,17 @@ pub enum RuntimeFunction {
     UnpackStruct,
     UnpackStorageStruct,
     UnpackReference,
+    // ABI packing
+    PackEnum,
+    PackU32,
+    PackU64,
+    PackU128,
+    PackU256,
+    PackAddress,
+    PackString,
+    PackVector,
+    PackStruct,
+    PackReference,
 }
 
 impl RuntimeFunction {
@@ -184,6 +196,17 @@ impl RuntimeFunction {
             Self::UnpackStruct => "unpack_struct",
             Self::UnpackStorageStruct => "unpack_storage_struct",
             Self::UnpackReference => "unpack_reference",
+            // ABI packing
+            Self::PackEnum => "pack_enum",
+            Self::PackU32 => "pack_u32",
+            Self::PackU64 => "pack_u64",
+            Self::PackU128 => "pack_u128",
+            Self::PackU256 => "pack_u256",
+            Self::PackAddress => "pack_address",
+            Self::PackString => "pack_string",
+            Self::PackVector => "pack_vector",
+            Self::PackStruct => "pack_struct",
+            Self::PackReference => "pack_reference",
         }
     }
 
@@ -326,6 +349,18 @@ impl RuntimeFunction {
                 (Self::UnpackString, Some(ctx)) => {
                     unpacking::string::unpack_string_function(module, ctx)?
                 }
+                // ABI packing
+                (Self::PackEnum, Some(ctx)) => packing::enums::pack_enum_function(module, ctx)?,
+                (Self::PackU32, Some(ctx)) => packing::uint::pack_u32_function(module, ctx)?,
+                (Self::PackU64, Some(ctx)) => packing::uint::pack_u64_function(module, ctx)?,
+                (Self::PackU128, Some(ctx)) => packing::heap_uint::pack_u128_function(module, ctx)?,
+                (Self::PackU256, Some(ctx)) => packing::heap_uint::pack_u256_function(module, ctx)?,
+                (Self::PackAddress, Some(ctx)) => {
+                    packing::heap_uint::pack_address_function(module, ctx)?
+                }
+                (Self::PackString, Some(ctx)) => {
+                    packing::string::pack_string_function(module, ctx)?
+                }
                 // Error
                 _ => return Err(RuntimeFunctionError::CouldNotLink(self.name().to_owned())),
             };
@@ -417,6 +452,18 @@ impl RuntimeFunction {
                     compilation_ctx,
                     generics[0],
                 )?
+            }
+            Self::PackVector => {
+                Self::assert_generics_length(generics.len(), 1, self.name())?;
+                packing::vector::pack_vector_function(module, compilation_ctx, generics[0])?
+            }
+            Self::PackStruct => {
+                Self::assert_generics_length(generics.len(), 1, self.name())?;
+                packing::structs::pack_struct_function(module, compilation_ctx, generics[0])?
+            }
+            Self::PackReference => {
+                Self::assert_generics_length(generics.len(), 1, self.name())?;
+                packing::reference::pack_reference_function(module, compilation_ctx, generics[0])?
             }
             _ => {
                 return Err(RuntimeFunctionError::CouldNotLinkGeneric(

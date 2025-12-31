@@ -1,198 +1,128 @@
-use super::Packable;
-use super::error::AbiPackError;
-use crate::CompilationContext;
-use crate::abi_types::error::AbiError;
-use crate::translation::intermediate_types::IntermediateType;
-use crate::translation::intermediate_types::reference::{IMutRef, IRef};
+use crate::{
+    CompilationContext,
+    abi_types::error::{AbiError, AbiOperationError},
+    abi_types::packing::Packable,
+    runtime::{RuntimeFunction, RuntimeFunctionError},
+    translation::intermediate_types::IntermediateType,
+};
 use walrus::{
-    InstrSeqBuilder, LocalId, Module, ValType,
+    FunctionBuilder, FunctionId, Module, ValType,
     ir::{LoadKind, MemArg},
 };
 
-impl IRef {
-    #[allow(clippy::too_many_arguments)]
-    pub fn add_pack_instructions(
-        inner: &IntermediateType,
-        builder: &mut InstrSeqBuilder,
-        module: &mut Module,
-        local: LocalId,
-        writer_pointer: LocalId,
-        calldata_reference_pointer: LocalId,
-        compilation_ctx: &CompilationContext,
-    ) -> Result<(), AbiError> {
-        match inner {
-            IntermediateType::ISigner
-            | IntermediateType::IU128
-            | IntermediateType::IU256
-            | IntermediateType::IAddress
-            | IntermediateType::IVector(_)
-            | IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IEnum { .. }
-            | IntermediateType::IGenericEnumInstance { .. } => {
-                // Load the intermediate pointer and pack
-                builder
-                    .local_get(local)
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    )
-                    .local_set(local);
+pub fn pack_reference_function(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    inner: &IntermediateType,
+) -> Result<FunctionId, RuntimeFunctionError> {
+    let name =
+        RuntimeFunction::PackReference.get_generic_function_name(compilation_ctx, &[inner])?;
+    if let Some(function) = module.funcs.by_name(&name) {
+        return Ok(function);
+    }
 
-                inner.add_pack_instructions(
-                    builder,
-                    module,
-                    local,
-                    writer_pointer,
-                    calldata_reference_pointer,
-                    compilation_ctx,
-                )?;
-            }
-            IntermediateType::IBool
-            | IntermediateType::IU8
-            | IntermediateType::IU16
-            | IntermediateType::IU32
-            | IntermediateType::IU64 => {
-                // Load the intermediate pointer
-                builder
-                    .local_get(local)
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    )
-                    .local_tee(local);
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32, ValType::I32],
+        &[],
+    );
 
-                builder.load(
+    let mut builder: walrus::InstrSeqBuilder<'_> = function.name(name).func_body();
+
+    // Arguments
+    let reference_pointer = module.locals.add(ValType::I32);
+    let writer_pointer = module.locals.add(ValType::I32);
+    let calldata_reference_pointer = module.locals.add(ValType::I32);
+
+    match inner {
+        IntermediateType::ISigner
+        | IntermediateType::IU128
+        | IntermediateType::IU256
+        | IntermediateType::IAddress
+        | IntermediateType::IVector(_)
+        | IntermediateType::IStruct { .. }
+        | IntermediateType::IGenericStructInstance { .. }
+        | IntermediateType::IEnum { .. }
+        | IntermediateType::IGenericEnumInstance { .. } => {
+            // Load the intermediate pointer and pack
+            builder
+                .local_get(reference_pointer)
+                .load(
                     compilation_ctx.memory_id,
-                    inner.load_kind()?,
+                    LoadKind::I32 { atomic: false },
                     MemArg {
                         align: 0,
                         offset: 0,
                     },
-                );
+                )
+                .local_set(reference_pointer);
 
-                let value_local = module.locals.add(ValType::try_from(inner)?);
-                builder.local_set(value_local);
-
-                inner.add_pack_instructions(
-                    builder,
-                    module,
-                    value_local,
-                    writer_pointer,
-                    calldata_reference_pointer,
-                    compilation_ctx,
-                )?;
-            }
-            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                return Err(AbiPackError::RefInsideRef)?;
-            }
-            IntermediateType::ITypeParameter(_) => {
-                return Err(AbiPackError::PackingGenericTypeParameter)?;
-            }
+            inner.add_pack_instructions(
+                &mut builder,
+                module,
+                reference_pointer,
+                writer_pointer,
+                calldata_reference_pointer,
+                compilation_ctx,
+            )?;
         }
-
-        Ok(())
-    }
-}
-
-impl IMutRef {
-    #[allow(clippy::too_many_arguments)]
-    pub fn add_pack_instructions(
-        inner: &IntermediateType,
-        builder: &mut InstrSeqBuilder,
-        module: &mut Module,
-        local: LocalId,
-        writer_pointer: LocalId,
-        calldata_reference_pointer: LocalId,
-        compilation_ctx: &CompilationContext,
-    ) -> Result<(), AbiError> {
-        match inner {
-            IntermediateType::IU128
-            | IntermediateType::IU256
-            | IntermediateType::IAddress
-            | IntermediateType::IVector(_)
-            | IntermediateType::ISigner
-            | IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IEnum { .. }
-            | IntermediateType::IGenericEnumInstance { .. } => {
-                builder
-                    .local_get(local)
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    )
-                    .local_set(local);
-
-                inner.add_pack_instructions(
-                    builder,
-                    module,
-                    local,
-                    writer_pointer,
-                    calldata_reference_pointer,
-                    compilation_ctx,
-                )?;
-            }
-            // Immediate types: deref the pointer and pass the value as LocalId
-            IntermediateType::IBool
-            | IntermediateType::IU8
-            | IntermediateType::IU16
-            | IntermediateType::IU32
-            | IntermediateType::IU64 => {
-                builder
-                    .local_get(local)
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    )
-                    .local_tee(local);
-
-                builder.load(
+        IntermediateType::IBool
+        | IntermediateType::IU8
+        | IntermediateType::IU16
+        | IntermediateType::IU32
+        | IntermediateType::IU64 => {
+            // Load the intermediate pointer
+            builder
+                .local_get(reference_pointer)
+                .load(
                     compilation_ctx.memory_id,
-                    inner.load_kind()?,
+                    LoadKind::I32 { atomic: false },
                     MemArg {
                         align: 0,
                         offset: 0,
                     },
-                );
-                let value_local = module.locals.add(ValType::try_from(inner)?);
-                builder.local_set(value_local);
+                )
+                .local_tee(reference_pointer);
 
-                inner.add_pack_instructions(
-                    builder,
-                    module,
-                    value_local,
-                    writer_pointer,
-                    calldata_reference_pointer,
-                    compilation_ctx,
-                )?;
-            }
-            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                return Err(AbiPackError::RefInsideRef)?;
-            }
-            IntermediateType::ITypeParameter(_) => {
-                return Err(AbiPackError::PackingGenericTypeParameter)?;
-            }
+            builder.load(
+                compilation_ctx.memory_id,
+                inner.load_kind()?,
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+
+            let value_local = module.locals.add(ValType::try_from(inner)?);
+            builder.local_set(value_local);
+
+            inner.add_pack_instructions(
+                &mut builder,
+                module,
+                value_local,
+                writer_pointer,
+                calldata_reference_pointer,
+                compilation_ctx,
+            )?;
         }
-
-        Ok(())
+        IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+            Err(AbiError::Pack(AbiOperationError::RefInsideRef))?;
+        }
+        IntermediateType::ITypeParameter(_) => {
+            Err(AbiError::Pack(
+                AbiOperationError::PackingGenericTypeParameter,
+            ))?;
+        }
     }
+
+    Ok(function.finish(
+        vec![
+            reference_pointer,
+            writer_pointer,
+            calldata_reference_pointer,
+        ],
+        &mut module.funcs,
+    ))
 }
 
 #[cfg(test)]
