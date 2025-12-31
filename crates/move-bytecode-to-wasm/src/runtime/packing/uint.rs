@@ -14,24 +14,25 @@ pub fn pack_u32_function(
     // Little-endian to Big-endian
     let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
 
-    let mut function_builder =
-        FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
-    let mut function_body = function_builder.func_body();
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
+    let mut builder = function
+        .name(RuntimeFunction::PackU32.name().to_owned())
+        .func_body();
 
     let value = module.locals.add(ValType::I32);
     let writer_pointer = module.locals.add(ValType::I32);
 
     // Get writer pointer on stack
-    function_body.local_get(writer_pointer);
+    builder.local_get(writer_pointer);
 
     // Load the value to the stack
-    function_body.local_get(value);
+    builder.local_get(value);
 
     // Little-endian to Big-endian
-    function_body.call(swap_i32_bytes_function);
+    builder.call(swap_i32_bytes_function);
 
     // Store at writer pointer (left-padded to 32 bytes)
-    function_body.store(
+    builder.store(
         compilation_ctx.memory_id,
         StoreKind::I32 { atomic: false },
         MemArg {
@@ -41,8 +42,7 @@ pub fn pack_u32_function(
         },
     );
 
-    function_builder.name(RuntimeFunction::PackU32.name().to_owned());
-    Ok(function_builder.finish(vec![value, writer_pointer], &mut module.funcs))
+    Ok(function.finish(vec![value, writer_pointer], &mut module.funcs))
 }
 
 pub fn pack_u64_function(
@@ -51,25 +51,26 @@ pub fn pack_u64_function(
 ) -> Result<FunctionId, RuntimeFunctionError> {
     // Little-endian to Big-endian
     let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None)?;
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I64, ValType::I32], &[]);
 
-    let mut function_builder =
-        FunctionBuilder::new(&mut module.types, &[ValType::I64, ValType::I32], &[]);
-    let mut function_body = function_builder.func_body();
+    let mut builder = function
+        .name(RuntimeFunction::PackU64.name().to_owned())
+        .func_body();
 
     let value = module.locals.add(ValType::I64);
     let writer_pointer = module.locals.add(ValType::I32);
 
     // Get writer pointer on stack
-    function_body.local_get(writer_pointer);
+    builder.local_get(writer_pointer);
 
     // Load the value to the stack
-    function_body.local_get(value);
+    builder.local_get(value);
 
     // Little-endian to Big-endian
-    function_body.call(swap_i64_bytes_function);
+    builder.call(swap_i64_bytes_function);
 
     // Store at writer pointer (left-padded to 32 bytes)
-    function_body.store(
+    builder.store(
         compilation_ctx.memory_id,
         StoreKind::I64 { atomic: false },
         MemArg {
@@ -79,8 +80,7 @@ pub fn pack_u64_function(
         },
     );
 
-    function_builder.name(RuntimeFunction::PackU64.name().to_owned());
-    Ok(function_builder.finish(vec![value, writer_pointer], &mut module.funcs))
+    Ok(function.finish(vec![value, writer_pointer], &mut module.funcs))
 }
 
 #[cfg(test)]

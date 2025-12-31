@@ -11,9 +11,10 @@ pub fn pack_enum_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
 ) -> Result<FunctionId, RuntimeFunctionError> {
-    let mut function_builder =
-        FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
-    let mut function_body = function_builder.func_body();
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
+    let mut builder = function
+        .name(RuntimeFunction::PackEnum.name().to_owned())
+        .func_body();
 
     let enum_ptr = module.locals.add(ValType::I32);
     let writer_pointer = module.locals.add(ValType::I32);
@@ -21,10 +22,10 @@ pub fn pack_enum_function(
     // Little-endian to Big-endian
     let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
 
-    function_body.local_get(writer_pointer);
+    builder.local_get(writer_pointer);
 
     // Read variant number from enum pointer
-    function_body
+    builder
         .local_get(enum_ptr)
         .load(
             compilation_ctx.memory_id,
@@ -37,7 +38,7 @@ pub fn pack_enum_function(
         .call(swap_i32_bytes_function);
 
     // Store the variant number at the writer pointer (left-padded to 32 bytes)
-    function_body.store(
+    builder.store(
         compilation_ctx.memory_id,
         StoreKind::I32 { atomic: false },
         MemArg {
@@ -47,6 +48,5 @@ pub fn pack_enum_function(
         },
     );
 
-    function_builder.name(RuntimeFunction::PackEnum.name().to_owned());
-    Ok(function_builder.finish(vec![enum_ptr, writer_pointer], &mut module.funcs))
+    Ok(function.finish(vec![enum_ptr, writer_pointer], &mut module.funcs))
 }

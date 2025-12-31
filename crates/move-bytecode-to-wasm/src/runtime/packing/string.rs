@@ -13,12 +13,14 @@ pub fn pack_string_function(
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let pack_u32_function = RuntimeFunction::PackU32.get(module, Some(compilation_ctx))?;
 
-    let mut function_builder = FunctionBuilder::new(
+    let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32, ValType::I32],
         &[],
     );
-    let mut function_body = function_builder.func_body();
+    let mut builder = function
+        .name(RuntimeFunction::PackString.name().to_owned())
+        .func_body();
 
     let string_pointer = module.locals.add(ValType::I32);
     let writer_pointer = module.locals.add(ValType::I32);
@@ -36,7 +38,7 @@ pub fn pack_string_function(
     // }
     //
     // So we need to perform a load first to get to the inner vector
-    function_body
+    builder
         .local_get(string_pointer)
         .load(
             compilation_ctx.memory_id,
@@ -49,7 +51,7 @@ pub fn pack_string_function(
         .local_set(vector_pointer);
 
     // Load the length
-    function_body
+    builder
         .local_get(vector_pointer)
         .load(
             compilation_ctx.memory_id,
@@ -63,7 +65,7 @@ pub fn pack_string_function(
 
     // Allocate space for the text, padding by 32 bytes plus 32 bytes for the length
     // Calculate: ((len + 31) & !31) + 32
-    function_body
+    builder
         .local_get(len)
         .i32_const(31)
         .binop(BinaryOp::I32Add)
@@ -76,40 +78,40 @@ pub fn pack_string_function(
 
     // The value stored at this param position should be the distance from the start of this
     // calldata portion to the pointer
-    function_body
+    builder
         .local_get(data_pointer)
         .local_get(calldata_reference_pointer)
         .binop(BinaryOp::I32Sub)
         .local_set(reference_value);
 
     // Write the offset at writer_pointer
-    function_body
+    builder
         .local_get(reference_value)
         .local_get(writer_pointer)
         .call(pack_u32_function);
 
     // Set the vector pointer to point to the first element (skip vector header)
-    function_body
+    builder
         .local_get(vector_pointer)
         .i32_const(8)
         .binop(BinaryOp::I32Add)
         .local_set(vector_pointer);
 
     // Write the length at data_pointer
-    function_body
+    builder
         .local_get(len)
         .local_get(data_pointer)
         .call(pack_u32_function);
 
     // Increment the data pointer to point to the data area
-    function_body
+    builder
         .local_get(data_pointer)
         .i32_const(32)
         .binop(BinaryOp::I32Add)
         .local_set(data_pointer);
 
     // Outer block: if the vector length is 0, we skip to the end
-    function_body.block(None, |outer_block| {
+    builder.block(None, |outer_block| {
         let outer_block_id = outer_block.id();
 
         // Check if length == 0
@@ -174,8 +176,7 @@ pub fn pack_string_function(
         });
     });
 
-    function_builder.name(RuntimeFunction::PackString.name().to_owned());
-    Ok(function_builder.finish(
+    Ok(function.finish(
         vec![string_pointer, writer_pointer, calldata_reference_pointer],
         &mut module.funcs,
     ))
