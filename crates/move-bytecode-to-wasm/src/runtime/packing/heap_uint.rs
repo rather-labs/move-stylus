@@ -127,7 +127,11 @@ pub fn pack_address_function(
 #[cfg(test)]
 mod tests {
     use alloy_primitives::{Address, U256, address};
-    use alloy_sol_types::{SolType, sol};
+    use alloy_sol_types::SolValue;
+    use rstest::rstest;
+    use std::cell::RefCell;
+    use std::panic::AssertUnwindSafe;
+    use std::rc::Rc;
     use walrus::{FunctionBuilder, ValType};
 
     use crate::{
@@ -137,7 +141,72 @@ mod tests {
         translation::intermediate_types::IntermediateType,
     };
 
-    fn test_uint(int_type: impl Packable, data: &[u8], expected_result: &[u8]) {
+    #[rstest]
+    #[case(
+        IntermediateType::IU128,
+        &128128128128u128.to_le_bytes(),
+        &128128128128_u128.abi_encode()
+    )]
+    #[case(
+        IntermediateType::IU128,
+        &u128::MAX.to_le_bytes(),
+        &u128::MAX.abi_encode()
+    )]
+    #[case(
+        IntermediateType::IU128,
+        &u128::MIN.to_le_bytes(),
+        &u128::MIN.abi_encode()
+    )]
+    #[case(
+        IntermediateType::IU128,
+        &(u128::MAX - 1).to_le_bytes(),
+        &(u128::MAX - 1).abi_encode()
+    )]
+    #[case(
+        IntermediateType::IU256,
+        &U256::from(256256256256u128).to_le_bytes::<32>(),
+        &U256::from(256256256256u128).abi_encode()
+    )]
+    #[case(
+        IntermediateType::IU256,
+        &U256::MAX.to_le_bytes::<32>(),
+        &U256::MAX.abi_encode()
+    )]
+    #[case(
+        IntermediateType::IU256,
+        &U256::MIN.to_le_bytes::<32>(),
+        &U256::MIN.abi_encode()
+    )]
+    #[case(
+        IntermediateType::IU256,
+        &(U256::MAX - U256::from(1)).to_le_bytes::<32>(),
+        &(U256::MAX - U256::from(1)).abi_encode()
+    )]
+    #[case(
+        IntermediateType::IAddress,
+        &address!("0x0000000000000000000000000000000000000000").abi_encode(),
+        &address!("0x0000000000000000000000000000000000000000").abi_encode()
+    )]
+    #[case(
+        IntermediateType::IAddress,
+        &address!("0x1234567890abcdef1234567890abcdef12345678").abi_encode(),
+        &address!("0x1234567890abcdef1234567890abcdef12345678").abi_encode()
+    )]
+    #[case(
+        IntermediateType::IAddress,
+        &address!("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF").abi_encode(),
+        &address!("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF").abi_encode()
+    )]
+    #[case(
+        IntermediateType::IAddress,
+        &address!("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE").abi_encode(),
+        &address!("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE").abi_encode()
+    )]
+    fn test_pack_uint(
+        #[case] int_type: impl Packable,
+        #[case] data: &[u8],
+        #[case] expected_result: &[u8],
+    ) {
         let (mut raw_module, alloc_function, memory_id, calldata_reader_pointer_global) =
             build_module(None);
 
@@ -192,93 +261,255 @@ mod tests {
     }
 
     #[test]
-    fn test_pack_u128() {
-        type IntType = u128;
-        type SolType = sol!((uint128,));
-        let int_type = IntermediateType::IU128;
+    fn test_pack_u128_fuzz() {
+        let (mut raw_module, alloc_function, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
 
-        let expected_result = SolType::abi_encode_params(&(128128128128,));
-        test_uint(
-            int_type.clone(),
-            &128128128128u128.to_le_bytes(),
-            &expected_result,
-        );
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
+        let compilation_ctx =
+            test_compilation_context!(memory_id, alloc_function, calldata_reader_pointer_global);
 
-        let expected_result = SolType::abi_encode_params(&(IntType::MAX,));
-        test_uint(
-            int_type.clone(),
-            &IntType::MAX.to_le_bytes(),
-            &expected_result,
-        ); // max
+        let local = raw_module.locals.add(ValType::I32);
+        let writer_pointer = raw_module.locals.add(ValType::I32);
 
-        let expected_result = SolType::abi_encode_params(&(IntType::MIN,));
-        test_uint(
-            int_type.clone(),
-            &IntType::MIN.to_le_bytes(),
-            &expected_result,
-        ); // min
+        let mut func_body = function_builder.func_body();
 
-        let expected_result = SolType::abi_encode_params(&(IntType::MAX - 1,));
-        test_uint(
-            int_type.clone(),
-            &(IntType::MAX - 1).to_le_bytes(),
-            &expected_result,
-        ); // max -1 (avoid symmetry)
+        // Allocate 16 bytes for u128
+        func_body.i32_const(16);
+        func_body.call(alloc_function);
+        func_body.local_set(local);
+
+        func_body.i32_const(32); // ABI encoded size
+        func_body.call(alloc_function);
+        func_body.local_set(writer_pointer);
+
+        IntermediateType::IU128
+            .add_pack_instructions(
+                &mut func_body,
+                &mut raw_module,
+                local,
+                writer_pointer,
+                writer_pointer,
+                &compilation_ctx,
+            )
+            .unwrap();
+
+        func_body.local_get(writer_pointer);
+
+        let function = function_builder.finish(vec![], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type::<u128>()
+            .cloned()
+            .for_each(|value: u128| {
+                // Write value to memory (little-endian)
+                let data = value.to_le_bytes();
+                memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+
+                let result_ptr: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+
+                let mut result_memory_data = vec![0; 32];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        result_ptr as usize,
+                        &mut result_memory_data,
+                    )
+                    .unwrap();
+
+                let expected = value.abi_encode();
+                assert_eq!(
+                    result_memory_data, expected,
+                    "Packed u128 did not match expected result for value {value}",
+                );
+
+                reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+            });
     }
 
     #[test]
-    fn test_pack_u256() {
-        type IntType = U256;
-        type SolType = sol!((uint256,));
-        let int_type = IntermediateType::IU256;
+    fn test_pack_u256_fuzz() {
+        let (mut raw_module, alloc_function, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
 
-        let expected_result = SolType::abi_encode_params(&(U256::from(256256256256u128),));
-        test_uint(
-            int_type.clone(),
-            &U256::from(256256256256u128).to_le_bytes::<32>(),
-            &expected_result,
-        );
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
+        let compilation_ctx =
+            test_compilation_context!(memory_id, alloc_function, calldata_reader_pointer_global);
 
-        let expected_result = SolType::abi_encode_params(&(IntType::MAX,));
-        test_uint(
-            int_type.clone(),
-            &IntType::MAX.to_le_bytes::<32>(),
-            &expected_result,
-        ); // max
+        let local = raw_module.locals.add(ValType::I32);
+        let writer_pointer = raw_module.locals.add(ValType::I32);
 
-        let expected_result = SolType::abi_encode_params(&(IntType::MIN,));
-        test_uint(
-            int_type.clone(),
-            &IntType::MIN.to_le_bytes::<32>(),
-            &expected_result,
-        ); // min
+        let mut func_body = function_builder.func_body();
 
-        let expected_result = SolType::abi_encode_params(&(IntType::MAX - U256::from(1),));
-        test_uint(
-            int_type.clone(),
-            &(IntType::MAX - U256::from(1)).to_le_bytes::<32>(),
-            &expected_result,
-        ); // max -1 (avoid symmetry)
+        // Allocate 32 bytes for u256
+        func_body.i32_const(32);
+        func_body.call(alloc_function);
+        func_body.local_set(local);
+
+        func_body.i32_const(32); // ABI encoded size
+        func_body.call(alloc_function);
+        func_body.local_set(writer_pointer);
+
+        IntermediateType::IU256
+            .add_pack_instructions(
+                &mut func_body,
+                &mut raw_module,
+                local,
+                writer_pointer,
+                writer_pointer,
+                &compilation_ctx,
+            )
+            .unwrap();
+
+        func_body.local_get(writer_pointer);
+
+        let function = function_builder.finish(vec![], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type::<[u8; 32]>()
+            .cloned()
+            .for_each(|bytes: [u8; 32]| {
+                let store = store.clone();
+                let entrypoint = entrypoint.clone();
+                let reset_memory = reset_memory.clone();
+
+                let value = U256::from_le_bytes(bytes);
+
+                // Write value to memory (little-endian)
+                memory.write(&mut *store.0.borrow_mut(), 0, &bytes).unwrap();
+
+                let result_ptr: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+
+                let mut result_memory_data = vec![0; 32];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        result_ptr as usize,
+                        &mut result_memory_data,
+                    )
+                    .unwrap();
+
+                let expected = value.abi_encode();
+                assert_eq!(
+                    result_memory_data, expected,
+                    "Packed U256 did not match expected result for value {value}",
+                );
+
+                reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+            });
     }
 
     #[test]
-    fn test_pack_address() {
-        type SolType = sol!((address,));
-        let int_type = IntermediateType::IAddress;
+    fn test_pack_address_fuzz() {
+        let (mut raw_module, alloc_function, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
 
-        let expected_result = SolType::abi_encode_params(&(Address::ZERO,));
-        test_uint(int_type.clone(), &expected_result, &expected_result);
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
+        let compilation_ctx =
+            test_compilation_context!(memory_id, alloc_function, calldata_reader_pointer_global);
 
-        let expected_result =
-            SolType::abi_encode_params(&(address!("0x1234567890abcdef1234567890abcdef12345678"),));
-        test_uint(int_type.clone(), &expected_result, &expected_result);
+        let local = raw_module.locals.add(ValType::I32);
+        let writer_pointer = raw_module.locals.add(ValType::I32);
 
-        let expected_result =
-            SolType::abi_encode_params(&(address!("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"),));
-        test_uint(int_type.clone(), &expected_result, &expected_result);
+        let mut func_body = function_builder.func_body();
 
-        let expected_result =
-            SolType::abi_encode_params(&(address!("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE"),));
-        test_uint(int_type.clone(), &expected_result, &expected_result);
+        // Allocate 32 bytes for address (padded)
+        func_body.i32_const(32);
+        func_body.call(alloc_function);
+        func_body.local_set(local);
+
+        func_body.i32_const(32); // ABI encoded size
+        func_body.call(alloc_function);
+        func_body.local_set(writer_pointer);
+
+        IntermediateType::IAddress
+            .add_pack_instructions(
+                &mut func_body,
+                &mut raw_module,
+                local,
+                writer_pointer,
+                writer_pointer,
+                &compilation_ctx,
+            )
+            .unwrap();
+
+        func_body.local_get(writer_pointer);
+
+        let function = function_builder.finish(vec![], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type::<[u8; 20]>()
+            .cloned()
+            .for_each(|bytes: [u8; 20]| {
+                let value = Address::from_slice(&bytes);
+
+                // Write value to memory (padded to 32 bytes)
+                let data = value.abi_encode();
+                memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+
+                let result_ptr: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+
+                let mut result_memory_data = vec![0; 32];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        result_ptr as usize,
+                        &mut result_memory_data,
+                    )
+                    .unwrap();
+
+                let expected = value.abi_encode();
+                assert_eq!(
+                    result_memory_data, expected,
+                    "Packed address did not match expected result for value {value}",
+                );
+
+                reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+            });
     }
 }
