@@ -3,6 +3,7 @@ example/build
 stylus-framework/build
 nitro-devnode
 .local_gitignore
+__fuzz__
 
 .env
 .env.bak

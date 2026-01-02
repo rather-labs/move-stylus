@@ -35,3 +35,9 @@ move-parse-special-attributes = { path = "crates/move-parse-special-attributes" 
 move-test-runner = { path = "crates/move-test-runner" }
 move-ir-types = { git = "https://github.com/MystenLabs/sui" }
 wasmprinter = "0.228"
+
+[profile.fuzz]
+inherits = "dev"
+opt-level = 3
+incremental = false
+codegen-units = 1

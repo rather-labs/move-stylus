@@ -27,6 +27,7 @@ wasmprinter.workspace = true
 move-test-runner.workspace = true
 rstest = "0.25.0"
 wasmtime = { version = "31.0.0" }
+bolero = "0.13.4"
 
 [features]
 inject-host-debug-fns = ["wasmtime"]
