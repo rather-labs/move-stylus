@@ -6,7 +6,6 @@ use walrus::{
 use super::{RuntimeFunction, error::RuntimeFunctionError};
 use crate::CompilationContext;
 use crate::translation::intermediate_types::IntermediateType;
-use crate::translation::intermediate_types::vector::IVector;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 
 /// Increments vector length by 1
@@ -546,6 +545,93 @@ pub fn vec_update_mut_ref_function(
     function.finish(vec![vec_ref_ptr], &mut module.funcs)
 }
 
+/// Allocates memory for a vector with a header of 8 bytes.
+/// First 4 bytes are the length, next 4 bytes are the capacity.
+pub fn allocate_vector_with_header_function(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) -> FunctionId {
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32, ValType::I32],
+        &[ValType::I32],
+    );
+    let mut builder = function
+        .name(RuntimeFunction::AllocateVectorWithHeader.name().to_owned())
+        .func_body();
+
+    // Arguments
+    let len = module.locals.add(ValType::I32);
+    let capacity = module.locals.add(ValType::I32);
+    let data_size = module.locals.add(ValType::I32);
+
+    // Local pointer to the allocated memory
+    let pointer = module.locals.add(ValType::I32);
+
+    // If the len is 0 we just allocate 8 bytes representing 0 length and 0 capacity
+    builder
+        .local_get(capacity)
+        .i32_const(0)
+        .binop(BinaryOp::I32Eq)
+        .if_else(
+            None,
+            |then| {
+                then.i32_const(8)
+                    .call(compilation_ctx.allocator)
+                    .local_set(pointer);
+            },
+            |else_| {
+                // This is a failsafe to prevent UB if static checks failed
+                else_
+                    .local_get(len)
+                    .local_get(capacity)
+                    .binop(BinaryOp::I32GtU)
+                    .if_else(
+                        None,
+                        |then_| {
+                            then_.unreachable(); // Trap if len > capacity
+                        },
+                        |_| {},
+                    );
+
+                // Allocate memory: capacity * element size + 8 bytes for header
+                else_
+                    .local_get(capacity)
+                    .local_get(data_size)
+                    .binop(BinaryOp::I32Mul)
+                    .i32_const(8)
+                    .binop(BinaryOp::I32Add)
+                    .call(compilation_ctx.allocator)
+                    .local_set(pointer);
+
+                // Write length at offset 0
+                else_.local_get(pointer).local_get(len).store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+
+                // Write capacity at offset 4
+                else_.local_get(pointer).local_get(capacity).store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 4,
+                    },
+                );
+            },
+        );
+
+    // Return the pointer
+    builder.local_get(pointer);
+
+    function.finish(vec![len, capacity, data_size], &mut module.funcs)
+}
+
 /// Converts raw bytes (bytesN) into a vector<u8>.
 ///
 /// # WASM Function Arguments
@@ -557,7 +643,7 @@ pub fn vec_update_mut_ref_function(
 pub fn bytes_to_vec_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
-) -> FunctionId {
+) -> Result<FunctionId, RuntimeFunctionError> {
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32],
@@ -571,8 +657,15 @@ pub fn bytes_to_vec_function(
     let n = module.locals.add(ValType::I32);
 
     let vector_ptr = module.locals.add(ValType::I32);
-    // Allocate vector of u8 elements
-    IVector::allocate_vector_with_header(&mut builder, compilation_ctx, vector_ptr, n, n, 1);
+
+    let allocate_vector_with_header_function =
+        RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx))?;
+    builder
+        .local_get(n)
+        .local_get(n)
+        .i32_const(1)
+        .call(allocate_vector_with_header_function)
+        .local_set(vector_ptr);
 
     builder
         .skip_vec_header(vector_ptr)
@@ -582,5 +675,5 @@ pub fn bytes_to_vec_function(
 
     builder.local_get(vector_ptr);
 
-    function.finish(vec![bytes_ptr, n], &mut module.funcs)
+    Ok(function.finish(vec![bytes_ptr, n], &mut module.funcs))
 }

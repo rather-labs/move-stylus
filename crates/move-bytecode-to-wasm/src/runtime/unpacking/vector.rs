@@ -2,7 +2,7 @@ use crate::{
     CompilationContext,
     abi_types::{error::AbiError, unpacking::Unpackable},
     runtime::{RuntimeFunction, RuntimeFunctionError},
-    translation::intermediate_types::{IntermediateType, vector::IVector},
+    translation::intermediate_types::IntermediateType,
     wasm_builder_extensions::WasmBuilderExtension,
 };
 use walrus::{
@@ -118,14 +118,16 @@ pub fn unpack_vector_function(
     let data_size = inner
         .wasm_memory_data_size()
         .map_err(RuntimeFunctionError::from)?;
-    IVector::allocate_vector_with_header(
-        &mut builder,
-        compilation_ctx,
-        vector_pointer,
-        length,
-        length,
-        data_size,
-    );
+
+    // Allocate space for the vector
+    let allocate_vector_with_header_function =
+        RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx))?;
+    builder
+        .local_get(length)
+        .local_get(length)
+        .i32_const(data_size)
+        .call(allocate_vector_with_header_function)
+        .local_set(vector_pointer);
 
     // Set the writer pointer to the start of the vector data
     builder

@@ -1,5 +1,5 @@
 use walrus::{
-    InstrSeqBuilder, LocalId, Module, ValType,
+    InstrSeqBuilder, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
@@ -12,75 +12,6 @@ use crate::{CompilationContext, compilation_context::ModuleData};
 pub struct IVector;
 
 impl IVector {
-    /// Allocates memory for a vector with a header of 8 bytes.
-    /// First 4 bytes are the length, next 4 bytes are the capacity.
-    pub fn allocate_vector_with_header(
-        builder: &mut InstrSeqBuilder,
-        compilation_ctx: &CompilationContext,
-        pointer: LocalId,
-        len: LocalId,
-        capacity: LocalId,
-        data_size: i32,
-    ) {
-        // If the len is 0 we just allocate 8 bytes representing 0 length and 0 capacity
-        builder
-            .local_get(capacity)
-            .i32_const(0)
-            .binop(BinaryOp::I32Eq)
-            .if_else(
-                None,
-                |then| {
-                    then.i32_const(8)
-                        .call(compilation_ctx.allocator)
-                        .local_set(pointer);
-                },
-                |else_| {
-                    // This is a failsafe to prevent UB if static checks failed
-                    else_
-                        .local_get(len)
-                        .local_get(capacity)
-                        .binop(BinaryOp::I32GtU)
-                        .if_else(
-                            None,
-                            |then_| {
-                                then_.unreachable(); // Trap if len > capacity
-                            },
-                            |_| {},
-                        );
-
-                    // Allocate memory: capacity * element size + 8 bytes for header
-                    else_
-                        .local_get(capacity)
-                        .i32_const(data_size)
-                        .binop(BinaryOp::I32Mul)
-                        .i32_const(8)
-                        .binop(BinaryOp::I32Add)
-                        .call(compilation_ctx.allocator)
-                        .local_set(pointer);
-
-                    // Write length at offset 0
-                    else_.local_get(pointer).local_get(len).store(
-                        compilation_ctx.memory_id,
-                        StoreKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
-
-                    // Write capacity at offset 4
-                    else_.local_get(pointer).local_get(capacity).store(
-                        compilation_ctx.memory_id,
-                        StoreKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 4,
-                        },
-                    );
-                },
-            );
-    }
-
     pub fn load_constant_instructions(
         inner: &IntermediateType,
         module: &mut Module,
@@ -102,14 +33,15 @@ impl IVector {
         // len + capacity + data_size * len
         let needed_bytes = 4 + 4 + data_size * (*len as usize);
 
-        IVector::allocate_vector_with_header(
-            builder,
-            compilation_ctx,
-            ptr_local,
-            len_local,
-            len_local,
-            data_size as i32,
-        );
+        let allocate_vector_with_header_function =
+            RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx))?;
+
+        builder
+            .local_get(len_local)
+            .local_get(len_local)
+            .i32_const(data_size as i32)
+            .call(allocate_vector_with_header_function)
+            .local_set(ptr_local);
 
         let mut store_offset: u32 = 8;
 
@@ -203,14 +135,14 @@ impl IVector {
             );
 
         // Allocate memory and write length and capacity at the beginning
-        IVector::allocate_vector_with_header(
-            builder,
-            compilation_ctx,
-            dst_ptr,
-            len,
-            capacity,
-            data_size,
-        );
+        let allocate_vector_with_header_function =
+            RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx))?;
+        builder
+            .local_get(len)
+            .local_get(capacity)
+            .i32_const(data_size)
+            .call(allocate_vector_with_header_function)
+            .local_set(dst_ptr);
 
         // === Loop  ===
         builder.i32_const(0).local_set(index);
@@ -589,31 +521,29 @@ impl IVector {
         let ptr_local = module.locals.add(ValType::I32);
         let len_local = module.locals.add(ValType::I32);
         let data_size = inner.wasm_memory_data_size()?;
+        let allocate_vector_with_header_function =
+            RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx))?;
 
         if num_elements == 0 {
             // Set length
             builder.i32_const(0).local_set(len_local);
 
-            IVector::allocate_vector_with_header(
-                builder,
-                compilation_ctx,
-                ptr_local,
-                len_local,
-                len_local,
-                data_size,
-            );
+            builder
+                .local_get(len_local)
+                .local_get(len_local)
+                .i32_const(data_size)
+                .call(allocate_vector_with_header_function)
+                .local_set(ptr_local);
         } else {
             // Set length
             builder.i32_const(num_elements).local_set(len_local);
 
-            IVector::allocate_vector_with_header(
-                builder,
-                compilation_ctx,
-                ptr_local,
-                len_local,
-                len_local,
-                data_size,
-            );
+            builder
+                .local_get(len_local)
+                .local_get(len_local)
+                .i32_const(data_size)
+                .call(allocate_vector_with_header_function)
+                .local_set(ptr_local);
 
             let temp_local = module.locals.add(inner.try_into()?);
             for i in 0..num_elements {
