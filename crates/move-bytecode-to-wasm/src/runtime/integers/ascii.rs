@@ -1,4 +1,7 @@
-use walrus::{FunctionBuilder, FunctionId, Module, ValType};
+use walrus::{
+    FunctionBuilder, FunctionId, Module, ValType,
+    ir::{BinaryOp, MemArg, StoreKind, UnaryOp},
+};
 
 use crate::CompilationContext;
 
@@ -18,7 +21,7 @@ use super::RuntimeFunction;
 /// * Input: 999_999    → `[6, '9','9','9','9','9','9']`   // len=6, data="999999"
 ///
 /// # WASM Function Arguments
-/// * `val` (i64) - The value to convert. Passed as WASM `i64` but must be ≥ 0; traps if negative.
+/// * `val` (i64) - The value to convert.
 ///
 /// # WASM Function Returns
 /// * `ptr` (i32) - Pointer to the allocated blob `[len: u32 LE][ASCII bytes...]`.
@@ -30,19 +33,17 @@ pub fn u64_to_ascii_base_10(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
 ) -> FunctionId {
-    use walrus::ir::{BinaryOp, MemArg, StoreKind, UnaryOp};
-
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I64], &[ValType::I32]);
+
+    let mut builder = function
+        .name(RuntimeFunction::U64ToAsciiBase10.name().to_owned())
+        .func_body();
 
     // locals
     let n = module.locals.add(ValType::I64); // input (>= 0)
     let len = module.locals.add(ValType::I32); // digit count
     let ptr = module.locals.add(ValType::I32); // [len|bytes..]
     let scale = module.locals.add(ValType::I64); // current power of 10
-
-    let mut builder = function
-        .name(RuntimeFunction::U64ToAsciiBase10.name().to_owned())
-        .func_body();
 
     // Handle n = 0 case
     builder
@@ -190,6 +191,10 @@ pub fn u64_to_ascii_base_10(
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
+    use std::panic::AssertUnwindSafe;
+    use std::rc::Rc;
+
     use crate::test_compilation_context;
     use crate::test_tools::{build_module, setup_wasmtime_module};
     use rstest::rstest;
@@ -248,5 +253,70 @@ mod tests {
         let result_str = String::from_utf8(ascii_data.to_vec()).unwrap();
 
         assert_eq!(result_str, expected, "Failed for input {error_code}");
+    }
+
+    #[test]
+    fn test_u64_to_ascii_base_10_fuzz() {
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+
+        // Add the u64_to_ascii_base_10 function to the module
+        let ascii_func = u64_to_ascii_base_10(&mut raw_module, &compilation_ctx);
+
+        // Create a test function that calls u64_to_ascii_base_10 and writes to memory
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[ValType::I64], &[]);
+
+        let n = raw_module.locals.add(ValType::I64);
+
+        let mut func_body = function_builder.func_body();
+        func_body.local_get(n).call(ascii_func).drop();
+
+        let function = function_builder.finish(vec![n], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module::<i64, ()>(&mut raw_module, vec![], "test_function", None);
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!().with_type::<u64>().cloned().for_each(|a| {
+            let expected = a.to_string();
+
+            let mut store = store.borrow_mut();
+
+            let mut memory_data = [0u8; 256];
+            memory.read(&*store, 0, &mut memory_data).unwrap();
+
+            entrypoint.call(&mut *store, a as i64).unwrap();
+
+            // let memory_data = memory.data(&*store);
+            memory.read(&*store, 0, &mut memory_data).unwrap();
+
+            let len = memory_data[0] as u32;
+
+            // Read the ASCII string
+            let ascii_data = &memory_data[1..1 + len as usize];
+            let result_str = String::from_utf8(ascii_data.to_vec()).unwrap();
+
+            // Wipe memory for the next iteration
+            memory.write(&mut *store, 0, &[0; 256]).unwrap();
+
+            // let memory_data = memory.data(&*store);
+            memory.read(&*store, 0, &mut memory_data).unwrap();
+
+            assert_eq!(result_str, expected, "Failed for input {a}");
+
+            reset_memory.call(&mut *store, ()).unwrap();
+        });
     }
 }

@@ -417,6 +417,10 @@ pub fn mul_u64(module: &mut Module) -> FunctionId {
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
+    use std::panic::AssertUnwindSafe;
+    use std::rc::Rc;
+
     use crate::test_compilation_context;
     use crate::test_tools::{build_module, setup_wasmtime_module};
     use alloy_primitives::U256;
@@ -496,6 +500,94 @@ mod tests {
         memory.read(&mut store, 0, &mut buff).unwrap();
 
         assert_eq!(result_memory_data, expected.to_le_bytes().to_vec());
+    }
+
+    #[test]
+    fn test_heap_mul_u128_fuzz() {
+        const TYPE_HEAP_SIZE: i32 = 16;
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(TYPE_HEAP_SIZE * 2));
+
+        let mut function_builder = FunctionBuilder::new(
+            &mut raw_module.types,
+            &[ValType::I32, ValType::I32],
+            &[ValType::I32],
+        );
+
+        let n1_ptr = raw_module.locals.add(ValType::I32);
+        let n2_ptr = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
+        func_body
+            .i32_const(0)
+            .i32_const(TYPE_HEAP_SIZE)
+            .i32_const(TYPE_HEAP_SIZE);
+
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+        let heap_integers_add_f = heap_integers_mul(&mut raw_module, &compilation_ctx);
+        func_body.call(heap_integers_add_f);
+
+        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        // display_module(&mut raw_module);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
+
+        let pointer: i32 = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+        let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
+        memory
+            .read(&mut store, pointer as usize, &mut result_memory_data)
+            .unwrap();
+
+        let mut buff = vec![0; TYPE_HEAP_SIZE as usize * 3];
+        memory.read(&mut store, 0, &mut buff).unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type()
+            .for_each(|&(a, b): &(u128, u128)| {
+                let data = [a.to_le_bytes(), b.to_le_bytes()].concat();
+                memory.write(&mut *store.borrow_mut(), 0, &data).unwrap();
+
+                let expected = a.wrapping_mul(b);
+
+                let result: Result<i32, _> =
+                    entrypoint.call(&mut *store.borrow_mut(), (0, TYPE_HEAP_SIZE));
+
+                match result {
+                    Ok(pointer) => {
+                        let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
+                        memory
+                            .read(
+                                &mut *store.borrow_mut(),
+                                pointer as usize,
+                                &mut result_memory_data,
+                            )
+                            .unwrap();
+
+                        assert_eq!(result_memory_data, expected.to_le_bytes().to_vec());
+                    }
+                    Err(_) => {
+                        assert!(a.checked_mul(b).is_none());
+                    }
+                }
+
+                reset_memory.call(&mut *store.borrow_mut(), ()).unwrap();
+            });
     }
 
     #[rstest]
@@ -609,6 +701,96 @@ mod tests {
         assert_eq!(result_memory_data, expected.to_le_bytes::<32>().to_vec());
     }
 
+    #[test]
+    fn test_heap_mul_u256_fuzz() {
+        const TYPE_HEAP_SIZE: i32 = 32;
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(TYPE_HEAP_SIZE * 2));
+
+        let mut function_builder = FunctionBuilder::new(
+            &mut raw_module.types,
+            &[ValType::I32, ValType::I32],
+            &[ValType::I32],
+        );
+
+        let n1_ptr = raw_module.locals.add(ValType::I32);
+        let n2_ptr = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
+        func_body
+            .i32_const(0)
+            .i32_const(TYPE_HEAP_SIZE)
+            .i32_const(TYPE_HEAP_SIZE);
+
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+        let heap_integers_add_f = heap_integers_mul(&mut raw_module, &compilation_ctx);
+        func_body.call(heap_integers_add_f);
+
+        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        // display_module(&mut raw_module);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
+
+        let pointer: i32 = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+        let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
+        memory
+            .read(&mut store, pointer as usize, &mut result_memory_data)
+            .unwrap();
+
+        let mut buff = vec![0; TYPE_HEAP_SIZE as usize * 3];
+        memory.read(&mut store, 0, &mut buff).unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!().with_type().for_each(
+            |&(a, b): &([u8; TYPE_HEAP_SIZE as usize], [u8; TYPE_HEAP_SIZE as usize])| {
+                let data = [a, b].concat();
+                let a = U256::from_le_bytes::<32>(a);
+                let b = U256::from_le_bytes::<32>(b);
+                memory.write(&mut *store.borrow_mut(), 0, &data).unwrap();
+
+                let expected = a.wrapping_mul(b);
+
+                let result: Result<i32, _> =
+                    entrypoint.call(&mut *store.borrow_mut(), (0, TYPE_HEAP_SIZE));
+
+                match result {
+                    Ok(pointer) => {
+                        let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
+                        memory
+                            .read(
+                                &mut *store.borrow_mut(),
+                                pointer as usize,
+                                &mut result_memory_data,
+                            )
+                            .unwrap();
+
+                        assert_eq!(result_memory_data, expected.to_le_bytes::<32>().to_vec());
+                    }
+                    Err(_) => {
+                        assert!(a.checked_mul(b).is_none());
+                    }
+                }
+
+                reset_memory.call(&mut *store.borrow_mut(), ()).unwrap();
+            },
+        );
+    }
+
     #[rstest]
     #[case(0, 1, 0)]
     #[case(1, 0, 0)]
@@ -620,7 +802,7 @@ mod tests {
     #[case(u32::MAX as i32, 2, -1)]
     #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
     #[case(2, u32::MAX as i32, -1)]
-    fn test_add_u32(#[case] n1: i32, #[case] n2: i32, #[case] expected: i32) {
+    fn test_mul_u32(#[case] n1: i32, #[case] n2: i32, #[case] expected: i32) {
         let (mut raw_module, _, _, _) = build_module(None);
 
         let mut function_builder = FunctionBuilder::new(
@@ -637,8 +819,8 @@ mod tests {
         // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
         func_body.local_get(n1_l).local_get(n2_l);
 
-        let add_u32_f = mul_u32(&mut raw_module);
-        func_body.call(add_u32_f);
+        let mul_u32_f = mul_u32(&mut raw_module);
+        func_body.call(mul_u32_f);
 
         let function = function_builder.finish(vec![n1_l, n2_l], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
@@ -651,7 +833,62 @@ mod tests {
         assert_eq!(expected, result);
     }
 
-    #[rstest]
+    #[test]
+    fn test_mul_u32_fuzz() {
+        let (mut raw_module, _, _, _) = build_module(None);
+
+        let mut function_builder = FunctionBuilder::new(
+            &mut raw_module.types,
+            &[ValType::I32, ValType::I32],
+            &[ValType::I32],
+        );
+
+        let n1_l = raw_module.locals.add(ValType::I32);
+        let n2_l = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
+        func_body.local_get(n1_l).local_get(n2_l);
+
+        let mul_u32_f = mul_u32(&mut raw_module);
+        func_body.call(mul_u32_f);
+
+        let function = function_builder.finish(vec![n1_l, n2_l], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type()
+            .for_each(|&(a, b): &(u32, u32)| {
+                let expected = a.wrapping_mul(b);
+                let mut store = store.borrow_mut();
+
+                let result: Result<i32, _> = entrypoint.call(&mut *store, (a as i32, b as i32));
+
+                match result {
+                    Ok(res) => {
+                        assert_eq!(res, expected as i32);
+                    }
+                    Err(_) => {
+                        assert!(a.checked_mul(b).is_none());
+                    }
+                }
+
+                reset_memory.call(&mut *store, ()).unwrap();
+            });
+    }
+
     #[rstest]
     #[case(0, 1, 0)]
     #[case(1, 0, 0)]
@@ -692,5 +929,61 @@ mod tests {
         let result: i64 = entrypoint.call(&mut store, (n1, n2)).unwrap();
 
         assert_eq!(expected, result);
+    }
+
+    #[test]
+    fn test_mul_u64_fuzz() {
+        let (mut raw_module, _, _, _) = build_module(None);
+
+        let mut function_builder = FunctionBuilder::new(
+            &mut raw_module.types,
+            &[ValType::I64, ValType::I64],
+            &[ValType::I64],
+        );
+
+        let n1_l = raw_module.locals.add(ValType::I64);
+        let n2_l = raw_module.locals.add(ValType::I64);
+
+        let mut func_body = function_builder.func_body();
+
+        // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
+        func_body.local_get(n1_l).local_get(n2_l);
+
+        let add_u64_f = mul_u64(&mut raw_module);
+        func_body.call(add_u64_f);
+
+        let function = function_builder.finish(vec![n1_l, n2_l], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type()
+            .for_each(|&(a, b): &(u64, u64)| {
+                let expected = a.wrapping_mul(b);
+                let mut store = store.borrow_mut();
+
+                let result: Result<i64, _> = entrypoint.call(&mut *store, (a as i64, b as i64));
+
+                match result {
+                    Ok(res) => {
+                        assert_eq!(res as u64, expected);
+                    }
+                    Err(_) => {
+                        assert!(a.checked_mul(b).is_none());
+                    }
+                }
+
+                reset_memory.call(&mut *store, ()).unwrap();
+            });
     }
 }

@@ -487,6 +487,10 @@ fn set_bit(module: &mut Module, compilation_ctx: &CompilationContext) -> Functio
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
+    use std::panic::AssertUnwindSafe;
+    use std::rc::Rc;
+
     use crate::test_compilation_context;
     use crate::test_tools::{
         build_module, get_linker_with_host_debug_functions, setup_wasmtime_module,
@@ -683,7 +687,7 @@ mod tests {
 
         let mut func_body = function_builder.func_body();
 
-        // arguments for heap_integers_add (n1_ptr, n2_ptr, size in heap and return quotient)
+        // arguments for heap_integers_div (n1_ptr, n2_ptr, size in heap and return quotient)
         func_body
             .i32_const(0)
             .i32_const(TYPE_HEAP_SIZE)
@@ -692,8 +696,8 @@ mod tests {
 
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let heap_integers_add_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
-        func_body.call(heap_integers_add_f);
+        let heap_integers_div_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
+        func_body.call(heap_integers_div_f);
 
         let linker = get_linker_with_host_debug_functions();
         let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
@@ -719,6 +723,86 @@ mod tests {
             .unwrap();
 
         assert_eq!(quotient_result_memory_data, quotient.to_le_bytes());
+    }
+
+    #[test]
+    pub fn test_div_u128_fuzz() {
+        const TYPE_HEAP_SIZE: i32 = 16;
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(TYPE_HEAP_SIZE * 2));
+
+        let mut function_builder = FunctionBuilder::new(
+            &mut raw_module.types,
+            &[ValType::I32, ValType::I32],
+            &[ValType::I32],
+        );
+
+        let n1_ptr = raw_module.locals.add(ValType::I32);
+        let n2_ptr = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        // arguments for heap_integers_div (n1_ptr, n2_ptr, size in heap and return quotient)
+        func_body
+            .i32_const(0)
+            .i32_const(TYPE_HEAP_SIZE)
+            .i32_const(128)
+            .i32_const(1);
+
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+        let heap_integers_div_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
+        func_body.call(heap_integers_div_f);
+
+        let linker = get_linker_with_host_debug_functions();
+        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, vec![], "test_function", Some(linker));
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type()
+            .for_each(|&(n1, n2): &(u128, u128)| {
+                let mut store = store.borrow_mut();
+                let data = [n1.to_le_bytes(), n2.to_le_bytes()].concat();
+                memory.write(&mut *store, 0, &data).unwrap();
+
+                let expected_quotient = n1 / n2;
+
+                let quotient_ptr: Result<i32, _> =
+                    entrypoint.call(&mut *store, (0, TYPE_HEAP_SIZE));
+
+                match quotient_ptr {
+                    Ok(quotient_ptr) => {
+                        let mut quotient_result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
+                        memory
+                            .read(
+                                &mut *store,
+                                quotient_ptr as usize,
+                                &mut quotient_result_memory_data,
+                            )
+                            .unwrap();
+
+                        assert_eq!(quotient_result_memory_data, expected_quotient.to_le_bytes());
+                    }
+                    Err(_) => {
+                        // Division by zero
+                        assert_eq!(n2, 0);
+                    }
+                }
+
+                reset_memory.call(&mut *store, ()).unwrap();
+            });
     }
 
     #[rstest]
@@ -754,7 +838,7 @@ mod tests {
 
         let mut func_body = function_builder.func_body();
 
-        // arguments for heap_integers_add (n1_ptr, n2_ptr, size in heap and return remainder)
+        // arguments for heap_integers_div (n1_ptr, n2_ptr, size in heap and return remainder)
         func_body
             .i32_const(0)
             .i32_const(TYPE_HEAP_SIZE)
@@ -763,9 +847,9 @@ mod tests {
 
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let heap_integers_add_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
+        let heap_integers_div_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
         // Shift left
-        func_body.call(heap_integers_add_f);
+        func_body.call(heap_integers_div_f);
 
         let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
@@ -793,6 +877,86 @@ mod tests {
             .unwrap();
 
         assert_eq!(remainder_result_memory_data, remainder.to_le_bytes());
+    }
+
+    #[test]
+    pub fn test_mod_u128_fuzz() {
+        const TYPE_HEAP_SIZE: i32 = 16;
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(TYPE_HEAP_SIZE * 2));
+
+        let mut function_builder = FunctionBuilder::new(
+            &mut raw_module.types,
+            &[ValType::I32, ValType::I32],
+            &[ValType::I32],
+        );
+
+        let n1_ptr = raw_module.locals.add(ValType::I32);
+        let n2_ptr = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        // arguments for heap_integers_div (n1_ptr, n2_ptr, size in heap and return mod)
+        func_body
+            .i32_const(0)
+            .i32_const(TYPE_HEAP_SIZE)
+            .i32_const(128)
+            .i32_const(0);
+
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+        let heap_integers_div_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
+        func_body.call(heap_integers_div_f);
+
+        let linker = get_linker_with_host_debug_functions();
+        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, vec![], "test_function", Some(linker));
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type()
+            .for_each(|&(n1, n2): &(u128, u128)| {
+                let mut store = store.borrow_mut();
+                let data = [n1.to_le_bytes(), n2.to_le_bytes()].concat();
+                memory.write(&mut *store, 0, &data).unwrap();
+
+                let expected_quotient = n1 % n2;
+
+                let reminder_ptr: Result<i32, _> =
+                    entrypoint.call(&mut *store, (0, TYPE_HEAP_SIZE));
+
+                match reminder_ptr {
+                    Ok(quotient_ptr) => {
+                        let mut quotient_result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
+                        memory
+                            .read(
+                                &mut *store,
+                                quotient_ptr as usize,
+                                &mut quotient_result_memory_data,
+                            )
+                            .unwrap();
+
+                        assert_eq!(quotient_result_memory_data, expected_quotient.to_le_bytes());
+                    }
+                    Err(_) => {
+                        // Division by zero
+                        assert_eq!(n2, 0);
+                    }
+                }
+
+                reset_memory.call(&mut *store, ()).unwrap();
+            });
     }
 
     #[rstest]
@@ -844,7 +1008,7 @@ mod tests {
 
         let mut func_body = function_builder.func_body();
 
-        // arguments for heap_integers_add (n1_ptr, n2_ptr, size in heap and return quotient)
+        // arguments for heap_integers_div (n1_ptr, n2_ptr, size in heap and return quotient)
         func_body
             .i32_const(0)
             .i32_const(TYPE_HEAP_SIZE)
@@ -853,9 +1017,9 @@ mod tests {
 
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let heap_integers_add_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
+        let heap_integers_div_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
         // Shift left
-        func_body.call(heap_integers_add_f);
+        func_body.call(heap_integers_div_f);
 
         let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
@@ -877,6 +1041,93 @@ mod tests {
             .unwrap();
 
         assert_eq!(quotient_result_memory_data, quotient.to_le_bytes::<32>());
+    }
+
+    #[test]
+    pub fn test_div_u256_fuzz() {
+        const TYPE_HEAP_SIZE: i32 = 32;
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(TYPE_HEAP_SIZE * 2));
+
+        let mut function_builder = FunctionBuilder::new(
+            &mut raw_module.types,
+            &[ValType::I32, ValType::I32],
+            &[ValType::I32],
+        );
+
+        let n1_ptr = raw_module.locals.add(ValType::I32);
+        let n2_ptr = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        // arguments for heap_integers_div (n1_ptr, n2_ptr, size in heap and return quotient)
+        func_body
+            .i32_const(0)
+            .i32_const(TYPE_HEAP_SIZE)
+            .i32_const(256)
+            .i32_const(1);
+
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+        let heap_integers_div_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
+        func_body.call(heap_integers_div_f);
+
+        let linker = get_linker_with_host_debug_functions();
+        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, vec![], "test_function", Some(linker));
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type()
+            .for_each(|&(n1, n2): &([u8; 32], [u8; 32])| {
+                let mut store = store.borrow_mut();
+                let data = [n1, n2].concat();
+
+                memory.write(&mut *store, 0, &data).unwrap();
+
+                let n1 = U256::from_le_bytes(n1);
+                let n2 = U256::from_le_bytes(n2);
+
+                let expected_quotient = n1 / n2;
+
+                let quotient_ptr: Result<i32, _> =
+                    entrypoint.call(&mut *store, (0, TYPE_HEAP_SIZE));
+
+                match quotient_ptr {
+                    Ok(quotient_ptr) => {
+                        let mut quotient_result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
+                        memory
+                            .read(
+                                &mut *store,
+                                quotient_ptr as usize,
+                                &mut quotient_result_memory_data,
+                            )
+                            .unwrap();
+
+                        assert_eq!(
+                            quotient_result_memory_data,
+                            expected_quotient.to_le_bytes::<32>()
+                        );
+                    }
+                    Err(_) => {
+                        // Division by zero
+                        assert_eq!(n2, 0);
+                    }
+                }
+
+                reset_memory.call(&mut *store, ()).unwrap();
+            });
     }
 
     #[rstest]
@@ -933,7 +1184,7 @@ mod tests {
 
         let mut func_body = function_builder.func_body();
 
-        // arguments for heap_integers_add (n1_ptr, n2_ptr, size in heap and return remainder)
+        // arguments for heap_integers_div (n1_ptr, n2_ptr, size in heap and return remainder)
         func_body
             .i32_const(0)
             .i32_const(TYPE_HEAP_SIZE)
@@ -942,9 +1193,9 @@ mod tests {
 
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let heap_integers_add_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
+        let heap_integers_div_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
         // Shift left
-        func_body.call(heap_integers_add_f);
+        func_body.call(heap_integers_div_f);
 
         let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
@@ -967,5 +1218,92 @@ mod tests {
             .unwrap();
 
         assert_eq!(remainder_result_memory_data, remainder.to_le_bytes::<32>());
+    }
+
+    #[test]
+    pub fn test_mod_u256_fuzz() {
+        const TYPE_HEAP_SIZE: i32 = 32;
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(Some(TYPE_HEAP_SIZE * 2));
+
+        let mut function_builder = FunctionBuilder::new(
+            &mut raw_module.types,
+            &[ValType::I32, ValType::I32],
+            &[ValType::I32],
+        );
+
+        let n1_ptr = raw_module.locals.add(ValType::I32);
+        let n2_ptr = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        // arguments for heap_integers_div (n1_ptr, n2_ptr, size in heap and return quotient)
+        func_body
+            .i32_const(0)
+            .i32_const(TYPE_HEAP_SIZE)
+            .i32_const(256)
+            .i32_const(0);
+
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+        let heap_integers_div_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
+        func_body.call(heap_integers_div_f);
+
+        let linker = get_linker_with_host_debug_functions();
+        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, vec![], "test_function", Some(linker));
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type()
+            .for_each(|&(n1, n2): &([u8; 32], [u8; 32])| {
+                let mut store = store.borrow_mut();
+                let data = [n1, n2].concat();
+
+                memory.write(&mut *store, 0, &data).unwrap();
+
+                let n1 = U256::from_le_bytes(n1);
+                let n2 = U256::from_le_bytes(n2);
+
+                let expected_quotient = n1 % n2;
+
+                let remainder_ptr: Result<i32, _> =
+                    entrypoint.call(&mut *store, (0, TYPE_HEAP_SIZE));
+
+                match remainder_ptr {
+                    Ok(quotient_ptr) => {
+                        let mut quotient_result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
+                        memory
+                            .read(
+                                &mut *store,
+                                quotient_ptr as usize,
+                                &mut quotient_result_memory_data,
+                            )
+                            .unwrap();
+
+                        assert_eq!(
+                            quotient_result_memory_data,
+                            expected_quotient.to_le_bytes::<32>()
+                        );
+                    }
+                    Err(_) => {
+                        // Division by zero
+                        assert_eq!(n2, 0);
+                    }
+                }
+
+                reset_memory.call(&mut *store, ()).unwrap();
+            });
     }
 }
