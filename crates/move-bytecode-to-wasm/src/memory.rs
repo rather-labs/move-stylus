@@ -127,9 +127,9 @@ pub fn setup_module_memory(
         // Function that resets memory
         let mut func_builder = FunctionBuilder::new(&mut module.types, &[], &[]);
 
-        // Wipe memory
         let mut builder = func_builder.name("reset_memory".to_owned()).func_body();
 
+        // Wipe memory
         builder
             .i32_const(initial_offset.unwrap_or(0))
             .i32_const(0)
@@ -143,9 +143,9 @@ pub fn setup_module_memory(
             .i32_const(initial_offset.unwrap_or(0))
             .global_set(global_next_free_memory_pointer);
 
-        let func = func_builder.finish(vec![], &mut module.funcs);
+        let reset_memoryn_func = func_builder.finish(vec![], &mut module.funcs);
 
-        module.exports.add("reset_memory", func);
+        module.exports.add("reset_memory", reset_memoryn_func);
 
         module
             .exports
