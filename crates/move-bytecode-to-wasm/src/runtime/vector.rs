@@ -929,6 +929,172 @@ pub fn copy_local_function(
     Ok(function.finish(vec![src_ptr, multiplier], &mut module.funcs))
 }
 
+/// Compares two vectors for equality
+///
+/// # WASM Function Arguments
+/// * `v1_ptr` (i32) - pointer to the first vector
+/// * `v2_ptr` (i32) - pointer to the second vector
+///
+/// # WASM Function Returns
+/// * `result` (i32) - 1 if vectors are equal, 0 otherwise
+pub fn vec_equality_function(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    inner: &IntermediateType,
+) -> Result<FunctionId, RuntimeFunctionError> {
+    let name = RuntimeFunction::VecEquality.get_generic_function_name(compilation_ctx, &[inner])?;
+    if let Some(function) = module.funcs.by_name(&name) {
+        return Ok(function);
+    }
+
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32],
+        &[ValType::I32],
+    );
+    let mut builder = function.name(name).func_body();
+
+    // Arguments
+    let v1_ptr = module.locals.add(ValType::I32);
+    let v2_ptr = module.locals.add(ValType::I32);
+
+    // Local variables
+    let len = module.locals.add(ValType::I32);
+    let result = module.locals.add(ValType::I32);
+    builder.i32_const(1).local_set(result);
+
+    // Load and compare the length of both vectors
+    builder
+        .local_get(v1_ptr)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .local_get(v2_ptr)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .local_tee(len);
+
+    // If both lengths are equal, we skip the capacity and compare element by element, otherwise we return false
+    let mut inner_result: Result<(), IntermediateTypeError> = Ok(());
+    builder.binop(BinaryOp::I32Eq).if_else(
+        None,
+        |then| {
+            inner_result = (|| {
+                let then_id = then.id();
+
+                let i = module.locals.add(ValType::I32);
+                then.i32_const(0).local_set(i);
+                match inner {
+                    IntermediateType::IBool
+                    | IntermediateType::IU8
+                    | IntermediateType::IU16
+                    | IntermediateType::IU32
+                    | IntermediateType::IU64 => {
+                        // Call the generic equality function
+                        let equality_f =
+                            RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx))?;
+                        then.skip_vec_header(v1_ptr)
+                            .skip_vec_header(v2_ptr)
+                            .local_get(len)
+                            .i32_const(inner.wasm_memory_data_size()?)
+                            .binop(BinaryOp::I32Mul)
+                            .call(equality_f)
+                            .local_set(result);
+                    }
+                    IntermediateType::IU128
+                    | IntermediateType::IU256
+                    | IntermediateType::IAddress
+                    | IntermediateType::IVector(_)
+                    | IntermediateType::IStruct { .. }
+                    | IntermediateType::IGenericStructInstance { .. }
+                    | IntermediateType::IEnum { .. }
+                    | IntermediateType::IGenericEnumInstance { .. } => {
+                        let mut loop_result: Result<(), IntermediateTypeError> = Ok(());
+                        then.loop_(None, |loop_| {
+                            loop_result = (|| {
+                                //  Get the i-th element of both vectors and compare them
+                                let data_size = inner.wasm_memory_data_size()?;
+                                loop_.vec_elem_ptr(v1_ptr, i, data_size).load(
+                                    compilation_ctx.memory_id,
+                                    inner.load_kind()?,
+                                    MemArg {
+                                        align: 0,
+                                        offset: 0,
+                                    },
+                                );
+                                loop_.vec_elem_ptr(v2_ptr, i, data_size).load(
+                                    compilation_ctx.memory_id,
+                                    inner.load_kind()?,
+                                    MemArg {
+                                        align: 0,
+                                        offset: 0,
+                                    },
+                                );
+
+                                inner.load_equality_instructions(module, loop_, compilation_ctx)?;
+
+                                // If they are not equal we set result to false and break the loop
+                                loop_.if_else(
+                                    None,
+                                    |_| {},
+                                    |else_| {
+                                        else_.i32_const(0).local_set(result).br(then_id);
+                                    },
+                                );
+
+                                // === index++ ===
+                                loop_.local_get(i);
+                                loop_.i32_const(1);
+                                loop_.binop(BinaryOp::I32Add);
+                                loop_.local_tee(i);
+
+                                // === Continue if index < len ===
+                                loop_.local_get(len);
+                                loop_.binop(BinaryOp::I32LtU);
+                                loop_.br_if(loop_.id());
+                                Ok(())
+                            })();
+                        });
+
+                        loop_result?;
+                    }
+                    IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                        return Err(IntermediateTypeError::FoundVectorOfReferences);
+                    }
+                    IntermediateType::ISigner => {
+                        return Err(IntermediateTypeError::FoundVectorOfSigner);
+                    }
+                    IntermediateType::ITypeParameter(_) => {
+                        return Err(IntermediateTypeError::FoundTypeParameter);
+                    }
+                }
+
+                Ok(())
+            })();
+        },
+        |else_| {
+            else_.i32_const(0).local_set(result);
+        },
+    );
+
+    inner_result.map_err(RuntimeFunctionError::from)?;
+
+    builder.local_get(result);
+
+    Ok(function.finish(vec![v1_ptr, v2_ptr], &mut module.funcs))
+}
+
 /// Converts raw bytes (bytesN) into a vector<u8>.
 ///
 /// # WASM Function Arguments

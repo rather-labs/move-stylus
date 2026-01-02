@@ -66,6 +66,7 @@ pub enum RuntimeFunction {
     BytesToVec,
     AllocateVectorWithHeader,
     CopyLocalVector,
+    VecEquality,
     // Storage
     StorageNextSlot,
     DeriveMappingSlot,
@@ -163,6 +164,7 @@ impl RuntimeFunction {
             Self::BytesToVec => "bytes_to_vec",
             Self::AllocateVectorWithHeader => "allocate_vector_with_header",
             Self::CopyLocalVector => "copy_local_vector",
+            Self::VecEquality => "vec_equality",
             // Storage
             Self::StorageNextSlot => "storage_next_slot",
             Self::DeriveMappingSlot => "derive_mapping_slot",
@@ -478,6 +480,10 @@ impl RuntimeFunction {
             Self::CopyLocalVector => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
                 vector::copy_local_function(module, compilation_ctx, generics[0])?
+            }
+            Self::VecEquality => {
+                Self::assert_generics_length(generics.len(), 1, self.name())?;
+                vector::vec_equality_function(module, compilation_ctx, generics[0])?
             }
             _ => {
                 return Err(RuntimeFunctionError::CouldNotLinkGeneric(

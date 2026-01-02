@@ -784,7 +784,11 @@ impl IntermediateType {
                 // compared, we are comparing the same thing.
                 builder.i32_const(1);
             }
-            Self::IVector(inner) => IVector::equality(builder, module, compilation_ctx, inner)?,
+            Self::IVector(inner) => {
+                let equality_f =
+                    RuntimeFunction::VecEquality.get_generic(module, compilation_ctx, &[inner])?;
+                builder.call(equality_f);
+            }
             Self::IStruct {
                 index, module_id, ..
             } => {
