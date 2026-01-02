@@ -650,7 +650,7 @@ pub fn copy_local_function(
     inner: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let name =
-        RuntimeFunction::CopyLocalVector.get_generic_function_name(compilation_ctx, &[inner])?;
+        RuntimeFunction::VecCopyLocal.get_generic_function_name(compilation_ctx, &[inner])?;
     if let Some(function) = module.funcs.by_name(&name) {
         return Ok(function);
     }
@@ -834,7 +834,7 @@ pub fn copy_local_function(
                         } else {
                             return Err(IntermediateTypeError::from(
                                 RuntimeFunctionError::CouldNotLinkGeneric(
-                                    RuntimeFunction::CopyLocalVector.name().to_owned(),
+                                    RuntimeFunction::VecCopyLocal.name().to_owned(),
                                 ),
                             ));
                         }
@@ -937,7 +937,7 @@ pub fn copy_local_function(
 ///
 /// # WASM Function Returns
 /// * `result` (i32) - 1 if vectors are equal, 0 otherwise
-pub fn vec_equality_function(
+pub fn equality_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     inner: &IntermediateType,

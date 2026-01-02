@@ -423,7 +423,7 @@ impl IntermediateType {
                     }
                     IntermediateType::IVector(inner_type) => {
                         builder.i32_const(1); // This is the length "multiplier", i.e. length * multiplier = capacity
-                        let copy_local_function = RuntimeFunction::CopyLocalVector.get_generic(
+                        let copy_local_function = RuntimeFunction::VecCopyLocal.get_generic(
                             module,
                             compilation_ctx,
                             &[inner_type],
@@ -529,7 +529,7 @@ impl IntermediateType {
             }
             IntermediateType::IVector(inner_type) => {
                 builder.i32_const(1); // Length multiplier
-                let copy_local_function = RuntimeFunction::CopyLocalVector.get_generic(
+                let copy_local_function = RuntimeFunction::VecCopyLocal.get_generic(
                     module,
                     compilation_ctx,
                     &[inner_type],

@@ -322,7 +322,7 @@ impl IVector {
 
         // Check if len == capacity. If true, we copy the original vector but doubling its capacity.
         let copy_local_function =
-            RuntimeFunction::CopyLocalVector.get_generic(module, compilation_ctx, &[inner])?;
+            RuntimeFunction::VecCopyLocal.get_generic(module, compilation_ctx, &[inner])?;
         builder.binop(BinaryOp::I32Eq).if_else(
             None,
             |then| {
@@ -474,7 +474,7 @@ mod tests {
         builder.i32_const(1);
 
         // Copy the vector and return the new pointer
-        let copy_local_function = RuntimeFunction::CopyLocalVector
+        let copy_local_function = RuntimeFunction::VecCopyLocal
             .get_generic(&mut raw_module, &compilation_ctx, &[&inner_type])
             .unwrap();
 
