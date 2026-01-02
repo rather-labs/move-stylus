@@ -3,7 +3,7 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
-use super::{IntermediateType, error::IntermediateTypeError, heap_integers::IU128};
+use super::{IntermediateType, error::IntermediateTypeError};
 use crate::CompilationContext;
 use crate::runtime::RuntimeFunction;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
@@ -70,276 +70,6 @@ impl IVector {
                 actual: store_offset as usize,
             });
         }
-
-        Ok(())
-    }
-
-    /// Perform a deep copy of a vector.
-    ///
-    /// # Stack Arguments
-    ///
-    /// * `multiplier`: (i32) A factor used to determine the new vector's capacity, calculated as `multiplier * len`.
-    /// * `src_ptr`: (i32) A pointer referencing the vector to be duplicated.
-    ///
-    /// # Returns
-    ///
-    /// * `dst_ptr`: (i32) A pointer to the newly copied vector.
-    pub fn copy_local_instructions(
-        inner: &IntermediateType,
-        module: &mut Module,
-        builder: &mut InstrSeqBuilder,
-        compilation_ctx: &CompilationContext,
-    ) -> Result<(), IntermediateTypeError> {
-        // === Local declarations ===
-        let src_ptr = module.locals.add(ValType::I32); // pointer to the vector to be copied
-        let dst_ptr = module.locals.add(ValType::I32); // pointer to the newly copied vector
-        let index = module.locals.add(ValType::I32); // index of the current element being copied
-        let len = module.locals.add(ValType::I32); // length of the original vector
-        let multiplier = module.locals.add(ValType::I32); // multiplier for capacity calculation
-        let capacity = module.locals.add(ValType::I32); // capacity of the new vector
-        let data_size = inner.wasm_memory_data_size()?; // size of the inner type data in the vector
-
-        builder.local_set(multiplier);
-
-        // === Set vector ptr and length ===
-        builder
-            .local_tee(src_ptr)
-            .load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            )
-            .local_set(len);
-
-        // Calculate the capacity
-        builder
-            .local_get(len)
-            .i32_const(0)
-            .binop(BinaryOp::I32Eq)
-            .if_else(
-                None,
-                |then| {
-                    then.i32_const(1).local_set(capacity);
-                },
-                |else_| {
-                    else_
-                        .local_get(len)
-                        .local_get(multiplier)
-                        .binop(BinaryOp::I32Mul)
-                        .local_set(capacity);
-                },
-            );
-
-        // Allocate memory and write length and capacity at the beginning
-        let allocate_vector_with_header_function =
-            RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx))?;
-        builder
-            .local_get(len)
-            .local_get(capacity)
-            .i32_const(data_size)
-            .call(allocate_vector_with_header_function)
-            .local_set(dst_ptr);
-
-        // === Loop  ===
-        builder.i32_const(0).local_set(index);
-
-        // Aux locals for the loop
-        let src_elem_ptr = module.locals.add(ValType::I32);
-        let dst_elem_ptr = module.locals.add(ValType::I32);
-
-        // Outer block: if the vector length is 0, we skip to the end
-        let mut inner_result = Ok(());
-        builder.block(None, |outer_block| {
-            let outer_block_id = outer_block.id();
-
-            // Check if length == 0
-            outer_block
-                .local_get(len)
-                .i32_const(0)
-                .binop(BinaryOp::I32Eq)
-                .br_if(outer_block_id);
-
-            outer_block.loop_(None, |loop_block| {
-                loop_block.vec_elem_ptr(dst_ptr, index, data_size); // where to store the element
-                loop_block.vec_elem_ptr(src_ptr, index, data_size); // where to read the element
-
-                inner_result = (|| {
-                    match inner {
-                        IntermediateType::IBool
-                        | IntermediateType::IU8
-                        | IntermediateType::IU16
-                        | IntermediateType::IU32
-                        | IntermediateType::IU64 => {
-                            loop_block.load(
-                                compilation_ctx.memory_id,
-                                inner.load_kind()?,
-                                MemArg {
-                                    align: 0,
-                                    offset: 0,
-                                },
-                            );
-                        }
-                        IntermediateType::IU128 => {
-                            // Set src
-                            loop_block
-                                .load(
-                                    compilation_ctx.memory_id,
-                                    LoadKind::I32 { atomic: false },
-                                    MemArg {
-                                        align: 0,
-                                        offset: 0,
-                                    },
-                                )
-                                .local_set(src_elem_ptr);
-
-                            // Allocate memory for dest
-                            loop_block
-                                .i32_const(16)
-                                .call(compilation_ctx.allocator)
-                                .local_tee(dst_elem_ptr);
-
-                            // Put dest (tee above), src and size to perform memory copy
-                            loop_block
-                                .local_get(src_elem_ptr)
-                                .i32_const(IU128::HEAP_SIZE);
-
-                            loop_block
-                                .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-
-                            loop_block.local_get(dst_elem_ptr);
-                        }
-                        IntermediateType::IU256 | IntermediateType::IAddress => {
-                            loop_block
-                                .load(
-                                    compilation_ctx.memory_id,
-                                    LoadKind::I32 { atomic: false },
-                                    MemArg {
-                                        align: 0,
-                                        offset: 0,
-                                    },
-                                )
-                                .local_set(src_elem_ptr);
-
-                            loop_block
-                                .i32_const(32)
-                                .call(compilation_ctx.allocator)
-                                .local_tee(dst_elem_ptr);
-
-                            // Put dest (tee above), src and size to perform memory copy
-                            loop_block.local_get(src_elem_ptr).i32_const(32);
-
-                            loop_block
-                                .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-
-                            loop_block.local_get(dst_elem_ptr);
-                        }
-                        IntermediateType::IVector(inner_) => {
-                            loop_block.load(
-                                compilation_ctx.memory_id,
-                                LoadKind::I32 { atomic: false },
-                                MemArg {
-                                    align: 0,
-                                    offset: 0,
-                                },
-                            );
-
-                            loop_block.i32_const(1); // We dont increase the capacity of nested vectors
-                            IVector::copy_local_instructions(
-                                inner_,
-                                module,
-                                loop_block,
-                                compilation_ctx,
-                            )?;
-                        }
-                        IntermediateType::IStruct {
-                            module_id, index, ..
-                        } => {
-                            loop_block.load(
-                                compilation_ctx.memory_id,
-                                LoadKind::I32 { atomic: false },
-                                MemArg {
-                                    align: 0,
-                                    offset: 0,
-                                },
-                            );
-
-                            let struct_ = compilation_ctx.get_struct_by_index(module_id, *index)?;
-
-                            struct_.copy_local_instructions(module, loop_block, compilation_ctx)?;
-                        }
-
-                        IntermediateType::IGenericStructInstance {
-                            module_id,
-                            index,
-                            types,
-                            ..
-                        } => {
-                            loop_block.load(
-                                compilation_ctx.memory_id,
-                                LoadKind::I32 { atomic: false },
-                                MemArg {
-                                    align: 0,
-                                    offset: 0,
-                                },
-                            );
-
-                            let struct_ = compilation_ctx.get_struct_by_index(module_id, *index)?;
-                            let struct_ = struct_.instantiate(types);
-
-                            struct_.copy_local_instructions(module, loop_block, compilation_ctx)?;
-                        }
-                        IntermediateType::IEnum { .. } => {
-                            loop_block.load(
-                                compilation_ctx.memory_id,
-                                LoadKind::I32 { atomic: false },
-                                MemArg {
-                                    align: 0,
-                                    offset: 0,
-                                },
-                            );
-                            let enum_ = compilation_ctx.get_enum_by_intermediate_type(inner)?;
-                            inner_result =
-                                enum_.copy_local_instructions(module, loop_block, compilation_ctx);
-                        }
-
-                        t => return Err(IntermediateTypeError::VectorUnnsuportedType(t.clone())),
-                    }
-
-                    // === Store result from stack into memory ===
-                    loop_block.store(
-                        compilation_ctx.memory_id,
-                        match inner {
-                            IntermediateType::IU64 => StoreKind::I64 { atomic: false },
-                            _ => StoreKind::I32 { atomic: false },
-                        },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
-
-                    // === index++ ===
-                    loop_block.local_get(index);
-                    loop_block.i32_const(1);
-                    loop_block.binop(BinaryOp::I32Add);
-                    loop_block.local_tee(index);
-
-                    // === Continue if index < len ===
-                    loop_block.local_get(len);
-                    loop_block.binop(BinaryOp::I32LtU);
-                    loop_block.br_if(loop_block.id());
-                    Ok(())
-                })();
-            });
-        });
-
-        inner_result?;
-
-        // === Return pointer to copied vector ===
-        builder.local_get(dst_ptr);
 
         Ok(())
     }
@@ -739,15 +469,15 @@ impl IVector {
         );
 
         // Check if len == capacity. If true, we copy the original vector but doubling its capacity.
-        let mut inner_result = Ok(());
+        let copy_local_function =
+            RuntimeFunction::CopyLocalVector.get_generic(module, compilation_ctx, &[inner])?;
         builder.binop(BinaryOp::I32Eq).if_else(
             None,
             |then| {
-                then.local_get(vec_ptr);
-                then.i32_const(2); // Capacity multiplier
-
-                inner_result =
-                    IVector::copy_local_instructions(inner, module, then, compilation_ctx);
+                // Copy the vector but doubling its capacity
+                then.local_get(vec_ptr)
+                    .i32_const(2)
+                    .call(copy_local_function);
 
                 // Set vec_ptr to the new vector pointer and store it at *vec_ref
                 // This modifies the original vector reference to point to the new vector
@@ -794,8 +524,6 @@ impl IVector {
             },
             |_| {},
         );
-
-        inner_result?;
 
         // Store the element in the next free position
         builder
@@ -894,14 +622,11 @@ mod tests {
         builder.i32_const(1);
 
         // Copy the vector and return the new pointer
-        IVector::copy_local_instructions(
-            &inner_type,
-            &mut raw_module,
-            &mut builder,
-            &compilation_ctx,
-        )
-        .unwrap();
+        let copy_local_function = RuntimeFunction::CopyLocalVector
+            .get_generic(&mut raw_module, &compilation_ctx, &[&inner_type])
+            .unwrap();
 
+        builder.call(copy_local_function);
         let function = function_builder.finish(vec![], &mut raw_module.funcs);
         raw_module.exports.add("test_copy_vector", function);
 

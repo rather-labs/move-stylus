@@ -423,12 +423,12 @@ impl IntermediateType {
                     }
                     IntermediateType::IVector(inner_type) => {
                         builder.i32_const(1); // This is the length "multiplier", i.e. length * multiplier = capacity
-                        IVector::copy_local_instructions(
-                            inner_type,
+                        let copy_local_function = RuntimeFunction::CopyLocalVector.get_generic(
                             module,
-                            builder,
                             compilation_ctx,
+                            &[inner_type],
                         )?;
+                        builder.call(copy_local_function);
                     }
                     IntermediateType::IStruct { .. }
                     | IntermediateType::IGenericStructInstance { .. } => {
@@ -529,7 +529,12 @@ impl IntermediateType {
             }
             IntermediateType::IVector(inner_type) => {
                 builder.i32_const(1); // Length multiplier
-                IVector::copy_local_instructions(inner_type, module, builder, compilation_ctx)?;
+                let copy_local_function = RuntimeFunction::CopyLocalVector.get_generic(
+                    module,
+                    compilation_ctx,
+                    &[inner_type],
+                )?;
+                builder.call(copy_local_function);
             }
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
                 let struct_ = compilation_ctx.get_struct_by_intermediate_type(self)?;

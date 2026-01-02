@@ -65,6 +65,7 @@ pub enum RuntimeFunction {
     VecUpdateMutRef,
     BytesToVec,
     AllocateVectorWithHeader,
+    CopyLocalVector,
     // Storage
     StorageNextSlot,
     DeriveMappingSlot,
@@ -161,6 +162,7 @@ impl RuntimeFunction {
             Self::VecUpdateMutRef => "vec_update_mut_ref",
             Self::BytesToVec => "bytes_to_vec",
             Self::AllocateVectorWithHeader => "allocate_vector_with_header",
+            Self::CopyLocalVector => "copy_local_vector",
             // Storage
             Self::StorageNextSlot => "storage_next_slot",
             Self::DeriveMappingSlot => "derive_mapping_slot",
@@ -472,6 +474,10 @@ impl RuntimeFunction {
             Self::PackReference => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
                 packing::reference::pack_reference_function(module, compilation_ctx, generics[0])?
+            }
+            Self::CopyLocalVector => {
+                Self::assert_generics_length(generics.len(), 1, self.name())?;
+                vector::copy_local_function(module, compilation_ctx, generics[0])?
             }
             _ => {
                 return Err(RuntimeFunctionError::CouldNotLinkGeneric(
