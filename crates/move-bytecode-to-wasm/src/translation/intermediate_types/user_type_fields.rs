@@ -8,7 +8,7 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
-use crate::{CompilationContext, compilation_context::ModuleData};
+use crate::CompilationContext;
 
 use super::{IntermediateType, error::IntermediateTypeError};
 
@@ -30,7 +30,6 @@ impl UserTypeFields {
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
         compilation_ctx: &CompilationContext,
-        module_data: &ModuleData,
         src_ptr: LocalId,
         dst_ptr: LocalId,
         start_offset: u32,
@@ -104,13 +103,7 @@ impl UserTypeFields {
                         .binop(BinaryOp::I32Add)
                         .local_set(ptr_to_data);
 
-                    field.copy_local_instructions(
-                        module,
-                        builder,
-                        compilation_ctx,
-                        module_data,
-                        ptr_to_data,
-                    )?;
+                    field.copy_local_instructions(module, builder, compilation_ctx, ptr_to_data)?;
 
                     builder.local_set(ptr_to_data);
                 }
@@ -156,7 +149,6 @@ impl UserTypeFields {
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
         compilation_ctx: &CompilationContext,
-        module_data: &ModuleData,
         ptr_1: LocalId,
         ptr_2: LocalId,
     ) -> Result<(), IntermediateTypeError> {
@@ -210,12 +202,7 @@ impl UserTypeFields {
                     }
 
                     // Compare the field values
-                    field.load_equality_instructions(
-                        module,
-                        block,
-                        compilation_ctx,
-                        module_data,
-                    )?;
+                    field.load_equality_instructions(module, block, compilation_ctx)?;
 
                     block.if_else(
                         None,

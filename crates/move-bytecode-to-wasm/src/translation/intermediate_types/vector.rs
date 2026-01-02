@@ -4,9 +4,9 @@ use walrus::{
 };
 
 use super::{IntermediateType, error::IntermediateTypeError, heap_integers::IU128};
+use crate::CompilationContext;
 use crate::runtime::RuntimeFunction;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
-use crate::{CompilationContext, compilation_context::ModuleData};
 
 #[derive(Clone)]
 pub struct IVector;
@@ -89,7 +89,6 @@ impl IVector {
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
-        module_data: &ModuleData,
     ) -> Result<(), IntermediateTypeError> {
         // === Local declarations ===
         let src_ptr = module.locals.add(ValType::I32); // pointer to the vector to be copied
@@ -253,7 +252,6 @@ impl IVector {
                                 module,
                                 loop_block,
                                 compilation_ctx,
-                                module_data,
                             )?;
                         }
                         IntermediateType::IStruct {
@@ -270,12 +268,7 @@ impl IVector {
 
                             let struct_ = compilation_ctx.get_struct_by_index(module_id, *index)?;
 
-                            struct_.copy_local_instructions(
-                                module,
-                                loop_block,
-                                compilation_ctx,
-                                module_data,
-                            )?;
+                            struct_.copy_local_instructions(module, loop_block, compilation_ctx)?;
                         }
 
                         IntermediateType::IGenericStructInstance {
@@ -296,14 +289,9 @@ impl IVector {
                             let struct_ = compilation_ctx.get_struct_by_index(module_id, *index)?;
                             let struct_ = struct_.instantiate(types);
 
-                            struct_.copy_local_instructions(
-                                module,
-                                loop_block,
-                                compilation_ctx,
-                                module_data,
-                            )?;
+                            struct_.copy_local_instructions(module, loop_block, compilation_ctx)?;
                         }
-                        IntermediateType::IEnum { index, .. } => {
+                        IntermediateType::IEnum { .. } => {
                             loop_block.load(
                                 compilation_ctx.memory_id,
                                 LoadKind::I32 { atomic: false },
@@ -312,13 +300,9 @@ impl IVector {
                                     offset: 0,
                                 },
                             );
-                            let enum_ = module_data.enums.get_enum_by_index(*index)?;
-                            inner_result = enum_.copy_local_instructions(
-                                module,
-                                loop_block,
-                                compilation_ctx,
-                                module_data,
-                            );
+                            let enum_ = compilation_ctx.get_enum_by_intermediate_type(inner)?;
+                            inner_result =
+                                enum_.copy_local_instructions(module, loop_block, compilation_ctx);
                         }
 
                         t => return Err(IntermediateTypeError::VectorUnnsuportedType(t.clone())),
@@ -364,7 +348,6 @@ impl IVector {
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
         compilation_ctx: &CompilationContext,
-        module_data: &ModuleData,
         inner: &IntermediateType,
     ) -> Result<(), IntermediateTypeError> {
         let equality_f = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx))?;
@@ -456,7 +439,6 @@ impl IVector {
                                         module,
                                         loop_,
                                         compilation_ctx,
-                                        module_data,
                                     )?;
 
                                     // If they are not equal we set result to false and break the loop
@@ -708,7 +690,6 @@ impl IVector {
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
-        module_data: &ModuleData,
     ) -> Result<(), IntermediateTypeError> {
         let valtype = inner.try_into()?;
         let size = inner.wasm_memory_data_size()?;
@@ -765,13 +746,8 @@ impl IVector {
                 then.local_get(vec_ptr);
                 then.i32_const(2); // Capacity multiplier
 
-                inner_result = IVector::copy_local_instructions(
-                    inner,
-                    module,
-                    then,
-                    compilation_ctx,
-                    module_data,
-                );
+                inner_result =
+                    IVector::copy_local_instructions(inner, module, then, compilation_ctx);
 
                 // Set vec_ptr to the new vector pointer and store it at *vec_ref
                 // This modifies the original vector reference to point to the new vector
@@ -923,7 +899,6 @@ mod tests {
             &mut raw_module,
             &mut builder,
             &compilation_ctx,
-            compilation_ctx.root_module_data,
         )
         .unwrap();
 
@@ -1130,7 +1105,6 @@ mod tests {
             &mut raw_module,
             &mut builder,
             &compilation_ctx,
-            compilation_ctx.root_module_data,
         )
         .unwrap();
 
@@ -1142,7 +1116,6 @@ mod tests {
             &mut raw_module,
             &mut builder,
             &compilation_ctx,
-            compilation_ctx.root_module_data,
         )
         .unwrap();
 
