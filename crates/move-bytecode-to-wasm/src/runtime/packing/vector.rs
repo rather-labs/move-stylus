@@ -181,10 +181,14 @@ pub fn pack_vector_function(
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
+    use std::panic::AssertUnwindSafe;
+    use std::rc::Rc;
     use std::sync::Arc;
 
-    use alloy_primitives::{U256, address};
-    use alloy_sol_types::{SolType, sol};
+    use alloy_primitives::{Address, U256, address};
+    use alloy_sol_types::SolValue;
+    use rstest::rstest;
     use walrus::{FunctionBuilder, ValType};
 
     use crate::{
@@ -194,7 +198,179 @@ mod tests {
         translation::intermediate_types::IntermediateType,
     };
 
-    fn test_vec_packing(int_type: impl Packable, data: &[u8], expected_result: &[u8]) {
+    #[rstest]
+    #[case::vector_u8(
+        IntermediateType::IVector(Arc::new(IntermediateType::IU8)),
+        [3u32.to_le_bytes().as_slice(),
+            6u32.to_le_bytes().as_slice(),
+            1u8.to_le_bytes().as_slice(),
+            2u8.to_le_bytes().as_slice(),
+            3u8.to_le_bytes().as_slice(),
+            0u8.to_le_bytes().as_slice(),
+            0u8.to_le_bytes().as_slice()].concat(),
+        vec![1i8, 2i8, 3i8].abi_encode()
+    )]
+    #[case::vector_u16(
+        IntermediateType::IVector(Arc::new(IntermediateType::IU16)),
+        [3u32.to_le_bytes().as_slice(),
+            6u32.to_le_bytes().as_slice(),
+            1u16.to_le_bytes().as_slice(),
+            2u16.to_le_bytes().as_slice(),
+            3u16.to_le_bytes().as_slice(),
+            0u16.to_le_bytes().as_slice(),
+            0u16.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice()].concat(),
+        vec![1u16, 2u16, 3u16].abi_encode()
+    )]
+    #[case::vector_u32(
+        IntermediateType::IVector(Arc::new(IntermediateType::IU32)),
+        [3u32.to_le_bytes().as_slice(),
+            6u32.to_le_bytes().as_slice(),
+            1u32.to_le_bytes().as_slice(),
+            2u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice()].concat(),
+        vec![1u32, 2u32, 3u32].abi_encode()
+    )]
+    #[case::vector_u64(
+        IntermediateType::IVector(Arc::new(IntermediateType::IU64)),
+        [3u32.to_le_bytes().as_slice(),
+            6u32.to_le_bytes().as_slice(),
+            1u64.to_le_bytes().as_slice(),
+            2u64.to_le_bytes().as_slice(),
+            3u64.to_le_bytes().as_slice(),
+            0u64.to_le_bytes().as_slice(),
+            0u64.to_le_bytes().as_slice(),
+            0u64.to_le_bytes().as_slice()].concat(),
+        vec![1u64, 2u64, 3u64].abi_encode()
+    )]
+    #[case::vector_u128(
+        IntermediateType::IVector(Arc::new(IntermediateType::IU128)),
+        [3u32.to_le_bytes().as_slice(),
+            6u32.to_le_bytes().as_slice(),
+            32u32.to_le_bytes().as_slice(),
+            48u32.to_le_bytes().as_slice(),
+            64u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            1u128.to_le_bytes().as_slice(),
+            2u128.to_le_bytes().as_slice(),
+            3u128.to_le_bytes().as_slice()].concat(),
+        vec![1u128, 2u128, 3u128].abi_encode()
+    )]
+    #[case::vector_u256(
+        IntermediateType::IVector(Arc::new(IntermediateType::IU256)),
+        [3u32.to_le_bytes().as_slice(),
+            6u32.to_le_bytes().as_slice(),
+            32u32.to_le_bytes().as_slice(),
+            64u32.to_le_bytes().as_slice(),
+            96u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            U256::from(1).to_le_bytes::<32>().as_slice(),
+            U256::from(2).to_le_bytes::<32>().as_slice(),
+            U256::from(3).to_le_bytes::<32>().as_slice()].concat(),
+        vec![U256::from(1), U256::from(2), U256::from(3)].abi_encode()
+    )]
+    #[case::vector_address(
+        IntermediateType::IVector(Arc::new(IntermediateType::IAddress)),
+        vec![
+            3u32.to_le_bytes().as_slice(),
+            6u32.to_le_bytes().as_slice(),
+            32u32.to_le_bytes().as_slice(),
+            64u32.to_le_bytes().as_slice(),
+            96u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            &[0; 12],
+            address!("0x1234567890abcdef1234567890abcdef12345678").as_slice(),
+            &[0; 12],
+            address!("0x1234567890abcdef1234567890abcdef12345678").as_slice(),
+            &[0; 12],
+            address!("0x1234567890abcdef1234567890abcdef12345678").as_slice(),
+        ].concat(),
+        vec![
+            address!("0x1234567890abcdef1234567890abcdef12345678"),
+            address!("0x1234567890abcdef1234567890abcdef12345678"),
+            address!("0x1234567890abcdef1234567890abcdef12345678"),
+        ].abi_encode()
+    )]
+    #[case::vector_vector_u32(
+        IntermediateType::IVector(Arc::new(IntermediateType::IVector(Arc::new(
+            IntermediateType::IU32,
+        )))),
+        vec![
+            2u32.to_le_bytes().as_slice(),
+            4u32.to_le_bytes().as_slice(),
+            24u32.to_le_bytes().as_slice(),
+            56u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            6u32.to_le_bytes().as_slice(),
+            1u32.to_le_bytes().as_slice(),
+            2u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            6u32.to_le_bytes().as_slice(),
+            4u32.to_le_bytes().as_slice(),
+            5u32.to_le_bytes().as_slice(),
+            6u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+        ].concat(),
+        vec![vec![1u32, 2u32, 3u32], vec![4u32, 5u32, 6u32]].abi_encode()
+    )]
+    #[case::vector_vector_u128(
+        IntermediateType::IVector(Arc::new(IntermediateType::IVector(Arc::new(
+            IntermediateType::IU128,
+        )))),
+        vec![
+            2u32.to_le_bytes().as_slice(),
+            4u32.to_le_bytes().as_slice(),
+            24u32.to_le_bytes().as_slice(),
+            104u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            6u32.to_le_bytes().as_slice(),
+            56u32.to_le_bytes().as_slice(),
+            72u32.to_le_bytes().as_slice(),
+            88u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            1u128.to_le_bytes().as_slice(),
+            2u128.to_le_bytes().as_slice(),
+            3u128.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            6u32.to_le_bytes().as_slice(),
+            136u32.to_le_bytes().as_slice(),
+            152u32.to_le_bytes().as_slice(),
+            168u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            4u128.to_le_bytes().as_slice(),
+            5u128.to_le_bytes().as_slice(),
+            6u128.to_le_bytes().as_slice(),
+        ].concat(),
+        vec![vec![1u128, 2u128, 3u128], vec![4u128, 5u128, 6u128]].abi_encode()
+    )]
+    fn test_vec_packing(
+        #[case] int_type: IntermediateType,
+        #[case] data: Vec<u8>,
+        #[case] expected_result: Vec<u8>,
+    ) {
         let (mut raw_module, alloc_function, memory_id, calldata_reader_pointer_global) =
             build_module(None);
 
@@ -252,258 +428,947 @@ mod tests {
     }
 
     #[test]
-    fn test_pack_vector_u8() {
-        type SolType = sol!((uint8[],));
+    fn test_pack_vector_u8_fuzz() {
         let vector_type = IntermediateType::IVector(Arc::new(IntermediateType::IU8));
 
-        let expected_result = SolType::abi_encode_params(&(vec![1, 2, 3],));
-        test_vec_packing(
-            vector_type.clone(),
-            &[
-                3u32.to_le_bytes().as_slice(),
-                6u32.to_le_bytes().as_slice(),
-                1u8.to_le_bytes().as_slice(),
-                2u8.to_le_bytes().as_slice(),
-                3u8.to_le_bytes().as_slice(),
-                0u8.to_le_bytes().as_slice(),
-                0u8.to_le_bytes().as_slice(),
-            ]
-            .concat(),
-            &expected_result,
-        );
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[ValType::I32]);
+
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+
+        let local = raw_module.locals.add(ValType::I32);
+        let writer_pointer = raw_module.locals.add(ValType::I32);
+        let calldata_reference_pointer = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        let data_space = raw_module.locals.add(ValType::I32);
+
+        func_body.local_get(data_space);
+        func_body.call(allocator);
+        func_body.local_set(local);
+
+        func_body.i32_const(vector_type.encoded_size(&compilation_ctx).unwrap() as i32);
+        func_body.call(allocator);
+        func_body.local_tee(writer_pointer);
+        func_body.local_set(calldata_reference_pointer);
+
+        vector_type
+            .add_pack_instructions(
+                &mut func_body,
+                &mut raw_module,
+                local,
+                writer_pointer,
+                calldata_reference_pointer,
+                &compilation_ctx,
+            )
+            .unwrap();
+
+        func_body.local_get(writer_pointer);
+
+        let function = function_builder.finish(vec![data_space], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module::<i32, i32>(&mut raw_module, vec![], "test_function", None);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type::<Vec<u16>>()
+            .for_each(|values: &Vec<u16>| {
+                let values = values.iter().map(|v| v % 256).collect::<Vec<u16>>();
+
+                let len = values.len() as u32;
+                let capacity = len;
+                let mut data: Vec<u8> = vec![];
+                data.extend(&len.to_le_bytes());
+                data.extend(&capacity.to_le_bytes());
+                for value in &values {
+                    data.push(value.to_le_bytes()[0]);
+                }
+
+                memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+
+                let result_ptr: i32 = entrypoint
+                    .0
+                    .call(&mut *store.0.borrow_mut(), data.len() as i32)
+                    .unwrap();
+
+                let expected = values.abi_encode();
+                let mut result_memory_data = vec![0; expected.len()];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        result_ptr as usize,
+                        &mut result_memory_data,
+                    )
+                    .unwrap();
+
+                assert_eq!(
+                    result_memory_data, expected,
+                    "Packed vec<u8> did not match expected result",
+                );
+
+                reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+            });
     }
 
     #[test]
-    fn test_pack_vector_u16() {
-        type SolType = sol!((uint16[],));
+    fn test_pack_vector_u16_fuzz() {
         let vector_type = IntermediateType::IVector(Arc::new(IntermediateType::IU16));
 
-        let expected_result = SolType::abi_encode_params(&(vec![1, 2, 3],));
-        test_vec_packing(
-            vector_type.clone(),
-            &[
-                3u32.to_le_bytes().as_slice(),
-                6u32.to_le_bytes().as_slice(),
-                1u16.to_le_bytes().as_slice(),
-                2u16.to_le_bytes().as_slice(),
-                3u16.to_le_bytes().as_slice(),
-                0u16.to_le_bytes().as_slice(),
-                0u16.to_le_bytes().as_slice(),
-                0u32.to_le_bytes().as_slice(),
-            ]
-            .concat(),
-            &expected_result,
-        );
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[ValType::I32]);
+
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+
+        let local = raw_module.locals.add(ValType::I32);
+        let writer_pointer = raw_module.locals.add(ValType::I32);
+        let calldata_reference_pointer = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        let data_space = raw_module.locals.add(ValType::I32);
+
+        func_body.local_get(data_space);
+        func_body.call(allocator);
+        func_body.local_set(local);
+
+        func_body.i32_const(vector_type.encoded_size(&compilation_ctx).unwrap() as i32);
+        func_body.call(allocator);
+        func_body.local_tee(writer_pointer);
+        func_body.local_set(calldata_reference_pointer);
+
+        vector_type
+            .add_pack_instructions(
+                &mut func_body,
+                &mut raw_module,
+                local,
+                writer_pointer,
+                calldata_reference_pointer,
+                &compilation_ctx,
+            )
+            .unwrap();
+
+        func_body.local_get(writer_pointer);
+
+        let function = function_builder.finish(vec![data_space], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module::<i32, i32>(&mut raw_module, vec![], "test_function", None);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type::<Vec<u16>>()
+            .for_each(|values: &Vec<u16>| {
+                let len = values.len() as u32;
+                let capacity = len;
+                let mut data = vec![];
+                data.extend(&len.to_le_bytes());
+                data.extend(&capacity.to_le_bytes());
+                for value in values {
+                    data.extend(&value.to_le_bytes());
+                }
+
+                memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+
+                let result_ptr: i32 = entrypoint
+                    .0
+                    .call(&mut *store.0.borrow_mut(), data.len() as i32)
+                    .unwrap();
+
+                let expected = values.abi_encode();
+                let mut result_memory_data = vec![0; expected.len()];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        result_ptr as usize,
+                        &mut result_memory_data,
+                    )
+                    .unwrap();
+
+                assert_eq!(
+                    result_memory_data, expected,
+                    "Packed vec<u16> did not match expected result",
+                );
+
+                reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+            });
     }
 
     #[test]
-    fn test_pack_vector_u32() {
-        type SolType = sol!((uint32[],));
+    fn test_pack_vector_u32_fuzz() {
         let vector_type = IntermediateType::IVector(Arc::new(IntermediateType::IU32));
 
-        let expected_result = SolType::abi_encode_params(&(vec![1, 2, 3],));
-        test_vec_packing(
-            vector_type.clone(),
-            &[
-                3u32.to_le_bytes().as_slice(),
-                6u32.to_le_bytes().as_slice(),
-                1u32.to_le_bytes().as_slice(),
-                2u32.to_le_bytes().as_slice(),
-                3u32.to_le_bytes().as_slice(),
-                0u32.to_le_bytes().as_slice(),
-                0u32.to_le_bytes().as_slice(),
-                0u32.to_le_bytes().as_slice(),
-            ]
-            .concat(),
-            &expected_result,
-        );
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[ValType::I32]);
+
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+
+        let local = raw_module.locals.add(ValType::I32);
+        let writer_pointer = raw_module.locals.add(ValType::I32);
+        let calldata_reference_pointer = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        let data_space = raw_module.locals.add(ValType::I32);
+
+        func_body.local_get(data_space);
+        func_body.call(allocator);
+        func_body.local_set(local);
+
+        func_body.i32_const(vector_type.encoded_size(&compilation_ctx).unwrap() as i32);
+        func_body.call(allocator);
+        func_body.local_tee(writer_pointer);
+        func_body.local_set(calldata_reference_pointer);
+
+        vector_type
+            .add_pack_instructions(
+                &mut func_body,
+                &mut raw_module,
+                local,
+                writer_pointer,
+                calldata_reference_pointer,
+                &compilation_ctx,
+            )
+            .unwrap();
+
+        func_body.local_get(writer_pointer);
+
+        let function = function_builder.finish(vec![data_space], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module::<i32, i32>(&mut raw_module, vec![], "test_function", None);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type::<Vec<u32>>()
+            .for_each(|values: &Vec<u32>| {
+                let len = values.len() as u32;
+                let capacity = len;
+                let mut data = vec![];
+                data.extend(&len.to_le_bytes());
+                data.extend(&capacity.to_le_bytes());
+                for value in values {
+                    data.extend(&value.to_le_bytes());
+                }
+
+                memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+
+                let result_ptr: i32 = entrypoint
+                    .0
+                    .call(&mut *store.0.borrow_mut(), data.len() as i32)
+                    .unwrap();
+
+                let expected = values.abi_encode();
+                let mut result_memory_data = vec![0; expected.len()];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        result_ptr as usize,
+                        &mut result_memory_data,
+                    )
+                    .unwrap();
+
+                assert_eq!(
+                    result_memory_data, expected,
+                    "Packed vec<u32> did not match expected result",
+                );
+
+                reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+            });
     }
 
     #[test]
-    fn test_pack_vector_u64() {
-        type SolType = sol!((uint64[],));
+    fn test_pack_vector_u64_fuzz() {
         let vector_type = IntermediateType::IVector(Arc::new(IntermediateType::IU64));
 
-        let expected_result = SolType::abi_encode_params(&(vec![1, 2, 3],));
-        test_vec_packing(
-            vector_type.clone(),
-            &[
-                3u32.to_le_bytes().as_slice(),
-                6u32.to_le_bytes().as_slice(),
-                1u64.to_le_bytes().as_slice(),
-                2u64.to_le_bytes().as_slice(),
-                3u64.to_le_bytes().as_slice(),
-                0u64.to_le_bytes().as_slice(),
-                0u64.to_le_bytes().as_slice(),
-                0u64.to_le_bytes().as_slice(),
-            ]
-            .concat(),
-            &expected_result,
-        );
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[ValType::I32]);
+
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+
+        let local = raw_module.locals.add(ValType::I32);
+        let writer_pointer = raw_module.locals.add(ValType::I32);
+        let calldata_reference_pointer = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        let data_space = raw_module.locals.add(ValType::I32);
+
+        func_body.local_get(data_space);
+        func_body.call(allocator);
+        func_body.local_set(local);
+
+        func_body.i32_const(vector_type.encoded_size(&compilation_ctx).unwrap() as i32);
+        func_body.call(allocator);
+        func_body.local_tee(writer_pointer);
+        func_body.local_set(calldata_reference_pointer);
+
+        vector_type
+            .add_pack_instructions(
+                &mut func_body,
+                &mut raw_module,
+                local,
+                writer_pointer,
+                calldata_reference_pointer,
+                &compilation_ctx,
+            )
+            .unwrap();
+
+        func_body.local_get(writer_pointer);
+
+        let function = function_builder.finish(vec![data_space], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module::<i32, i32>(&mut raw_module, vec![], "test_function", None);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type::<Vec<u64>>()
+            .for_each(|values: &Vec<u64>| {
+                let len = values.len() as u32;
+                let capacity = len;
+                let mut data = vec![];
+                data.extend(&len.to_le_bytes());
+                data.extend(&capacity.to_le_bytes());
+                for value in values {
+                    data.extend(&value.to_le_bytes());
+                }
+
+                memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+
+                let result_ptr: i32 = entrypoint
+                    .0
+                    .call(&mut *store.0.borrow_mut(), data.len() as i32)
+                    .unwrap();
+
+                let expected = values.abi_encode();
+                let mut result_memory_data = vec![0; expected.len()];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        result_ptr as usize,
+                        &mut result_memory_data,
+                    )
+                    .unwrap();
+
+                assert_eq!(
+                    result_memory_data, expected,
+                    "Packed vec<u64> did not match expected result",
+                );
+
+                reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+            });
     }
 
     #[test]
-    fn test_pack_vector_u128() {
-        type SolType = sol!((uint128[],));
+    fn test_pack_vector_u128_fuzz() {
         let vector_type = IntermediateType::IVector(Arc::new(IntermediateType::IU128));
 
-        let expected_result = SolType::abi_encode_params(&(vec![1, 2, 3],));
-        test_vec_packing(
-            vector_type.clone(),
-            &[
-                3u32.to_le_bytes().as_slice(),
-                6u32.to_le_bytes().as_slice(),
-                32u32.to_le_bytes().as_slice(),
-                48u32.to_le_bytes().as_slice(),
-                64u32.to_le_bytes().as_slice(),
-                0u32.to_le_bytes().as_slice(),
-                0u32.to_le_bytes().as_slice(),
-                0u32.to_le_bytes().as_slice(),
-                1u128.to_le_bytes().as_slice(),
-                2u128.to_le_bytes().as_slice(),
-                3u128.to_le_bytes().as_slice(),
-            ]
-            .concat(),
-            &expected_result,
-        );
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[ValType::I32]);
+
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+
+        let local = raw_module.locals.add(ValType::I32);
+        let writer_pointer = raw_module.locals.add(ValType::I32);
+        let calldata_reference_pointer = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        let data_space = raw_module.locals.add(ValType::I32);
+
+        func_body.local_get(data_space);
+        func_body.call(allocator);
+        func_body.local_set(local);
+
+        func_body.i32_const(vector_type.encoded_size(&compilation_ctx).unwrap() as i32);
+        func_body.call(allocator);
+        func_body.local_tee(writer_pointer);
+        func_body.local_set(calldata_reference_pointer);
+
+        vector_type
+            .add_pack_instructions(
+                &mut func_body,
+                &mut raw_module,
+                local,
+                writer_pointer,
+                calldata_reference_pointer,
+                &compilation_ctx,
+            )
+            .unwrap();
+
+        func_body.local_get(writer_pointer);
+
+        let function = function_builder.finish(vec![data_space], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module::<i32, i32>(&mut raw_module, vec![], "test_function", None);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type::<Vec<u128>>()
+            .for_each(|values: &Vec<u128>| {
+                let len = values.len() as u32;
+                let capacity = len;
+                let mut data = vec![];
+                data.extend(&len.to_le_bytes());
+                data.extend(&capacity.to_le_bytes());
+
+                let base_offset = 8 + (len as usize * 4);
+                for (i, _) in values.iter().enumerate() {
+                    let value_offset = base_offset + (i * 16);
+                    data.extend(&(value_offset as u32).to_le_bytes());
+                }
+
+                for value in values {
+                    data.extend(&value.to_le_bytes());
+                }
+
+                memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+
+                let result_ptr: i32 = entrypoint
+                    .0
+                    .call(&mut *store.0.borrow_mut(), data.len() as i32)
+                    .unwrap();
+
+                let expected = values.abi_encode();
+                let mut result_memory_data = vec![0; expected.len()];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        result_ptr as usize,
+                        &mut result_memory_data,
+                    )
+                    .unwrap();
+
+                assert_eq!(
+                    result_memory_data, expected,
+                    "Packed vec<u128> did not match expected result",
+                );
+
+                reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+            });
     }
 
     #[test]
-    fn test_pack_vector_u256() {
-        type SolType = sol!((uint256[],));
+    fn test_pack_vector_u256_fuzz() {
         let vector_type = IntermediateType::IVector(Arc::new(IntermediateType::IU256));
 
-        let expected_result =
-            SolType::abi_encode_params(&(vec![U256::from(1), U256::from(2), U256::from(3)],));
-        test_vec_packing(
-            vector_type.clone(),
-            &[
-                3u32.to_le_bytes().as_slice(),
-                6u32.to_le_bytes().as_slice(),
-                32u32.to_le_bytes().as_slice(),
-                64u32.to_le_bytes().as_slice(),
-                96u32.to_le_bytes().as_slice(),
-                0u32.to_le_bytes().as_slice(),
-                0u32.to_le_bytes().as_slice(),
-                0u32.to_le_bytes().as_slice(),
-                U256::from(1).to_le_bytes::<32>().as_slice(),
-                U256::from(2).to_le_bytes::<32>().as_slice(),
-                U256::from(3).to_le_bytes::<32>().as_slice(),
-            ]
-            .concat(),
-            &expected_result,
-        );
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[ValType::I32]);
+
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+
+        let local = raw_module.locals.add(ValType::I32);
+        let writer_pointer = raw_module.locals.add(ValType::I32);
+        let calldata_reference_pointer = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        let data_space = raw_module.locals.add(ValType::I32);
+
+        func_body.local_get(data_space);
+        func_body.call(allocator);
+        func_body.local_set(local);
+
+        func_body.i32_const(vector_type.encoded_size(&compilation_ctx).unwrap() as i32);
+        func_body.call(allocator);
+        func_body.local_tee(writer_pointer);
+        func_body.local_set(calldata_reference_pointer);
+
+        vector_type
+            .add_pack_instructions(
+                &mut func_body,
+                &mut raw_module,
+                local,
+                writer_pointer,
+                calldata_reference_pointer,
+                &compilation_ctx,
+            )
+            .unwrap();
+
+        func_body.local_get(writer_pointer);
+
+        let function = function_builder.finish(vec![data_space], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module::<i32, i32>(&mut raw_module, vec![], "test_function", None);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type::<Vec<[u8; 32]>>()
+            .for_each(|values: &Vec<[u8; 32]>| {
+                let len = values.len() as u32;
+                let capacity = len;
+                let mut data = vec![];
+                data.extend(&len.to_le_bytes());
+                data.extend(&capacity.to_le_bytes());
+
+                let base_offset = 8 + (len as usize * 4);
+                for (i, _) in values.iter().enumerate() {
+                    let value_offset = base_offset + (i * 32);
+                    data.extend(&(value_offset as u32).to_le_bytes());
+                }
+
+                for value in values {
+                    data.extend(value);
+                }
+
+                memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+
+                let result_ptr: i32 = entrypoint
+                    .0
+                    .call(&mut *store.0.borrow_mut(), data.len() as i32)
+                    .unwrap();
+
+                let expected = values
+                    .iter()
+                    .map(|v| U256::from_le_bytes(*v))
+                    .collect::<Vec<U256>>()
+                    .abi_encode();
+
+                let mut result_memory_data = vec![0; expected.len()];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        result_ptr as usize,
+                        &mut result_memory_data,
+                    )
+                    .unwrap();
+
+                assert_eq!(
+                    result_memory_data, expected,
+                    "Packed vec<u256> did not match expected result",
+                );
+
+                reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+            });
     }
 
     #[test]
-    fn test_pack_vector_address() {
-        type SolType = sol!((address[],));
+    fn test_pack_vector_address_fuzz() {
         let vector_type = IntermediateType::IVector(Arc::new(IntermediateType::IAddress));
 
-        let expected_result = SolType::abi_encode_params(&(vec![
-            address!("0x1234567890abcdef1234567890abcdef12345678"),
-            address!("0x1234567890abcdef1234567890abcdef12345678"),
-            address!("0x1234567890abcdef1234567890abcdef12345678"),
-        ],));
-        test_vec_packing(
-            vector_type.clone(),
-            &[
-                3u32.to_le_bytes().as_slice(),
-                6u32.to_le_bytes().as_slice(),
-                32u32.to_le_bytes().as_slice(),
-                64u32.to_le_bytes().as_slice(),
-                96u32.to_le_bytes().as_slice(),
-                0u32.to_le_bytes().as_slice(),
-                0u32.to_le_bytes().as_slice(),
-                0u32.to_le_bytes().as_slice(),
-                &[0; 12],
-                address!("0x1234567890abcdef1234567890abcdef12345678").as_slice(),
-                &[0; 12],
-                address!("0x1234567890abcdef1234567890abcdef12345678").as_slice(),
-                &[0; 12],
-                address!("0x1234567890abcdef1234567890abcdef12345678").as_slice(),
-            ]
-            .concat(),
-            &expected_result,
-        );
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[ValType::I32]);
+
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+
+        let local = raw_module.locals.add(ValType::I32);
+        let writer_pointer = raw_module.locals.add(ValType::I32);
+        let calldata_reference_pointer = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        let data_space = raw_module.locals.add(ValType::I32);
+
+        func_body.local_get(data_space);
+        func_body.call(allocator);
+        func_body.local_set(local);
+
+        func_body.i32_const(vector_type.encoded_size(&compilation_ctx).unwrap() as i32);
+        func_body.call(allocator);
+        func_body.local_tee(writer_pointer);
+        func_body.local_set(calldata_reference_pointer);
+
+        vector_type
+            .add_pack_instructions(
+                &mut func_body,
+                &mut raw_module,
+                local,
+                writer_pointer,
+                calldata_reference_pointer,
+                &compilation_ctx,
+            )
+            .unwrap();
+
+        func_body.local_get(writer_pointer);
+
+        let function = function_builder.finish(vec![data_space], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module::<i32, i32>(&mut raw_module, vec![], "test_function", None);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type::<Vec<[u8; 20]>>()
+            .for_each(|values: &Vec<[u8; 20]>| {
+                let len = values.len() as u32;
+                let capacity = len;
+
+                let mut data = vec![];
+                data.extend(&len.to_le_bytes());
+                data.extend(&capacity.to_le_bytes());
+
+                let base_offset = 8 + (len as usize * 4);
+                for (i, _) in values.iter().enumerate() {
+                    let value_offset = base_offset + (i * 32);
+                    data.extend(&(value_offset as u32).to_le_bytes());
+                }
+
+                for value in values {
+                    data.extend(&[0u8; 12]);
+                    data.extend(value.as_slice());
+                }
+
+                memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+
+                let result_ptr: i32 = entrypoint
+                    .0
+                    .call(&mut *store.0.borrow_mut(), data.len() as i32)
+                    .unwrap();
+
+                let expected = values
+                    .iter()
+                    .map(Address::from)
+                    .collect::<Vec<Address>>()
+                    .abi_encode();
+
+                let mut result_memory_data = vec![0; expected.len()];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        result_ptr as usize,
+                        &mut result_memory_data,
+                    )
+                    .unwrap();
+
+                assert_eq!(
+                    result_memory_data, expected,
+                    "Packed vec<address> did not match expected result",
+                );
+
+                reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+            });
     }
 
     #[test]
-    fn test_pack_vector_vector_u32() {
-        type SolType = sol!((uint32[][],));
+    fn test_pack_vector_vector_u32_fuzz() {
         let vector_type = IntermediateType::IVector(Arc::new(IntermediateType::IVector(Arc::new(
             IntermediateType::IU32,
         ))));
 
-        let expected_result = SolType::abi_encode_params(&(vec![vec![1, 2, 3], vec![4, 5, 6]],));
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
 
-        let data = [
-            2u32.to_le_bytes().as_slice(),
-            4u32.to_le_bytes().as_slice(),
-            24u32.to_le_bytes().as_slice(),
-            56u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            3u32.to_le_bytes().as_slice(),
-            6u32.to_le_bytes().as_slice(),
-            1u32.to_le_bytes().as_slice(),
-            2u32.to_le_bytes().as_slice(),
-            3u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            3u32.to_le_bytes().as_slice(),
-            6u32.to_le_bytes().as_slice(),
-            4u32.to_le_bytes().as_slice(),
-            5u32.to_le_bytes().as_slice(),
-            6u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-        ]
-        .concat();
-        test_vec_packing(vector_type.clone(), &data, &expected_result);
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[ValType::I32]);
+
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+
+        let local = raw_module.locals.add(ValType::I32);
+        let writer_pointer = raw_module.locals.add(ValType::I32);
+        let calldata_reference_pointer = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        let data_space = raw_module.locals.add(ValType::I32);
+
+        func_body.local_get(data_space);
+        func_body.call(allocator);
+        func_body.local_set(local);
+
+        func_body.i32_const(vector_type.encoded_size(&compilation_ctx).unwrap() as i32);
+        func_body.call(allocator);
+        func_body.local_tee(writer_pointer);
+        func_body.local_set(calldata_reference_pointer);
+
+        vector_type
+            .add_pack_instructions(
+                &mut func_body,
+                &mut raw_module,
+                local,
+                writer_pointer,
+                calldata_reference_pointer,
+                &compilation_ctx,
+            )
+            .unwrap();
+
+        func_body.local_get(writer_pointer);
+
+        let function = function_builder.finish(vec![data_space], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module::<i32, i32>(&mut raw_module, vec![], "test_function", None);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type::<Vec<Vec<u32>>>()
+            .for_each(|values: &Vec<Vec<u32>>| {
+                let outer_len = values.len() as u32;
+                let outer_capacity = outer_len;
+                let mut data = vec![];
+                data.extend(&outer_len.to_le_bytes());
+                data.extend(&outer_capacity.to_le_bytes());
+
+                let mut current_offset = 8 + (outer_len as usize * 4);
+                for inner_vec in values {
+                    data.extend(&(current_offset as u32).to_le_bytes());
+                    current_offset += 8 + (inner_vec.len() * 4);
+                }
+
+                for inner_vec in values {
+                    let inner_len = inner_vec.len() as u32;
+                    data.extend(&inner_len.to_le_bytes());
+                    data.extend(&inner_len.to_le_bytes());
+                    for value in inner_vec {
+                        data.extend(&value.to_le_bytes());
+                    }
+                }
+
+                memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+
+                let result_ptr: i32 = entrypoint
+                    .0
+                    .call(&mut *store.0.borrow_mut(), data.len() as i32)
+                    .unwrap();
+
+                let expected = values.abi_encode();
+                let mut result_memory_data = vec![0; expected.len()];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        result_ptr as usize,
+                        &mut result_memory_data,
+                    )
+                    .unwrap();
+
+                assert_eq!(
+                    result_memory_data, expected,
+                    "Packed vec<vec<u32>> did not match expected result",
+                );
+
+                reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+            });
     }
 
     #[test]
-    fn test_pack_vector_vector_u128() {
-        type SolType = sol!((uint128[][],));
+    fn test_pack_vector_vector_u128_fuzz() {
         let vector_type = IntermediateType::IVector(Arc::new(IntermediateType::IVector(Arc::new(
             IntermediateType::IU128,
         ))));
 
-        let expected_result = SolType::abi_encode_params(&(vec![vec![1, 2, 3], vec![4, 5, 6]],));
-        let data = [
-            2u32.to_le_bytes().as_slice(),
-            4u32.to_le_bytes().as_slice(),
-            24u32.to_le_bytes().as_slice(),
-            104u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            3u32.to_le_bytes().as_slice(),
-            6u32.to_le_bytes().as_slice(),
-            56u32.to_le_bytes().as_slice(),
-            72u32.to_le_bytes().as_slice(),
-            88u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            1u128.to_le_bytes().as_slice(),
-            2u128.to_le_bytes().as_slice(),
-            3u128.to_le_bytes().as_slice(),
-            3u32.to_le_bytes().as_slice(),
-            6u32.to_le_bytes().as_slice(),
-            136u32.to_le_bytes().as_slice(),
-            152u32.to_le_bytes().as_slice(),
-            168u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            4u128.to_le_bytes().as_slice(),
-            5u128.to_le_bytes().as_slice(),
-            6u128.to_le_bytes().as_slice(),
-        ]
-        .concat();
-        test_vec_packing(vector_type.clone(), &data, &expected_result);
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[ValType::I32]);
+
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+
+        let local = raw_module.locals.add(ValType::I32);
+        let writer_pointer = raw_module.locals.add(ValType::I32);
+        let calldata_reference_pointer = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        let data_space = raw_module.locals.add(ValType::I32);
+
+        func_body.local_get(data_space);
+        func_body.call(allocator);
+        func_body.local_set(local);
+
+        func_body.i32_const(vector_type.encoded_size(&compilation_ctx).unwrap() as i32);
+        func_body.call(allocator);
+        func_body.local_tee(writer_pointer);
+        func_body.local_set(calldata_reference_pointer);
+
+        vector_type
+            .add_pack_instructions(
+                &mut func_body,
+                &mut raw_module,
+                local,
+                writer_pointer,
+                calldata_reference_pointer,
+                &compilation_ctx,
+            )
+            .unwrap();
+
+        func_body.local_get(writer_pointer);
+
+        let function = function_builder.finish(vec![data_space], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module::<i32, i32>(&mut raw_module, vec![], "test_function", None);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type::<Vec<Vec<u128>>>()
+            .for_each(|values: &Vec<Vec<u128>>| {
+                let outer_len = values.len() as u32;
+                let outer_capacity = outer_len;
+                let mut data = vec![];
+                data.extend(&outer_len.to_le_bytes());
+                data.extend(&outer_capacity.to_le_bytes());
+
+                let mut inner_vec_ptr_offset = 8 + (outer_len as usize * 4);
+                for inner_vec in values {
+                    data.extend(&(inner_vec_ptr_offset as u32).to_le_bytes());
+                    inner_vec_ptr_offset += 8 + (inner_vec.len() * 4);
+                }
+
+                let mut u128_data_offset = inner_vec_ptr_offset;
+                for inner_vec in values {
+                    let inner_len = inner_vec.len() as u32;
+                    data.extend(&inner_len.to_le_bytes());
+                    data.extend(&inner_len.to_le_bytes());
+
+                    for _ in 0..inner_vec.len() {
+                        data.extend(&(u128_data_offset as u32).to_le_bytes());
+                        u128_data_offset += 16;
+                    }
+                }
+
+                for inner_vec in values {
+                    for value in inner_vec {
+                        data.extend(&value.to_le_bytes());
+                    }
+                }
+
+                memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+
+                let result_ptr: i32 = entrypoint
+                    .0
+                    .call(&mut *store.0.borrow_mut(), data.len() as i32)
+                    .unwrap();
+
+                let expected = values.abi_encode();
+                let mut result_memory_data = vec![0; expected.len()];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        result_ptr as usize,
+                        &mut result_memory_data,
+                    )
+                    .unwrap();
+
+                assert_eq!(
+                    result_memory_data, expected,
+                    "Packed vec<vec<u128>> did not match expected result",
+                );
+
+                reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+            });
     }
 }
