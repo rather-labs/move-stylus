@@ -85,7 +85,11 @@ pub fn pack_u64_function(
 
 #[cfg(test)]
 mod tests {
-    use alloy_sol_types::{SolType, sol};
+    use alloy_sol_types::SolValue;
+    use rstest::rstest;
+    use std::cell::RefCell;
+    use std::panic::AssertUnwindSafe;
+    use std::rc::Rc;
     use walrus::{FunctionBuilder, ValType};
 
     use crate::{
@@ -100,7 +104,28 @@ mod tests {
         U64(u64),
     }
 
-    fn test_uint(int_type: impl Packable, literal: Int, expected_result: &[u8]) {
+    #[rstest]
+    #[case::u8_88(IntermediateType::IU8, Int::U32(88), 88i8.abi_encode())]
+    #[case::u8_max(IntermediateType::IU8, Int::U32(u8::MAX as u32), (u8::MAX as u16).abi_encode())]
+    #[case::u8_min(IntermediateType::IU8, Int::U32(u8::MIN as u32), (u8::MIN as u16).abi_encode())]
+    #[case::u8_max_minus_1(IntermediateType::IU8, Int::U32((u8::MAX - 1) as u32), (u8::MAX as u16 - 1).abi_encode())]
+    #[case::u16_1616(IntermediateType::IU16, Int::U32(1616), 1616u16.abi_encode())]
+    #[case::u16_max(IntermediateType::IU16, Int::U32(u16::MAX as u32), u16::MAX.abi_encode())]
+    #[case::u16_min(IntermediateType::IU16, Int::U32(u16::MIN as u32), u16::MIN.abi_encode())]
+    #[case::u16_max_minus_1(IntermediateType::IU16, Int::U32((u16::MAX - 1) as u32), (u16::MAX - 1).abi_encode())]
+    #[case::u32_323232(IntermediateType::IU32, Int::U32(323232), 323232u32.abi_encode())]
+    #[case::u32_max(IntermediateType::IU32, Int::U32(u32::MAX), u32::MAX.abi_encode())]
+    #[case::u32_min(IntermediateType::IU32, Int::U32(u32::MIN), u32::MIN.abi_encode())]
+    #[case::u32_max_minus_1(IntermediateType::IU32, Int::U32(u32::MAX - 1), (u32::MAX - 1).abi_encode())]
+    #[case::u64_6464646464(IntermediateType::IU64, Int::U64(6464646464), 6464646464u64.abi_encode())]
+    #[case::u64_max(IntermediateType::IU64, Int::U64(u64::MAX), u64::MAX.abi_encode())]
+    #[case::u64_min(IntermediateType::IU64, Int::U64(u64::MIN), u64::MIN.abi_encode())]
+    #[case::u64_max_minus_1(IntermediateType::IU64, Int::U64(u64::MAX - 1), (u64::MAX - 1).abi_encode())]
+    fn test_uint(
+        #[case] int_type: impl Packable,
+        #[case] literal: Int,
+        #[case] expected_result: Vec<u8>,
+    ) {
         let (mut raw_module, alloc_function, memory_id, calldata_reader_pointer_global) =
             build_module(None);
 
@@ -161,110 +186,166 @@ mod tests {
     }
 
     #[test]
-    fn test_pack_u8() {
-        type IntType = u8;
-        type SolType = sol!((uint8,));
-        let int_type = IntermediateType::IU8;
+    fn test_pack_u32_fuzz() {
+        let (mut raw_module, alloc_function, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
 
-        let expected_result = SolType::abi_encode_params(&(88,));
-        test_uint(int_type.clone(), Int::U32(88), &expected_result);
+        let compilation_ctx =
+            test_compilation_context!(memory_id, alloc_function, calldata_reader_pointer_global);
 
-        let expected_result = SolType::abi_encode_params(&(IntType::MAX,));
-        test_uint(
-            int_type.clone(),
-            Int::U32(IntType::MAX as u32),
-            &expected_result,
-        ); // max
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[ValType::I32]);
 
-        let expected_result = SolType::abi_encode_params(&(IntType::MIN,));
-        test_uint(
-            int_type.clone(),
-            Int::U32(IntType::MIN as u32),
-            &expected_result,
-        ); // min
+        let mut func_body = function_builder.func_body();
+        let value = raw_module.locals.add(ValType::I32);
 
-        let expected_result = SolType::abi_encode_params(&(IntType::MAX - 1,));
-        test_uint(
-            int_type.clone(),
-            Int::U32((IntType::MAX - 1) as u32),
-            &expected_result,
-        ); // max -1 (avoid symmetry)
+        let writer_pointer = raw_module.locals.add(ValType::I32);
+
+        func_body
+            .i32_const(
+                IntermediateType::IU32
+                    .encoded_size(&compilation_ctx)
+                    .unwrap() as i32,
+            )
+            .call(alloc_function)
+            .local_set(writer_pointer);
+
+        IntermediateType::IU32
+            .add_pack_instructions(
+                &mut func_body,
+                &mut raw_module,
+                value,
+                writer_pointer,
+                writer_pointer,
+                &compilation_ctx,
+            )
+            .unwrap();
+
+        func_body.local_get(writer_pointer);
+
+        let function = function_builder.finish(vec![value], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type::<u32>()
+            .cloned()
+            .for_each(|value: u32| {
+                let result_ptr: i32 = entrypoint
+                    .0
+                    .call(&mut *store.0.borrow_mut(), (value as i32,))
+                    .unwrap();
+
+                let mut result_memory_data = vec![0; 32];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        result_ptr as usize,
+                        &mut result_memory_data,
+                    )
+                    .unwrap();
+
+                let expected = value.abi_encode();
+                assert_eq!(
+                    result_memory_data, expected,
+                    "Packed u32 did not match expected result for value {value}",
+                );
+
+                reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+            });
     }
 
     #[test]
-    fn test_unpack_u16() {
-        type IntType = u16;
-        type SolType = sol!((uint16,));
-        let int_type = IntermediateType::IU16;
+    fn test_pack_u64_fuzz() {
+        let (mut raw_module, alloc_function, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
 
-        let expected_result = SolType::abi_encode_params(&(1616,));
-        test_uint(int_type.clone(), Int::U32(1616), &expected_result);
+        let compilation_ctx =
+            test_compilation_context!(memory_id, alloc_function, calldata_reader_pointer_global);
 
-        let expected_result = SolType::abi_encode_params(&(IntType::MAX,));
-        test_uint(
-            int_type.clone(),
-            Int::U32(IntType::MAX as u32),
-            &expected_result,
-        ); // max
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[ValType::I64], &[ValType::I32]);
 
-        let expected_result = SolType::abi_encode_params(&(IntType::MIN,));
-        test_uint(
-            int_type.clone(),
-            Int::U32(IntType::MIN as u32),
-            &expected_result,
-        ); // min
+        let mut func_body = function_builder.func_body();
+        let value = raw_module.locals.add(ValType::I64);
 
-        let expected_result = SolType::abi_encode_params(&(IntType::MAX - 1,));
-        test_uint(
-            int_type.clone(),
-            Int::U32((IntType::MAX - 1) as u32),
-            &expected_result,
-        ); // max -1 (avoid symmetry)
-    }
+        let writer_pointer = raw_module.locals.add(ValType::I32);
 
-    #[test]
-    fn test_unpack_u32() {
-        type IntType = u32;
-        type SolType = sol!((uint32,));
-        let int_type = IntermediateType::IU32;
+        func_body
+            .i32_const(
+                IntermediateType::IU64
+                    .encoded_size(&compilation_ctx)
+                    .unwrap() as i32,
+            )
+            .call(alloc_function)
+            .local_set(writer_pointer);
 
-        let expected_result = SolType::abi_encode_params(&(323232,));
-        test_uint(int_type.clone(), Int::U32(323232), &expected_result);
+        IntermediateType::IU64
+            .add_pack_instructions(
+                &mut func_body,
+                &mut raw_module,
+                value,
+                writer_pointer,
+                writer_pointer,
+                &compilation_ctx,
+            )
+            .unwrap();
 
-        let expected_result = SolType::abi_encode_params(&(IntType::MAX,));
-        test_uint(int_type.clone(), Int::U32(IntType::MAX), &expected_result); // max
+        func_body.local_get(writer_pointer);
 
-        let expected_result = SolType::abi_encode_params(&(IntType::MIN,));
-        test_uint(int_type.clone(), Int::U32(IntType::MIN), &expected_result); // min
+        let function = function_builder.finish(vec![value], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
 
-        let expected_result = SolType::abi_encode_params(&(IntType::MAX - 1,));
-        test_uint(
-            int_type.clone(),
-            Int::U32(IntType::MAX - 1),
-            &expected_result,
-        ); // max -1 (avoid symmetry)
-    }
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
 
-    #[test]
-    fn test_unpack_u64() {
-        type IntType = u64;
-        type SolType = sol!((uint64,));
-        let int_type = IntermediateType::IU64;
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
 
-        let expected_result = SolType::abi_encode_params(&(6464646464,));
-        test_uint(int_type.clone(), Int::U64(6464646464), &expected_result);
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
 
-        let expected_result = SolType::abi_encode_params(&(IntType::MAX,));
-        test_uint(int_type.clone(), Int::U64(IntType::MAX), &expected_result); // max
+        bolero::check!()
+            .with_type::<u64>()
+            .cloned()
+            .for_each(|value: u64| {
+                let result_ptr: i32 = entrypoint
+                    .0
+                    .call(&mut *store.0.borrow_mut(), (value as i64,))
+                    .unwrap();
 
-        let expected_result = SolType::abi_encode_params(&(IntType::MIN,));
-        test_uint(int_type.clone(), Int::U64(IntType::MIN), &expected_result); // min
+                let mut result_memory_data = vec![0; 32];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        result_ptr as usize,
+                        &mut result_memory_data,
+                    )
+                    .unwrap();
 
-        let expected_result = SolType::abi_encode_params(&(IntType::MAX - 1,));
-        test_uint(
-            int_type.clone(),
-            Int::U64(IntType::MAX - 1),
-            &expected_result,
-        ); // max -1 (avoid symmetry)
+                let expected = value.abi_encode();
+                assert_eq!(
+                    result_memory_data, expected,
+                    "Packed u64 did not match expected result for value {value}",
+                );
+
+                reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+            });
     }
 }
