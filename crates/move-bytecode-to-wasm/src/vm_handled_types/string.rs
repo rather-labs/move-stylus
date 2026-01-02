@@ -19,8 +19,9 @@ impl VmHandledType for String_ {
         _block: &mut InstrSeqBuilder,
         _module: &mut Module,
         _compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), VmHandledTypeError> {
         // String are not injected, they are created by the user
+        Ok(())
     }
 
     fn is_vm_type(

@@ -1,6 +1,6 @@
 use crate::{
     CompilationContext,
-    abi_types::error::{AbiError, AbiUnpackError},
+    abi_types::error::{AbiError, AbiOperationError},
     runtime::{RuntimeFunction, RuntimeFunctionError},
     translation::intermediate_types::IntermediateType,
 };
@@ -25,9 +25,10 @@ pub fn unpack_enum_function(
 
     let enum_ = compilation_ctx.get_enum_by_intermediate_type(itype)?;
     if !enum_.is_simple {
-        return Err(
-            AbiError::from(AbiUnpackError::EnumIsNotSimple(enum_.identifier.to_owned())).into(),
-        );
+        return Err(AbiError::Unpack(AbiOperationError::EnumIsNotSimple(
+            enum_.identifier.to_owned(),
+        ))
+        .into());
     }
     let reader_pointer = module.locals.add(ValType::I32);
     let encoded_size =

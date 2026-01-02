@@ -1,6 +1,5 @@
 use alloy_sol_types::{SolType, sol_data};
-use error::AbiPackError;
-use pack_native_int::{pack_i32_type_instructions, pack_i64_type_instructions};
+
 use walrus::{
     InstrSeqBuilder, LocalId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg},
@@ -8,26 +7,11 @@ use walrus::{
 
 use crate::{
     CompilationContext,
-    translation::intermediate_types::{
-        IntermediateType,
-        address::IAddress,
-        heap_integers::{IU128, IU256},
-        reference::{IMutRef, IRef},
-        vector::IVector,
-    },
+    abi_types::error::{AbiError, AbiOperationError},
+    runtime::RuntimeFunction,
+    translation::intermediate_types::IntermediateType,
     vm_handled_types::{VmHandledType, string::String_},
 };
-
-use super::error::{AbiEncodingError, AbiError};
-
-pub mod error;
-mod pack_enum;
-mod pack_heap_int;
-mod pack_native_int;
-mod pack_reference;
-mod pack_string;
-mod pack_struct;
-mod pack_vector;
 
 pub trait Packable {
     /// Adds the instructions to pack the value into memory according to Solidity's ABI encoding.
@@ -234,101 +218,98 @@ impl Packable for IntermediateType {
             | IntermediateType::IU8
             | IntermediateType::IU16
             | IntermediateType::IU32 => {
-                pack_i32_type_instructions(
-                    builder,
-                    module,
-                    compilation_ctx.memory_id,
-                    local,
-                    writer_pointer,
-                )?;
+                let pack_u32_function =
+                    RuntimeFunction::PackU32.get(module, Some(compilation_ctx))?;
+                builder
+                    .local_get(local)
+                    .local_get(writer_pointer)
+                    .call(pack_u32_function);
             }
             IntermediateType::IU64 => {
-                pack_i64_type_instructions(
-                    builder,
-                    module,
-                    compilation_ctx.memory_id,
-                    local,
-                    writer_pointer,
-                )?;
+                let pack_u64_function =
+                    RuntimeFunction::PackU64.get(module, Some(compilation_ctx))?;
+                builder
+                    .local_get(local)
+                    .local_get(writer_pointer)
+                    .call(pack_u64_function);
             }
-            IntermediateType::IU128 => IU128::add_pack_instructions(
-                builder,
-                module,
-                local,
-                writer_pointer,
-                compilation_ctx.memory_id,
-            )?,
-            IntermediateType::IU256 => IU256::add_pack_instructions(
-                builder,
-                module,
-                local,
-                writer_pointer,
-                compilation_ctx.memory_id,
-            )?,
-            IntermediateType::ISigner => return Err(AbiPackError::FoundSignerType)?,
-            IntermediateType::IAddress => IAddress::add_pack_instructions(
-                builder,
-                module,
-                local,
-                writer_pointer,
-                compilation_ctx.memory_id,
-            ),
-            IntermediateType::IVector(inner) => IVector::add_pack_instructions(
-                inner,
-                builder,
-                module,
-                local,
-                writer_pointer,
-                calldata_reference_pointer,
-                compilation_ctx,
-            )?,
-            IntermediateType::IRef(inner) => IRef::add_pack_instructions(
-                inner,
-                builder,
-                module,
-                local,
-                writer_pointer,
-                calldata_reference_pointer,
-                compilation_ctx,
-            )?,
-            IntermediateType::IMutRef(inner) => IMutRef::add_pack_instructions(
-                inner,
-                builder,
-                module,
-                local,
-                writer_pointer,
-                calldata_reference_pointer,
-                compilation_ctx,
-            )?,
-
-            IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
-                let struct_ = compilation_ctx.get_struct_by_intermediate_type(self)?;
-
-                struct_.add_pack_instructions(
-                    builder,
+            IntermediateType::IU128 => {
+                let pack_u128_function =
+                    RuntimeFunction::PackU128.get(module, Some(compilation_ctx))?;
+                builder
+                    .local_get(local)
+                    .local_get(writer_pointer)
+                    .call(pack_u128_function);
+            }
+            IntermediateType::IU256 => {
+                let pack_u256_function =
+                    RuntimeFunction::PackU256.get(module, Some(compilation_ctx))?;
+                builder
+                    .local_get(local)
+                    .local_get(writer_pointer)
+                    .call(pack_u256_function);
+            }
+            IntermediateType::IAddress => {
+                let pack_address_function =
+                    RuntimeFunction::PackAddress.get(module, Some(compilation_ctx))?;
+                builder
+                    .local_get(local)
+                    .local_get(writer_pointer)
+                    .call(pack_address_function);
+            }
+            IntermediateType::IVector(inner) => {
+                let pack_vector_function =
+                    RuntimeFunction::PackVector.get_generic(module, compilation_ctx, &[inner])?;
+                builder
+                    .local_get(local)
+                    .local_get(writer_pointer)
+                    .local_get(calldata_reference_pointer)
+                    .call(pack_vector_function);
+            }
+            IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
+                let pack_reference_function = RuntimeFunction::PackReference.get_generic(
                     module,
-                    local,
-                    writer_pointer,
-                    calldata_reference_pointer,
                     compilation_ctx,
-                    None,
-                )?
+                    &[inner],
+                )?;
+                builder
+                    .local_get(local)
+                    .local_get(writer_pointer)
+                    .local_get(calldata_reference_pointer)
+                    .call(pack_reference_function);
+            }
+            IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
+                let pack_struct_function =
+                    RuntimeFunction::PackStruct.get_generic(module, compilation_ctx, &[self])?;
+
+                builder
+                    .local_get(local)
+                    .local_get(writer_pointer)
+                    .local_get(calldata_reference_pointer)
+                    .i32_const(0) // is_nested = false
+                    .call(pack_struct_function);
             }
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
                 let enum_ = compilation_ctx.get_enum_by_intermediate_type(self)?;
                 if !enum_.is_simple {
-                    return Err(AbiPackError::EnumIsNotSimple(enum_.identifier))?;
+                    return Err(AbiError::Pack(AbiOperationError::EnumIsNotSimple(
+                        enum_.identifier,
+                    )))?;
                 }
-                enum_.add_pack_instructions(
-                    builder,
-                    module,
-                    local,
-                    writer_pointer,
-                    compilation_ctx,
-                )?
+                let pack_enum_function =
+                    RuntimeFunction::PackEnum.get(module, Some(compilation_ctx))?;
+                builder
+                    .local_get(local)
+                    .local_get(writer_pointer)
+                    .call(pack_enum_function);
+            }
+            IntermediateType::ISigner => {
+                return Err(AbiError::Pack(AbiOperationError::FoundSignerType))?;
             }
             IntermediateType::ITypeParameter(_) => {
-                return Err(AbiPackError::PackingGenericTypeParameter)?;
+                return Err(AbiError::Pack(
+                    AbiOperationError::PackingGenericTypeParameter,
+                ))?;
             }
         }
 
@@ -372,27 +353,24 @@ impl Packable for IntermediateType {
             IntermediateType::IStruct {
                 module_id, index, ..
             } if String_::is_vm_type(module_id, *index, compilation_ctx)? => {
-                String_::add_pack_instructions(
-                    builder,
-                    module,
-                    local,
-                    writer_pointer,
-                    calldata_reference_pointer,
-                    compilation_ctx,
-                )?;
+                let pack_string_function =
+                    RuntimeFunction::PackString.get(module, Some(compilation_ctx))?;
+                builder
+                    .local_get(local)
+                    .local_get(writer_pointer)
+                    .local_get(calldata_reference_pointer)
+                    .call(pack_string_function);
             }
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
-                let struct_ = compilation_ctx.get_struct_by_intermediate_type(self)?;
+                let pack_struct_function =
+                    RuntimeFunction::PackStruct.get_generic(module, compilation_ctx, &[self])?;
 
-                struct_.add_pack_instructions(
-                    builder,
-                    module,
-                    local,
-                    writer_pointer,
-                    calldata_reference_pointer,
-                    compilation_ctx,
-                    Some(calldata_reference_pointer),
-                )?;
+                builder
+                    .local_get(local)
+                    .local_get(writer_pointer)
+                    .local_get(calldata_reference_pointer)
+                    .i32_const(1) // is_nested = true
+                    .call(pack_struct_function);
             }
             _ => self.add_pack_instructions(
                 builder,
@@ -447,7 +425,9 @@ impl Packable for IntermediateType {
                 struct_.solidity_abi_encode_size(compilation_ctx)?
             }
             IntermediateType::ITypeParameter(_) => {
-                return Err(AbiEncodingError::GenericTypeParameterSize)?;
+                return Err(AbiError::AbiEncoding(
+                    AbiOperationError::GenericTypeParameterSize,
+                ))?;
             }
         };
 
@@ -473,7 +453,9 @@ impl Packable for IntermediateType {
                 struct_.solidity_abi_encode_is_dynamic(compilation_ctx)?
             }
             IntermediateType::ITypeParameter(_) => {
-                return Err(AbiEncodingError::GenericTypeParameterIsDynamic)?;
+                return Err(AbiError::AbiEncoding(
+                    AbiOperationError::GenericTypeParameterIsDynamic,
+                ))?;
             }
             // References are dynamic if the inner type is dynamic!
             IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {

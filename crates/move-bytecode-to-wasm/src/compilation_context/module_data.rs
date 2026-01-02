@@ -996,7 +996,10 @@ impl ModuleData<'_> {
             .and_then(|last| {
                 IntermediateType::try_from_signature_token(last, datatype_handles_map).ok()
             })
-            .is_some_and(|arg| is_tx_context_ref(&arg, move_module_dependencies));
+            .map(|arg| is_tx_context_ref(&arg, move_module_dependencies))
+            .transpose()
+            .map_err(CompilationContextError::from)?
+            .unwrap_or(false);
 
         if !is_tx_context_ref {
             return Err(CompilationContextError::InitFunctionNoTxContext);
@@ -1113,7 +1116,9 @@ impl ModuleData<'_> {
             if let Ok(arg) =
                 IntermediateType::try_from_signature_token(first_arg, datatype_handles_map)
             {
-                if !is_tx_context_ref(&arg, move_module_dependencies) {
+                if !is_tx_context_ref(&arg, move_module_dependencies)
+                    .map_err(CompilationContextError::from)?
+                {
                     return Err(CompilationContextError::ReceiveFunctionNonTxContextArgument);
                 }
             }
@@ -1180,7 +1185,9 @@ impl ModuleData<'_> {
                     })
                     .ok_or(CompilationContextError::FallbackFunctionInvalidArgumentType)?;
 
-                if !is_tx_context_ref(&first_arg, move_module_dependencies) {
+                if !is_tx_context_ref(&first_arg, move_module_dependencies)
+                    .map_err(CompilationContextError::from)?
+                {
                     return Err(CompilationContextError::FallbackFunctionInvalidArgumentType);
                 }
             }
@@ -1233,7 +1240,7 @@ fn is_vector_u8_ref(argument: &IntermediateType) -> bool {
 fn is_tx_context_ref(
     argument: &IntermediateType,
     move_module_dependencies: &[(PackageName, CompiledUnitWithSource)],
-) -> bool {
+) -> std::result::Result<bool, ModuleDataError> {
     match argument {
         IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
             match inner.as_ref() {
@@ -1251,7 +1258,7 @@ fn is_tx_context_ref(
                                 && Address::from(m.unit.address.into_bytes())
                                     == STYLUS_FRAMEWORK_ADDRESS
                         })
-                        .expect("could not find stylus framework as dependency")
+                        .ok_or(ModuleDataError::StylusFrameworkDependencyNotFound)?
                         .1
                         .unit
                         .module;
@@ -1260,12 +1267,12 @@ fn is_tx_context_ref(
                         external_module_source.struct_def_at(StructDefinitionIndex::new(*index));
                     let handle = external_module_source.datatype_handle_at(struct_.struct_handle);
                     let identifier = external_module_source.identifier_at(handle.name);
-                    identifier.as_str() == "TxContext"
+                    Ok(identifier.as_str() == "TxContext")
                 }
 
-                _ => false,
+                _ => Ok(false),
             }
         }
-        _ => false,
+        _ => Ok(false),
     }
 }

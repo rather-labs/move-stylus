@@ -1,9 +1,6 @@
 use super::{VmHandledType, error::VmHandledTypeError};
-use crate::{
-    CompilationContext, compilation_context::ModuleId, hostio::host_functions::tx_origin,
-    translation::intermediate_types::signer::ISigner,
-};
-use walrus::{InstrSeqBuilder, Module, ValType, ir::BinaryOp};
+use crate::{CompilationContext, compilation_context::ModuleId, runtime::RuntimeFunction};
+use walrus::{InstrSeqBuilder, Module};
 
 pub struct Signer;
 
@@ -14,22 +11,11 @@ impl VmHandledType for Signer {
         block: &mut InstrSeqBuilder,
         module: &mut Module,
         compilation_ctx: &CompilationContext,
-    ) {
-        let (tx_origin_function, _) = tx_origin(module);
-        let signer_pointer = module.locals.add(ValType::I32);
+    ) -> Result<(), VmHandledTypeError> {
+        let inject_signer_fn = RuntimeFunction::InjectSigner.get(module, Some(compilation_ctx))?;
 
-        block
-            .i32_const(ISigner::HEAP_SIZE)
-            .call(compilation_ctx.allocator)
-            .local_tee(signer_pointer);
-
-        // We add 12 to the pointer returned by the allocator because stylus writes 20
-        // bytes, and those bytes need to be at the end.
-        block
-            .i32_const(12)
-            .binop(BinaryOp::I32Add)
-            .call(tx_origin_function)
-            .local_get(signer_pointer);
+        block.call(inject_signer_fn);
+        Ok(())
     }
 
     fn is_vm_type(

@@ -550,6 +550,7 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
     builder.i32_const(0).local_set(i);
     builder.i32_const(0).local_set(elem_slot_offset);
 
+    let load_kind = inner.load_kind()?;
     let mut inner_result = Ok(());
     // Loop through the vector and encode and save the elements to the storage.
     builder.block(None, |outer_block| {
@@ -587,7 +588,7 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                 // Pointer to the element in memory
                 loop_.vec_elem_ptr(vector_ptr, i, data_size).load(
                     compilation_ctx.memory_id,
-                    inner.load_kind().unwrap(),
+                    load_kind,
                     MemArg {
                         align: 0,
                         offset: 0,

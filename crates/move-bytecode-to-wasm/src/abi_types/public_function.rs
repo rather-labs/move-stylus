@@ -1,13 +1,11 @@
 use move_symbol_pool::Symbol;
 use walrus::{
-    FunctionId, GlobalId, InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg},
+    FunctionId, InstrSeqBuilder, LocalId, Module,
+    ir::{BinaryOp, InstrSeqId},
 };
 
 use crate::{
     CompilationContext,
-    data::DATA_ABORT_MESSAGE_PTR_OFFSET,
-    runtime::RuntimeFunction,
     translation::{
         functions::add_unpack_function_return_values_instructions,
         intermediate_types::{ISignature, IntermediateType},
@@ -78,80 +76,58 @@ impl<'a> PublicFunction<'a> {
         &self,
         router_builder: &mut InstrSeqBuilder,
         module: &mut Module,
-        selector_variable: LocalId,
-        args_pointer: LocalId,
-        args_len: LocalId,
-        write_return_data_function: FunctionId,
+        function_selector: LocalId,
+        data_pointer: LocalId,
+        data_len: LocalId,
+        return_block_id: InstrSeqId,
         compilation_ctx: &CompilationContext,
-        dynamic_fields_global_variables: &Vec<(GlobalId, IntermediateType)>,
     ) -> Result<(), AbiError> {
-        let mut inner_result = Ok(());
-        let commit_changes_to_storage_function = RuntimeFunction::get_commit_changes_to_storage_fn(
-            module,
-            compilation_ctx,
-            dynamic_fields_global_variables,
-        )?;
+        let mut inner_result: Result<(), AbiError> = Ok(());
 
         router_builder.block(None, |block| {
             let block_id = block.id();
 
-            block.local_get(selector_variable);
-            block.i32_const(i32::from_le_bytes(self.function_selector));
-            block.binop(BinaryOp::I32Ne);
-            block.br_if(block_id);
-
-            // Offset args pointer by 4 bytes to exclude selector
-            block.local_get(args_pointer);
-            block.i32_const(4);
-            block.binop(BinaryOp::I32Add);
-            block.local_set(args_pointer);
+            // If the function selector does not match, jump to the end of the block
+            block
+                .local_get(function_selector)
+                .i32_const(i32::from_le_bytes(self.function_selector))
+                .binop(BinaryOp::I32Ne)
+                .br_if(block_id);
 
             // If the first argument's type is signer, we inject the tx.origin into the stack as a
-            // first parameter
+            // first argument
             match self.signature.arguments.first() {
                 Some(IntermediateType::ISigner) => {
-                    Signer::inject(block, module, compilation_ctx);
+                    inner_result =
+                        Signer::inject(block, module, compilation_ctx).map_err(AbiError::from);
                 }
                 Some(IntermediateType::IRef(inner)) if **inner == IntermediateType::ISigner => {
-                    Signer::inject(block, module, compilation_ctx);
+                    inner_result =
+                        Signer::inject(block, module, compilation_ctx).map_err(AbiError::from);
                 }
-                _ => {
-                    // If there's no signer, reduce args length by 4 bytes to exclude selector,
-                    // otherwise we reuse the selector's 4 bytes (32 bits) for the signer pointer
-                    block.local_get(args_len);
-                    block.i32_const(4);
-                    block.binop(BinaryOp::I32Sub);
-                    block.local_set(args_len);
-                }
+                _ => {}
             }
 
-            // Wrap function to pack/unpack parameters
-            inner_result = self.wrap_public_function(module, block, args_pointer, compilation_ctx);
+            // Wrap function to unpack/pack arguments (only if signer injection succeeded)
+            if inner_result.is_ok() {
+                inner_result =
+                    self.wrap_public_function(module, block, data_pointer, compilation_ctx);
+            }
 
-            // Stack: [return_data_pointer] [return_data_length] [status]
-            let status = module.locals.add(ValType::I32);
-            block.local_set(status);
-
-            // Write return data to memory
-            // Stack: [return_data_pointer] [return_data_length]
-            block.call(write_return_data_function);
-
-            // TODO: This is repeated for every function, we should move this and the return below
-            // outside this into the main body of the entrypoint so we don't needlesly repeat code
-            block.call(commit_changes_to_storage_function);
-
-            // Return status
-            block.local_get(status);
-            block.return_();
+            // Set the return data length and pointer to the locals and break to the return block
+            block
+                .local_set(data_len)
+                .local_set(data_pointer)
+                .br(return_block_id);
         });
 
         inner_result
     }
 
-    /// Wraps the function unpacking input parameters from memory and packing output parameters to memory
+    /// Wraps the function unpacking arguments from memory and packing returns to memory
     ///
-    /// Input parameters are read from memory and unpacked as *abi encoded* values
-    /// Output parameters are packed as *abi encoded* values and written to memory
+    /// Arguments are read from memory and unpacked as *abi encoded* values
+    /// Returns are packed as *abi encoded* values and written to memory
     pub fn wrap_public_function(
         &self,
         module: &mut Module,
@@ -159,10 +135,7 @@ impl<'a> PublicFunction<'a> {
         args_pointer: LocalId,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), AbiError> {
-        let status = module.locals.add(ValType::I32);
-        let data_ptr = module.locals.add(ValType::I32);
-        let data_len = module.locals.add(ValType::I32);
-
+        // Unpack function arguments
         build_unpack_instructions(
             block,
             module,
@@ -171,9 +144,10 @@ impl<'a> PublicFunction<'a> {
             compilation_ctx,
         )?;
 
+        // Call the function
         block.call(self.function_id);
 
-        // Unpack function return values
+        // Unpack function multi-value returns
         add_unpack_function_return_values_instructions(
             block,
             module,
@@ -182,71 +156,14 @@ impl<'a> PublicFunction<'a> {
         )?;
 
         if self.signature.returns.is_empty() {
-            // Set data_ptr and data_len to 0
-            block.i32_const(0).local_set(data_ptr);
-            block.i32_const(0).local_set(data_len);
+            // Push 0 for both return data pointer and return data length
+            block.i32_const(0).i32_const(0);
         } else {
-            // Set data_ptr and data_len to the result of packing the return values
-            let (data_ptr_, data_len_) =
+            // Pack return values and push the result pointer and length directly
+            let (data_ptr, data_len) =
                 build_pack_instructions(block, &self.signature.returns, module, compilation_ctx)?;
-            block.local_get(data_ptr_).local_set(data_ptr);
-            block.local_get(data_len_).local_set(data_len);
+            block.local_get(data_ptr).local_get(data_len);
         }
-
-        // Load the abort message pointer from DATA_ABORT_MESSAGE_PTR_OFFSET
-        // If not null, an abort occurred and we need to return the error message
-        block.block(None, |abort_block| {
-            let abort_block_id = abort_block.id();
-
-            // Load the ptr
-            let ptr = module.locals.add(ValType::I32);
-            abort_block
-                .i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)
-                .load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                )
-                .local_tee(ptr);
-
-            // Check if the ptr is null
-            abort_block.i32_const(0).binop(BinaryOp::I32Eq);
-
-            // If the ptr is null, jump to the end of the block, skipping the error message loading
-            abort_block.br_if(abort_block_id);
-
-            // Load the abort message length from the ptr and set data_len
-            abort_block
-                .local_get(ptr)
-                .load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                )
-                .local_set(data_len);
-
-            // Load the abort message pointer and set data_ptr
-            abort_block
-                .local_get(ptr)
-                .i32_const(4)
-                .binop(BinaryOp::I32Add)
-                .local_set(data_ptr);
-
-            // Set status to 1
-            abort_block.i32_const(1).local_set(status);
-        });
-
-        // [data_ptr][data_len][status]
-        block
-            .local_get(data_ptr)
-            .local_get(data_len)
-            .local_get(status);
 
         Ok(())
     }
@@ -307,13 +224,12 @@ mod tests {
 
     use alloy_sol_types::{SolType, sol};
     use walrus::{
-        ConstExpr, FunctionBuilder, MemoryId,
+        ConstExpr, FunctionBuilder, MemoryId, ValType,
         ir::{LoadKind, MemArg, Value},
     };
     use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store, TypedFunc};
 
     use crate::{
-        hostio::host_functions,
         test_compilation_context,
         test_tools::build_module,
         translation::{functions::prepare_function_return, intermediate_types::IntermediateType},
@@ -464,11 +380,11 @@ mod tests {
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         // Build mock router
-        let (write_return_data_function, _) = host_functions::write_result(module);
 
         let selector = module.locals.add(ValType::I32);
         let args_pointer = module.locals.add(ValType::I32);
         let args_len = module.locals.add(ValType::I32);
+        let status = module.locals.add(ValType::I32);
 
         let mut mock_router_builder = FunctionBuilder::new(&mut module.types, &[], &[ValType::I32]);
 
@@ -479,40 +395,46 @@ mod tests {
         mock_router_body.call(allocator_func);
         mock_router_body.drop();
 
-        mock_router_body.i32_const(0);
-        mock_router_body.local_set(args_pointer);
+        mock_router_body.i32_const(0).local_set(args_pointer);
 
-        mock_router_body.i32_const(data_len);
-        mock_router_body.local_set(args_len);
+        mock_router_body.i32_const(data_len).local_set(args_len);
+
+        mock_router_body.i32_const(0).local_set(status);
 
         // Load selector from first 4 bytes of args
-        mock_router_body.local_get(args_pointer);
-        mock_router_body.load(
-            memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        );
-        mock_router_body.local_set(selector);
-
-        public_function
-            .build_router_block(
-                &mut mock_router_body,
-                module,
-                selector,
-                args_pointer,
-                args_len,
-                write_return_data_function,
-                &compilation_ctx,
-                &vec![],
+        mock_router_body
+            .local_get(args_pointer)
+            .load(
+                memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
             )
-            .unwrap();
+            .local_set(selector);
 
-        // if no match, return -1
-        mock_router_body.i32_const(-1);
-        mock_router_body.return_();
+        mock_router_body.block(None, |return_block| {
+            let return_block_id = return_block.id();
+
+            public_function
+                .build_router_block(
+                    return_block,
+                    module,
+                    selector,
+                    args_pointer,
+                    args_len,
+                    return_block_id,
+                    &compilation_ctx,
+                )
+                .unwrap();
+
+            return_block.i32_const(-1).local_set(status);
+        });
+
+        // After the block: if a match was found, status was set and we broke out
+        // Return the status (0 for success, non-zero for error)
+        mock_router_body.local_get(status).return_();
 
         let mock_entrypoint = mock_router_builder.finish(vec![], &mut module.funcs);
         module.exports.add("mock_entrypoint", mock_entrypoint);

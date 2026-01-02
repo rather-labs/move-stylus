@@ -3,6 +3,7 @@ use walrus::{InstrSeqBuilder, LocalId, Module, ValType};
 
 use crate::{
     CompilationContext,
+    abi_types::error::{AbiError, AbiOperationError},
     compilation_context::{
         ModuleId,
         reserved_modules::{SF_MODULE_NAME_OBJECT, STYLUS_FRAMEWORK_ADDRESS},
@@ -15,8 +16,6 @@ use crate::{
         uid::Uid,
     },
 };
-
-use super::error::{AbiError, AbiUnpackError};
 
 pub trait Unpackable {
     /// Adds the instructions to unpack the abi encoded type to WASM function parameters
@@ -181,7 +180,7 @@ impl Unpackable for IntermediateType {
             IntermediateType::IStruct {
                 module_id, index, ..
             } if TxContext::is_vm_type(module_id, *index, compilation_ctx)? => {
-                TxContext::inject(builder, module, compilation_ctx);
+                TxContext::inject(builder, module, compilation_ctx)?;
             }
             IntermediateType::IStruct {
                 module_id, index, ..
@@ -245,8 +244,8 @@ impl Unpackable for IntermediateType {
                 builder.local_get(reader_pointer).call(unpack_enum_function);
             }
             IntermediateType::ITypeParameter(_) => {
-                return Err(AbiError::from(
-                    AbiUnpackError::UnpackingGenericTypeParameter,
+                return Err(AbiError::Unpack(
+                    AbiOperationError::UnpackingGenericTypeParameter,
                 ));
             }
         }
@@ -299,12 +298,14 @@ fn load_struct_storage_id(
                 &ModuleId::new(STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT),
                 types,
             )
-            .map_err(AbiUnpackError::NativeFunction)?;
+            .map_err(AbiError::NativeFunction)?;
 
             function_builder.call(compute_named_id_fn);
         }
         _ => {
-            Err(AbiUnpackError::StorageObjectHasNoId(struct_.identifier))?;
+            Err(AbiError::Unpack(AbiOperationError::StorageObjectHasNoId(
+                struct_.identifier,
+            )))?;
         }
     }
     Ok(())

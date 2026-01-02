@@ -28,7 +28,7 @@ pub trait VmHandledType {
         block: &mut InstrSeqBuilder,
         module: &mut Module,
         compilation_ctx: &CompilationContext,
-    );
+    ) -> Result<(), VmHandledTypeError>;
 
     /// Checks if the type is the reserved one or one declared by the user with the same name.
     ///

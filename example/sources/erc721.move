@@ -92,7 +92,7 @@ entry fun init(_ctx: &mut TxContext) {
         id: object::new_named_id<COLLECTION_INFO>(),
         name: ascii::string(b"Moving Stylus"),
         symbol: ascii::string(b"MST"),
-        base_uri: ascii::string(b"https://ipfs.io/ipfs/bafkreihfxkbqku2h3zazdedexclljtr3zqa7x2zlug6rxnm6asefq3h3hu"),
+        base_uri: ascii::string(b"https://examplerc721.com/token/"),
     });
 
     transfer::share_object(TotalSupply {
@@ -150,8 +150,10 @@ entry fun symbol(contract_info: &Info): String {
     contract_info.symbol
 }
 
-entry fun token_URI(_token_id: u256, contract_info: &Info): String {
-    contract_info.base_uri
+entry fun token_URI(token_id: u256, contract_info: &Info): String {
+    let mut token_url = std::ascii::string(*contract_info.base_uri.as_bytes());
+    token_url.append(std::ascii::string(*token_id.to_string().as_bytes()));
+    token_url
 }
 
 entry fun total_supply(t_supply: &TotalSupply): u256 {
