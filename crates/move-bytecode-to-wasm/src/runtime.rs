@@ -59,6 +59,7 @@ pub enum RuntimeFunction {
     // Vector
     VecSwap,
     VecPopBack,
+    VecPushBack,
     VecBorrow,
     VecIncrementLen,
     VecDecrementLen,
@@ -157,6 +158,7 @@ impl RuntimeFunction {
             // Vector
             Self::VecSwap => "vec_swap",
             Self::VecPopBack => "vec_pop_back",
+            Self::VecPushBack => "vec_push_back",
             Self::VecBorrow => "vec_borrow",
             Self::VecIncrementLen => "vec_increment_len",
             Self::VecDecrementLen => "vec_decrement_len",
@@ -436,6 +438,10 @@ impl RuntimeFunction {
             Self::VecPopBack => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
                 vector::vec_pop_back_function(module, compilation_ctx, generics[0])?
+            }
+            Self::VecPushBack => {
+                Self::assert_generics_length(generics.len(), 1, self.name())?;
+                vector::vec_push_back_function(module, compilation_ctx, generics[0])?
             }
             Self::UnpackVector => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;

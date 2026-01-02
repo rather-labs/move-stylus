@@ -1635,7 +1635,9 @@ fn translate_instruction(
                 });
             }
 
-            IVector::vec_push_back_instructions(&elem_ty, module, builder, compilation_ctx)?;
+            let push_back_f =
+                RuntimeFunction::VecPushBack.get_generic(module, compilation_ctx, &[&elem_ty])?;
+            builder.call(push_back_f);
         }
         Bytecode::VecSwap(signature_index) => {
             let [id2_ty, id1_ty, ref_ty] = types_stack.pop_n_from_stack()?;

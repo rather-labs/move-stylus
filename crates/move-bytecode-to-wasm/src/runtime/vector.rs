@@ -362,6 +362,152 @@ pub fn vec_pop_back_function(
     Ok(function.finish(vec![vector_ref], &mut module.funcs))
 }
 
+/// Appends an element to the end of a vector.
+/// If the vector's capacity is greater than its length, the element is simply added at the next available position.
+/// If the vector's capacity equals its length, a new vector is created with double the current length as its capacity,
+/// the existing elements are copied into this new vector, and then the element is pushed.
+///
+/// # Stack Arguments
+///
+/// * `elem`: (i32/i64) The element to be pushed.
+/// * `vec_ref`: (i32) A reference to the vector.
+pub fn vec_push_back_function(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    inner: &IntermediateType,
+) -> Result<FunctionId, RuntimeFunctionError> {
+    let name = RuntimeFunction::VecPushBack.get_generic_function_name(compilation_ctx, &[inner])?;
+    if let Some(function) = module.funcs.by_name(&name) {
+        return Ok(function);
+    }
+
+    let inner_valtype = ValType::try_from(inner)?;
+
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, inner_valtype], &[]);
+    let mut builder = function.name(name).func_body();
+
+    // Arguments
+    let vec_ref = module.locals.add(ValType::I32);
+    let elem = module.locals.add(inner_valtype);
+
+    // Locals
+    let vec_ptr = module.locals.add(ValType::I32);
+    let len = module.locals.add(ValType::I32);
+
+    let size = inner.wasm_memory_data_size()?;
+
+    // Load and set the vector pointer
+    builder
+        .local_get(vec_ref)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .local_tee(vec_ptr);
+
+    // Load and set the vector length
+    builder
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .local_tee(len);
+
+    // Load the vector capacity
+    builder.local_get(vec_ptr).load(
+        compilation_ctx.memory_id,
+        LoadKind::I32 { atomic: false },
+        MemArg {
+            align: 0,
+            offset: 4,
+        },
+    );
+
+    // Check if len == capacity. If true, we copy the original vector but doubling its capacity.
+    let copy_local_function =
+        RuntimeFunction::VecCopyLocal.get_generic(module, compilation_ctx, &[inner])?;
+    builder.binop(BinaryOp::I32Eq).if_else(
+        None,
+        |then| {
+            // Copy the vector but doubling its capacity
+            then.local_get(vec_ptr)
+                .i32_const(2)
+                .call(copy_local_function);
+
+            // Set vec_ptr to the new vector pointer and store it at *vec_ref
+            // This modifies the original vector reference to point to the new vector
+            let new_vec_ptr = module.locals.add(ValType::I32);
+            then.local_set(new_vec_ptr)
+                .local_get(vec_ref)
+                .local_get(new_vec_ptr)
+                .store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+
+            // Mark the original vector location with the DEADBEEF flag to indicate relocation.
+            // When a vector is resized, any existing mutable references pointing to the old
+            // location become invalid. By writing DEADBEEF into the length field (first 4 bytes)
+            // of the original vector, we create a marker that can be detected after function calls.
+            // After a call_indirect, we check for this flag and update any mutable references
+            // that still point to the old location, following the chain to the new vector.
+            then.local_get(vec_ptr)
+                .i32_const(0xDEADBEEF_u32 as i32)
+                .store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            // Set the original vector pointer to the new vector pointer.
+            // This way we can update the reference to it, as explained above
+            then.local_get(vec_ptr).local_get(new_vec_ptr).store(
+                compilation_ctx.memory_id,
+                StoreKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 4,
+                },
+            );
+            then.local_get(new_vec_ptr).local_set(vec_ptr);
+        },
+        |_| {},
+    );
+
+    // Store the element in the next free position
+    builder
+        .vec_elem_ptr(vec_ptr, len, size)
+        .local_get(elem)
+        .store(
+            compilation_ctx.memory_id,
+            inner.store_kind()?,
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
+
+    // length++
+    let vec_increment_len_fn =
+        RuntimeFunction::VecIncrementLen.get(module, Some(compilation_ctx))?;
+    builder.local_get(vec_ptr).call(vec_increment_len_fn);
+
+    Ok(function.finish(vec![vec_ref, elem], &mut module.funcs))
+}
 /// Pushes a pointer to a non-heap element in a vector.
 ///
 /// # WASM Function Arguments
