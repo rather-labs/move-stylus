@@ -51,7 +51,6 @@ use crate::{
         error::{AbiError, AbiOperationError},
         packing::Packable,
     },
-    compilation_context::ModuleData,
     generics::replace_type_parameters,
     vm_handled_types::{VmHandledType, string::String_},
 };
@@ -145,7 +144,6 @@ impl IStruct {
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
         compilation_ctx: &CompilationContext,
-        module_data: &ModuleData,
     ) -> Result<(), IntermediateTypeError> {
         let s1_ptr = module.locals.add(ValType::I32);
         let s2_ptr = module.locals.add(ValType::I32);
@@ -157,7 +155,6 @@ impl IStruct {
             builder,
             module,
             compilation_ctx,
-            module_data,
             s1_ptr,
             s2_ptr,
         )?;
@@ -170,7 +167,6 @@ impl IStruct {
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
-        module_data: &ModuleData,
     ) -> Result<(), IntermediateTypeError> {
         let src_ptr = module.locals.add(ValType::I32);
         let ptr = module.locals.add(ValType::I32);
@@ -201,7 +197,6 @@ impl IStruct {
             builder,
             module,
             compilation_ctx,
-            module_data,
             src_ptr,
             ptr,
             0,

@@ -1,7 +1,6 @@
 use crate::{
     CompilationContext,
     runtime::{RuntimeFunction, RuntimeFunctionError},
-    translation::intermediate_types::vector::IVector,
     wasm_builder_extensions::WasmBuilderExtension,
 };
 use walrus::{
@@ -95,14 +94,15 @@ pub fn unpack_string_function(
 
     // Allocate space for the vector
     // Each u8 element takes 1 byte
-    IVector::allocate_vector_with_header(
-        &mut builder,
-        compilation_ctx,
-        vector_pointer,
-        length,
-        length,
-        1,
-    );
+    let allocate_vector_with_header_function =
+        RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx))?;
+    builder
+        .local_get(length)
+        .local_get(length)
+        .i32_const(1)
+        .call(allocate_vector_with_header_function)
+        .local_set(vector_pointer);
+
     builder.local_get(vector_pointer).local_set(writer_pointer);
 
     // Set writer pointer to the start of the vector data

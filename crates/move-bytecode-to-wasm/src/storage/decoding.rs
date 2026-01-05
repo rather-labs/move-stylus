@@ -12,7 +12,7 @@ use crate::{
     hostio::host_functions::{native_keccak256, storage_load_bytes32},
     runtime::RuntimeFunction,
     storage::storage_layout::field_size,
-    translation::intermediate_types::{IntermediateType, vector::IVector},
+    translation::intermediate_types::IntermediateType,
     vm_handled_types::is_uid_or_named_id,
     wasm_builder_extensions::WasmBuilderExtension,
 };
@@ -458,7 +458,14 @@ pub fn add_read_and_decode_storage_vector_instructions(
     let elem_size = field_size(inner, compilation_ctx)? as i32;
 
     // Allocate memory for the vector and write the header data
-    IVector::allocate_vector_with_header(builder, compilation_ctx, data_ptr, len, len, data_size);
+    let allocate_vector_with_header_function =
+        RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx))?;
+    builder
+        .local_get(len)
+        .local_get(len)
+        .i32_const(data_size)
+        .call(allocate_vector_with_header_function)
+        .local_set(data_ptr);
 
     let mut inner_result: Result<(), StorageError> = Ok(());
     // Iterate through the vector reading and decoding the elements from storage.
