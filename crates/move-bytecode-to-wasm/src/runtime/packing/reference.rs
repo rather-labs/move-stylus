@@ -440,9 +440,9 @@ mod tests {
         let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
 
         bolero::check!()
-            .with_type::<i8>()
+            .with_type::<u8>()
             .cloned()
-            .for_each(|value: i8| {
+            .for_each(|value: u8| {
                 let data = [
                     4u32.to_le_bytes().as_slice(),
                     value.to_le_bytes().as_slice(),
@@ -461,7 +461,7 @@ mod tests {
                     )
                     .unwrap();
 
-                let expected = value.abi_encode();
+                let expected = (value as u16).abi_encode();
                 assert_eq!(
                     result_memory_data, expected,
                     "Packed ref u8 did not match expected result for value {value}",
