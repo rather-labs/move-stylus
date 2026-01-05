@@ -229,9 +229,13 @@ pub fn pack_struct_function(
 mod tests {
     use std::{collections::HashMap, sync::Arc};
 
+    use crate::compilation_context::ModuleData;
     use alloy_primitives::{U256, address};
     use alloy_sol_types::{SolValue, sol};
     use rstest::rstest;
+    use std::cell::RefCell;
+    use std::panic::AssertUnwindSafe;
+    use std::rc::Rc;
     use walrus::{FunctionBuilder, ValType};
 
     use crate::{
@@ -704,5 +708,707 @@ mod tests {
             .read(&mut store, result as usize, &mut result_memory_data)
             .unwrap();
         assert_eq!(result_memory_data, expected_result);
+    }
+
+    #[test]
+    fn test_pack_struct_mixed_static_types_fuzz() {
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
+
+        let mut compilation_ctx =
+            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+
+        let struct_type = IntermediateType::IStruct {
+            module_id: ModuleId::default(),
+            index: 0,
+            vm_handled_struct: VmHandledStruct::None,
+        };
+
+        let test_struct = IStruct::new(
+            move_binary_format::file_format::StructDefinitionIndex(0),
+            "TestStruct",
+            vec![
+                (None, IntermediateType::IU8),
+                (None, IntermediateType::IU64),
+                (None, IntermediateType::IU128),
+                (None, IntermediateType::IBool),
+                (None, IntermediateType::IAddress),
+            ],
+            HashMap::new(),
+            false,
+            IStructType::Common,
+        );
+
+        let mut module_data = ModuleData::default();
+        module_data.structs.structs = vec![test_struct];
+        compilation_ctx.root_module_data = &module_data;
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[ValType::I32]);
+
+        let mut func_body = function_builder.func_body();
+
+        let data_space = raw_module.locals.add(ValType::I32);
+        let struct_pointer = raw_module.locals.add(ValType::I32);
+        let writer_pointer = raw_module.locals.add(ValType::I32);
+        let calldata_reference_pointer = raw_module.locals.add(ValType::I32);
+
+        func_body.local_get(data_space);
+        func_body.call(allocator);
+        func_body.local_set(struct_pointer);
+
+        func_body.i32_const(struct_type.encoded_size(&compilation_ctx).unwrap() as i32);
+        func_body.call(allocator);
+        func_body.local_tee(writer_pointer);
+        func_body.local_set(calldata_reference_pointer);
+
+        struct_type
+            .add_pack_instructions(
+                &mut func_body,
+                &mut raw_module,
+                struct_pointer,
+                writer_pointer,
+                calldata_reference_pointer,
+                &compilation_ctx,
+            )
+            .unwrap();
+
+        func_body.local_get(writer_pointer);
+
+        let function = function_builder.finish(vec![data_space], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module::<i32, i32>(&mut raw_module, vec![], "test_function", None);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type::<(u8, u64, u128, bool, [u8; 20])>()
+            .cloned()
+            .for_each(
+                |(a, b, c, d, addr_bytes): (u8, u64, u128, bool, [u8; 20])| {
+                    // Build memory layout: pointer array, then values
+                    let mut data = vec![];
+                    // Pointer array (5 fields)
+                    data.extend(&20u32.to_le_bytes()); // u8 at offset 20
+                    data.extend(&21u32.to_le_bytes()); // u64 at offset 21
+                    data.extend(&29u32.to_le_bytes()); // u128 at offset 29 (pointer)
+                    data.extend(&45u32.to_le_bytes()); // bool at offset 45
+                    data.extend(&46u32.to_le_bytes()); // address at offset 46 (pointer)
+                    // Values
+                    data.extend(&[a]); // u8 value
+                    data.extend(&b.to_le_bytes()); // u64 value
+                    data.extend(&c.to_le_bytes()); // u128 value
+                    data.extend(&[d as u8]); // bool value
+                    data.extend(&[0u8; 12]); // address padding
+                    data.extend(&addr_bytes); // address value
+
+                    memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+
+                    let result_ptr: i32 = entrypoint
+                        .0
+                        .call(&mut *store.0.borrow_mut(), data.len() as i32)
+                        .unwrap();
+
+                    sol! {
+                        struct TestStruct {
+                            uint8 a;
+                            uint64 b;
+                            uint128 c;
+                            bool d;
+                            address e;
+                        }
+                    }
+                    let addr = alloy_primitives::Address::from_slice(&addr_bytes);
+                    let expected = TestStruct {
+                        a,
+                        b,
+                        c,
+                        d,
+                        e: addr,
+                    }
+                    .abi_encode();
+                    let mut result_memory_data = vec![0; expected.len()];
+                    memory
+                        .read(
+                            &mut *store.0.borrow_mut(),
+                            result_ptr as usize,
+                            &mut result_memory_data,
+                        )
+                        .unwrap();
+
+                    assert_eq!(
+                        result_memory_data, expected,
+                        "Packed struct with mixed types did not match expected result",
+                    );
+
+                    reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+                },
+            );
+    }
+
+    // Test dynamic types inside sturcts
+    #[test]
+    fn test_pack_struct_with_vectors_fuzz() {
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
+
+        let mut compilation_ctx =
+            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+
+        let struct_type = IntermediateType::IStruct {
+            module_id: ModuleId::default(),
+            index: 0,
+            vm_handled_struct: VmHandledStruct::None,
+        };
+
+        let test_struct = IStruct::new(
+            move_binary_format::file_format::StructDefinitionIndex(0),
+            "TestStruct",
+            vec![
+                (None, IntermediateType::IU64),
+                (None, IntermediateType::IU128),
+                (None, IntermediateType::IBool),
+                (
+                    None,
+                    IntermediateType::IVector(Arc::new(IntermediateType::IU128)),
+                ),
+                (
+                    None,
+                    IntermediateType::IVector(Arc::new(IntermediateType::IU32)),
+                ),
+            ],
+            HashMap::new(),
+            false,
+            IStructType::Common,
+        );
+
+        let mut module_data = ModuleData::default();
+        module_data.structs.structs = vec![test_struct];
+        compilation_ctx.root_module_data = &module_data;
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[ValType::I32]);
+
+        let mut func_body = function_builder.func_body();
+
+        let data_space = raw_module.locals.add(ValType::I32);
+        let struct_pointer = raw_module.locals.add(ValType::I32);
+        let writer_pointer = raw_module.locals.add(ValType::I32);
+        let calldata_reference_pointer = raw_module.locals.add(ValType::I32);
+
+        func_body.local_get(data_space);
+        func_body.call(allocator);
+        func_body.local_set(struct_pointer);
+
+        func_body.i32_const(struct_type.encoded_size(&compilation_ctx).unwrap() as i32);
+        func_body.call(allocator);
+        func_body.local_tee(writer_pointer);
+        func_body.local_set(calldata_reference_pointer);
+
+        struct_type
+            .add_pack_instructions(
+                &mut func_body,
+                &mut raw_module,
+                struct_pointer,
+                writer_pointer,
+                calldata_reference_pointer,
+                &compilation_ctx,
+            )
+            .unwrap();
+
+        func_body.local_get(writer_pointer);
+
+        let function = function_builder.finish(vec![data_space], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module::<i32, i32>(&mut raw_module, vec![], "test_function", None);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type::<(u64, u128, bool, Vec<u128>, Vec<u32>)>()
+            .cloned()
+            .for_each(
+                |(a, b, c, vec_u128, vec_u32): (u64, u128, bool, Vec<u128>, Vec<u32>)| {
+                    let len_u128 = vec_u128.len() as u32;
+                    let len_u32 = vec_u32.len() as u32;
+
+                    // Calculate offsets
+                    let struct_ptr_array_size = 20; // 5 fields * 4 bytes
+                    let a_offset = struct_ptr_array_size;
+                    let b_offset = a_offset + 8; // u64 size
+                    let c_offset = b_offset + 16; // u128 size
+                    let vec_u128_offset = c_offset + 1; // bool size
+                    let vec_u128_ptr_array_offset = vec_u128_offset + 8; // vec header (len + cap)
+                    let vec_u128_data_offset = vec_u128_ptr_array_offset + (len_u128 as usize * 4);
+                    let vec_u32_offset = vec_u128_data_offset + (len_u128 as usize * 16);
+
+                    // Build memory layout
+                    let mut data = vec![];
+                    // Struct pointer array
+                    data.extend(&(a_offset as u32).to_le_bytes());
+                    data.extend(&(b_offset as u32).to_le_bytes());
+                    data.extend(&(c_offset as u32).to_le_bytes());
+                    data.extend(&(vec_u128_offset as u32).to_le_bytes());
+                    data.extend(&(vec_u32_offset as u32).to_le_bytes());
+
+                    // Values
+                    data.extend(&a.to_le_bytes()); // u64
+                    data.extend(&b.to_le_bytes()); // u128
+                    data.extend(&[c as u8]); // bool
+
+                    // vec<u128>: len, cap, pointer array, values
+                    data.extend(&len_u128.to_le_bytes());
+                    data.extend(&len_u128.to_le_bytes());
+                    for i in 0..len_u128 {
+                        let ptr = (vec_u128_data_offset + (i as usize * 16)) as u32;
+                        data.extend(&ptr.to_le_bytes());
+                    }
+                    for val in &vec_u128 {
+                        data.extend(&val.to_le_bytes());
+                    }
+
+                    // vec<u32>: len, cap, values
+                    data.extend(&len_u32.to_le_bytes());
+                    data.extend(&len_u32.to_le_bytes());
+                    for val in &vec_u32 {
+                        data.extend(&val.to_le_bytes());
+                    }
+
+                    memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+
+                    let result_ptr: i32 = entrypoint
+                        .0
+                        .call(&mut *store.0.borrow_mut(), data.len() as i32)
+                        .unwrap();
+
+                    sol! {
+                        struct TestStruct {
+                            uint64 a;
+                            uint128 b;
+                            bool c;
+                            uint128[] d;
+                            uint32[] e;
+                        }
+                    }
+                    let expected = TestStruct {
+                        a,
+                        b,
+                        c,
+                        d: vec_u128.clone(),
+                        e: vec_u32.clone(),
+                    }
+                    .abi_encode_sequence();
+                    let mut result_memory_data = vec![0; expected.len()];
+                    memory
+                        .read(
+                            &mut *store.0.borrow_mut(),
+                            result_ptr as usize,
+                            &mut result_memory_data,
+                        )
+                        .unwrap();
+
+                    assert_eq!(
+                        result_memory_data, expected,
+                        "Packed struct with vectors did not match expected result",
+                    );
+
+                    reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+                },
+            );
+    }
+
+    // Substruct without dynamic types
+    #[test]
+    fn test_pack_struct_with_simple_substruct_fuzz() {
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
+
+        let mut compilation_ctx =
+            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+
+        let struct_type = IntermediateType::IStruct {
+            module_id: ModuleId::default(),
+            index: 0,
+            vm_handled_struct: VmHandledStruct::None,
+        };
+
+        let test_struct = IStruct::new(
+            move_binary_format::file_format::StructDefinitionIndex(0),
+            "TestStruct",
+            vec![
+                (None, IntermediateType::IU64),
+                (None, IntermediateType::IU128),
+                (
+                    None,
+                    IntermediateType::IStruct {
+                        module_id: ModuleId::default(),
+                        index: 1,
+                        vm_handled_struct: VmHandledStruct::None,
+                    },
+                ),
+            ],
+            HashMap::new(),
+            false,
+            IStructType::Common,
+        );
+
+        let sub_struct = IStruct::new(
+            move_binary_format::file_format::StructDefinitionIndex(1),
+            "SubStruct",
+            vec![
+                (None, IntermediateType::IBool),
+                (None, IntermediateType::IAddress),
+            ],
+            HashMap::new(),
+            false,
+            IStructType::Common,
+        );
+
+        let mut module_data = ModuleData::default();
+        module_data.structs.structs = vec![test_struct, sub_struct];
+        compilation_ctx.root_module_data = &module_data;
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[ValType::I32]);
+
+        let mut func_body = function_builder.func_body();
+
+        let data_space = raw_module.locals.add(ValType::I32);
+        let struct_pointer = raw_module.locals.add(ValType::I32);
+        let writer_pointer = raw_module.locals.add(ValType::I32);
+        let calldata_reference_pointer = raw_module.locals.add(ValType::I32);
+
+        func_body.local_get(data_space);
+        func_body.call(allocator);
+        func_body.local_set(struct_pointer);
+
+        func_body.i32_const(struct_type.encoded_size(&compilation_ctx).unwrap() as i32);
+        func_body.call(allocator);
+        func_body.local_tee(writer_pointer);
+        func_body.local_set(calldata_reference_pointer);
+
+        struct_type
+            .add_pack_instructions(
+                &mut func_body,
+                &mut raw_module,
+                struct_pointer,
+                writer_pointer,
+                calldata_reference_pointer,
+                &compilation_ctx,
+            )
+            .unwrap();
+
+        func_body.local_get(writer_pointer);
+
+        let function = function_builder.finish(vec![data_space], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module::<i32, i32>(&mut raw_module, vec![], "test_function", None);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type::<(u64, u128, bool, [u8; 20])>()
+            .cloned()
+            .for_each(
+                |(a, b, sub_bool, addr_bytes): (u64, u128, bool, [u8; 20])| {
+                    // Build memory layout
+                    let mut data = vec![];
+
+                    // Main struct pointer array (3 fields)
+                    data.extend(&12u32.to_le_bytes()); // u64 at offset 12
+                    data.extend(&20u32.to_le_bytes()); // u128 at offset 20
+                    data.extend(&36u32.to_le_bytes()); // substruct at offset 36
+
+                    // Main struct values
+                    data.extend(&a.to_le_bytes()); // u64
+                    data.extend(&b.to_le_bytes()); // u128
+
+                    // SubStruct pointer array (2 fields)
+                    data.extend(&44u32.to_le_bytes()); // bool at offset 44
+                    data.extend(&45u32.to_le_bytes()); // address at offset 45
+
+                    // SubStruct values
+                    data.extend(&[sub_bool as u8]); // bool
+                    data.extend(&[0u8; 12]); // address padding
+                    data.extend(&addr_bytes); // address
+
+                    memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+
+                    let result_ptr: i32 = entrypoint
+                        .0
+                        .call(&mut *store.0.borrow_mut(), data.len() as i32)
+                        .unwrap();
+
+                    sol! {
+                        struct SubStruct {
+                            bool x;
+                            address y;
+                        }
+                        struct TestStruct {
+                            uint64 a;
+                            uint128 b;
+                            SubStruct c;
+                        }
+                    }
+                    let addr = alloy_primitives::Address::from_slice(&addr_bytes);
+                    let expected = TestStruct {
+                        a,
+                        b,
+                        c: SubStruct {
+                            x: sub_bool,
+                            y: addr,
+                        },
+                    }
+                    .abi_encode_sequence();
+                    let mut result_memory_data = vec![0; expected.len()];
+                    memory
+                        .read(
+                            &mut *store.0.borrow_mut(),
+                            result_ptr as usize,
+                            &mut result_memory_data,
+                        )
+                        .unwrap();
+
+                    assert_eq!(
+                        result_memory_data, expected,
+                        "Packed struct with simple substruct did not match expected result",
+                    );
+
+                    reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+                },
+            );
+    }
+
+    #[test]
+    fn test_pack_struct_with_dynamic_substruct_fuzz() {
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
+
+        let mut compilation_ctx =
+            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+
+        let struct_type = IntermediateType::IStruct {
+            module_id: ModuleId::default(),
+            index: 0,
+            vm_handled_struct: VmHandledStruct::None,
+        };
+
+        let test_struct = IStruct::new(
+            move_binary_format::file_format::StructDefinitionIndex(0),
+            "TestStruct",
+            vec![
+                (None, IntermediateType::IU64),
+                (None, IntermediateType::IU128),
+                (
+                    None,
+                    IntermediateType::IStruct {
+                        module_id: ModuleId::default(),
+                        index: 1,
+                        vm_handled_struct: VmHandledStruct::None,
+                    },
+                ),
+            ],
+            HashMap::new(),
+            false,
+            IStructType::Common,
+        );
+
+        let sub_struct = IStruct::new(
+            move_binary_format::file_format::StructDefinitionIndex(1),
+            "SubStruct",
+            vec![
+                (
+                    None,
+                    IntermediateType::IVector(Arc::new(IntermediateType::IU128)),
+                ),
+                (
+                    None,
+                    IntermediateType::IVector(Arc::new(IntermediateType::IU32)),
+                ),
+            ],
+            HashMap::new(),
+            false,
+            IStructType::Common,
+        );
+
+        let mut module_data = ModuleData::default();
+        module_data.structs.structs = vec![test_struct, sub_struct];
+        compilation_ctx.root_module_data = &module_data;
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[ValType::I32]);
+
+        let mut func_body = function_builder.func_body();
+
+        let data_space = raw_module.locals.add(ValType::I32);
+        let struct_pointer = raw_module.locals.add(ValType::I32);
+        let writer_pointer = raw_module.locals.add(ValType::I32);
+        let calldata_reference_pointer = raw_module.locals.add(ValType::I32);
+
+        func_body.local_get(data_space);
+        func_body.call(allocator);
+        func_body.local_set(struct_pointer);
+
+        func_body.i32_const(struct_type.encoded_size(&compilation_ctx).unwrap() as i32);
+        func_body.call(allocator);
+        func_body.local_tee(writer_pointer);
+        func_body.local_set(calldata_reference_pointer);
+
+        struct_type
+            .add_pack_instructions(
+                &mut func_body,
+                &mut raw_module,
+                struct_pointer,
+                writer_pointer,
+                calldata_reference_pointer,
+                &compilation_ctx,
+            )
+            .unwrap();
+
+        func_body.local_get(writer_pointer);
+
+        let function = function_builder.finish(vec![data_space], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module::<i32, i32>(&mut raw_module, vec![], "test_function", None);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type::<(u64, u128, Vec<u128>, Vec<u32>)>()
+            .cloned()
+            .for_each(
+                |(a, b, vec_u128, vec_u32): (u64, u128, Vec<u128>, Vec<u32>)| {
+                    let len_u128 = vec_u128.len() as u32;
+                    let len_u32 = vec_u32.len() as u32;
+
+                    // Calculate offsets
+                    let main_ptr_array_size = 12; // 3 fields * 4 bytes
+                    let a_offset = main_ptr_array_size;
+                    let b_offset = a_offset + 8; // u64 size
+                    let substruct_offset = b_offset + 16; // u128 size
+                    let substruct_ptr_array_size = 8; // 2 fields * 4 bytes
+                    let vec_u128_offset = substruct_offset + substruct_ptr_array_size;
+                    let vec_u128_ptr_array_offset = vec_u128_offset + 8; // vec header
+                    let vec_u128_data_offset = vec_u128_ptr_array_offset + (len_u128 as usize * 4);
+                    let vec_u32_offset = vec_u128_data_offset + (len_u128 as usize * 16);
+
+                    // Build memory layout
+                    let mut data = vec![];
+
+                    // Main struct pointer array
+                    data.extend(&(a_offset as u32).to_le_bytes());
+                    data.extend(&(b_offset as u32).to_le_bytes());
+                    data.extend(&(substruct_offset as u32).to_le_bytes());
+
+                    // Main struct values
+                    data.extend(&a.to_le_bytes()); // u64
+                    data.extend(&b.to_le_bytes()); // u128
+
+                    // SubStruct pointer array
+                    data.extend(&(vec_u128_offset as u32).to_le_bytes());
+                    data.extend(&(vec_u32_offset as u32).to_le_bytes());
+
+                    // vec<u128>: len, cap, pointer array, values
+                    data.extend(&len_u128.to_le_bytes());
+                    data.extend(&len_u128.to_le_bytes());
+                    for i in 0..len_u128 {
+                        let ptr = (vec_u128_data_offset + (i as usize * 16)) as u32;
+                        data.extend(&ptr.to_le_bytes());
+                    }
+                    for val in &vec_u128 {
+                        data.extend(&val.to_le_bytes());
+                    }
+
+                    // vec<u32>: len, cap, values
+                    data.extend(&len_u32.to_le_bytes());
+                    data.extend(&len_u32.to_le_bytes());
+                    for val in &vec_u32 {
+                        data.extend(&val.to_le_bytes());
+                    }
+
+                    memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+
+                    let result_ptr: i32 = entrypoint
+                        .0
+                        .call(&mut *store.0.borrow_mut(), data.len() as i32)
+                        .unwrap();
+
+                    sol! {
+                        struct SubStruct {
+                            uint128[] x;
+                            uint32[] y;
+                        }
+                        struct TestStruct {
+                            uint64 a;
+                            uint128 b;
+                            SubStruct c;
+                        }
+                    }
+                    let expected = TestStruct {
+                        a,
+                        b,
+                        c: SubStruct {
+                            x: vec_u128.clone(),
+                            y: vec_u32.clone(),
+                        },
+                    }
+                    .abi_encode_sequence();
+                    let mut result_memory_data = vec![0; expected.len()];
+                    memory
+                        .read(
+                            &mut *store.0.borrow_mut(),
+                            result_ptr as usize,
+                            &mut result_memory_data,
+                        )
+                        .unwrap();
+
+                    assert_eq!(
+                        result_memory_data, expected,
+                        "Packed struct with dynamic substruct did not match expected result",
+                    );
+
+                    reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+                },
+            );
     }
 }
