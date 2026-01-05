@@ -122,7 +122,11 @@ pub fn pack_string_function(
 
 #[cfg(test)]
 mod tests {
-    use alloy_sol_types::{SolType, sol};
+    use alloy_sol_types::SolValue;
+    use rstest::rstest;
+    use std::cell::RefCell;
+    use std::panic::AssertUnwindSafe;
+    use std::rc::Rc;
     use walrus::{FunctionBuilder, ValType};
 
     use crate::{
@@ -131,7 +135,18 @@ mod tests {
         test_tools::{build_module, setup_wasmtime_module},
     };
 
-    fn test_string_packing(input_string: &str, expected_result: &[u8]) {
+    #[rstest]
+    #[case::empty("", "".abi_encode())]
+    #[case::short("hello", "hello".abi_encode())]
+    #[case::medium("Hello, World!", "Hello, World!".abi_encode())]
+    #[case::long("This is a longer string that will test padding and multiple 32-byte chunks", "This is a longer string that will test padding and multiple 32-byte chunks".abi_encode())]
+    #[case::exactly_32_bytes("12345678901234567890123456789012", "12345678901234567890123456789012".abi_encode())]
+    #[case::exactly_31_bytes("1234567890123456789012345678901", "1234567890123456789012345678901".abi_encode())]
+    #[case::exactly_33_bytes("123456789012345678901234567890123", "123456789012345678901234567890123".abi_encode())]
+    #[case::special_characters("Hello\nWorld\tTest\x00", "Hello\nWorld\tTest\x00".abi_encode())]
+    #[case::unicode("Hello 世界 🌍", "Hello 世界 🌍".abi_encode())]
+    #[case::multiple_chunks("This string is long enough to require multiple 32-byte chunks when encoded according to Solidity ABI encoding rules", "This string is long enough to require multiple 32-byte chunks when encoded according to Solidity ABI encoding rules".abi_encode())]
+    fn test_string_packing(#[case] input_string: &str, #[case] expected_result: Vec<u8>) {
         let (mut raw_module, alloc_function, memory_id, calldata_reader_pointer_global) =
             build_module(None);
 
@@ -253,83 +268,122 @@ mod tests {
     }
 
     #[test]
-    fn test_pack_string_empty() {
-        type SolType = sol!((string,));
-        let input = "";
-        let expected_result = SolType::abi_encode_params(&(input,));
-        test_string_packing(input, &expected_result);
-    }
+    fn test_string_packing_fuzz() {
+        use alloy_sol_types::SolValue;
 
-    #[test]
-    fn test_pack_string_short() {
-        type SolType = sol!((string,));
-        let input = "hello";
-        let expected_result = SolType::abi_encode_params(&(input,));
-        test_string_packing(input, &expected_result);
-    }
+        let (mut raw_module, alloc_function, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
 
-    #[test]
-    fn test_pack_string_medium() {
-        type SolType = sol!((string,));
-        let input = "Hello, World!";
-        let expected_result = SolType::abi_encode_params(&(input,));
-        test_string_packing(input, &expected_result);
-    }
+        let compilation_ctx =
+            test_compilation_context!(memory_id, alloc_function, calldata_reader_pointer_global);
 
-    #[test]
-    fn test_pack_string_long() {
-        type SolType = sol!((string,));
-        let input = "This is a longer string that will test padding and multiple 32-byte chunks";
-        let expected_result = SolType::abi_encode_params(&(input,));
-        test_string_packing(input, &expected_result);
-    }
+        // Build a function that takes string length and returns writer pointer
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[ValType::I32]);
 
-    #[test]
-    fn test_pack_string_exactly_32_bytes() {
-        type SolType = sol!((string,));
-        let input = "12345678901234567890123456789012"; // exactly 32 bytes
-        let expected_result = SolType::abi_encode_params(&(input,));
-        test_string_packing(input, &expected_result);
-    }
+        let string_pointer = raw_module.locals.add(ValType::I32);
+        let writer_pointer = raw_module.locals.add(ValType::I32);
+        let calldata_reference_pointer = raw_module.locals.add(ValType::I32);
+        let vector_pointer = raw_module.locals.add(ValType::I32);
+        let len_param = raw_module.locals.add(ValType::I32);
 
-    #[test]
-    fn test_pack_string_exactly_31_bytes() {
-        type SolType = sol!((string,));
-        let input = "1234567890123456789012345678901"; // exactly 31 bytes
-        let expected_result = SolType::abi_encode_params(&(input,));
-        test_string_packing(input, &expected_result);
-    }
+        let mut func_body = function_builder.func_body();
 
-    #[test]
-    fn test_pack_string_exactly_33_bytes() {
-        type SolType = sol!((string,));
-        let input = "123456789012345678901234567890123"; // exactly 33 bytes
-        let expected_result = SolType::abi_encode_params(&(input,));
-        test_string_packing(input, &expected_result);
-    }
+        // Get length parameter
+        func_body.local_get(len_param);
+        func_body.i32_const(8);
+        func_body.binop(walrus::ir::BinaryOp::I32Add);
+        func_body.call(alloc_function);
+        func_body.local_set(vector_pointer);
 
-    #[test]
-    fn test_pack_string_special_characters() {
-        type SolType = sol!((string,));
-        // Use a string with special characters (avoiding invalid hex escapes)
-        let input = "Hello\nWorld\tTest\x00";
-        let expected_result = SolType::abi_encode_params(&(input,));
-        test_string_packing(input, &expected_result);
-    }
+        // Allocate String struct
+        func_body.i32_const(4);
+        func_body.call(alloc_function);
+        func_body.local_set(string_pointer);
 
-    #[test]
-    fn test_pack_string_unicode() {
-        type SolType = sol!((string,));
-        let input = "Hello 世界 🌍";
-        let expected_result = SolType::abi_encode_params(&(input,));
-        test_string_packing(input, &expected_result);
-    }
+        // Write vector pointer to String struct
+        func_body.local_get(string_pointer);
+        func_body.local_get(vector_pointer);
+        func_body.store(
+            memory_id,
+            walrus::ir::StoreKind::I32 { atomic: false },
+            walrus::ir::MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
 
-    #[test]
-    fn test_pack_string_multiple_chunks() {
-        type SolType = sol!((string,));
-        let input = "This string is long enough to require multiple 32-byte chunks when encoded according to Solidity ABI encoding rules";
-        let expected_result = SolType::abi_encode_params(&(input,));
-        test_string_packing(input, &expected_result);
+        // Allocate space for packed output
+        func_body.i32_const(32);
+        func_body.call(alloc_function);
+        func_body.local_tee(writer_pointer);
+        func_body.local_set(calldata_reference_pointer);
+
+        // Call pack_string_function
+        let pack_string_func = RuntimeFunction::PackString
+            .get(&mut raw_module, Some(&compilation_ctx))
+            .unwrap();
+        func_body
+            .local_get(string_pointer)
+            .local_get(writer_pointer)
+            .local_get(calldata_reference_pointer)
+            .call(pack_string_func);
+
+        func_body.local_get(writer_pointer);
+
+        let function = function_builder.finish(vec![len_param], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module::<i32, i32>(&mut raw_module, vec![], "test_function", None);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type::<String>()
+            .for_each(|input_string: &String| {
+                let string_bytes = input_string.as_bytes();
+                let len = string_bytes.len() as u32;
+
+                // Write vector data (length + capacity + data) at memory offset 0
+                let mut vector_data = vec![];
+                vector_data.extend(&len.to_le_bytes());
+                vector_data.extend(&len.to_le_bytes());
+                vector_data.extend(string_bytes);
+
+                memory
+                    .write(&mut *store.0.borrow_mut(), 0, &vector_data)
+                    .unwrap();
+
+                let result_ptr: i32 = entrypoint
+                    .0
+                    .call(&mut *store.0.borrow_mut(), len as i32)
+                    .unwrap();
+
+                let expected = input_string.abi_encode();
+                let mut result_memory_data = vec![0; expected.len()];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        result_ptr as usize,
+                        &mut result_memory_data,
+                    )
+                    .unwrap();
+
+                assert_eq!(
+                    result_memory_data, expected,
+                    "Packed string did not match expected result for value {input_string}",
+                );
+
+                reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+            });
     }
 }
