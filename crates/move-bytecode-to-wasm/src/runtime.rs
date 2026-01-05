@@ -59,11 +59,15 @@ pub enum RuntimeFunction {
     // Vector
     VecSwap,
     VecPopBack,
+    VecPushBack,
     VecBorrow,
     VecIncrementLen,
     VecDecrementLen,
     VecUpdateMutRef,
     BytesToVec,
+    AllocateVectorWithHeader,
+    VecCopyLocal,
+    VecEquality,
     // Storage
     StorageNextSlot,
     DeriveMappingSlot,
@@ -154,11 +158,15 @@ impl RuntimeFunction {
             // Vector
             Self::VecSwap => "vec_swap",
             Self::VecPopBack => "vec_pop_back",
+            Self::VecPushBack => "vec_push_back",
             Self::VecBorrow => "vec_borrow",
             Self::VecIncrementLen => "vec_increment_len",
             Self::VecDecrementLen => "vec_decrement_len",
             Self::VecUpdateMutRef => "vec_update_mut_ref",
             Self::BytesToVec => "bytes_to_vec",
+            Self::AllocateVectorWithHeader => "allocate_vector_with_header",
+            Self::VecCopyLocal => "vec_copy_local",
+            Self::VecEquality => "vec_equality",
             // Storage
             Self::StorageNextSlot => "storage_next_slot",
             Self::DeriveMappingSlot => "derive_mapping_slot",
@@ -302,7 +310,10 @@ impl RuntimeFunction {
                 (Self::VecUpdateMutRef, Some(ctx)) => {
                     vector::vec_update_mut_ref_function(module, ctx)
                 }
-                (Self::BytesToVec, Some(ctx)) => vector::bytes_to_vec_function(module, ctx),
+                (Self::BytesToVec, Some(ctx)) => vector::bytes_to_vec_function(module, ctx)?,
+                (Self::AllocateVectorWithHeader, Some(ctx)) => {
+                    vector::allocate_vector_with_header_function(module, ctx)
+                }
                 // Storage
                 (Self::StorageNextSlot, Some(ctx)) => {
                     storage::storage_next_slot_function(module, ctx)?
@@ -428,6 +439,10 @@ impl RuntimeFunction {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
                 vector::vec_pop_back_function(module, compilation_ctx, generics[0])?
             }
+            Self::VecPushBack => {
+                Self::assert_generics_length(generics.len(), 1, self.name())?;
+                vector::vec_push_back_function(module, compilation_ctx, generics[0])?
+            }
             Self::UnpackVector => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
                 unpacking::vector::unpack_vector_function(module, compilation_ctx, generics[0])?
@@ -467,6 +482,14 @@ impl RuntimeFunction {
             Self::PackReference => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
                 packing::reference::pack_reference_function(module, compilation_ctx, generics[0])?
+            }
+            Self::VecCopyLocal => {
+                Self::assert_generics_length(generics.len(), 1, self.name())?;
+                vector::copy_local_function(module, compilation_ctx, generics[0])?
+            }
+            Self::VecEquality => {
+                Self::assert_generics_length(generics.len(), 1, self.name())?;
+                vector::equality_function(module, compilation_ctx, generics[0])?
             }
             _ => {
                 return Err(RuntimeFunctionError::CouldNotLinkGeneric(

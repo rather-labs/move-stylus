@@ -1173,13 +1173,7 @@ fn translate_instruction(
         Bytecode::CopyLoc(local_id) => {
             let local = function_locals[*local_id as usize];
             let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
-            local_type.copy_local_instructions(
-                module,
-                builder,
-                compilation_ctx,
-                module_data,
-                local,
-            )?;
+            local_type.copy_local_instructions(module, builder, compilation_ctx, local)?;
             types_stack.push(local_type);
         }
         Bytecode::ImmBorrowLoc(local_id) => {
@@ -1641,13 +1635,9 @@ fn translate_instruction(
                 });
             }
 
-            IVector::vec_push_back_instructions(
-                &elem_ty,
-                module,
-                builder,
-                compilation_ctx,
-                module_data,
-            )?;
+            let push_back_f =
+                RuntimeFunction::VecPushBack.get_generic(module, compilation_ctx, &[&elem_ty])?;
+            builder.call(push_back_f);
         }
         Bytecode::VecSwap(signature_index) => {
             let [id2_ty, id1_ty, ref_ty] = types_stack.pop_n_from_stack()?;
@@ -1733,7 +1723,7 @@ fn translate_instruction(
                 ref_type
             ));
 
-            inner.add_read_ref_instructions(builder, module, compilation_ctx, module_data)?;
+            inner.add_read_ref_instructions(builder, module, compilation_ctx)?;
             types_stack.push((*inner).clone());
         }
         Bytecode::WriteRef => {
@@ -2152,7 +2142,7 @@ fn translate_instruction(
                 });
             }
 
-            t1.load_equality_instructions(module, builder, compilation_ctx, module_data)?;
+            t1.load_equality_instructions(module, builder, compilation_ctx)?;
 
             types_stack.push(IntermediateType::IBool);
         }
@@ -2166,7 +2156,7 @@ fn translate_instruction(
                 });
             }
 
-            t1.load_not_equality_instructions(module, builder, compilation_ctx, module_data)?;
+            t1.load_not_equality_instructions(module, builder, compilation_ctx)?;
 
             types_stack.push(IntermediateType::IBool);
         }
