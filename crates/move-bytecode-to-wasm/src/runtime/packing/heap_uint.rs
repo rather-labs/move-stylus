@@ -7,6 +7,18 @@ use walrus::{
     ir::{LoadKind, MemArg, StoreKind},
 };
 
+/// Generates a WASM function that packs a u128 value from heap memory into Solidity ABI format.
+///
+/// The function reads the u128 value (stored as two i64 chunks in little-endian),
+/// converts each chunk to big-endian, and writes them to the output in the correct order,
+/// left-padded to 32 bytes as required by the Solidity ABI specification.
+///
+/// # WASM Function Arguments:
+/// * `value_pointer` (i32) - pointer to the heap memory location containing the u128 value
+/// * `writer_pointer` (i32) - pointer to the memory location where the packed value will be written
+///
+/// # WASM Function Returns:
+/// * None - the result is written directly to memory at the writer_pointer location
 pub fn pack_u128_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -55,6 +67,18 @@ pub fn pack_u128_function(
     Ok(function.finish(vec![value_pointer, writer_pointer], &mut module.funcs))
 }
 
+/// Generates a WASM function that packs a u256 value from heap memory into Solidity ABI format.
+///
+/// The function reads the u256 value (stored as four i64 chunks in little-endian),
+/// converts each chunk to big-endian, and writes them to the output in the correct order
+/// as required by the Solidity ABI specification (32 bytes total).
+///
+/// # WASM Function Arguments:
+/// * `value_pointer` (i32) - pointer to the heap memory location containing the u256 value
+/// * `writer_pointer` (i32) - pointer to the memory location where the packed value will be written
+///
+/// # WASM Function Returns:
+/// * None - the result is written directly to memory at the writer_pointer location
 pub fn pack_u256_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -102,6 +126,18 @@ pub fn pack_u256_function(
     Ok(function.finish(vec![value_pointer, writer_pointer], &mut module.funcs))
 }
 
+/// Generates a WASM function that packs an address value from heap memory into Solidity ABI format.
+///
+/// The function copies the 20-byte address to a 32-byte slot. Endianness conversion is not
+/// required for addresses. The address is right-aligned in the 32-byte slot with 12 zero bytes
+/// of padding on the left, as required by the Solidity ABI specification.
+///
+/// # WASM Function Arguments:
+/// * `value_pointer` (i32) - pointer to the heap memory location containing the address value (32 bytes with padding)
+/// * `writer_pointer` (i32) - pointer to the memory location where the packed value will be written
+///
+/// # WASM Function Returns:
+/// * None - the result is written directly to memory at the writer_pointer location
 pub fn pack_address_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,

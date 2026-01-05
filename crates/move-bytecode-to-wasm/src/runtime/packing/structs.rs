@@ -13,6 +13,23 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg},
 };
 
+/// Generates a WASM function that packs a Move struct into Solidity ABI tuple format.
+///
+/// The function handles both static and dynamic structs. For static structs, fields are packed
+/// directly at the writer_pointer. For dynamic structs (when is_nested=1), memory is allocated
+/// and an offset is written at writer_pointer. Fields with dynamic types (vectors, dynamic structs)
+/// are packed with offsets to their actual data locations.
+///
+/// For event structs, indexed fields are excluded from the packed data as they are handled separately.
+///
+/// # WASM Function Arguments:
+/// * `struct_pointer` (i32) - pointer to the Move struct structure
+/// * `writer_pointer` (i32) - pointer where the packed struct should be written
+/// * `calldata_reference_pointer` (i32) - reference point for calculating relative offsets
+/// * `is_nested` (i32) - flag indicating if this is a nested dynamic struct (1) or root struct (0)
+///
+/// # WASM Function Returns:
+/// * None - the result is written directly to memory at writer_pointer or at allocated memory
 pub fn pack_struct_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,

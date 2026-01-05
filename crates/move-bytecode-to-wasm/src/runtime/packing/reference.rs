@@ -10,6 +10,23 @@ use walrus::{
     ir::{LoadKind, MemArg},
 };
 
+/// Generates a WASM function that packs a Move reference into Solidity ABI format.
+///
+/// The function dereferences the pointer and packs the underlying value. For heap-allocated
+/// types (u128, u256, address, vectors, structs, enums), it loads the pointer and passes it
+/// to the appropriate packing function. For stack types (bool, u8-u64), it loads the value
+/// directly and passes it to the packing function.
+///
+/// References to type parameters and nested references (ref of ref) are not supported and
+/// will return an error.
+///
+/// # WASM Function Arguments:
+/// * `reference_pointer` (i32) - pointer to the reference (contains pointer to the actual value)
+/// * `writer_pointer` (i32) - pointer where the packed value should be written
+/// * `calldata_reference_pointer` (i32) - reference point for calculating relative offsets
+///
+/// # WASM Function Returns:
+/// * None - the result is written directly to memory at writer_pointer
 pub fn pack_reference_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
