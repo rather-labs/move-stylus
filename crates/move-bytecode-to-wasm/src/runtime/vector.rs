@@ -367,10 +367,10 @@ pub fn vec_pop_back_function(
 /// If the vector's capacity equals its length, a new vector is created with double the current length as its capacity,
 /// the existing elements are copied into this new vector, and then the element is pushed.
 ///
-/// # Stack Arguments
+/// # WASM Function Arguments
 ///
-/// * `elem`: (i32/i64) The element to be pushed.
-/// * `vec_ref`: (i32) A reference to the vector.
+/// * `elem` - (i32/i64) The element to be pushed.
+/// * `vec_ref` - (i32) A reference to the vector.
 pub fn vec_push_back_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -508,6 +508,7 @@ pub fn vec_push_back_function(
 
     Ok(function.finish(vec![vec_ref, elem], &mut module.funcs))
 }
+
 /// Pushes a pointer to a non-heap element in a vector.
 ///
 /// # WASM Function Arguments
@@ -695,6 +696,14 @@ pub fn vec_update_mut_ref_function(
 
 /// Allocates memory for a vector with a header of 8 bytes.
 /// First 4 bytes are the length, next 4 bytes are the capacity.
+///
+/// # WASM Function Arguments
+/// * `len` - (i32) The length of the vector.
+/// * `capacity` - (i32) The capacity of the vector.
+/// * `data_size` - (i32) The size of the data in the vector.
+///
+/// # WASM Function Returns
+/// * `pointer` - (i32) A pointer to the newly allocated vector.
 pub fn allocate_vector_with_header_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -782,14 +791,12 @@ pub fn allocate_vector_with_header_function(
 
 /// Perform a deep copy of a vector.
 ///
-/// # Stack Arguments
+/// # WASM Function Arguments
+/// * `multiplier` - (i32) A factor used to determine the new vector's capacity, calculated as `multiplier * len`.
+/// * `src_ptr` - (i32) A pointer referencing the vector to be duplicated.
 ///
-/// * `multiplier`: (i32) A factor used to determine the new vector's capacity, calculated as `multiplier * len`.
-/// * `src_ptr`: (i32) A pointer referencing the vector to be duplicated.
-///
-/// # Returns
-///
-/// * `dst_ptr`: (i32) A pointer to the newly copied vector.
+/// # WASM Function Returns
+/// * `dst_ptr` - (i32) A pointer to the newly copied vector.
 pub fn copy_local_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
