@@ -6,9 +6,15 @@ use stylus::object as object;
 use stylus::tx_context::TxContext;
 use stylus::transfer::transfer;
 
-public struct Foo has key {
+public struct Foo has key, store {
     id: UID,
     secret: u32
+}
+
+public struct Bar has key {
+    id: UID,
+    a: vector<u128>,
+    b: Foo
 }
 
 entry fun create_owned_foo(owner_address: address, ctx: &mut TxContext) {
@@ -20,6 +26,18 @@ entry fun create_owned_foo(owner_address: address, ctx: &mut TxContext) {
     transfer(foo, owner_address);
 }
 
+entry fun create_owned_bar(owner_address: address, ctx: &mut TxContext) {
+    let bar = Bar {
+        id: object::new(ctx),
+        a: vector[1, 2, 3],
+        b: Foo {
+            id: object::new(ctx),
+            secret: 100
+        }
+    };
+    transfer(bar, owner_address);
+}
+
 entry fun owner_peep_foo(foo: &Foo, ctx: &TxContext): u32 {
     let foo_: &Foo = stylus_peep::peep<Foo>(ctx.sender(), &foo.id);
     foo_.secret
@@ -27,4 +45,8 @@ entry fun owner_peep_foo(foo: &Foo, ctx: &TxContext): u32 {
 
 entry fun peep_foo(owner: address,foo_id: &UID, ctx: &TxContext): &Foo {
     stylus_peep::peep<Foo>(owner, foo_id)
+}
+
+entry fun peep_bar(owner: address, bar_id: &UID, ctx: &TxContext): &Bar {
+    stylus_peep::peep<Bar>(owner, bar_id)
 }
