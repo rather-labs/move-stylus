@@ -1,18 +1,23 @@
 use super::NativeFunction;
 use crate::{
     CompilationContext, IntermediateType, Module, ModuleId,
-    data::{
-        DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
-        DATA_STORAGE_OBJECT_OWNER_OFFSET,
-    },
+    data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET},
     hostio::host_functions::storage_load_bytes32,
     native_functions::error::NativeFunctionError,
     runtime::RuntimeFunction,
     wasm_builder_extensions::WasmBuilderExtension,
 };
-use walrus::{FunctionBuilder, FunctionId, ValType};
+use walrus::{
+    FunctionBuilder, FunctionId, ValType,
+    ir::{LoadKind, MemArg, StoreKind},
+};
 
-// This function allows to peek into the storage of another address.
+/// This function allows to peek into the storage of another address.
+// #Arguments:
+// * `owner_address_ptr` - pointer to the owner address
+// * `uid_ptr` - pointer to the object id
+// #Returns:
+// * reference to the object in memory
 pub fn add_peep_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -35,7 +40,7 @@ pub fn add_peep_fn(
     let write_object_slot_fn =
         RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
 
-    let owner_address = module.locals.add(ValType::I32);
+    let owner_address_ptr = module.locals.add(ValType::I32);
     let uid_ptr = module.locals.add(ValType::I32);
 
     let mut function = FunctionBuilder::new(
@@ -45,13 +50,33 @@ pub fn add_peep_fn(
     );
     let mut builder = function.name(name).func_body();
 
+    // Load the UID ptr from the reference
+    builder
+        .local_get(uid_ptr)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .local_set(uid_ptr);
+
     // Search for the object in the owner's address mapping
-    // If not found, emit an unreachable
     builder.block(None, |block| {
         let exit_block = block.id();
 
         block
-            .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+            .local_get(owner_address_ptr)
             .local_get(uid_ptr)
             .call(write_object_slot_fn);
 
@@ -73,5 +98,45 @@ pub fn add_peep_fn(
         block.unreachable();
     });
 
-    Ok(function.finish(vec![owner_address, uid_ptr], &mut module.funcs))
+    // Decode the storage object into the internal representation
+
+    let read_and_decode_from_storage_fn =
+        RuntimeFunction::ReadAndDecodeFromStorage.get_generic(module, compilation_ctx, &[itype])?;
+
+    // Copy the slot number into a local to avoid overwriting it later
+    let slot_ptr = module.locals.add(ValType::I32);
+    builder
+        .i32_const(32)
+        .call(compilation_ctx.allocator)
+        .local_tee(slot_ptr)
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .i32_const(32)
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
+    // Allocate memory for the reference to the object
+    let ref_ptr = module.locals.add(ValType::I32);
+    builder
+        .i32_const(4)
+        .call(compilation_ctx.allocator)
+        .local_tee(ref_ptr);
+
+    // Decode the object from the storage encoding into the internal representation
+    builder
+        .local_get(slot_ptr)
+        .local_get(uid_ptr)
+        .call(read_and_decode_from_storage_fn);
+
+    // Store the ptr to the decoded object into the reference
+    builder.store(
+        compilation_ctx.memory_id,
+        StoreKind::I32 { atomic: false },
+        MemArg {
+            align: 0,
+            offset: 0,
+        },
+    );
+
+    builder.local_get(ref_ptr);
+
+    Ok(function.finish(vec![owner_address_ptr, uid_ptr], &mut module.funcs))
 }

@@ -1,5 +1,5 @@
 module stylus::peep;
 
-use stylus::object::ID;
+use stylus::object::UID;
 
-public fun peep<T: key>(owner_address: address, id: ID): &T;
+public native fun peep<T: key>(owner_address: address, id: &UID): &T;
