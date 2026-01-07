@@ -1,9 +1,10 @@
 use super::RuntimeFunction;
 use super::error::RuntimeFunctionError;
 use crate::data::{
-    DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
-    DATA_OBJECTS_SLOT_OFFSET, DATA_SHARED_OBJECTS_KEY_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
-    DATA_STORAGE_OBJECT_OWNER_OFFSET, DATA_ZERO_OFFSET,
+    DATA_DERIVED_MAPPING_SLOT, DATA_FROZEN_OBJECTS_KEY_OFFSET,
+    DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_OBJECTS_SLOT_OFFSET,
+    DATA_SHARED_OBJECTS_KEY_OFFSET, DATA_SLOT_DATA_PTR_OFFSET, DATA_STORAGE_OBJECT_OWNER_OFFSET,
+    DATA_ZERO_OFFSET,
 };
 use crate::hostio::host_functions::{
     self, storage_cache_bytes32, storage_flush_cache, storage_load_bytes32, tx_origin,
@@ -15,11 +16,11 @@ use crate::translation::intermediate_types::IntermediateType;
 use crate::translation::intermediate_types::heap_integers::IU256;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 use crate::{CompilationContext, data::DATA_U256_ONE_OFFSET};
-use walrus::GlobalId;
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
+use walrus::{GlobalId, InstrSeqBuilder, LocalId};
 
 /// Looks for an struct inside the objects mappings. The objects mappings follows the solidity notation:
 /// mapping(bytes32 => mapping(bytes32 => T)) public moveObjects;
@@ -69,20 +70,15 @@ pub fn locate_storage_data(
         let exit_block = block.id();
 
         // ==
-        // Signer's objects
+        // Shared objects
         // ==
 
-        // Wipe the first 12 bytes, and then write the tx signer address
+        // Copy the shared objects key to the owners offset
         block
             .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
-            .i32_const(0)
-            .i32_const(12)
-            .memory_fill(compilation_ctx.memory_id);
-
-        // Write the tx signer (20 bytes) left padded
-        block
-            .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET + 12)
-            .call(tx_origin);
+            .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
+            .i32_const(32)
+            .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
         block
             .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
@@ -104,15 +100,20 @@ pub fn locate_storage_data(
             .br_if(exit_block);
 
         // ==
-        // Shared objects
+        // Signer's objects
         // ==
 
-        // Copy the shared objects key to the owners offset
+        // Wipe the first 12 bytes, and then write the tx signer address
         block
             .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
-            .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
-            .i32_const(32)
-            .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+            .i32_const(0)
+            .i32_const(12)
+            .memory_fill(compilation_ctx.memory_id);
+
+        // Write the tx signer (20 bytes) left padded
+        block
+            .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET + 12)
+            .call(tx_origin);
 
         block
             .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
@@ -197,21 +198,28 @@ pub fn locate_struct_slot(
         .name(RuntimeFunction::LocateStructSlot.name().to_owned())
         .func_body();
 
-    let write_object_slot_fn =
-        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
     let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx))?;
     let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, None)?;
 
     let struct_ptr = module.locals.add(ValType::I32);
 
+    let owner_ptr = module.locals.add(ValType::I32);
+    let uid_ptr = module.locals.add(ValType::I32);
+
     // Obtain this object's owner
-    builder.local_get(struct_ptr).call(get_struct_owner_fn);
+    builder
+        .local_get(struct_ptr)
+        .call(get_struct_owner_fn)
+        .local_set(owner_ptr);
 
     // Get the pointer to the 32 bytes holding the data of the id
-    builder.local_get(struct_ptr).call(get_id_bytes_ptr_fn);
+    builder
+        .local_get(struct_ptr)
+        .call(get_id_bytes_ptr_fn)
+        .local_set(uid_ptr);
 
     // Compute the slot where it should be saved
-    builder.call(write_object_slot_fn);
+    write_object_slot_inline(&mut builder, uid_ptr, owner_ptr, module, compilation_ctx)?;
 
     Ok(function.finish(vec![struct_ptr], &mut module.funcs))
 }
@@ -368,22 +376,14 @@ pub fn derive_mapping_slot(
 
     let (native_keccak, _) = host_functions::native_keccak256(module);
 
-    // Allocate memory for the hash data
-    let data_ptr = module.locals.add(ValType::I32);
-
     builder
-        .i32_const(64) // For now this is always 64 bytes as we are not dealing with dynamic keys yet
-        .call(compilation_ctx.allocator)
-        .local_set(data_ptr);
-
-    builder
-        .local_get(data_ptr)
+        .i32_const(DATA_DERIVED_MAPPING_SLOT)
         .local_get(key_ptr)
         .i32_const(32) // copy 32 bytes, for now fixed size
         .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
     builder
-        .local_get(data_ptr)
+        .i32_const(DATA_DERIVED_MAPPING_SLOT)
         .i32_const(32)
         .binop(BinaryOp::I32Add) // data_ptr + 32
         .local_get(mapping_slot_ptr)
@@ -392,7 +392,7 @@ pub fn derive_mapping_slot(
 
     // Hash the data, this is the mapping slot we are looking for -> v = keccak256(h(k) . p)
     builder
-        .local_get(data_ptr)
+        .i32_const(DATA_DERIVED_MAPPING_SLOT)
         .i32_const(64)
         .local_get(derived_slot_ptr)
         .call(native_keccak);
@@ -1407,6 +1407,34 @@ pub fn cache_storage_object_changes(
     );
 
     Ok(function.finish(vec![struct_ptr_ref], &mut module.funcs))
+}
+
+/// Calculates the slot from the slot mapping
+pub fn write_object_slot_inline(
+    builder: &mut InstrSeqBuilder,
+    uid_ptr: LocalId,
+    owner_ptr: LocalId,
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) -> Result<(), RuntimeFunctionError> {
+    // Calculate the slot address
+    let derive_slot_fn = RuntimeFunction::DeriveMappingSlot.get(module, Some(compilation_ctx))?;
+
+    // Derive the slot for the first mapping
+    builder
+        .i32_const(DATA_OBJECTS_SLOT_OFFSET)
+        .local_get(owner_ptr)
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .call(derive_slot_fn);
+
+    // Derive slot for the second mapping
+    builder
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .local_get(uid_ptr)
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .call(derive_slot_fn);
+
+    Ok(())
 }
 
 // The expected slot values were calculated using Remix to ensure the tests are correct.
