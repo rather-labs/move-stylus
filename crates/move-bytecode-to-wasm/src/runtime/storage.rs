@@ -52,8 +52,6 @@ pub fn locate_storage_data(
     let write_object_slot_fn =
         RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
 
-    // let (print_i32, _, print_m, _, _, _) = crate::declare_host_debug_functions!(module);
-
     // Host functions
     let (tx_origin, _) = tx_origin(module);
     let (storage_load, _) = storage_load_bytes32(module);
@@ -79,22 +77,16 @@ pub fn locate_storage_data(
         // Shared objects
         // ==
 
-        // block.i32_const(1).call(print_i32);
-
         block
             .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
             .local_get(uid_ptr)
             .call(write_object_slot_fn);
-
-        // block.i32_const(2).call(print_i32);
 
         // Load data from slot
         block
             .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
             .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
             .call(storage_load);
-
-        // block.i32_const(3).call(print_i32);
 
         // Check if it is empty (all zeroes)
         block
@@ -119,8 +111,6 @@ pub fn locate_storage_data(
             .i32_const(12)
             .memory_fill(compilation_ctx.memory_id);
 
-        // block.i32_const(5).call(print_i32);
-
         // Write the tx signer (20 bytes) left padded
         block
             .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET + 12)
@@ -130,8 +120,6 @@ pub fn locate_storage_data(
             .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
             .local_get(uid_ptr)
             .call(write_object_slot_fn);
-
-        // block.i32_const(6).call(print_i32);
 
         // Load data from slot
         block
@@ -149,8 +137,6 @@ pub fn locate_storage_data(
             .br_if(exit_block)
             .drop();
 
-        // block.i32_const(7).call(print_i32);
-
         // ==
         // Frozen objects
         // ==
@@ -163,14 +149,6 @@ pub fn locate_storage_data(
                 .binop(BinaryOp::I32Eq)
                 .br_if(exit_frozen_block);
 
-            /*
-            frozen_block
-                .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
-                .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
-                .i32_const(32)
-                .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-
-            */
             frozen_block
                 .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
                 .local_get(uid_ptr)
@@ -683,16 +661,6 @@ pub fn add_read_and_decode_from_storage_fn(
     let owner_ptr = module.locals.add(ValType::I32);
 
     // Locals
-
-    /*
-    builder
-        .i32_const(32)
-        .call(compilation_ctx.allocator)
-        .local_tee(owner_ptr)
-        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
-        .i32_const(32)
-        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-    */
 
     let slot_offset = module.locals.add(ValType::I32);
     builder.i32_const(0).local_set(slot_offset);

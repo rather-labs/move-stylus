@@ -213,7 +213,7 @@ pub fn add_remove_child_object_fn(
     let name = NativeFunction::get_generic_function_name(
         NativeFunction::NATIVE_REMOVE_CHILD_OBJECT,
         compilation_ctx,
-        &[&itype.clone()],
+        &[itype],
         module_id,
     )?;
     if let Some(function) = module.funcs.by_name(&name) {
