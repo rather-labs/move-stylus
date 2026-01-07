@@ -60,7 +60,7 @@ pub trait WasmBuilderExtension {
     fn skip_vec_header(&mut self, ptr: LocalId) -> &mut Self;
 
     /// Adds the instructions to compute: DATA_SLOT_DATA_PTR_OFFSET + (32 - used_bytes_in_slot).
-    fn add_slot_data_ptr_plus_offset(&mut self, used_bytes_in_slot: LocalId) -> &mut Self;
+    fn slot_data_ptr_plus_offset(&mut self, used_bytes_in_slot: LocalId) -> &mut Self;
 
     /// Loads a i32 constant from a byte slice.
     ///
@@ -120,7 +120,7 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
         self.local_get(ptr).i32_const(8).binop(BinaryOp::I32Add)
     }
 
-    fn add_slot_data_ptr_plus_offset(&mut self, slot_offset: LocalId) -> &mut Self {
+    fn slot_data_ptr_plus_offset(&mut self, slot_offset: LocalId) -> &mut Self {
         // Check if 0 < offset <= 32
         self.local_get(slot_offset).unop(UnaryOp::I32Eqz).if_else(
             None,

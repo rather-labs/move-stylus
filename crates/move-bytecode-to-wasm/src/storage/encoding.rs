@@ -216,7 +216,7 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
 
         // Write the variant index in the slot data.
         block
-            .add_slot_data_ptr_plus_offset(slot_offset)
+            .slot_data_ptr_plus_offset(slot_offset)
             .local_get(variant_index)
             .store(
                 compilation_ctx.memory_id,
@@ -749,7 +749,7 @@ pub fn add_encode_intermediate_type_instructions(
 
             // Save the value in slot data
             builder
-                .add_slot_data_ptr_plus_offset(slot_offset)
+                .slot_data_ptr_plus_offset(slot_offset)
                 .local_get(val)
                 .store(
                     compilation_ctx.memory_id,
@@ -764,7 +764,7 @@ pub fn add_encode_intermediate_type_instructions(
             let swap_fn = RuntimeFunction::SwapI128Bytes.get(module, Some(compilation_ctx))?;
 
             // Slot data plus offset as dest ptr
-            builder.add_slot_data_ptr_plus_offset(slot_offset);
+            builder.slot_data_ptr_plus_offset(slot_offset);
 
             // Transform to BE
             builder.call(swap_fn);
@@ -774,7 +774,7 @@ pub fn add_encode_intermediate_type_instructions(
 
             // Slot data plus offset as dest ptr (offset should be zero because data is already
             // 32 bytes in size)
-            builder.add_slot_data_ptr_plus_offset(slot_offset);
+            builder.slot_data_ptr_plus_offset(slot_offset);
 
             // Transform to BE
             builder.call(swap_fn);
@@ -785,7 +785,7 @@ pub fn add_encode_intermediate_type_instructions(
             builder.local_set(val_32);
 
             // Slot data plus offset as dest ptr
-            builder.add_slot_data_ptr_plus_offset(slot_offset);
+            builder.slot_data_ptr_plus_offset(slot_offset);
 
             // Grab the last 20 bytes of the address
             builder

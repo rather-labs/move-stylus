@@ -369,7 +369,8 @@ pub fn add_freeze_object_fn(
         block
             .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
             .i32_const(32)
-            .call(equality_fn).br_if(block_id);
+            .call(equality_fn)
+            .br_if(block_id);
 
         // Check if the object is shared. If so, emit an error as it cannot be frozen.
         block

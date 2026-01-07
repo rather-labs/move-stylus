@@ -291,7 +291,7 @@ pub fn add_read_and_decode_storage_enum_instructions(
 
     // Read the variant index
     builder
-        .add_slot_data_ptr_plus_offset(slot_offset)
+        .slot_data_ptr_plus_offset(slot_offset)
         .load(
             compilation_ctx.memory_id,
             LoadKind::I32_8 {
@@ -663,7 +663,7 @@ pub fn add_decode_intermediate_type_instructions(
 
             // Load and swap the value
             builder
-                .add_slot_data_ptr_plus_offset(slot_offset)
+                .slot_data_ptr_plus_offset(slot_offset)
                 .load(
                     compilation_ctx.memory_id,
                     load_kind,
@@ -697,7 +697,7 @@ pub fn add_decode_intermediate_type_instructions(
 
             // Copy 16 bytes from the slot data pointer (plus offset)
             builder
-                .add_slot_data_ptr_plus_offset(slot_offset)
+                .slot_data_ptr_plus_offset(slot_offset)
                 .call(copy_fn)
                 .local_set(data_ptr);
 
@@ -713,7 +713,7 @@ pub fn add_decode_intermediate_type_instructions(
 
             // Copy 32 bytes from the slot data pointer
             builder
-                .add_slot_data_ptr_plus_offset(slot_offset)
+                .slot_data_ptr_plus_offset(slot_offset)
                 .call(copy_fn)
                 .local_set(data_ptr);
 
@@ -733,7 +733,7 @@ pub fn add_decode_intermediate_type_instructions(
             // Add 12 to the offset to write the last 20 bytes of the address
             builder.i32_const(12).binop(BinaryOp::I32Add);
 
-            builder.add_slot_data_ptr_plus_offset(slot_offset);
+            builder.slot_data_ptr_plus_offset(slot_offset);
 
             // Number of bytes to copy
             builder.i32_const(20);
