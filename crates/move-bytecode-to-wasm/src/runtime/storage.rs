@@ -65,24 +65,25 @@ pub fn locate_storage_data(
     let uid_ptr = module.locals.add(ValType::I32);
     let search_frozen = module.locals.add(ValType::I32);
 
-    // Wipe the first 12 bytes, and then write the tx signer address
-    builder
-        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
-        .i32_const(0)
-        .i32_const(12)
-        .memory_fill(compilation_ctx.memory_id);
-
-    // Write the tx signer (20 bytes) left padded
-    builder
-        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET + 12)
-        .call(tx_origin);
-
     builder.block(None, |block| {
         let exit_block = block.id();
 
         // ==
         // Signer's objects
         // ==
+
+        // Wipe the first 12 bytes, and then write the tx signer address
+        block
+            .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+            .i32_const(0)
+            .i32_const(12)
+            .memory_fill(compilation_ctx.memory_id);
+
+        // Write the tx signer (20 bytes) left padded
+        block
+            .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET + 12)
+            .call(tx_origin);
+
         block
             .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
             .local_get(uid_ptr)

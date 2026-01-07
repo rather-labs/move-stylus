@@ -24,9 +24,9 @@ sol!(
 
         function constructor() public view;
         function mint(address to, uint256 amount) external view;
-        // function mintTo(address to, uint256 amount) external view;
-        function burn(address from, uint256 amount) external view;
-        // function burn(uint256 amount) external view;
+        function mintTo(address to, uint256 amount) external view;
+        // function burn(address from, uint256 amount) external view;
+        function burn(uint256 amount) external view;
         function balanceOf(address account) public view returns (uint256);
         function totalSupply() external view returns (uint256);
         function transfer(address recipient, uint256 amount) external returns (bool);
@@ -103,9 +103,11 @@ async fn main() -> eyre::Result<()> {
     println!("║         Creating ERC20 Token         ║");
     println!("╚══════════════════════════════════════╝");
 
+    /*
     let _pending_tx_ = example.constructor().send().await?;
     println!("✓ Contract initialized");
     gas_used(&_pending_tx_.get_receipt().await?);
+    */
 
     // ==================== Contract Info ====================
     println!("\n╔══════════════════════════════════════╗");
@@ -141,8 +143,8 @@ async fn main() -> eyre::Result<()> {
     println!("    {sender_2_short}: {res} TST");
 
     println!("\n  Minting 555555 TST to {sender_short}...");
-    // let pending_tx = example.mintTo(sender, U256::from(555555)).send().await?;
-    let pending_tx = example.mint(sender, U256::from(555555)).send().await?;
+    let pending_tx = example.mintTo(sender, U256::from(555555)).send().await?;
+    // let pending_tx = example.mint(sender, U256::from(555555)).send().await?;
     let receipt = pending_tx.get_receipt().await?;
     gas_used(&receipt);
     println!("  ✓ Mint complete");
@@ -192,8 +194,8 @@ async fn main() -> eyre::Result<()> {
     println!("╚══════════════════════════════════════╝");
 
     println!("\n  Burning 11111 TST from {sender_short}...");
-    let pending_tx = example.burn(sender, U256::from(11111)).send().await?;
-    // let pending_tx = example.burn(U256::from(11111)).send().await?;
+    // let pending_tx = example.burn(sender, U256::from(11111)).send().await?;
+    let pending_tx = example.burn(U256::from(11111)).send().await?;
     let receipt = pending_tx.get_receipt().await?;
     gas_used(&receipt);
     println!("  ✓ Burn complete");
