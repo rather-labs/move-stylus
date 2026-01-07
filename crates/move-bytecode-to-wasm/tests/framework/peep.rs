@@ -1,5 +1,7 @@
 use crate::common::runtime;
-use alloy_sol_types::{SolCall, sol};
+use alloy_primitives::keccak256;
+use alloy_sol_types::{SolCall, SolType, sol};
+use move_bytecode_to_wasm::error::RuntimeError;
 use move_test_runner::wasm_runner::RuntimeSandbox;
 use rstest::rstest;
 
@@ -94,4 +96,16 @@ fn test_peep(#[with("peep", "tests/framework/move_sources/peep.move")] runtime: 
     assert_eq!(0, result);
     assert_eq!(vec![1, 2, 3], return_data.a);
     assert_eq!(100, return_data.b.secret);
+
+    // Peep into a non-existent object
+    let call_data = peepFooCall::new((owner_address.into(), [0; 32].into())).abi_encode();
+    let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+    assert_eq!(1, result);
+    let error_message = RuntimeError::ObjectNotFound.to_string();
+    let expected_data = [
+        keccak256(b"Error(string)")[..4].to_vec(),
+        <sol!((string,))>::abi_encode_params(&(error_message,)),
+    ]
+    .concat();
+    assert_eq!(expected_data, return_data);
 }

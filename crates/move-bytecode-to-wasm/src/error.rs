@@ -163,4 +163,7 @@ pub enum RuntimeError {
 
     #[error("shared objects cannot be transferred")]
     SharedObjectsCannotBeTransferred,
+
+    #[error("object not found under the provided address")]
+    ObjectNotFound,
 }

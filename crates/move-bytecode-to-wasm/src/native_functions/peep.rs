@@ -1,8 +1,11 @@
 use super::NativeFunction;
 use crate::{
     CompilationContext, IntermediateType, Module, ModuleId,
+    abi_types::error_encoding::build_runtime_error_message,
     data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET},
+    error::RuntimeError,
     hostio::host_functions::storage_load_bytes32,
+    native_functions::abi_error::add_handle_error_instructions,
     native_functions::error::NativeFunctionError,
     runtime::RuntimeFunction,
     wasm_builder_extensions::WasmBuilderExtension,
@@ -71,6 +74,14 @@ pub fn add_peep_fn(
         )
         .local_set(uid_ptr);
 
+    // Build the runtime error message for the case where the object is not found
+    let encoded_error_ptr = build_runtime_error_message(
+        &mut builder,
+        module,
+        compilation_ctx,
+        &RuntimeError::ObjectNotFound.to_string(),
+    )?;
+
     // Search for the object in the owner's address mapping
     builder.block(None, |block| {
         let exit_block = block.id();
@@ -95,7 +106,7 @@ pub fn add_peep_fn(
             .br_if(exit_block);
 
         // If we get here means the object was not found
-        block.unreachable();
+        add_handle_error_instructions(block, compilation_ctx, encoded_error_ptr);
     });
 
     // Decode the storage object into the internal representation
