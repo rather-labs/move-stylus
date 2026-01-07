@@ -6,8 +6,9 @@ use crate::{
         reserved_modules::{SF_MODULE_NAME_DYNAMIC_FIELD, STYLUS_FRAMEWORK_ADDRESS},
     },
     data::{
-        DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
-        DATA_STORAGE_OBJECT_OWNER_OFFSET,
+        DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
+        DATA_SLOT_DATA_PTR_OFFSET,
+        // DATA_STORAGE_OBJECT_OWNER_OFFSET,
     },
     hostio::host_functions::{native_keccak256, storage_load_bytes32},
     runtime::RuntimeFunction,
@@ -156,11 +157,13 @@ pub fn add_borrow_object_fn(
         .call(write_object_slot_fn);
 
     // Write the owner
+    /*
     builder
         .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
         .local_get(parent_uid)
         .i32_const(32)
         .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+    */
 
     let result_struct = module.locals.add(ValType::I32);
 
@@ -177,6 +180,7 @@ pub fn add_borrow_object_fn(
     builder
         .local_get(slot_ptr)
         .local_get(child_id)
+        .local_get(parent_uid)
         .call(read_and_decode_from_storage_fn)
         .local_set(result_struct);
 

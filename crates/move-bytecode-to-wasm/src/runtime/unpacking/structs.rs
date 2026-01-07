@@ -252,6 +252,7 @@ pub fn unpack_storage_struct_function(
     // Arguments
     let uid_ptr = module.locals.add(ValType::I32);
     let unpack_frozen = module.locals.add(ValType::I32);
+    let owner_id_ptr = module.locals.add(ValType::I32);
 
     // Search for the object in the objects mappings
     let locate_storage_data_fn =
@@ -260,7 +261,8 @@ pub fn unpack_storage_struct_function(
     builder
         .local_get(uid_ptr)
         .local_get(unpack_frozen)
-        .call(locate_storage_data_fn);
+        .call(locate_storage_data_fn)
+        .local_set(owner_id_ptr);
 
     // Read the object
     let read_and_decode_from_storage_fn =
@@ -279,6 +281,7 @@ pub fn unpack_storage_struct_function(
     builder
         .local_get(slot_ptr)
         .local_get(uid_ptr)
+        .local_get(owner_id_ptr)
         .call(read_and_decode_from_storage_fn);
 
     Ok(function.finish(vec![uid_ptr, unpack_frozen], &mut module.funcs))
