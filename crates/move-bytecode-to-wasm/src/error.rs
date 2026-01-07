@@ -149,3 +149,18 @@ impl From<&CodeError> for Diagnostic {
         }
     }
 }
+
+#[derive(thiserror::Error, Debug)]
+pub enum RuntimeError {
+    #[error("frozen objects cannot be shared")]
+    FrozenObjectsCannotBeShared,
+
+    #[error("shared objects cannot be frozen")]
+    SharedObjectsCannotBeFrozen,
+
+    #[error("frozen objects cannot be transferred")]
+    FrozenObjectsCannotBeTransferred,
+
+    #[error("shared objects cannot be transferred")]
+    SharedObjectsCannotBeTransferred,
+}

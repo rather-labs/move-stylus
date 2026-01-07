@@ -123,7 +123,7 @@ pub fn build_constructor(
     builder.local_get(value_ptr).i32_const(32).call(is_zero_fn);
 
     // If storage has not been initialized, proceed with initialization
-    let mut inner_result = Ok(());
+    let mut inner_result: Result<(), VmHandledTypeError> = Ok(());
     builder.if_else(
         None,
         |then| {

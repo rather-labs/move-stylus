@@ -1,8 +1,8 @@
 use super::*;
 use crate::common::runtime;
 use alloy_primitives::address;
-use alloy_sol_types::sol;
-use alloy_sol_types::{SolCall, SolValue};
+use alloy_sol_types::{SolCall, SolType, sol};
+use move_bytecode_to_wasm::error::RuntimeError;
 use move_test_runner::constants::SIGNER_ADDRESS;
 use move_test_runner::wasm_runner::RuntimeSandbox;
 use rstest::rstest;
@@ -498,7 +498,6 @@ fn test_freeze_not_owned_object(
 
 // Tests the freeze of a shared object.
 #[rstest]
-#[should_panic(expected = "unreachable")]
 fn test_freeze_shared_object(
     #[with(
         "transfer_named_id",
@@ -513,7 +512,15 @@ fn test_freeze_shared_object(
 
     // Freeze the object. Only possible if the object is owned by the signer!
     let call_data = freezeObjCall::new(()).abi_encode();
-    runtime.call_entrypoint(call_data).unwrap();
+    let error_message = RuntimeError::SharedObjectsCannotBeFrozen.to_string();
+    let expected_data = [
+        keccak256(b"Error(string)")[..4].to_vec(),
+        <sol!((string,))>::abi_encode_params(&(error_message,)),
+    ]
+    .concat();
+    let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+    assert_eq!(1, result);
+    assert_eq!(expected_data, return_data);
 }
 
 // Freeze and then try to share or transfer the object.

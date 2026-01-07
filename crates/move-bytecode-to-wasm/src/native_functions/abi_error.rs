@@ -1,5 +1,5 @@
 use walrus::{
-    FunctionBuilder, FunctionId, Module, ValType,
+    FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
     ir::{MemArg, StoreKind},
 };
 
@@ -55,6 +55,16 @@ pub fn add_revert_fn(
         error_struct_ptr,
     )?;
 
+    add_handle_error_instructions(&mut builder, compilation_ctx, encoded_error_ptr);
+
+    Ok(function.finish(vec![error_struct_ptr], &mut module.funcs))
+}
+
+pub fn add_handle_error_instructions(
+    builder: &mut InstrSeqBuilder,
+    compilation_ctx: &CompilationContext,
+    encoded_error_ptr: LocalId,
+) {
     // Store the ptr at DATA_ABORT_MESSAGE_PTR_OFFSET
     builder
         .i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)
@@ -71,6 +81,4 @@ pub fn add_revert_fn(
     // Return 1 to indicate an error occurred
     builder.i32_const(1);
     builder.return_();
-
-    Ok(function.finish(vec![error_struct_ptr], &mut module.funcs))
 }

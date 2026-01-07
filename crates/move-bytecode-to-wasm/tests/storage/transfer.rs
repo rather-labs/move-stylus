@@ -1,7 +1,8 @@
 use super::*;
 use crate::common::runtime;
-use alloy_primitives::{FixedBytes, U256, address, hex};
-use alloy_sol_types::{SolCall, SolValue, sol};
+use alloy_primitives::{FixedBytes, U256, address, hex, keccak256};
+use alloy_sol_types::{SolCall, SolType, sol};
+use move_bytecode_to_wasm::error::RuntimeError;
 use move_test_runner::constants::SIGNER_ADDRESS;
 use move_test_runner::wasm_runner::RuntimeSandbox;
 use rstest::rstest;
@@ -84,6 +85,7 @@ sol!(
         Bar[] d;
     }
 
+
     #[allow(missing_docs)]
     function createShared() public view;
     function createOwned(address recipient) public view;
@@ -123,6 +125,9 @@ sol!(
     function createEpicVar() public view;
     function getEpicVar(bytes32 id) public view returns (EpicVar);
     function deleteEpicVar(bytes32 id) public view;
+
+    #[derive(Debug)]
+    error Error(string);
 );
 
 const SHARED: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
@@ -511,7 +516,6 @@ fn test_freeze_not_owned_object(
 
 // Tests the freeze of a shared object.
 #[rstest]
-#[should_panic(expected = "unreachable")]
 fn test_freeze_shared_object(
     #[with("transfer", "tests/storage/move_sources/transfer.move")] runtime: RuntimeSandbox,
 ) {
@@ -525,7 +529,18 @@ fn test_freeze_shared_object(
 
     // Freeze the object. Only possible if the object is owned by the signer!
     let call_data = freezeObjCall::new((object_id,)).abi_encode();
-    runtime.call_entrypoint(call_data).unwrap();
+    let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+
+    let error_message = RuntimeError::SharedObjectsCannotBeFrozen.to_string();
+    // let error_message = "shared objects cannot be frozen";
+    let expected_data = [
+        keccak256(b"Error(string)")[..4].to_vec(),
+        <sol!((string,))>::abi_encode_params(&(error_message,)),
+    ]
+    .concat();
+
+    assert_eq!(1, result);
+    assert_eq!(expected_data, return_data);
 }
 
 // Freeze and then try to share or transfer the object.

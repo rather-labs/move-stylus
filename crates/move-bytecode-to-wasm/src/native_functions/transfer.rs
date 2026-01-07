@@ -1,5 +1,6 @@
 use crate::{
     CompilationContext,
+    abi_types::error_encoding::build_runtime_error_message,
     compilation_context::ModuleId,
     data::{
         DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
@@ -13,7 +14,8 @@ use walrus::{
     ir::{BinaryOp, UnaryOp},
 };
 
-use super::{NativeFunction, error::NativeFunctionError};
+use super::{NativeFunction, abi_error::add_handle_error_instructions, error::NativeFunctionError};
+use crate::error::RuntimeError;
 
 /// Adds the instructions to transfer an object to a recipient.
 /// This implies deleting the object from the original owner's mapping and adding it to the recipient's mapping.
@@ -57,40 +59,64 @@ pub fn add_transfer_object_fn(
     let id_bytes_ptr = module.locals.add(ValType::I32);
     let slot_ptr = module.locals.add(ValType::I32);
 
+    // Get the owner key, which is stored in the 32 bytes prefixing the struct, which can either be:
+    // - An actual account address
+    // - The shared objects internal key (0x1)
+    // - The frozen objects internal key (0x2)
+    builder
+        .local_get(struct_ptr)
+        .i32_const(32)
+        .binop(BinaryOp::I32Sub)
+        .local_set(owner_ptr);
+
+    let mut inner_result: Result<(), NativeFunctionError> = Ok(());
+    // Check that the object is not shared
     builder.block(None, |block| {
         let block_id = block.id();
-
-        // Get the owner key, which is stored in the 32 bytes prefixing the struct, which can either be:
-        // - An actual account address
-        // - The shared objects internal key (0x1)
-        // - The frozen objects internal key (0x2)
         block
-            .local_get(struct_ptr)
-            .i32_const(32)
-            .binop(BinaryOp::I32Sub)
-            .local_tee(owner_ptr);
-
-        // Check that the object is not shared.
-        block
+            .local_get(owner_ptr)
             .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
             .i32_const(32)
-            .call(equality_fn);
+            .call(equality_fn)
+            .unop(UnaryOp::I32Eqz)
+            .br_if(block_id);
 
-        // Check that the object is not frozen.
+        inner_result = (|| {
+            let encoded_error_ptr = build_runtime_error_message(
+                block,
+                module,
+                compilation_ctx,
+                &RuntimeError::SharedObjectsCannotBeTransferred.to_string(),
+            )?;
+            add_handle_error_instructions(block, compilation_ctx, encoded_error_ptr);
+            Ok(())
+        })();
+    });
+
+    // Check that the object is not frozen
+    builder.block(None, |block| {
+        let block_id = block.id();
         block
             .local_get(owner_ptr)
             .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
             .i32_const(32)
-            .call(equality_fn);
-
-        // If the object is neither shared nor frozen, jump to the end of the block.
-        block
-            .binop(BinaryOp::I32Add)
             .unop(UnaryOp::I32Eqz)
+            .call(equality_fn)
             .br_if(block_id);
 
-        block.unreachable();
+        inner_result = (|| {
+            let encoded_error_ptr = build_runtime_error_message(
+                block,
+                module,
+                compilation_ctx,
+                &RuntimeError::FrozenObjectsCannotBeTransferred.to_string(),
+            )?;
+            add_handle_error_instructions(block, compilation_ctx, encoded_error_ptr);
+            Ok(())
+        })();
     });
+
+    inner_result?;
 
     // Delete the object from the owner mapping on the storage
     builder.block(None, |block| {
@@ -187,6 +213,7 @@ pub fn add_share_object_fn(
     let struct_ptr = module.locals.add(ValType::I32);
     let slot_ptr = module.locals.add(ValType::I32);
 
+    let mut inner_result: Result<(), NativeFunctionError> = Ok(());
     builder.block(None, |block| {
         let block_id = block.id();
 
@@ -204,70 +231,80 @@ pub fn add_share_object_fn(
             .call(equality_fn)
             .br_if(block_id);
 
-        // Emit an unreachable if the object is frozen, as it cannot be shared.
+        // Emit an error if the object is frozen, as it cannot be shared.
         block
             .local_get(owner_ptr)
             .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
             .i32_const(32)
-            .call(equality_fn);
+            .call(equality_fn)
+            .if_else(
+                None,
+                |then| {
+                    // Build the error message and handle the error
+                    inner_result = (|| {
+                        let encoded_error_ptr = build_runtime_error_message(
+                            then,
+                            module,
+                            compilation_ctx,
+                            &RuntimeError::FrozenObjectsCannotBeShared.to_string(),
+                        )?;
+                        add_handle_error_instructions(then, compilation_ctx, encoded_error_ptr);
+                        Ok(())
+                    })();
+                },
+                |else_| {
+                    // Delete the object from owner mapping on the storage
+                    else_.block(None, |block| {
+                        let block_id = block.id();
 
-        block.if_else(
-            None,
-            |then| {
-                // Object cannot be frozen
-                then.unreachable();
-            },
-            |else_| {
-                // Delete the object from owner mapping on the storage
-                else_.block(None, |block| {
-                    let block_id = block.id();
+                        // Check if the owner is zero (means there's no owner, so we don't need to delete anything)
+                        block.local_get(owner_ptr).i32_const(32).call(is_zero_fn);
 
-                    // Check if the owner is zero (means there's no owner, so we don't need to delete anything)
-                    block.local_get(owner_ptr).i32_const(32).call(is_zero_fn);
+                        block.br_if(block_id);
 
-                    block.br_if(block_id);
+                        block.local_get(struct_ptr).call(delete_object_fn);
+                    });
 
-                    block.local_get(struct_ptr).call(delete_object_fn);
-                });
+                    // Remove any objects that have been recently transferred into the struct from the original owner's mapping in storage.
 
-                // Remove any objects that have been recently transferred into the struct from the original owner's mapping in storage.
+                    else_
+                        .local_get(struct_ptr)
+                        .call(check_and_delete_struct_tto_fields_fn);
 
-                else_
-                    .local_get(struct_ptr)
-                    .call(check_and_delete_struct_tto_fields_fn);
+                    // Update the object ownership in memory to the shared objects key
+                    else_
+                        .local_get(owner_ptr)
+                        .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
+                        .i32_const(32)
+                        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
-                // Update the object ownership in memory to the shared objects key
-                else_
-                    .local_get(owner_ptr)
-                    .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
-                    .i32_const(32)
-                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+                    // Calculate the slot number in the shared objects mapping
+                    else_
+                        .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
+                        .local_get(struct_ptr)
+                        .call(get_id_bytes_ptr_fn)
+                        .call(write_object_slot_fn);
 
-                // Calculate the slot number in the shared objects mapping
-                else_
-                    .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
-                    .local_get(struct_ptr)
-                    .call(get_id_bytes_ptr_fn)
-                    .call(write_object_slot_fn);
+                    // Allocate 32 bytes for the slot pointer and copy the DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET to it
+                    // This is needed because DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET might be overwritten later on
+                    else_
+                        .i32_const(32)
+                        .call(compilation_ctx.allocator)
+                        .local_tee(slot_ptr)
+                        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                        .i32_const(32)
+                        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
-                // Allocate 32 bytes for the slot pointer and copy the DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET to it
-                // This is needed because DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET might be overwritten later on
-                else_
-                    .i32_const(32)
-                    .call(compilation_ctx.allocator)
-                    .local_tee(slot_ptr)
-                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                    .i32_const(32)
-                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-
-                // Save the struct in the shared objects mapping
-                else_
-                    .local_get(struct_ptr)
-                    .local_get(slot_ptr)
-                    .call(storage_save_fn);
-            },
-        );
+                    // Save the struct in the shared objects mapping
+                    else_
+                        .local_get(struct_ptr)
+                        .local_get(slot_ptr)
+                        .call(storage_save_fn);
+                },
+            );
     });
+
+    inner_result?;
 
     Ok(function.finish(vec![struct_ptr], &mut module.funcs))
 }
@@ -311,6 +348,7 @@ pub fn add_freeze_object_fn(
     let struct_ptr = module.locals.add(ValType::I32);
     let slot_ptr = module.locals.add(ValType::I32);
 
+    let mut inner_result: Result<(), NativeFunctionError> = Ok(());
     builder.block(None, |block| {
         let block_id = block.id();
         // Get the owner key, which is stored in the 32 bytes prefixing the struct, which can either be:
@@ -321,84 +359,92 @@ pub fn add_freeze_object_fn(
             .local_get(struct_ptr)
             .i32_const(32)
             .binop(BinaryOp::I32Sub)
-            .local_set(owner_ptr);
+            .local_tee(owner_ptr);
 
-        // Check that the object is not shared. If so, emit an unreacheable.
+        // Check that the object is not shared. If so, emit an error.
         // We dont need to check if the owner is the tx sender because this is implicitly done when unpacking the struct.
         // If the object is already frozen, we skip the rest of the function. Its a no-op.
 
         // Verify if the object is frozen; if true, skip to the block's end since no action is needed.
         block
-            .local_get(owner_ptr)
             .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
             .i32_const(32)
-            .call(equality_fn);
+            .call(equality_fn).br_if(block_id);
 
-        block.br_if(block_id);
-
-        // Check if the object is shared. If so, emit an unreachable as it cannot be frozen.
+        // Check if the object is shared. If so, emit an error as it cannot be frozen.
         block
             .local_get(owner_ptr)
             .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
             .i32_const(32)
-            .call(equality_fn);
+            .call(equality_fn)
+            .if_else(
+                None,
+                |then| {
+                    // Shared objects cannot be frozen
+                    inner_result = (|| {
+                        let encoded_error_ptr = build_runtime_error_message(
+                            then,
+                            module,
+                            compilation_ctx,
+                            &RuntimeError::SharedObjectsCannotBeFrozen.to_string(),
+                        )?;
 
-        block.if_else(
-            None,
-            |then| {
-                // Shared objects cannot be frozen
-                then.unreachable();
-            },
-            |else_| {
-                // Delete the object from the owner mapping on the storage
-                else_.block(None, |block| {
-                    let block_id = block.id();
+                        add_handle_error_instructions(then, compilation_ctx, encoded_error_ptr);
+                        Ok(())
+                    })();
+                },
+                |else_| {
+                    // Delete the object from the owner mapping on the storage
+                    else_.block(None, |block| {
+                        let block_id = block.id();
 
-                    // Check if the owner is zero (means there's no owner, so we don't need to delete anything)
-                    block.local_get(owner_ptr).i32_const(32).call(is_zero_fn);
+                        // Check if the owner is zero (means there's no owner, so we don't need to delete anything)
+                        block.local_get(owner_ptr).i32_const(32).call(is_zero_fn);
 
-                    block.br_if(block_id);
+                        block.br_if(block_id);
 
-                    block.local_get(struct_ptr).call(delete_object_fn);
-                });
+                        block.local_get(struct_ptr).call(delete_object_fn);
+                    });
 
-                // Remove any objects that have been recently transferred into the struct from the original owner's mapping in storage.
+                    // Remove any objects that have been recently transferred into the struct from the original owner's mapping in storage.
 
-                else_
-                    .local_get(struct_ptr)
-                    .call(check_and_delete_struct_tto_fields_fn);
+                    else_
+                        .local_get(struct_ptr)
+                        .call(check_and_delete_struct_tto_fields_fn);
 
-                // Update the object ownership in memory to the frozen objects key
-                else_
-                    .local_get(owner_ptr)
-                    .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
-                    .i32_const(32)
-                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+                    // Update the object ownership in memory to the frozen objects key
+                    else_
+                        .local_get(owner_ptr)
+                        .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
+                        .i32_const(32)
+                        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
-                // Calculate the struct slot in the frozen objects mapping
-                else_
-                    .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
-                    .local_get(struct_ptr)
-                    .call(get_id_bytes_ptr_fn)
-                    .call(write_object_slot_fn);
+                    // Calculate the struct slot in the frozen objects mapping
+                    else_
+                        .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
+                        .local_get(struct_ptr)
+                        .call(get_id_bytes_ptr_fn)
+                        .call(write_object_slot_fn);
 
-                // Allocate 32 bytes for the slot pointer and copy the DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET to it
-                else_
-                    .i32_const(32)
-                    .call(compilation_ctx.allocator)
-                    .local_tee(slot_ptr)
-                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                    .i32_const(32)
-                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+                    // Allocate 32 bytes for the slot pointer and copy the DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET to it
+                    else_
+                        .i32_const(32)
+                        .call(compilation_ctx.allocator)
+                        .local_tee(slot_ptr)
+                        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                        .i32_const(32)
+                        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
-                // Save the struct into the frozen objects mapping
-                else_
-                    .local_get(struct_ptr)
-                    .local_get(slot_ptr)
-                    .call(storage_save_fn);
-            },
-        );
+                    // Save the struct into the frozen objects mapping
+                    else_
+                        .local_get(struct_ptr)
+                        .local_get(slot_ptr)
+                        .call(storage_save_fn);
+                },
+            );
     });
+
+    inner_result?;
 
     Ok(function.finish(vec![struct_ptr], &mut module.funcs))
 }
