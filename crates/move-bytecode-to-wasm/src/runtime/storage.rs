@@ -80,6 +80,7 @@ pub fn locate_storage_data(
         block
             .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
             .local_get(uid_ptr)
+            .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
             .call(write_object_slot_fn);
 
         // Load data from slot
@@ -97,8 +98,6 @@ pub fn locate_storage_data(
             .negate()
             .br_if(exit_block)
             .drop();
-
-        // block.i32_const(4).call(print_i32);
 
         // ==
         // Signer's objects
@@ -119,6 +118,7 @@ pub fn locate_storage_data(
         block
             .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
             .local_get(uid_ptr)
+            .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
             .call(write_object_slot_fn);
 
         // Load data from slot
@@ -152,6 +152,7 @@ pub fn locate_storage_data(
             frozen_block
                 .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
                 .local_get(uid_ptr)
+                .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
                 .call(write_object_slot_fn);
 
             // Load data from slot
@@ -211,6 +212,8 @@ pub fn locate_struct_slot(
     // Get the pointer to the 32 bytes holding the data of the id
     builder.local_get(struct_ptr).call(get_id_bytes_ptr_fn);
 
+    builder.i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET);
+
     // Compute the slot where it should be saved
     builder.call(write_object_slot_fn);
 
@@ -222,56 +225,37 @@ pub fn write_object_slot(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
 ) -> Result<FunctionId, RuntimeFunctionError> {
-    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32, ValType::I32],
+        &[],
+    );
     let mut builder = function
         .name(RuntimeFunction::WriteObjectSlot.name().to_owned())
         .func_body();
 
     let uid_ptr = module.locals.add(ValType::I32);
     let owner_ptr = module.locals.add(ValType::I32);
-
-    // let (print_i32, _, print_m, _, _, _) = crate::declare_host_debug_functions!(module);
+    let slot_ptr = module.locals.add(ValType::I32);
 
     // Calculate the slot address
     let derive_slot_fn = RuntimeFunction::DeriveMappingSlot.get(module, Some(compilation_ctx))?;
-
-    /*
-    builder
-        .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
-        .i32_const(33)
-        .call(print_m);
-    */
-    // builder.local_get(owner_ptr).i32_const(32).call(print_m);
 
     // Derive the slot for the first mapping
     builder
         .i32_const(DATA_OBJECTS_SLOT_OFFSET)
         .local_get(owner_ptr)
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .local_get(slot_ptr)
         .call(derive_slot_fn);
-
-    /*
-    builder
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .i32_const(32)
-        .call(print_m);
-    */
 
     // Derive slot for the second mapping
     builder
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .local_get(slot_ptr)
         .local_get(uid_ptr)
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .local_get(slot_ptr)
         .call(derive_slot_fn);
 
-    /*
-    builder
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .i32_const(32)
-        .call(print_m);
-    */
-
-    Ok(function.finish(vec![owner_ptr, uid_ptr], &mut module.funcs))
+    Ok(function.finish(vec![owner_ptr, uid_ptr, slot_ptr], &mut module.funcs))
 }
 
 pub fn storage_next_slot_function(
@@ -400,9 +384,7 @@ pub fn derive_mapping_slot(
         .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
     builder
-        .i32_const(DATA_DERIVED_MAPPING_SLOT)
-        .i32_const(32)
-        .binop(BinaryOp::I32Add) // data_ptr + 32
+        .i32_const(DATA_DERIVED_MAPPING_SLOT + 32)
         .local_get(mapping_slot_ptr)
         .i32_const(32) // copy 32 bytes
         .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
@@ -1122,21 +1104,20 @@ pub fn add_commit_changes_to_storage_fn(
                 // deleted from storage, so we skip the save
                 block.i32_const(32).call(is_zero_fn).br_if(block_id);
 
+                let slot_ptr = module.locals.add(ValType::I32);
+
+                block
+                    .i32_const(32)
+                    .call(compilation_ctx.allocator)
+                    .local_set(slot_ptr);
+
                 // Put in the stack the field id
                 block
                     .local_get(owner_ptr)
                     .global_get(*dynamic_field_ptr)
                     .call(get_id_bytes_ptr_fn)
+                    .local_get(slot_ptr)
                     .call(write_object_slot_fn);
-
-                let slot_ptr = module.locals.add(ValType::I32);
-                block
-                    .i32_const(32)
-                    .call(compilation_ctx.allocator)
-                    .local_tee(slot_ptr)
-                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                    .i32_const(32)
-                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
                 // Save struct changes
                 block

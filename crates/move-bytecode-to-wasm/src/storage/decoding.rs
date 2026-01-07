@@ -762,24 +762,19 @@ pub fn add_decode_intermediate_type_instructions(
                     .local_get(child_struct_id_ptr)
                     .call(storage_load);
 
+                let child_struct_slot_ptr = module.locals.add(ValType::I32);
+                builder
+                    .i32_const(32)
+                    .call(compilation_ctx.allocator)
+                    .local_set(child_struct_slot_ptr);
+
                 // Calculate the child struct's storage slot
                 // child_struct_slot = keccak256(child_struct_id || keccak256(owner || 0))
                 builder
                     .local_get(owner_ptr)
                     .local_get(child_struct_id_ptr)
+                    .local_get(child_struct_slot_ptr)
                     .call(write_object_slot_fn);
-
-                // Allocate memory for the child struct slot and copy the calculated
-                // slot data to avoid overwriting during recursive decoding.
-
-                let child_struct_slot_ptr = module.locals.add(ValType::I32);
-                builder
-                    .i32_const(32)
-                    .call(compilation_ctx.allocator)
-                    .local_tee(child_struct_slot_ptr)
-                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                    .i32_const(32)
-                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
                 // Reset slot_offset for the child struct decoding
                 builder.i32_const(0).local_set(slot_offset);

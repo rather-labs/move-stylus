@@ -5,11 +5,7 @@ use crate::{
         ModuleId,
         reserved_modules::{SF_MODULE_NAME_DYNAMIC_FIELD, STYLUS_FRAMEWORK_ADDRESS},
     },
-    data::{
-        DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
-        DATA_SLOT_DATA_PTR_OFFSET,
-        // DATA_STORAGE_OBJECT_OWNER_OFFSET,
-    },
+    data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET},
     hostio::host_functions::{native_keccak256, storage_load_bytes32},
     runtime::RuntimeFunction,
     translation::intermediate_types::error::IntermediateTypeError,
@@ -63,20 +59,18 @@ pub fn add_child_object_fn(
 
     let slot_ptr = module.locals.add(ValType::I32);
 
+    builder
+        .i32_const(32)
+        .call(compilation_ctx.allocator)
+        .local_set(slot_ptr);
+
     // Calculate the destiny slot
     builder
         .local_get(parent_address)
         .local_get(child_ptr)
         .call(get_id_bytes_ptr_fn)
+        .local_get(slot_ptr)
         .call(write_object_slot_fn);
-
-    builder
-        .i32_const(32)
-        .call(compilation_ctx.allocator)
-        .local_tee(slot_ptr)
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .i32_const(32)
-        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
     // Save the field into storage
     builder
@@ -133,6 +127,12 @@ pub fn add_borrow_object_fn(
     let parent_uid = module.locals.add(ValType::I32);
     let child_id = module.locals.add(ValType::I32);
 
+    let slot_ptr = module.locals.add(ValType::I32);
+    builder
+        .i32_const(32)
+        .call(compilation_ctx.allocator)
+        .local_set(slot_ptr);
+
     // Calculate the destiny slot
     builder
         .local_get(parent_uid)
@@ -154,27 +154,10 @@ pub fn add_borrow_object_fn(
         )
         .local_tee(parent_uid)
         .local_get(child_id)
+        .local_get(slot_ptr)
         .call(write_object_slot_fn);
 
-    // Write the owner
-    /*
-    builder
-        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
-        .local_get(parent_uid)
-        .i32_const(32)
-        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-    */
-
     let result_struct = module.locals.add(ValType::I32);
-
-    let slot_ptr = module.locals.add(ValType::I32);
-    builder
-        .i32_const(32)
-        .call(compilation_ctx.allocator)
-        .local_tee(slot_ptr)
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .i32_const(32)
-        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
     // Read from storage
     builder
@@ -297,6 +280,7 @@ pub fn add_has_child_object_fn(
     builder
         .local_get(parent_uid)
         .local_get(child_id)
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
         .call(write_object_slot_fn);
 
     builder

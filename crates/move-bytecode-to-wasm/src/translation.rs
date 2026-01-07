@@ -14,6 +14,7 @@ pub mod table;
 
 use std::{
     collections::{HashMap, HashSet},
+    hash::{Hash, Hasher},
     rc::Rc,
     sync::Arc,
 };
@@ -37,6 +38,7 @@ use crate::{
     compilation_context::{ModuleData, ModuleId},
     data::DATA_ABORT_MESSAGE_PTR_OFFSET,
     generics::{replace_type_parameters, type_contains_generics},
+    hasher::get_hasher,
     hostio::host_functions::storage_flush_cache,
     native_functions::NativeFunction,
     runtime::RuntimeFunction,
@@ -199,7 +201,15 @@ pub fn translate_function(
     let mut function = FunctionBuilder::new(&mut module.types, &params, &results);
 
     #[cfg(debug_assertions)]
-    function.name(function_information.function_id.identifier.to_string());
+    {
+        let mut hasher = get_hasher();
+        function_information.function_id.hash(&mut hasher);
+        function.name(format!(
+            "{}_{:x}",
+            function_information.function_id.identifier,
+            hasher.finish()
+        ));
+    }
 
     let mut builder = function.func_body();
 
