@@ -1,10 +1,7 @@
 use crate::{
     CompilationContext,
     compilation_context::ModuleId,
-    data::{
-        DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
-        DATA_SHARED_OBJECTS_KEY_OFFSET,
-    },
+    data::{DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_SHARED_OBJECTS_KEY_OFFSET},
     runtime::RuntimeFunction,
     translation::intermediate_types::IntermediateType,
 };

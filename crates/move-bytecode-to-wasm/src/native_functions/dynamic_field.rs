@@ -5,7 +5,11 @@ use crate::{
         ModuleId,
         reserved_modules::{SF_MODULE_NAME_DYNAMIC_FIELD, STYLUS_FRAMEWORK_ADDRESS},
     },
-    data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET},
+    data::{
+        DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
+        DATA_SLOT_DATA_PTR_OFFSET,
+        // DATA_STORAGE_OBJECT_OWNER_OFFSET,
+    },
     hostio::host_functions::{native_keccak256, storage_load_bytes32},
     runtime::RuntimeFunction,
     translation::intermediate_types::error::IntermediateTypeError,
@@ -58,7 +62,6 @@ pub fn add_child_object_fn(
     let child_ptr = module.locals.add(ValType::I32);
 
     let slot_ptr = module.locals.add(ValType::I32);
-
     builder
         .i32_const(32)
         .call(compilation_ctx.allocator)
@@ -196,7 +199,7 @@ pub fn add_remove_child_object_fn(
     let name = NativeFunction::get_generic_function_name(
         NativeFunction::NATIVE_REMOVE_CHILD_OBJECT,
         compilation_ctx,
-        &[itype],
+        &[&itype.clone()],
         module_id,
     )?;
     if let Some(function) = module.funcs.by_name(&name) {

@@ -10,7 +10,7 @@ use walrus::{
 
 use crate::{
     CompilationContext,
-    data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET, DATA_ZERO_OFFSET},
+    data::{DATA_SLOT_DATA_PTR_OFFSET, DATA_ZERO_OFFSET},
     hostio::host_functions::{native_keccak256, storage_cache_bytes32, storage_load_bytes32},
     runtime::RuntimeFunction,
     storage::storage_layout::field_size,
@@ -834,7 +834,7 @@ pub fn add_encode_intermediate_type_instructions(
                     .i32_const(32)
                     .call(compilation_ctx.allocator)
                     .local_set(child_struct_slot_ptr);
-                
+
                 // Calculate the child struct slot
                 builder
                     .local_get(owner_ptr)

@@ -8,7 +8,7 @@ use walrus::{
 
 use crate::{
     CompilationContext,
-    data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET},
+    data::DATA_SLOT_DATA_PTR_OFFSET,
     hostio::host_functions::{native_keccak256, storage_load_bytes32},
     runtime::RuntimeFunction,
     storage::storage_layout::field_size,
