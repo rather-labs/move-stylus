@@ -59,12 +59,23 @@ pub fn translate_package_cli(
             .map_err(|e| ICEError::new(ICEErrorKind::Unexpected(e.into())))?;
 
         if optimize {
-            wasm_opt::OptimizationOptions::new_optimize_for_size_aggressively()
+            // wasm_opt::OptimizationOptions::new_optimize_for_size_aggressively()
+            let mut optimizations =
+                wasm_opt::OptimizationOptions::new_optimize_for_size_aggressively();
+            optimizations
+                .optimize_level(wasm_opt::OptimizeLevel::Level4)
+                .add_pass(wasm_opt::Pass::DwarfDump)
+                .add_pass(wasm_opt::Pass::StripDebug)
+                .add_pass(wasm_opt::Pass::StripDwarf)
+                .add_pass(wasm_opt::Pass::InliningOptimizing)
+                .add_pass(wasm_opt::Pass::Inlining)
                 .enable_feature(wasm_opt::Feature::BulkMemory)
                 .disable_feature(wasm_opt::Feature::Simd)
-                .disable_feature(wasm_opt::Feature::Multivalue)
-                .run(&wasm_file_path, &wasm_file_path)
-                .unwrap();
+                .disable_feature(wasm_opt::Feature::Multivalue);
+
+            println!("Passes: {:?}", &optimizations.passes);
+
+            optimizations.run(&wasm_file_path, &wasm_file_path).unwrap();
         }
 
         if emit_wat {
