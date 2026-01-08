@@ -6,6 +6,7 @@ use walrus::{
 
 use crate::{
     CompilationContext,
+    data::RuntimeErrorData,
     translation::{
         functions::add_unpack_function_return_values_instructions,
         intermediate_types::{ISignature, IntermediateType},
@@ -81,6 +82,7 @@ impl<'a> PublicFunction<'a> {
         data_len: LocalId,
         return_block_id: InstrSeqId,
         compilation_ctx: &CompilationContext,
+        runtime_error_data: &mut RuntimeErrorData,
     ) -> Result<(), AbiError> {
         let mut inner_result: Result<(), AbiError> = Ok(());
 
@@ -110,8 +112,13 @@ impl<'a> PublicFunction<'a> {
 
             // Wrap function to unpack/pack arguments (only if signer injection succeeded)
             if inner_result.is_ok() {
-                inner_result =
-                    self.wrap_public_function(module, block, data_pointer, compilation_ctx);
+                inner_result = self.wrap_public_function(
+                    module,
+                    block,
+                    data_pointer,
+                    compilation_ctx,
+                    runtime_error_data,
+                );
             }
 
             // Set the return data length and pointer to the locals and break to the return block
@@ -134,6 +141,7 @@ impl<'a> PublicFunction<'a> {
         block: &mut InstrSeqBuilder,
         args_pointer: LocalId,
         compilation_ctx: &CompilationContext,
+        runtime_error_data: &mut RuntimeErrorData,
     ) -> Result<(), AbiError> {
         // Unpack function arguments
         build_unpack_instructions(
@@ -142,6 +150,7 @@ impl<'a> PublicFunction<'a> {
             &self.signature.arguments,
             args_pointer,
             compilation_ctx,
+            runtime_error_data,
         )?;
 
         // Call the function
@@ -160,8 +169,13 @@ impl<'a> PublicFunction<'a> {
             block.i32_const(0).i32_const(0);
         } else {
             // Pack return values and push the result pointer and length directly
-            let (data_ptr, data_len) =
-                build_pack_instructions(block, &self.signature.returns, module, compilation_ctx)?;
+            let (data_ptr, data_len) = build_pack_instructions(
+                block,
+                &self.signature.returns,
+                module,
+                compilation_ctx,
+                runtime_error_data,
+            )?;
             block.local_get(data_ptr).local_get(data_len);
         }
 
@@ -224,13 +238,14 @@ mod tests {
 
     use alloy_sol_types::{SolType, sol};
     use walrus::{
-        ConstExpr, FunctionBuilder, MemoryId, ValType,
-        ir::{LoadKind, MemArg, Value},
+        FunctionBuilder, MemoryId, ValType,
+        ir::{LoadKind, MemArg},
     };
     use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store, TypedFunc};
 
     use crate::{
-        test_compilation_context,
+        compilation_context::globals::CompilationContextGlobals,
+        test_compilation_context, test_runtime_error_data,
         test_tools::build_module,
         translation::{functions::prepare_function_return, intermediate_types::IntermediateType},
         utils::display_module,
@@ -372,13 +387,10 @@ mod tests {
         data_len: i32,
         allocator_func: FunctionId,
         memory_id: MemoryId,
+        ctx_globals: CompilationContextGlobals,
     ) {
-        let calldata_reader_pointer_global =
-            module
-                .globals
-                .add_local(ValType::I32, true, false, ConstExpr::Value(Value::I32(0)));
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
+        let mut runtime_error_data = test_runtime_error_data!();
         // Build mock router
 
         let selector = module.locals.add(ValType::I32);
@@ -426,6 +438,7 @@ mod tests {
                     args_len,
                     return_block_id,
                     &compilation_ctx,
+                    &mut runtime_error_data,
                 )
                 .unwrap();
 
@@ -442,11 +455,9 @@ mod tests {
 
     #[test]
     fn test_build_public_function() {
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
             &[ValType::I32, ValType::I32, ValType::I64],
@@ -525,6 +536,7 @@ mod tests {
             data_len,
             allocator,
             memory_id,
+            ctx_globals,
         );
 
         display_module(&mut raw_module);
@@ -542,10 +554,8 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_build_public_function_with_signer() {
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -609,6 +619,7 @@ mod tests {
             data_len,
             allocator,
             memory_id,
+            ctx_globals,
         );
 
         display_module(&mut raw_module);
@@ -627,10 +638,8 @@ mod tests {
 
     #[test]
     fn test_build_entrypoint_router_no_match() {
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+        let (mut raw_module, allocator_func, memory_id, ctx_globals) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -687,6 +696,7 @@ mod tests {
             data_len,
             allocator_func,
             memory_id,
+            ctx_globals,
         );
 
         display_module(&mut raw_module);
@@ -702,10 +712,8 @@ mod tests {
     // injects a mock address as signer and execute the function
     #[test]
     fn public_function_with_signature() {
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
 
         let function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -733,10 +741,8 @@ mod tests {
 
     #[test]
     fn test_fail_public_function_signature() {
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
 
         let function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[ValType::I32, ValType::I64], &[]);
@@ -772,10 +778,8 @@ mod tests {
 
     #[test]
     fn test_fail_public_function_signature_complex_type() {
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
 
         let function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[ValType::I32, ValType::I64], &[]);
@@ -812,10 +816,8 @@ mod tests {
 
     #[test]
     fn test_fail_public_function_signature_complex_type_2() {
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
 
         let function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[ValType::I32, ValType::I64], &[]);

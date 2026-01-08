@@ -1,7 +1,9 @@
 use super::{RuntimeFunction, error::RuntimeFunctionError};
-use crate::CompilationContext;
-use crate::data::DATA_ENUM_STORAGE_SIZE_OFFSET;
-use crate::translation::intermediate_types::IntermediateType;
+use crate::{
+    CompilationContext,
+    data::{DATA_ENUM_STORAGE_SIZE_OFFSET, RuntimeErrorData},
+    translation::intermediate_types::IntermediateType,
+};
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
@@ -90,6 +92,7 @@ pub fn get_storage_size_by_offset(
 pub fn compute_enum_storage_tail_position(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     itype: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let name = RuntimeFunction::ComputeEnumStorageTailPosition
@@ -110,8 +113,12 @@ pub fn compute_enum_storage_tail_position(
     let head_slot_offset = module.locals.add(ValType::I32);
 
     // Get the storage size function for this enum type
-    let get_storage_size_by_offset_fn =
-        RuntimeFunction::GetStorageSizeByOffset.get_generic(module, compilation_ctx, &[itype])?;
+    let get_storage_size_by_offset_fn = RuntimeFunction::GetStorageSizeByOffset.get_generic(
+        module,
+        compilation_ctx,
+        Some(runtime_error_data),
+        &[itype],
+    )?;
     let swap_256_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx))?;
     let add_u256_fn = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx))?;
 

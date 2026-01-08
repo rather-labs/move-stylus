@@ -1,8 +1,7 @@
 use super::NativeFunction;
 use crate::{
     CompilationContext, IntermediateType, Module, ModuleId,
-    abi_types::error_encoding::build_runtime_error_message,
-    data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET},
+    data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET, RuntimeErrorData},
     error::RuntimeError,
     hostio::host_functions::storage_load_bytes32,
     native_functions::abi_error::add_handle_error_instructions,
@@ -24,6 +23,7 @@ use walrus::{
 pub fn add_peep_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     itype: &IntermediateType,
     module_id: &ModuleId,
 ) -> Result<FunctionId, NativeFunctionError> {
@@ -74,14 +74,6 @@ pub fn add_peep_fn(
         )
         .local_set(uid_ptr);
 
-    // Build the runtime error message for the case where the object is not found
-    let encoded_error_ptr = build_runtime_error_message(
-        &mut builder,
-        module,
-        compilation_ctx,
-        &RuntimeError::ObjectNotFound.to_string(),
-    )?;
-
     // Search for the object in the owner's address mapping
     builder.block(None, |block| {
         let exit_block = block.id();
@@ -106,13 +98,27 @@ pub fn add_peep_fn(
             .br_if(exit_block);
 
         // If we get here means the object was not found
+        let encoded_error_offset = runtime_error_data.get(
+            module,
+            compilation_ctx.memory_id,
+            RuntimeError::ObjectNotFound,
+        );
+        let encoded_error_ptr = module.locals.add(ValType::I32);
+
+        block
+            .i32_const(encoded_error_offset)
+            .local_set(encoded_error_ptr);
         add_handle_error_instructions(block, compilation_ctx, encoded_error_ptr);
     });
 
     // Decode the storage object into the internal representation
 
-    let read_and_decode_from_storage_fn =
-        RuntimeFunction::ReadAndDecodeFromStorage.get_generic(module, compilation_ctx, &[itype])?;
+    let read_and_decode_from_storage_fn = RuntimeFunction::ReadAndDecodeFromStorage.get_generic(
+        module,
+        compilation_ctx,
+        Some(runtime_error_data),
+        &[itype],
+    )?;
 
     // Copy the slot number into a local to avoid overwriting it later
     let slot_ptr = module.locals.add(ValType::I32);

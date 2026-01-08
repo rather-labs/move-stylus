@@ -8,6 +8,7 @@ use walrus::{
 use crate::{
     CompilationContext,
     abi_types::error::{AbiError, AbiOperationError},
+    data::RuntimeErrorData,
     runtime::RuntimeFunction,
     translation::intermediate_types::IntermediateType,
     vm_handled_types::{VmHandledType, string::String_},
@@ -30,6 +31,7 @@ pub trait Packable {
         writer_pointer: LocalId,
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
+        runtime_error_data: Option<&mut RuntimeErrorData>,
     ) -> Result<(), AbiError>;
 
     /// Adds the instructions to pack the value into memory according to Solidity's ABI encoding.
@@ -58,6 +60,7 @@ pub trait Packable {
         writer_pointer: LocalId,
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
+        runtime_error_data: Option<&mut RuntimeErrorData>,
     ) -> Result<(), AbiError>;
 
     /// Adds the instructions to load the value into a local variable.
@@ -101,6 +104,7 @@ pub fn build_pack_instructions<T: Packable>(
     function_return_signature: &[T],
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
 ) -> Result<(LocalId, LocalId), AbiError> {
     // We need to load all return types into locals in order to reverse the read order
     // Otherwise they would be popped in reverse order
@@ -154,6 +158,7 @@ pub fn build_pack_instructions<T: Packable>(
                 writer_pointer,
                 calldata_reference_pointer,
                 compilation_ctx,
+                Some(runtime_error_data),
             )?;
 
             // A dynamic value will only save the offset to where the values are located, so, we
@@ -171,6 +176,7 @@ pub fn build_pack_instructions<T: Packable>(
                 writer_pointer,
                 calldata_reference_pointer,
                 compilation_ctx,
+                Some(runtime_error_data),
             )?;
 
             builder
@@ -212,6 +218,7 @@ impl Packable for IntermediateType {
         writer_pointer: LocalId,
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
+        runtime_error_data: Option<&mut RuntimeErrorData>,
     ) -> Result<(), AbiError> {
         match self {
             IntermediateType::IBool
@@ -258,8 +265,12 @@ impl Packable for IntermediateType {
                     .call(pack_address_function);
             }
             IntermediateType::IVector(inner) => {
-                let pack_vector_function =
-                    RuntimeFunction::PackVector.get_generic(module, compilation_ctx, &[inner])?;
+                let pack_vector_function = RuntimeFunction::PackVector.get_generic(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    &[inner],
+                )?;
                 builder
                     .local_get(local)
                     .local_get(writer_pointer)
@@ -270,6 +281,7 @@ impl Packable for IntermediateType {
                 let pack_reference_function = RuntimeFunction::PackReference.get_generic(
                     module,
                     compilation_ctx,
+                    runtime_error_data,
                     &[inner],
                 )?;
                 builder
@@ -279,8 +291,12 @@ impl Packable for IntermediateType {
                     .call(pack_reference_function);
             }
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
-                let pack_struct_function =
-                    RuntimeFunction::PackStruct.get_generic(module, compilation_ctx, &[self])?;
+                let pack_struct_function = RuntimeFunction::PackStruct.get_generic(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    &[self],
+                )?;
 
                 builder
                     .local_get(local)
@@ -324,6 +340,7 @@ impl Packable for IntermediateType {
         writer_pointer: LocalId,
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
+        runtime_error_data: Option<&mut RuntimeErrorData>,
     ) -> Result<(), AbiError> {
         match self {
             IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
@@ -348,6 +365,7 @@ impl Packable for IntermediateType {
                     writer_pointer,
                     calldata_reference_pointer,
                     compilation_ctx,
+                    runtime_error_data,
                 )?;
             }
             IntermediateType::IStruct {
@@ -362,8 +380,12 @@ impl Packable for IntermediateType {
                     .call(pack_string_function);
             }
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
-                let pack_struct_function =
-                    RuntimeFunction::PackStruct.get_generic(module, compilation_ctx, &[self])?;
+                let pack_struct_function = RuntimeFunction::PackStruct.get_generic(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    &[self],
+                )?;
 
                 builder
                     .local_get(local)
@@ -379,6 +401,7 @@ impl Packable for IntermediateType {
                 writer_pointer,
                 calldata_reference_pointer,
                 compilation_ctx,
+                runtime_error_data,
             )?,
         }
         Ok(())
@@ -477,7 +500,7 @@ mod tests {
     use wasmtime::{Caller, Engine, Extern, Linker};
 
     use crate::{
-        test_compilation_context,
+        test_compilation_context, test_runtime_error_data,
         test_tools::{build_module, setup_wasmtime_module},
         utils::display_module,
     };
@@ -511,10 +534,9 @@ mod tests {
 
     #[test]
     fn test_build_pack_instructions() {
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+        let (mut raw_module, allocator_func, memory_id, ctx_globals) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
+        let mut runtime_error_data = test_runtime_error_data!();
 
         let validator_func_type = raw_module.types.add(&[ValType::I32, ValType::I32], &[]);
         let (validator_func, _) = raw_module.add_import_func("", "validator", validator_func_type);
@@ -541,6 +563,7 @@ mod tests {
             ],
             &mut raw_module,
             &compilation_ctx,
+            &mut runtime_error_data,
         )
         .unwrap();
 
@@ -577,10 +600,9 @@ mod tests {
     #[test]
     fn test_build_pack_instructions_memory_offset() {
         // Memory offset starts at 100
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(Some(100));
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+        let (mut raw_module, allocator_func, memory_id, ctx_globals) = build_module(Some(100));
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
+        let mut runtime_error_data = test_runtime_error_data!();
 
         let validator_func_type = raw_module.types.add(&[ValType::I32, ValType::I32], &[]);
         let (validator_func, _) = raw_module.add_import_func("", "validator", validator_func_type);
@@ -607,6 +629,7 @@ mod tests {
             ],
             &mut raw_module,
             &compilation_ctx,
+            &mut runtime_error_data,
         )
         .unwrap();
 
@@ -670,10 +693,9 @@ mod tests {
         .concat();
         let data_len = data.len() as i32;
 
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(Some(data_len));
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+        let (mut raw_module, allocator_func, memory_id, ctx_globals) = build_module(Some(data_len));
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
+        let mut runtime_error_data = test_runtime_error_data!();
 
         let validator_func_type = raw_module.types.add(&[ValType::I32, ValType::I32], &[]);
         let (validator_func, _) = raw_module.add_import_func("", "validator", validator_func_type);
@@ -702,6 +724,7 @@ mod tests {
             ],
             &mut raw_module,
             &compilation_ctx,
+            &mut runtime_error_data,
         )
         .unwrap();
 

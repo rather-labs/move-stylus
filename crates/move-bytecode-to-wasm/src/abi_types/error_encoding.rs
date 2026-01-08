@@ -7,6 +7,7 @@ use crate::{
     CompilationContext,
     abi_types::abi_encoding::{self, AbiFunctionSelector},
     abi_types::packing::build_pack_instructions,
+    data::RuntimeErrorData,
     runtime::RuntimeFunction,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
     utils::snake_to_upper_camel,
@@ -52,6 +53,7 @@ pub fn build_custom_error_message(
     builder: &mut InstrSeqBuilder,
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     error_struct: &IStruct,
     error_struct_ptr: LocalId,
 ) -> Result<LocalId, AbiError> {
@@ -118,8 +120,13 @@ pub fn build_custom_error_message(
     // allocating for the packed fields, this invariant would break and the error message buffer would become corrupted.
     // So, this code assumes that build_pack_instructions does not insert any unrelated allocations between the header/selector
     // and the packed error fields when laying out the memory.
-    let (_error_data_ptr, error_data_len) =
-        build_pack_instructions(builder, &error_struct.fields, module, compilation_ctx)?;
+    let (_error_data_ptr, error_data_len) = build_pack_instructions(
+        builder,
+        &error_struct.fields,
+        module,
+        compilation_ctx,
+        runtime_error_data,
+    )?;
 
     // Store the total length of the error message: length(4) + selector(4) + error_data_len
     builder
@@ -139,20 +146,22 @@ pub fn build_custom_error_message(
     Ok(ptr)
 }
 
-/// Common function to build an ABI-encoded Error(string) message.
+/// Builds an error message with the error code converted to decimal.
 ///
-/// This function takes a string pointer and length, and creates a structured error message
+/// This function takes a u64 error code from the stack and creates a structured error message
 /// in the format: [length: u32 LE][selector: 4 bytes][head: 32 bytes][length: 32 bytes][message: variable]
+/// where the message contains only the decimal representation of the error code.
 ///
 /// # Arguments
 /// * `builder` - WASM instruction sequence builder
 /// * `module` - WASM module being built
 /// * `compilation_ctx` - Compilation context with memory and allocator info
-/// * `error_ptr` - LocalId pointing to the string data in memory
-/// * `error_len` - LocalId containing the length of the string
 ///
 /// # Returns
 /// * A local id variable containing the pointer to the allocated error message blob
+///
+/// # Stack Input
+/// * Expects a u64 (error code) on the top of the stack
 ///
 /// # Memory Layout
 /// The returned blob has the following structure:
@@ -160,14 +169,42 @@ pub fn build_custom_error_message(
 /// * Bytes 4-7: Error selector (4 bytes)
 /// * Bytes 8-39: Head word (32 bytes, with 0x20 at offset 39)
 /// * Bytes 40-71: Length word (32 bytes, big-endian message length at offset 68)
-/// * Bytes 72+: Error message text
-fn build_error_string_abi_encoding(
+/// * Bytes 72+: Error message text (e.g., "123")
+pub fn build_abort_error_message(
     builder: &mut InstrSeqBuilder,
     module: &mut Module,
     compilation_ctx: &CompilationContext,
-    error_ptr: LocalId,
-    error_len: LocalId,
 ) -> Result<LocalId, AbiError> {
+    // Convert error code to decimal string
+    let u64_to_dec_ascii = RuntimeFunction::U64ToAsciiBase10.get(module, Some(compilation_ctx))?;
+    let error_ptr = module.locals.add(ValType::I32);
+    let error_len = module.locals.add(ValType::I32);
+
+    // Convert u64 error code to decimal ASCII string
+    builder.call(u64_to_dec_ascii).local_tee(error_ptr);
+
+    // Load the length of the decimal string from memory (1 byte)
+    builder
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32_8 {
+                kind: ExtendedLoad::ZeroExtend,
+            },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .local_set(error_len);
+
+    // Skip length header to get pointer to actual error code string
+    builder
+        .local_get(error_ptr)
+        .i32_const(1)
+        .binop(BinaryOp::I32Add)
+        .local_set(error_ptr);
+
+    // Build the ABI-encoded error message (inlined from build_error_string_abi_encoding)
     let ptr = module.locals.add(ValType::I32);
 
     // Step 1: Calculate memory requirements
@@ -262,125 +299,6 @@ fn build_error_string_abi_encoding(
     Ok(ptr)
 }
 
-/// Builds an error message with the error code converted to decimal.
-///
-/// This function takes a u64 error code from the stack and creates a structured error message
-/// in the format: [length: u32 LE][selector: 4 bytes][head: 32 bytes][length: 32 bytes][message: variable]
-/// where the message contains only the decimal representation of the error code.
-///
-/// # Arguments
-/// * `builder` - WASM instruction sequence builder
-/// * `module` - WASM module being built
-/// * `compilation_ctx` - Compilation context with memory and allocator info
-///
-/// # Returns
-/// * A local id variable containing the pointer to the allocated error message blob
-///
-/// # Stack Input
-/// * Expects a u64 (error code) on the top of the stack
-///
-/// # Memory Layout
-/// The returned blob has the following structure:
-/// * Bytes 0-3: Total message length (little-endian u32)
-/// * Bytes 4-7: Error selector (4 bytes)
-/// * Bytes 8-39: Head word (32 bytes, with 0x20 at offset 39)
-/// * Bytes 40-71: Length word (32 bytes, big-endian message length at offset 68)
-/// * Bytes 72+: Error message text (e.g., "123")
-pub fn build_abort_error_message(
-    builder: &mut InstrSeqBuilder,
-    module: &mut Module,
-    compilation_ctx: &CompilationContext,
-) -> Result<LocalId, AbiError> {
-    // Convert error code to decimal string
-    let u64_to_dec_ascii = RuntimeFunction::U64ToAsciiBase10.get(module, Some(compilation_ctx))?;
-    let error_ptr = module.locals.add(ValType::I32);
-    let error_len = module.locals.add(ValType::I32);
-
-    // Convert u64 error code to decimal ASCII string
-    builder.call(u64_to_dec_ascii).local_tee(error_ptr);
-
-    // Load the length of the decimal string from memory (1 byte)
-    builder
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32_8 {
-                kind: ExtendedLoad::ZeroExtend,
-            },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
-        .local_set(error_len);
-
-    // Skip length header to get pointer to actual error code string
-    builder
-        .local_get(error_ptr)
-        .i32_const(1)
-        .binop(BinaryOp::I32Add)
-        .local_set(error_ptr);
-
-    // Build the ABI-encoded error message
-    build_error_string_abi_encoding(builder, module, compilation_ctx, error_ptr, error_len)
-}
-
-/// Builds an error message from a Rust string.
-///
-/// This function takes a Rust string and creates a structured error message
-/// in the format: [length: u32 LE][selector: 4 bytes][head: 32 bytes][length: 32 bytes][message: variable]
-///
-/// # Arguments
-/// * `builder` - WASM instruction sequence builder
-/// * `module` - WASM module being built
-/// * `compilation_ctx` - Compilation context with memory and allocator info
-/// * `error_message` - The error message string to encode
-///
-/// # Returns
-/// * A local id variable containing the pointer to the allocated error message blob
-///
-/// # Memory Layout
-/// The returned blob has the following structure:
-/// * Bytes 0-3: Total message length (little-endian u32)
-/// * Bytes 4-7: Error selector (4 bytes)
-/// * Bytes 8-39: Head word (32 bytes, with 0x20 at offset 39)
-/// * Bytes 40-71: Length word (32 bytes, big-endian message length at offset 68)
-/// * Bytes 72+: Error message text
-pub fn build_runtime_error_message(
-    builder: &mut InstrSeqBuilder,
-    module: &mut Module,
-    compilation_ctx: &CompilationContext,
-    error_message: &str,
-) -> Result<LocalId, AbiError> {
-    let error_ptr = module.locals.add(ValType::I32);
-    let error_len = module.locals.add(ValType::I32);
-    let error_bytes = error_message.as_bytes();
-    let error_len_value = error_bytes.len() as i32;
-
-    // Allocate memory for the error message string
-    builder
-        .i32_const(error_len_value)
-        .call(compilation_ctx.allocator)
-        .local_set(error_ptr);
-
-    // Write the error message bytes to memory
-    for (i, &byte) in error_bytes.iter().enumerate() {
-        builder.local_get(error_ptr).i32_const(byte as i32).store(
-            compilation_ctx.memory_id,
-            StoreKind::I32_8 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: i as u32,
-            },
-        );
-    }
-
-    // Set the error length
-    builder.i32_const(error_len_value).local_set(error_len);
-
-    // Build the ABI-encoded error message
-    build_error_string_abi_encoding(builder, module, compilation_ctx, error_ptr, error_len)
-}
-
 #[cfg(test)]
 mod tests {
     use crate::test_compilation_context;
@@ -402,10 +320,8 @@ mod tests {
     #[case(9876543210u64, "9876543210")]
     #[case(u64::MAX, "18446744073709551615")]
     fn test_build_abort_error_message(#[case] error_code: u64, #[case] expected: &str) {
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+        let (mut raw_module, allocator_func, memory_id, ctx_globals) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
 
         // Create a test function that calls build_abort_error_message
         let mut function_builder =

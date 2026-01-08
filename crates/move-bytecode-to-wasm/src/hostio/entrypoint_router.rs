@@ -6,7 +6,11 @@ use walrus::{
 use crate::{
     CompilationContext,
     abi_types::{error_encoding::build_abort_error_message, public_function::PublicFunction},
-    data::{DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_CALLDATA_OFFSET},
+    data::{
+        DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_CALLDATA_OFFSET, RuntimeErrorData,
+        TOTAL_RESERVED_MEMORY,
+    },
+    memory::MEMORY_PAGE_SIZE,
     runtime::RuntimeFunction,
     translation::intermediate_types::IntermediateType,
 };
@@ -23,6 +27,7 @@ pub fn build_entrypoint_router(
     module: &mut Module,
     functions: &[PublicFunction],
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     dynamic_fields_global_variables: &Vec<(GlobalId, IntermediateType)>,
 ) -> Result<(), HostIOError> {
     let (read_args_function, _) = host_functions::read_args(module);
@@ -30,6 +35,22 @@ pub fn build_entrypoint_router(
 
     let mut router = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
     let mut router_builder = router.func_body();
+
+    // Set the next_free_memory_pointer global to the current next_offset from runtime_error_data
+    // This ensures the memory allocator starts after all error data that was added during compilation
+    let next_offset_value = runtime_error_data.get_next_offset();
+    router_builder
+        .i32_const(next_offset_value)
+        .global_set(compilation_ctx.globals.next_free_memory_pointer);
+
+    // Update the available_memory global to account for the memory used by error data
+    // available_memory starts at MEMORY_PAGE_SIZE and we need to reduce it by the amount
+    // of memory used for errors (from initial_offset to next_offset)
+    let memory_used_for_errors = next_offset_value - TOTAL_RESERVED_MEMORY;
+    let updated_available_memory = MEMORY_PAGE_SIZE - memory_used_for_errors;
+    router_builder
+        .i32_const(updated_available_memory)
+        .global_set(compilation_ctx.globals.available_memory);
 
     // Arguments
     let data_len = module.locals.add(ValType::I32); // Length of the calldata
@@ -149,6 +170,7 @@ pub fn build_entrypoint_router(
                     data_len,
                     return_block_id,
                     compilation_ctx,
+                    runtime_error_data,
                 );
             }
 
@@ -170,6 +192,7 @@ pub fn build_entrypoint_router(
                     return_block,
                     data_pointer,
                     compilation_ctx,
+                    runtime_error_data,
                 );
 
                 // Stack: [data_pointer] [data_len]
@@ -277,6 +300,7 @@ pub fn build_entrypoint_router(
     let commit_changes_to_storage_function = RuntimeFunction::get_commit_changes_to_storage_fn(
         module,
         compilation_ctx,
+        runtime_error_data,
         dynamic_fields_global_variables,
     )?;
 
@@ -477,10 +501,10 @@ mod tests {
 
     #[test]
     fn test_build_entrypoint_router_noop() {
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+        let (mut raw_module, allocator_func, memory_id, compilation_context_globals) =
             build_module(None);
         let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+            test_compilation_context!(memory_id, allocator_func, compilation_context_globals);
         let signature = ISignature {
             arguments: vec![],
             returns: vec![],
@@ -491,8 +515,15 @@ mod tests {
         let noop_selector_data = noop.get_selector().to_vec();
         let noop_2_selector_data = noop_2.get_selector().to_vec();
 
-        build_entrypoint_router(&mut raw_module, &[noop, noop_2], &compilation_ctx, &vec![])
-            .unwrap();
+        let mut runtime_error_data = RuntimeErrorData::new();
+        build_entrypoint_router(
+            &mut raw_module,
+            &[noop, noop_2],
+            &compilation_ctx,
+            &mut runtime_error_data,
+            &vec![],
+        )
+        .unwrap();
         display_module(&mut raw_module);
 
         let data = ReadArgsData {
@@ -519,10 +550,10 @@ mod tests {
     #[test]
     // #[should_panic(expected = "unreachable")]
     fn test_build_entrypoint_router_no_data() {
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+        let (mut raw_module, allocator_func, memory_id, compilation_context_globals) =
             build_module(None);
         let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+            test_compilation_context!(memory_id, allocator_func, compilation_context_globals);
         let signature = ISignature {
             arguments: vec![],
             returns: vec![],
@@ -530,8 +561,15 @@ mod tests {
         let noop = add_noop_function(&mut raw_module, &signature, &compilation_ctx);
         let noop_2 = add_noop_2_function(&mut raw_module, &signature, &compilation_ctx);
 
-        build_entrypoint_router(&mut raw_module, &[noop, noop_2], &compilation_ctx, &vec![])
-            .unwrap();
+        let mut runtime_error_data = RuntimeErrorData::new();
+        build_entrypoint_router(
+            &mut raw_module,
+            &[noop, noop_2],
+            &compilation_ctx,
+            &mut runtime_error_data,
+            &vec![],
+        )
+        .unwrap();
         display_module(&mut raw_module);
 
         // Invalid selector
@@ -545,10 +583,10 @@ mod tests {
 
     #[test]
     fn test_build_entrypoint_router_no_match() {
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+        let (mut raw_module, allocator_func, memory_id, compilation_context_globals) =
             build_module(None);
         let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+            test_compilation_context!(memory_id, allocator_func, compilation_context_globals);
         let signature = ISignature {
             arguments: vec![],
             returns: vec![],
@@ -556,8 +594,15 @@ mod tests {
         let noop = add_noop_function(&mut raw_module, &signature, &compilation_ctx);
         let noop_2 = add_noop_2_function(&mut raw_module, &signature, &compilation_ctx);
 
-        build_entrypoint_router(&mut raw_module, &[noop, noop_2], &compilation_ctx, &vec![])
-            .unwrap();
+        let mut runtime_error_data = RuntimeErrorData::new();
+        build_entrypoint_router(
+            &mut raw_module,
+            &[noop, noop_2],
+            &compilation_ctx,
+            &mut runtime_error_data,
+            &vec![],
+        )
+        .unwrap();
         display_module(&mut raw_module);
 
         // Invalid selector

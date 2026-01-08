@@ -16,6 +16,9 @@ pub enum RuntimeFunctionError {
     #[error("compilation context error")]
     CompilationContextError(#[from] CompilationContextError),
 
+    #[error("runtime error data not found")]
+    RuntimeErrorDataNotFound,
+
     #[error(r#"there was an error linking "{0}" runtime function, missing compilation context?"#)]
     CouldNotLink(String),
 

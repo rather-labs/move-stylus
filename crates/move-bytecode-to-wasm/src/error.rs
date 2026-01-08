@@ -150,7 +150,7 @@ impl From<&CodeError> for Diagnostic {
     }
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RuntimeError {
     #[error("frozen objects cannot be shared")]
     FrozenObjectsCannotBeShared,

@@ -1,6 +1,7 @@
 use crate::{
     CompilationContext,
     abi_types::{error::AbiError, unpacking::Unpackable},
+    data::RuntimeErrorData,
     runtime::{RuntimeFunction, RuntimeFunctionError},
     translation::intermediate_types::IntermediateType,
     wasm_builder_extensions::WasmBuilderExtension,
@@ -28,6 +29,7 @@ use walrus::{
 pub fn unpack_vector_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: Option<&mut RuntimeErrorData>,
     inner: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let name =
@@ -82,7 +84,7 @@ pub fn unpack_vector_function(
         .local_get(reader_pointer)
         .i32_const(32)
         .binop(BinaryOp::I32Add)
-        .global_set(compilation_ctx.calldata_reader_pointer);
+        .global_set(compilation_ctx.globals.calldata_reader_pointer);
 
     // Validate that the data reader pointer fits in 32 bits
     builder
@@ -157,6 +159,7 @@ pub fn unpack_vector_function(
                 data_reader_pointer,
                 calldata_base_pointer_,
                 compilation_ctx,
+                runtime_error_data,
             )?;
 
             // Store the value
@@ -193,7 +196,7 @@ pub fn unpack_vector_function(
         .local_get(reader_pointer)
         .i32_const(32)
         .binop(BinaryOp::I32Add)
-        .global_set(compilation_ctx.calldata_reader_pointer);
+        .global_set(compilation_ctx.globals.calldata_reader_pointer);
 
     builder.local_get(vector_pointer);
 
@@ -216,17 +219,17 @@ mod tests {
 
     use crate::{
         abi_types::unpacking::Unpackable,
-        test_compilation_context,
+        test_compilation_context, test_runtime_error_data,
         test_tools::{build_module, setup_wasmtime_module},
         translation::intermediate_types::IntermediateType,
     };
 
     /// Test helper for unpacking vector types
     fn unpack_vec(data: &[u8], int_type: IntermediateType, expected_result_bytes: &[u8]) {
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+        let (mut raw_module, allocator, memory_id, ctx_globals) =
             build_module(Some(data.len() as i32));
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+        let mut runtime_error_data = test_runtime_error_data!();
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
 
@@ -245,6 +248,7 @@ mod tests {
                 args_pointer,
                 calldata_reader_pointer,
                 &compilation_ctx,
+                Some(&mut runtime_error_data),
             )
             .unwrap();
 

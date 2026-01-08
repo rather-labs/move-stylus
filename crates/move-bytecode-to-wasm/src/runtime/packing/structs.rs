@@ -1,6 +1,7 @@
 use crate::{
     CompilationContext,
     abi_types::packing::Packable,
+    data::RuntimeErrorData,
     runtime::{RuntimeFunction, RuntimeFunctionError},
     translation::intermediate_types::{
         IntermediateType,
@@ -33,6 +34,7 @@ use walrus::{
 pub fn pack_struct_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     itype: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let name = RuntimeFunction::PackStruct.get_generic_function_name(compilation_ctx, &[itype])?;
@@ -186,6 +188,7 @@ pub fn pack_struct_function(
                         data_ptr,
                         inner_data_reference,
                         compilation_ctx,
+                        Some(runtime_error_data),
                     )?;
                     Ok(32)
                 } else {
@@ -196,6 +199,7 @@ pub fn pack_struct_function(
                         data_ptr,
                         inner_data_reference,
                         compilation_ctx,
+                        Some(runtime_error_data),
                     )?;
                     Ok(field.encoded_size(compilation_ctx)?)
                 }
@@ -208,6 +212,7 @@ pub fn pack_struct_function(
                     data_ptr,
                     inner_data_reference,
                     compilation_ctx,
+                    Some(runtime_error_data),
                 )?;
                 Ok(32)
             }
@@ -258,7 +263,7 @@ mod tests {
     use crate::{
         abi_types::packing::Packable,
         compilation_context::ModuleId,
-        test_compilation_context,
+        test_compilation_context, test_runtime_error_data,
         test_tools::{build_module, setup_wasmtime_module},
         translation::intermediate_types::{
             IntermediateType, VmHandledStruct,
@@ -625,11 +630,10 @@ mod tests {
     ) {
         use crate::compilation_context::ModuleData;
 
-        let (mut raw_module, alloc_function, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
+        let (mut raw_module, alloc_function, memory_id, ctx_globals) = build_module(None);
 
-        let mut compilation_ctx =
-            test_compilation_context!(memory_id, alloc_function, calldata_reader_pointer_global);
+        let mut compilation_ctx = test_compilation_context!(memory_id, alloc_function, ctx_globals);
+        let mut runtime_error_data = test_runtime_error_data!();
 
         let struct_type = IntermediateType::IStruct {
             module_id: ModuleId::default(),
@@ -706,6 +710,7 @@ mod tests {
                 writer_pointer,
                 calldata_reference_pointer,
                 &compilation_ctx,
+                Some(&mut runtime_error_data),
             )
             .unwrap();
 
@@ -729,11 +734,10 @@ mod tests {
 
     #[test]
     fn test_pack_struct_mixed_static_types_fuzz() {
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
-        let mut compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let mut compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+        let mut runtime_error_data = test_runtime_error_data!();
 
         let struct_type = IntermediateType::IStruct {
             module_id: ModuleId::default(),
@@ -787,6 +791,7 @@ mod tests {
                 writer_pointer,
                 calldata_reference_pointer,
                 &compilation_ctx,
+                Some(&mut runtime_error_data),
             )
             .unwrap();
 
@@ -876,11 +881,10 @@ mod tests {
     // Test dynamic types inside sturcts
     #[test]
     fn test_pack_struct_with_vectors_fuzz() {
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
-        let mut compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let mut compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+        let mut runtime_error_data = test_runtime_error_data!();
 
         let struct_type = IntermediateType::IStruct {
             module_id: ModuleId::default(),
@@ -940,6 +944,7 @@ mod tests {
                 writer_pointer,
                 calldata_reference_pointer,
                 &compilation_ctx,
+                Some(&mut runtime_error_data),
             )
             .unwrap();
 
@@ -1057,11 +1062,10 @@ mod tests {
     // Substruct without dynamic types
     #[test]
     fn test_pack_struct_with_simple_substruct_fuzz() {
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
-        let mut compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let mut compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+        let mut runtime_error_data = test_runtime_error_data!();
 
         let struct_type = IntermediateType::IStruct {
             module_id: ModuleId::default(),
@@ -1132,6 +1136,7 @@ mod tests {
                 writer_pointer,
                 calldata_reference_pointer,
                 &compilation_ctx,
+                Some(&mut runtime_error_data),
             )
             .unwrap();
 
@@ -1228,11 +1233,10 @@ mod tests {
 
     #[test]
     fn test_pack_struct_with_dynamic_substruct_fuzz() {
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
-        let mut compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let mut compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+        let mut runtime_error_data = test_runtime_error_data!();
 
         let struct_type = IntermediateType::IStruct {
             module_id: ModuleId::default(),
@@ -1309,6 +1313,7 @@ mod tests {
                 writer_pointer,
                 calldata_reference_pointer,
                 &compilation_ctx,
+                Some(&mut runtime_error_data),
             )
             .unwrap();
 

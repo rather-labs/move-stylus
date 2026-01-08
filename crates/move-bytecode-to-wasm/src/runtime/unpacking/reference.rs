@@ -2,6 +2,7 @@ use crate::{
     CompilationContext,
     abi_types::error::{AbiError, AbiOperationError},
     abi_types::unpacking::Unpackable,
+    data::RuntimeErrorData,
     runtime::{RuntimeFunction, RuntimeFunctionError},
     translation::intermediate_types::IntermediateType,
 };
@@ -10,6 +11,7 @@ use walrus::{FunctionBuilder, FunctionId, Module, ValType, ir::MemArg};
 pub fn unpack_reference_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     itype: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let name =
@@ -51,6 +53,7 @@ pub fn unpack_reference_function(
                 reader_pointer,
                 calldata_reader_pointer,
                 compilation_ctx,
+                Some(runtime_error_data),
             )?;
 
             builder.store(
@@ -107,17 +110,17 @@ mod tests {
 
     use crate::{
         abi_types::unpacking::Unpackable,
-        test_compilation_context,
+        test_compilation_context, test_runtime_error_data,
         test_tools::{build_module, setup_wasmtime_module},
         translation::intermediate_types::IntermediateType,
     };
 
     /// Test helper for unpacking reference types
     fn unpack_ref(data: &[u8], ref_type: IntermediateType, expected_memory_bytes: &[u8]) {
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+        let (mut raw_module, allocator, memory_id, ctx_globals) =
             build_module(Some(data.len() as i32));
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+        let mut runtime_error_data = test_runtime_error_data!();
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
@@ -138,6 +141,7 @@ mod tests {
                 args_pointer,
                 calldata_reader_pointer,
                 &compilation_ctx,
+                Some(&mut runtime_error_data),
             )
             .unwrap();
 

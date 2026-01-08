@@ -1,7 +1,7 @@
 use crate::{
     CompilationContext,
     abi_types::unpacking::Unpackable,
-    data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
+    data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, RuntimeErrorData},
     runtime::{RuntimeFunction, RuntimeFunctionError},
     translation::intermediate_types::IntermediateType,
 };
@@ -80,6 +80,7 @@ use walrus::{
 pub fn unpack_struct_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     itype: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let name =
@@ -159,6 +160,7 @@ pub fn unpack_struct_function(
             data_reader_pointer,
             calldata_ptr,
             compilation_ctx,
+            Some(runtime_error_data),
         )?;
 
         // If the field is stack type, we need to create the intermediate pointer, otherwise
@@ -221,7 +223,7 @@ pub fn unpack_struct_function(
         .local_get(reader_pointer)
         .i32_const(advancement)
         .binop(BinaryOp::I32Add)
-        .global_set(compilation_ctx.calldata_reader_pointer);
+        .global_set(compilation_ctx.globals.calldata_reader_pointer);
 
     builder.local_get(struct_ptr);
 
@@ -234,6 +236,7 @@ pub fn unpack_struct_function(
 pub fn unpack_storage_struct_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     itype: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let name = RuntimeFunction::UnpackStorageStruct
@@ -263,8 +266,12 @@ pub fn unpack_storage_struct_function(
         .call(locate_storage_data_fn);
 
     // Read the object
-    let read_and_decode_from_storage_fn =
-        RuntimeFunction::ReadAndDecodeFromStorage.get_generic(module, compilation_ctx, &[itype])?;
+    let read_and_decode_from_storage_fn = RuntimeFunction::ReadAndDecodeFromStorage.get_generic(
+        module,
+        compilation_ctx,
+        Some(runtime_error_data),
+        &[itype],
+    )?;
 
     // Copy the slot number into a local to avoid overwriting it later
     let slot_ptr = module.locals.add(ValType::I32);

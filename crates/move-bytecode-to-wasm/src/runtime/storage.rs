@@ -1,23 +1,24 @@
-use super::RuntimeFunction;
-use super::error::RuntimeFunctionError;
-use crate::data::{
-    DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
-    DATA_OBJECTS_SLOT_OFFSET, DATA_SHARED_OBJECTS_KEY_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
-    DATA_STORAGE_OBJECT_OWNER_OFFSET, DATA_ZERO_OFFSET,
+use super::{RuntimeFunction, error::RuntimeFunctionError};
+use crate::{
+    CompilationContext,
+    data::{
+        DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
+        DATA_OBJECTS_SLOT_OFFSET, DATA_SHARED_OBJECTS_KEY_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
+        DATA_STORAGE_OBJECT_OWNER_OFFSET, DATA_U256_ONE_OFFSET, DATA_ZERO_OFFSET, RuntimeErrorData,
+    },
+    hostio::host_functions::{
+        self, storage_cache_bytes32, storage_flush_cache, storage_load_bytes32, tx_origin,
+    },
+    storage::{
+        common::add_delete_storage_struct_instructions,
+        decoding::add_read_and_decode_storage_struct_instructions,
+        encoding::add_encode_and_save_into_storage_struct_instructions,
+    },
+    translation::intermediate_types::{IntermediateType, heap_integers::IU256},
+    wasm_builder_extensions::WasmBuilderExtension,
 };
-use crate::hostio::host_functions::{
-    self, storage_cache_bytes32, storage_flush_cache, storage_load_bytes32, tx_origin,
-};
-use crate::storage::common::add_delete_storage_struct_instructions;
-use crate::storage::decoding::add_read_and_decode_storage_struct_instructions;
-use crate::storage::encoding::add_encode_and_save_into_storage_struct_instructions;
-use crate::translation::intermediate_types::IntermediateType;
-use crate::translation::intermediate_types::heap_integers::IU256;
-use crate::wasm_builder_extensions::WasmBuilderExtension;
-use crate::{CompilationContext, data::DATA_U256_ONE_OFFSET};
-use walrus::GlobalId;
 use walrus::{
-    FunctionBuilder, FunctionId, Module, ValType,
+    FunctionBuilder, FunctionId, GlobalId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
@@ -573,6 +574,7 @@ pub fn derive_dyn_array_slot(
 pub fn add_encode_and_save_into_storage_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     itype: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let name = RuntimeFunction::EncodeAndSaveInStorage
@@ -596,6 +598,7 @@ pub fn add_encode_and_save_into_storage_fn(
         module,
         &mut builder,
         compilation_ctx,
+        runtime_error_data,
         struct_ptr,
         slot_ptr,
         slot_offset,
@@ -622,6 +625,7 @@ pub fn add_encode_and_save_into_storage_fn(
 pub fn add_read_and_decode_from_storage_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     itype: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let name = RuntimeFunction::ReadAndDecodeFromStorage
@@ -658,6 +662,7 @@ pub fn add_read_and_decode_from_storage_fn(
         module,
         &mut builder,
         compilation_ctx,
+        runtime_error_data,
         slot_ptr,
         slot_offset,
         owner_ptr,
@@ -683,6 +688,7 @@ pub fn add_read_and_decode_from_storage_fn(
 pub fn add_delete_struct_from_storage_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     itype: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let name =
@@ -745,6 +751,7 @@ pub fn add_delete_struct_from_storage_fn(
                 module,
                 else_,
                 compilation_ctx,
+                runtime_error_data,
                 slot_ptr,
                 slot_offset,
                 &struct_,
@@ -794,6 +801,7 @@ pub fn add_delete_struct_from_storage_fn(
 pub fn add_check_and_delete_struct_tto_fields_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     itype: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let name = RuntimeFunction::CheckAndDeleteStructTtoFields
@@ -837,14 +845,18 @@ pub fn add_check_and_delete_struct_tto_fields_fn(
 
             // Call the function recursively to delete any recently tto objects within the child struct
             let delete_tto_objects_fn = RuntimeFunction::CheckAndDeleteStructTtoFields
-                .get_generic(module, compilation_ctx, &[field])?;
+                .get_generic(module, compilation_ctx, Some(runtime_error_data), &[field])?;
             builder
                 .local_get(child_struct_ptr)
                 .call(delete_tto_objects_fn);
 
             // If the child struct has key, remove it from the original owner's storage if it's still there.
-            let delete_tto_object_fn =
-                RuntimeFunction::DeleteTtoObject.get_generic(module, compilation_ctx, &[field])?;
+            let delete_tto_object_fn = RuntimeFunction::DeleteTtoObject.get_generic(
+                module,
+                compilation_ctx,
+                Some(runtime_error_data),
+                &[field],
+            )?;
             builder
                 .local_get(parent_struct_ptr)
                 .local_get(child_struct_ptr)
@@ -885,11 +897,17 @@ pub fn add_check_and_delete_struct_tto_fields_fn(
                     .local_set(len);
 
                 let delete_tto_objects_fn = RuntimeFunction::CheckAndDeleteStructTtoFields
-                    .get_generic(module, compilation_ctx, &[inner.as_ref()])?;
+                    .get_generic(
+                        module,
+                        compilation_ctx,
+                        Some(runtime_error_data),
+                        &[inner.as_ref()],
+                    )?;
 
                 let delete_tto_object_fn = RuntimeFunction::DeleteTtoObject.get_generic(
                     module,
                     compilation_ctx,
+                    Some(runtime_error_data),
                     &[inner.as_ref()],
                 )?;
                 // Outer block: if the vector length is 0, we skip to the end
@@ -970,6 +988,7 @@ pub fn add_check_and_delete_struct_tto_fields_fn(
 pub fn add_delete_tto_object_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     itype: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let name =
@@ -982,8 +1001,12 @@ pub fn add_delete_tto_object_fn(
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx))?;
     let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx))?;
     let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, None)?;
-    let delete_wrapped_object_fn =
-        RuntimeFunction::DeleteFromStorage.get_generic(module, compilation_ctx, &[itype])?;
+    let delete_wrapped_object_fn = RuntimeFunction::DeleteFromStorage.get_generic(
+        module,
+        compilation_ctx,
+        Some(runtime_error_data),
+        &[itype],
+    )?;
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
     let mut builder = function.name(name).func_body();
@@ -1062,6 +1085,7 @@ pub fn get_struct_owner_fn(module: &mut Module) -> FunctionId {
 pub fn add_commit_changes_to_storage_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     dynamic_fields_global_variables: &Vec<(GlobalId, IntermediateType)>,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let mut function = FunctionBuilder::new(&mut module.types, &[], &[]);
@@ -1085,6 +1109,7 @@ pub fn add_commit_changes_to_storage_fn(
             let save_struct_into_storage_fn = RuntimeFunction::EncodeAndSaveInStorage.get_generic(
                 module,
                 compilation_ctx,
+                Some(runtime_error_data),
                 &[itype],
             )?;
 
@@ -1329,6 +1354,7 @@ where
 pub fn cache_storage_object_changes(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     itype: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let name = RuntimeFunction::CacheStorageObjectChanges
@@ -1342,10 +1368,14 @@ pub fn cache_storage_object_changes(
 
     let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, None)?;
     let locate_struct_fn = RuntimeFunction::LocateStructSlot.get(module, Some(compilation_ctx))?;
-    let save_in_slot_fn =
-        RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype])?;
+    let save_in_slot_fn = RuntimeFunction::EncodeAndSaveInStorage.get_generic(
+        module,
+        compilation_ctx,
+        Some(runtime_error_data),
+        &[itype],
+    )?;
     let check_and_delete_struct_tto_fields_fn = RuntimeFunction::CheckAndDeleteStructTtoFields
-        .get_generic(module, compilation_ctx, &[itype])?;
+        .get_generic(module, compilation_ctx, Some(runtime_error_data), &[itype])?;
 
     // Arguments
     let struct_ptr_ref = module.locals.add(ValType::I32);

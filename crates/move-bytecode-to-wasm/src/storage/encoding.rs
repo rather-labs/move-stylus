@@ -10,7 +10,10 @@ use walrus::{
 
 use crate::{
     CompilationContext,
-    data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET, DATA_ZERO_OFFSET},
+    data::{
+        DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET, DATA_ZERO_OFFSET,
+        RuntimeErrorData,
+    },
     hostio::host_functions::{native_keccak256, storage_cache_bytes32, storage_load_bytes32},
     runtime::RuntimeFunction,
     storage::storage_layout::field_size,
@@ -41,6 +44,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     struct_ptr: LocalId,
     slot_ptr: LocalId,
     slot_offset: LocalId,
@@ -126,6 +130,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
             module,
             builder,
             compilation_ctx,
+            runtime_error_data,
             slot_ptr,
             slot_offset,
             field_owner_ptr,
@@ -160,6 +165,7 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     enum_ptr: LocalId,
     slot_ptr: LocalId,
     slot_offset: LocalId,
@@ -175,7 +181,7 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx))?;
     let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx))?;
     let compute_enum_storage_tail_position_fn = RuntimeFunction::ComputeEnumStorageTailPosition
-        .get_generic(module, compilation_ctx, &[itype])?;
+        .get_generic(module, compilation_ctx, Some(runtime_error_data), &[itype])?;
 
     // Get the IEnum representation
     let enum_ = compilation_ctx.get_enum_by_intermediate_type(itype)?;
@@ -261,6 +267,7 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
                 module,
                 block,
                 compilation_ctx,
+                runtime_error_data,
                 slot_ptr,
                 slot_offset,
                 owner_ptr,
@@ -385,10 +392,12 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
 /// * `slot_ptr` - Local pointing to the vector header slot in storage.
 /// * `owner_ptr` - Local to the owner struct UID (for nested keyed objects).
 /// * `inner` - Intermediate type of the vector elements.
+#[allow(clippy::too_many_arguments)]
 pub fn add_encode_and_save_into_storage_vector_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     vector_ptr: LocalId,
     slot_ptr: LocalId,
     owner_ptr: LocalId,
@@ -509,6 +518,7 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                     module,
                     loop_,
                     compilation_ctx,
+                    runtime_error_data,
                     elem_slot_ptr,
                     elem_slot_offset,
                     inner,
@@ -600,6 +610,7 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                     module,
                     loop_,
                     compilation_ctx,
+                    runtime_error_data,
                     elem_slot_ptr,
                     elem_slot_offset,
                     owner_ptr,
@@ -680,6 +691,7 @@ pub fn add_encode_intermediate_type_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     slot_ptr: LocalId,
     slot_offset: LocalId,
     owner_ptr: LocalId,
@@ -853,6 +865,7 @@ pub fn add_encode_intermediate_type_instructions(
                     module,
                     builder,
                     compilation_ctx,
+                    runtime_error_data,
                     child_struct_ptr,
                     child_struct_slot_ptr,
                     slot_offset,
@@ -887,6 +900,7 @@ pub fn add_encode_intermediate_type_instructions(
                     module,
                     builder,
                     compilation_ctx,
+                    runtime_error_data,
                     child_struct_ptr,
                     slot_ptr,
                     slot_offset,
@@ -902,6 +916,7 @@ pub fn add_encode_intermediate_type_instructions(
                 module,
                 builder,
                 compilation_ctx,
+                runtime_error_data,
                 val_32,
                 slot_ptr,
                 slot_offset,
@@ -916,6 +931,7 @@ pub fn add_encode_intermediate_type_instructions(
                 module,
                 builder,
                 compilation_ctx,
+                runtime_error_data,
                 val_32,
                 slot_ptr,
                 owner_ptr,

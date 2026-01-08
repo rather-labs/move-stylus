@@ -7,7 +7,7 @@ use crate::{
     CompilationContext,
     abi_types::error_encoding::build_custom_error_message,
     compilation_context::ModuleId,
-    data::DATA_ABORT_MESSAGE_PTR_OFFSET,
+    data::{DATA_ABORT_MESSAGE_PTR_OFFSET, RuntimeErrorData},
     translation::intermediate_types::{IntermediateType, structs::IStructType},
 };
 
@@ -19,6 +19,7 @@ use super::{NativeFunction, error::NativeFunctionError};
 pub fn add_revert_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     error_itype: &IntermediateType,
     module_id: &ModuleId,
 ) -> Result<FunctionId, NativeFunctionError> {
@@ -51,6 +52,7 @@ pub fn add_revert_fn(
         &mut builder,
         module,
         compilation_ctx,
+        runtime_error_data,
         &error_struct,
         error_struct_ptr,
     )?;

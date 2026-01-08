@@ -221,7 +221,7 @@ mod tests {
 
     #[test]
     fn test_validate_stylus_wasm() {
-        let (mut module, _, _) = hostio::new_module_with_host();
+        let (mut module, _, _, _) = hostio::new_module_with_host();
         let factorial = add_valid_wasm_function(&mut module);
         hostio::add_entrypoint(&mut module, factorial);
 
@@ -230,7 +230,7 @@ mod tests {
 
     #[test]
     fn test_validate_invalid_wasm() {
-        let (mut module, _, _) = hostio::new_module_with_host();
+        let (mut module, _, _, _) = hostio::new_module_with_host();
         let factorial = add_invalid_wasm_function(&mut module);
         hostio::add_entrypoint(&mut module, factorial);
 
@@ -312,7 +312,7 @@ mod tests {
 
     #[test]
     fn test_validate_invalid_user_entrypoint_export() {
-        let (mut module, _, _) = hostio::new_module_with_host();
+        let (mut module, _, _, _) = hostio::new_module_with_host();
         add_valid_wasm_function(&mut module);
         // We are not adding the user_entrypoint export
 

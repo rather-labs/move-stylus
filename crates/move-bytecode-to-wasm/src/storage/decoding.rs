@@ -8,7 +8,7 @@ use walrus::{
 
 use crate::{
     CompilationContext,
-    data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET},
+    data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET, RuntimeErrorData},
     hostio::host_functions::{native_keccak256, storage_load_bytes32},
     runtime::RuntimeFunction,
     storage::storage_layout::field_size,
@@ -39,6 +39,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     slot_ptr: LocalId,
     slot_offset: LocalId,
     owner_ptr: LocalId,
@@ -201,6 +202,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
                 module,
                 builder,
                 compilation_ctx,
+                runtime_error_data,
                 field_ptr,
                 slot_ptr,
                 slot_offset,
@@ -241,6 +243,7 @@ pub fn add_read_and_decode_storage_enum_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     slot_ptr: LocalId,
     slot_offset: LocalId,
     owner_ptr: LocalId,
@@ -250,7 +253,7 @@ pub fn add_read_and_decode_storage_enum_instructions(
     let accumulate_or_advance_slot_read_fn =
         RuntimeFunction::AccumulateOrAdvanceSlotRead.get(module, Some(compilation_ctx))?;
     let compute_enum_storage_tail_position_fn = RuntimeFunction::ComputeEnumStorageTailPosition
-        .get_generic(module, compilation_ctx, &[itype])?;
+        .get_generic(module, compilation_ctx, Some(runtime_error_data), &[itype])?;
 
     // Get the IEnum representation
     let enum_ = compilation_ctx.get_enum_by_intermediate_type(itype)?;
@@ -341,6 +344,7 @@ pub fn add_read_and_decode_storage_enum_instructions(
                 module,
                 block,
                 compilation_ctx,
+                runtime_error_data,
                 field_ptr,
                 slot_ptr,
                 slot_offset,
@@ -399,6 +403,7 @@ pub fn add_read_and_decode_storage_vector_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     data_ptr: LocalId,
     slot_ptr: LocalId,
     owner_ptr: LocalId,
@@ -520,6 +525,7 @@ pub fn add_read_and_decode_storage_vector_instructions(
                         module,
                         loop_,
                         compilation_ctx,
+                        runtime_error_data,
                         elem_data_ptr,
                         elem_slot_ptr,
                         slot_offset,
@@ -608,6 +614,7 @@ pub fn add_decode_intermediate_type_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     data_ptr: LocalId,
     slot_ptr: LocalId,
     slot_offset: LocalId,
@@ -792,6 +799,7 @@ pub fn add_decode_intermediate_type_instructions(
                     module,
                     builder,
                     compilation_ctx,
+                    runtime_error_data,
                     child_struct_slot_ptr,
                     slot_offset,
                     owner_ptr,
@@ -811,6 +819,7 @@ pub fn add_decode_intermediate_type_instructions(
                     module,
                     builder,
                     compilation_ctx,
+                    runtime_error_data,
                     slot_ptr,
                     slot_offset,
                     owner_ptr,
@@ -827,6 +836,7 @@ pub fn add_decode_intermediate_type_instructions(
                 module,
                 builder,
                 compilation_ctx,
+                runtime_error_data,
                 slot_ptr,
                 slot_offset,
                 owner_ptr,
@@ -841,6 +851,7 @@ pub fn add_decode_intermediate_type_instructions(
                 module,
                 builder,
                 compilation_ctx,
+                runtime_error_data,
                 data_ptr,
                 slot_ptr,
                 owner_ptr,

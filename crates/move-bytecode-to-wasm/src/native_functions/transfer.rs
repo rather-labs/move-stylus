@@ -1,11 +1,11 @@
 use crate::{
     CompilationContext,
-    abi_types::error_encoding::build_runtime_error_message,
     compilation_context::ModuleId,
     data::{
         DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
-        DATA_SHARED_OBJECTS_KEY_OFFSET,
+        DATA_SHARED_OBJECTS_KEY_OFFSET, RuntimeErrorData,
     },
+    error::RuntimeError,
     runtime::RuntimeFunction,
     translation::intermediate_types::IntermediateType,
 };
@@ -15,13 +15,13 @@ use walrus::{
 };
 
 use super::{NativeFunction, abi_error::add_handle_error_instructions, error::NativeFunctionError};
-use crate::error::RuntimeError;
 
 /// Adds the instructions to transfer an object to a recipient.
 /// This implies deleting the object from the original owner's mapping and adding it to the recipient's mapping.
 pub fn add_transfer_object_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     itype: &IntermediateType,
     module_id: &ModuleId,
 ) -> Result<FunctionId, NativeFunctionError> {
@@ -41,10 +41,18 @@ pub fn add_transfer_object_fn(
     let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx))?;
     let write_object_slot_fn =
         RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
-    let storage_save_fn =
-        RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype])?;
-    let delete_object_fn =
-        RuntimeFunction::DeleteFromStorage.get_generic(module, compilation_ctx, &[itype])?;
+    let storage_save_fn = RuntimeFunction::EncodeAndSaveInStorage.get_generic(
+        module,
+        compilation_ctx,
+        Some(runtime_error_data),
+        &[itype],
+    )?;
+    let delete_object_fn = RuntimeFunction::DeleteFromStorage.get_generic(
+        module,
+        compilation_ctx,
+        Some(runtime_error_data),
+        &[itype],
+    )?;
 
     // Function declaration
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
@@ -69,7 +77,6 @@ pub fn add_transfer_object_fn(
         .binop(BinaryOp::I32Sub)
         .local_set(owner_ptr);
 
-    let mut inner_result: Result<(), NativeFunctionError> = Ok(());
     // Check that the object is not shared
     builder.block(None, |block| {
         let block_id = block.id();
@@ -81,16 +88,16 @@ pub fn add_transfer_object_fn(
             .unop(UnaryOp::I32Eqz)
             .br_if(block_id);
 
-        inner_result = (|| {
-            let encoded_error_ptr = build_runtime_error_message(
-                block,
-                module,
-                compilation_ctx,
-                &RuntimeError::SharedObjectsCannotBeTransferred.to_string(),
-            )?;
-            add_handle_error_instructions(block, compilation_ctx, encoded_error_ptr);
-            Ok(())
-        })();
+        let encoded_error_offset = runtime_error_data.get(
+            module,
+            compilation_ctx.memory_id,
+            RuntimeError::SharedObjectsCannotBeTransferred,
+        );
+        let encoded_error_ptr = module.locals.add(ValType::I32);
+        block
+            .i32_const(encoded_error_offset)
+            .local_set(encoded_error_ptr);
+        add_handle_error_instructions(block, compilation_ctx, encoded_error_ptr);
     });
 
     // Check that the object is not frozen
@@ -104,19 +111,17 @@ pub fn add_transfer_object_fn(
             .call(equality_fn)
             .br_if(block_id);
 
-        inner_result = (|| {
-            let encoded_error_ptr = build_runtime_error_message(
-                block,
-                module,
-                compilation_ctx,
-                &RuntimeError::FrozenObjectsCannotBeTransferred.to_string(),
-            )?;
-            add_handle_error_instructions(block, compilation_ctx, encoded_error_ptr);
-            Ok(())
-        })();
+        let encoded_error_offset = runtime_error_data.get(
+            module,
+            compilation_ctx.memory_id,
+            RuntimeError::FrozenObjectsCannotBeTransferred,
+        );
+        let encoded_error_ptr = module.locals.add(ValType::I32);
+        block
+            .i32_const(encoded_error_offset)
+            .local_set(encoded_error_ptr);
+        add_handle_error_instructions(block, compilation_ctx, encoded_error_ptr);
     });
-
-    inner_result?;
 
     // Delete the object from the owner mapping on the storage
     builder.block(None, |block| {
@@ -132,7 +137,7 @@ pub fn add_transfer_object_fn(
 
     // Remove any objects that have been recently transferred into the struct from the original owner's mapping in storage.
     let check_and_delete_struct_tto_fields_fn = RuntimeFunction::CheckAndDeleteStructTtoFields
-        .get_generic(module, compilation_ctx, &[itype])?;
+        .get_generic(module, compilation_ctx, Some(runtime_error_data), &[itype])?;
     builder
         .local_get(struct_ptr)
         .call(check_and_delete_struct_tto_fields_fn);
@@ -179,6 +184,7 @@ pub fn add_transfer_object_fn(
 pub fn add_share_object_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     itype: &IntermediateType,
     module_id: &ModuleId,
 ) -> Result<FunctionId, NativeFunctionError> {
@@ -197,13 +203,21 @@ pub fn add_share_object_fn(
     let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx))?;
     let write_object_slot_fn =
         RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
-    let storage_save_fn =
-        RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype])?;
-    let delete_object_fn =
-        RuntimeFunction::DeleteFromStorage.get_generic(module, compilation_ctx, &[itype])?;
+    let storage_save_fn = RuntimeFunction::EncodeAndSaveInStorage.get_generic(
+        module,
+        compilation_ctx,
+        Some(runtime_error_data),
+        &[itype],
+    )?;
+    let delete_object_fn = RuntimeFunction::DeleteFromStorage.get_generic(
+        module,
+        compilation_ctx,
+        Some(runtime_error_data),
+        &[itype],
+    )?;
     let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx))?;
     let check_and_delete_struct_tto_fields_fn = RuntimeFunction::CheckAndDeleteStructTtoFields
-        .get_generic(module, compilation_ctx, &[itype])?;
+        .get_generic(module, compilation_ctx, Some(runtime_error_data), &[itype])?;
     // Function declaration
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
     let mut builder = function.name(name).func_body();
@@ -213,7 +227,6 @@ pub fn add_share_object_fn(
     let struct_ptr = module.locals.add(ValType::I32);
     let slot_ptr = module.locals.add(ValType::I32);
 
-    let mut inner_result: Result<(), NativeFunctionError> = Ok(());
     builder.block(None, |block| {
         let block_id = block.id();
 
@@ -241,16 +254,15 @@ pub fn add_share_object_fn(
                 None,
                 |then| {
                     // Build the error message and handle the error
-                    inner_result = (|| {
-                        let encoded_error_ptr = build_runtime_error_message(
-                            then,
-                            module,
-                            compilation_ctx,
-                            &RuntimeError::FrozenObjectsCannotBeShared.to_string(),
-                        )?;
-                        add_handle_error_instructions(then, compilation_ctx, encoded_error_ptr);
-                        Ok(())
-                    })();
+                    let encoded_error_offset = runtime_error_data.get(
+                        module,
+                        compilation_ctx.memory_id,
+                        RuntimeError::FrozenObjectsCannotBeShared,
+                    );
+                    let encoded_error_ptr = module.locals.add(ValType::I32);
+                    then.i32_const(encoded_error_offset)
+                        .local_set(encoded_error_ptr);
+                    add_handle_error_instructions(then, compilation_ctx, encoded_error_ptr);
                 },
                 |else_| {
                     // Delete the object from owner mapping on the storage
@@ -304,8 +316,6 @@ pub fn add_share_object_fn(
             );
     });
 
-    inner_result?;
-
     Ok(function.finish(vec![struct_ptr], &mut module.funcs))
 }
 
@@ -313,6 +323,7 @@ pub fn add_share_object_fn(
 pub fn add_freeze_object_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     itype: &IntermediateType,
     module_id: &ModuleId,
 ) -> Result<FunctionId, NativeFunctionError> {
@@ -331,13 +342,21 @@ pub fn add_freeze_object_fn(
     let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx))?;
     let write_object_slot_fn =
         RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
-    let storage_save_fn =
-        RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype])?;
-    let delete_object_fn =
-        RuntimeFunction::DeleteFromStorage.get_generic(module, compilation_ctx, &[itype])?;
+    let storage_save_fn = RuntimeFunction::EncodeAndSaveInStorage.get_generic(
+        module,
+        compilation_ctx,
+        Some(runtime_error_data),
+        &[itype],
+    )?;
+    let delete_object_fn = RuntimeFunction::DeleteFromStorage.get_generic(
+        module,
+        compilation_ctx,
+        Some(runtime_error_data),
+        &[itype],
+    )?;
     let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx))?;
     let check_and_delete_struct_tto_fields_fn = RuntimeFunction::CheckAndDeleteStructTtoFields
-        .get_generic(module, compilation_ctx, &[itype])?;
+        .get_generic(module, compilation_ctx, Some(runtime_error_data), &[itype])?;
 
     // Function declaration
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
@@ -348,7 +367,6 @@ pub fn add_freeze_object_fn(
     let struct_ptr = module.locals.add(ValType::I32);
     let slot_ptr = module.locals.add(ValType::I32);
 
-    let mut inner_result: Result<(), NativeFunctionError> = Ok(());
     builder.block(None, |block| {
         let block_id = block.id();
         // Get the owner key, which is stored in the 32 bytes prefixing the struct, which can either be:
@@ -382,17 +400,15 @@ pub fn add_freeze_object_fn(
                 None,
                 |then| {
                     // Shared objects cannot be frozen
-                    inner_result = (|| {
-                        let encoded_error_ptr = build_runtime_error_message(
-                            then,
-                            module,
-                            compilation_ctx,
-                            &RuntimeError::SharedObjectsCannotBeFrozen.to_string(),
-                        )?;
-
-                        add_handle_error_instructions(then, compilation_ctx, encoded_error_ptr);
-                        Ok(())
-                    })();
+                    let encoded_error_offset = runtime_error_data.get(
+                        module,
+                        compilation_ctx.memory_id,
+                        RuntimeError::SharedObjectsCannotBeFrozen,
+                    );
+                    let encoded_error_ptr = module.locals.add(ValType::I32);
+                    then.i32_const(encoded_error_offset)
+                        .local_set(encoded_error_ptr);
+                    add_handle_error_instructions(then, compilation_ctx, encoded_error_ptr);
                 },
                 |else_| {
                     // Delete the object from the owner mapping on the storage
@@ -444,8 +460,6 @@ pub fn add_freeze_object_fn(
                 },
             );
     });
-
-    inner_result?;
 
     Ok(function.finish(vec![struct_ptr], &mut module.funcs))
 }

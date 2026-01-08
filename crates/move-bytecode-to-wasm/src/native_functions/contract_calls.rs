@@ -10,7 +10,7 @@ use crate::{
         function_encoding::move_signature_to_abi_selector, packing::Packable, unpacking::Unpackable,
     },
     compilation_context::ModuleId,
-    data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
+    data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, RuntimeErrorData},
     hostio::host_functions::{
         call_contract, delegate_call_contract, read_return_data, static_call_contract,
     },
@@ -37,9 +37,11 @@ use super::error::NativeFunctionError;
 /// the `value` argument as the first argument. Additionally, if the function is declared with the
 /// `gas` argument, it will be passed to the `call_contract` functions, otherwise, the maximum gas
 /// (u64::MAX) will be used.
+#[allow(clippy::too_many_arguments)]
 pub fn add_external_contract_call_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     module_id: &ModuleId,
     function_information: &MappedFunction,
     function_modifiers: &[FunctionModifier],
@@ -248,6 +250,7 @@ pub fn add_external_contract_call_fn(
                     writer_pointer,
                     calldata_reference_pointer,
                     compilation_ctx,
+                    Some(runtime_error_data),
                 )?;
 
                 builder
@@ -263,6 +266,7 @@ pub fn add_external_contract_call_fn(
                     writer_pointer,
                     calldata_reference_pointer,
                     compilation_ctx,
+                    Some(runtime_error_data),
                 )?;
 
                 builder
@@ -466,6 +470,7 @@ pub fn add_external_contract_call_fn(
                             return_data_abi_encoded_ptr,
                             calldata_reader_pointer,
                             compilation_ctx,
+                            Some(runtime_error_data),
                         )?;
 
                         let abi_decoded_call_result = if result_type == &IntermediateType::IU64 {
@@ -703,7 +708,12 @@ pub fn add_external_contract_call_fn(
 
                 // The slot for this struct written in DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET
                 let read_and_decode_from_storage_fn = RuntimeFunction::ReadAndDecodeFromStorage
-                    .get_generic(module, compilation_ctx, &[&storage_obj_itype]);
+                    .get_generic(
+                        module,
+                        compilation_ctx,
+                        Some(runtime_error_data),
+                        &[&storage_obj_itype],
+                    );
 
                 match read_and_decode_from_storage_fn {
                     Err(e) => {

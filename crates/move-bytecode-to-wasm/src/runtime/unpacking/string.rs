@@ -58,7 +58,7 @@ pub fn unpack_string_function(
         .local_get(reader_pointer)
         .i32_const(32)
         .binop(BinaryOp::I32Add)
-        .global_set(compilation_ctx.calldata_reader_pointer);
+        .global_set(compilation_ctx.globals.calldata_reader_pointer);
 
     // Validate that the data reader pointer fits in 32 bits
     builder

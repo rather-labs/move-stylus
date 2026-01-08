@@ -46,7 +46,7 @@ pub fn unpack_u32_function(
         .local_get(reader_pointer)
         .local_get(encoded_size)
         .binop(BinaryOp::I32Add)
-        .global_set(compilation_ctx.calldata_reader_pointer);
+        .global_set(compilation_ctx.globals.calldata_reader_pointer);
 
     Ok(function.finish(vec![reader_pointer, encoded_size], &mut module.funcs))
 }
@@ -85,7 +85,7 @@ pub fn unpack_u64_function(
         .local_get(reader_pointer)
         .i32_const(encoded_size as i32)
         .binop(BinaryOp::I32Add)
-        .global_set(compilation_ctx.calldata_reader_pointer);
+        .global_set(compilation_ctx.globals.calldata_reader_pointer);
 
     Ok(function.finish(vec![reader_pointer], &mut module.funcs))
 }
@@ -131,6 +131,7 @@ mod tests {
                 args_pointer,
                 args_pointer,
                 &compilation_ctx,
+                None,
             )
             .unwrap();
 

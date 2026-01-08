@@ -5,6 +5,7 @@ use walrus::{FunctionId, GlobalId, Module};
 
 use crate::{
     CompilationContext,
+    data::RuntimeErrorData,
     hasher::get_hasher,
     translation::intermediate_types::{
         IntermediateType,
@@ -392,104 +393,173 @@ impl RuntimeFunction {
         &self,
         module: &mut Module,
         compilation_ctx: &CompilationContext,
+        runtime_error_data: Option<&mut RuntimeErrorData>,
         generics: &[&IntermediateType],
     ) -> Result<FunctionId, RuntimeFunctionError> {
-        let function_id = match self {
-            Self::EncodeAndSaveInStorage => {
+        let function_id = match (self, runtime_error_data) {
+            (Self::EncodeAndSaveInStorage, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
-                storage::add_encode_and_save_into_storage_fn(module, compilation_ctx, generics[0])?
+                storage::add_encode_and_save_into_storage_fn(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    generics[0],
+                )?
             }
-            Self::ReadAndDecodeFromStorage => {
+            (Self::ReadAndDecodeFromStorage, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
-                storage::add_read_and_decode_from_storage_fn(module, compilation_ctx, generics[0])?
+                storage::add_read_and_decode_from_storage_fn(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    generics[0],
+                )?
             }
-            Self::DeleteFromStorage => {
+            (Self::DeleteFromStorage, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
-                storage::add_delete_struct_from_storage_fn(module, compilation_ctx, generics[0])?
+                storage::add_delete_struct_from_storage_fn(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    generics[0],
+                )?
             }
-            Self::CheckAndDeleteStructTtoFields => {
+            (Self::CheckAndDeleteStructTtoFields, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
                 storage::add_check_and_delete_struct_tto_fields_fn(
                     module,
                     compilation_ctx,
+                    runtime_error_data,
                     generics[0],
                 )?
             }
-            Self::DeleteTtoObject => {
+            (Self::DeleteTtoObject, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
-                storage::add_delete_tto_object_fn(module, compilation_ctx, generics[0])?
+                storage::add_delete_tto_object_fn(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    generics[0],
+                )?
             }
-            Self::CacheStorageObjectChanges => {
+            (Self::CacheStorageObjectChanges, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
-                storage::cache_storage_object_changes(module, compilation_ctx, generics[0])?
+                storage::cache_storage_object_changes(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    generics[0],
+                )?
             }
-            Self::GetStorageSizeByOffset => {
+            (Self::GetStorageSizeByOffset, _) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
                 enums::get_storage_size_by_offset(module, compilation_ctx, generics[0])?
             }
-            Self::ComputeEnumStorageTailPosition => {
+            (Self::ComputeEnumStorageTailPosition, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
-                enums::compute_enum_storage_tail_position(module, compilation_ctx, generics[0])?
+                enums::compute_enum_storage_tail_position(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    generics[0],
+                )?
             }
-            Self::VecSwap => {
+            (Self::VecSwap, _) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
                 vector::vec_swap_function(module, compilation_ctx, generics[0])?
             }
-            Self::VecPopBack => {
+            (Self::VecPopBack, _) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
                 vector::vec_pop_back_function(module, compilation_ctx, generics[0])?
             }
-            Self::VecPushBack => {
+            (Self::VecPushBack, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
-                vector::vec_push_back_function(module, compilation_ctx, generics[0])?
+                vector::vec_push_back_function(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    generics[0],
+                )?
             }
-            Self::UnpackVector => {
+            (Self::UnpackVector, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
-                unpacking::vector::unpack_vector_function(module, compilation_ctx, generics[0])?
+                unpacking::vector::unpack_vector_function(
+                    module,
+                    compilation_ctx,
+                    Some(runtime_error_data),
+                    generics[0],
+                )?
             }
-            Self::UnpackEnum => {
+            (Self::UnpackEnum, _) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
                 unpacking::enums::unpack_enum_function(module, compilation_ctx, generics[0])?
             }
-            Self::UnpackStruct => {
+            (Self::UnpackStruct, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
-                unpacking::structs::unpack_struct_function(module, compilation_ctx, generics[0])?
+                unpacking::structs::unpack_struct_function(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    generics[0],
+                )?
             }
-            Self::UnpackStorageStruct => {
+            (Self::UnpackStorageStruct, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
                 unpacking::structs::unpack_storage_struct_function(
                     module,
                     compilation_ctx,
+                    runtime_error_data,
                     generics[0],
                 )?
             }
-            Self::UnpackReference => {
+            (Self::UnpackReference, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
                 unpacking::reference::unpack_reference_function(
                     module,
                     compilation_ctx,
+                    runtime_error_data,
                     generics[0],
                 )?
             }
-            Self::PackVector => {
+            (Self::PackVector, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
-                packing::vector::pack_vector_function(module, compilation_ctx, generics[0])?
+                packing::vector::pack_vector_function(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    generics[0],
+                )?
             }
-            Self::PackStruct => {
+            (Self::PackStruct, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
-                packing::structs::pack_struct_function(module, compilation_ctx, generics[0])?
+                packing::structs::pack_struct_function(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    generics[0],
+                )?
             }
-            Self::PackReference => {
+            (Self::PackReference, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
-                packing::reference::pack_reference_function(module, compilation_ctx, generics[0])?
+                packing::reference::pack_reference_function(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    generics[0],
+                )?
             }
-            Self::VecCopyLocal => {
+            (Self::VecCopyLocal, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
-                vector::copy_local_function(module, compilation_ctx, generics[0])?
+                vector::copy_local_function(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    generics[0],
+                )?
             }
-            Self::VecEquality => {
+            (Self::VecEquality, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
-                vector::equality_function(module, compilation_ctx, generics[0])?
+                vector::equality_function(module, compilation_ctx, runtime_error_data, generics[0])?
             }
             _ => {
                 return Err(RuntimeFunctionError::CouldNotLinkGeneric(
@@ -510,6 +580,7 @@ impl RuntimeFunction {
     pub fn get_commit_changes_to_storage_fn(
         module: &mut Module,
         compilation_ctx: &CompilationContext,
+        runtime_error_data: &mut RuntimeErrorData,
         dynamic_fields_global_variables: &Vec<(GlobalId, IntermediateType)>,
     ) -> Result<FunctionId, RuntimeFunctionError> {
         if let Some(function) = module.funcs.by_name(Self::CommitChangesToStorage.name()) {
@@ -518,6 +589,7 @@ impl RuntimeFunction {
             storage::add_commit_changes_to_storage_fn(
                 module,
                 compilation_ctx,
+                runtime_error_data,
                 dynamic_fields_global_variables,
             )
         }

@@ -8,6 +8,7 @@ use crate::{
         ModuleId,
         reserved_modules::{SF_MODULE_NAME_OBJECT, STYLUS_FRAMEWORK_ADDRESS},
     },
+    data::RuntimeErrorData,
     native_functions::NativeFunction,
     runtime::RuntimeFunction,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
@@ -27,6 +28,7 @@ pub trait Unpackable {
     /// The calldata base pointer should never be updated, it is considered static for each type value
     ///
     /// The stack at the end contains the value(or pointer to the value) as **i32/i64**
+    #[allow(clippy::too_many_arguments)]
     fn add_unpack_instructions(
         &self,
         parent_type: Option<&IntermediateType>,
@@ -35,6 +37,7 @@ pub trait Unpackable {
         reader_pointer: LocalId,
         calldata_base_pointer: LocalId,
         compilation_ctx: &CompilationContext,
+        runtime_error_data: Option<&mut RuntimeErrorData>,
     ) -> Result<(), AbiError>;
 }
 
@@ -48,6 +51,7 @@ pub fn build_unpack_instructions<T: Unpackable>(
     function_arguments_signature: &[T],
     args_pointer: LocalId,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
 ) -> Result<(), AbiError> {
     let reader_pointer = module.locals.add(ValType::I32);
     let calldata_base_pointer = module.locals.add(ValType::I32);
@@ -60,7 +64,7 @@ pub fn build_unpack_instructions<T: Unpackable>(
     // Set the global calldata reader pointer to the reader pointer
     function_builder
         .local_get(reader_pointer)
-        .global_set(compilation_ctx.calldata_reader_pointer);
+        .global_set(compilation_ctx.globals.calldata_reader_pointer);
 
     // The ABI encoded params are always a tuple
     // Static types are stored in-place, but dynamic types are referenced to the call data
@@ -72,6 +76,7 @@ pub fn build_unpack_instructions<T: Unpackable>(
             reader_pointer,
             calldata_base_pointer,
             compilation_ctx,
+            Some(runtime_error_data),
         )?;
     }
 
@@ -87,6 +92,7 @@ impl Unpackable for IntermediateType {
         reader_pointer: LocalId,
         calldata_base_pointer: LocalId,
         compilation_ctx: &CompilationContext,
+        runtime_error_data: Option<&mut RuntimeErrorData>,
     ) -> Result<(), AbiError> {
         match self {
             IntermediateType::IBool
@@ -132,8 +138,12 @@ impl Unpackable for IntermediateType {
                     .call(unpack_address_function);
             }
             IntermediateType::IVector(inner) => {
-                let unpack_vector_fn =
-                    RuntimeFunction::UnpackVector.get_generic(module, compilation_ctx, &[inner])?;
+                let unpack_vector_fn = RuntimeFunction::UnpackVector.get_generic(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    &[inner],
+                )?;
 
                 builder
                     .local_get(reader_pointer)
@@ -162,13 +172,14 @@ impl Unpackable for IntermediateType {
                             reader_pointer,
                             calldata_base_pointer,
                             compilation_ctx,
+                            runtime_error_data,
                         )?;
                     }
                     _ => {
                         // For stack types, call the unpack reference runtime fn,
                         // which has the instructions to allocate a middle pointer to the unpacked value
                         let unpack_reference_function = RuntimeFunction::UnpackReference
-                            .get_generic(module, compilation_ctx, &[inner])?;
+                            .get_generic(module, compilation_ctx, runtime_error_data, &[inner])?;
                         builder
                             .local_get(reader_pointer)
                             .local_get(calldata_base_pointer)
@@ -222,7 +233,7 @@ impl Unpackable for IntermediateType {
                     }
 
                     let unpack_storage_struct_function = RuntimeFunction::UnpackStorageStruct
-                        .get_generic(module, compilation_ctx, &[self])?;
+                        .get_generic(module, compilation_ctx, runtime_error_data, &[self])?;
 
                     // Unpack the storage struct
                     builder.call(unpack_storage_struct_function);
@@ -230,6 +241,7 @@ impl Unpackable for IntermediateType {
                     let unpack_struct_function = RuntimeFunction::UnpackStruct.get_generic(
                         module,
                         compilation_ctx,
+                        runtime_error_data,
                         &[self],
                     )?;
                     builder
@@ -239,8 +251,12 @@ impl Unpackable for IntermediateType {
                 }
             }
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
-                let unpack_enum_function =
-                    RuntimeFunction::UnpackEnum.get_generic(module, compilation_ctx, &[self])?;
+                let unpack_enum_function = RuntimeFunction::UnpackEnum.get_generic(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    &[self],
+                )?;
                 builder.local_get(reader_pointer).call(unpack_enum_function);
             }
             IntermediateType::ITypeParameter(_) => {
@@ -252,7 +268,7 @@ impl Unpackable for IntermediateType {
 
         // Update the local reader pointer value to the global reader pointer, which is modified when unpacking
         builder
-            .global_get(compilation_ctx.calldata_reader_pointer)
+            .global_get(compilation_ctx.globals.calldata_reader_pointer)
             .local_set(reader_pointer);
         Ok(())
     }
@@ -295,6 +311,7 @@ fn load_struct_storage_id(
                 NativeFunction::NATIVE_COMPUTE_NAMED_ID,
                 module,
                 compilation_ctx,
+                None,
                 &ModuleId::new(STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT),
                 types,
             )
@@ -335,10 +352,8 @@ mod tests {
 
     #[test]
     fn test_build_unpack_instructions() {
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+        let (mut raw_module, allocator_func, memory_id, ctx_globals) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
 
         let validator_func_type = raw_module
             .types
@@ -353,6 +368,7 @@ mod tests {
 
         let mut func_body = function_builder.func_body();
         // Args data should already be stored in memory
+        let mut runtime_error_data = RuntimeErrorData::new();
         build_unpack_instructions(
             &mut func_body,
             &mut raw_module,
@@ -363,6 +379,7 @@ mod tests {
             ],
             args_pointer,
             &compilation_ctx,
+            &mut runtime_error_data,
         )
         .unwrap();
 
@@ -395,10 +412,8 @@ mod tests {
 
     #[test]
     fn test_build_unpack_instructions_reversed() {
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+        let (mut raw_module, allocator_func, memory_id, ctx_globals) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
 
         let validator_func_type = raw_module
             .types
@@ -413,6 +428,7 @@ mod tests {
 
         let mut func_body = function_builder.func_body();
         // Args data should already be stored in memory
+        let mut runtime_error_data = RuntimeErrorData::new();
         build_unpack_instructions(
             &mut func_body,
             &mut raw_module,
@@ -423,6 +439,7 @@ mod tests {
             ],
             args_pointer,
             &compilation_ctx,
+            &mut runtime_error_data,
         )
         .unwrap();
 
@@ -462,10 +479,8 @@ mod tests {
 
     #[test]
     fn test_build_unpack_instructions_offset_memory() {
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+        let (mut raw_module, allocator_func, memory_id, ctx_globals) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
 
         let validator_func_type = raw_module
             .types
@@ -480,6 +495,7 @@ mod tests {
 
         let mut func_body = function_builder.func_body();
         // Args data should already be stored in memory
+        let mut runtime_error_data = RuntimeErrorData::new();
         build_unpack_instructions(
             &mut func_body,
             &mut raw_module,
@@ -490,6 +506,7 @@ mod tests {
             ],
             args_pointer,
             &compilation_ctx,
+            &mut runtime_error_data,
         )
         .unwrap();
 
