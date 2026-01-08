@@ -63,7 +63,6 @@ pub fn translate_package_cli(
                 wasm_opt::OptimizationOptions::new_optimize_for_size_aggressively();
             optimizations
                 .optimize_level(wasm_opt::OptimizeLevel::Level3)
-                .add_pass(wasm_opt::Pass::DwarfDump)
                 .add_pass(wasm_opt::Pass::StripDebug)
                 .add_pass(wasm_opt::Pass::StripDwarf)
                 .add_pass(wasm_opt::Pass::InliningOptimizing)
@@ -73,6 +72,7 @@ pub fn translate_package_cli(
                 .add_pass(wasm_opt::Pass::Directize)
                 .add_pass(wasm_opt::Pass::Dce)
                 .add_pass(wasm_opt::Pass::Vacuum)
+                .shrink_level(wasm_opt::ShrinkLevel::Level2)
                 .enable_feature(wasm_opt::Feature::BulkMemory)
                 .disable_feature(wasm_opt::Feature::Simd)
                 .disable_feature(wasm_opt::Feature::Multivalue);
