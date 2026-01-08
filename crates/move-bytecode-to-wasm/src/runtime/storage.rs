@@ -815,15 +815,13 @@ pub fn add_check_and_delete_struct_tto_fields_fn(
             // Get the pointer to the child struct
             builder
                 .local_get(parent_struct_ptr)
-                .i32_const(offset)
-                .binop(BinaryOp::I32Add)
                 // Load the intermediate pointer to the child struct
                 .load(
                     compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
                     MemArg {
                         align: 0,
-                        offset: 0,
+                        offset: offset as u32,
                     },
                 )
                 .local_set(child_struct_ptr);
@@ -853,14 +851,12 @@ pub fn add_check_and_delete_struct_tto_fields_fn(
                 // Get the pointer to the vector
                 builder
                     .local_get(parent_struct_ptr)
-                    .i32_const(offset)
-                    .binop(BinaryOp::I32Add)
                     .load(
                         compilation_ctx.memory_id,
                         LoadKind::I32 { atomic: false },
                         MemArg {
                             align: 0,
-                            offset: 0,
+                            offset: offset as u32,
                         },
                     )
                     .local_tee(vector_ptr);
