@@ -86,3 +86,9 @@ public native fun remove<T: key>(id: NamedId<T>);
 
 public(package) native fun as_uid<T: key>(named_id: &NamedId<T>): &UID;
 public(package) native fun as_uid_mut<T: key>(named_id: &mut NamedId<T>): &mut UID;
+
+
+/// Storage lookup structs
+public struct FrozenStorageObject<T: key> {}
+public struct OwnedStorageObject<T: key> {}
+public struct SharedStorageObject<T: key> {}

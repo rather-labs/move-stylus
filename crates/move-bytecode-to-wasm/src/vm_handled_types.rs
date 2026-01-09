@@ -7,6 +7,7 @@ pub mod dynamic_fields;
 pub mod error;
 pub mod named_id;
 pub mod signer;
+pub mod storage_object;
 pub mod string;
 pub mod table;
 pub mod tx_context;

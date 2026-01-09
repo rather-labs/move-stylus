@@ -5,7 +5,12 @@ use crate::{
     CompilationContext,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
     vm_handled_types::{
-        VmHandledType, bytes::Bytes, named_id::NamedId, string::String_, tx_context::TxContext,
+        VmHandledType,
+        bytes::Bytes,
+        named_id::NamedId,
+        storage_object::{FrozenStorageObject, OwnedStorageObject, SharedStorageObject},
+        string::String_,
+        tx_context::TxContext,
         uid::Uid,
     },
 };
@@ -91,6 +96,25 @@ fn solidity_name(
             module_id, index, ..
         } if Uid::is_vm_type(module_id, *index, compilation_ctx)? => {
             Some(sol_data::FixedBytes::<32>::SOL_NAME.to_string())
+        }
+        IntermediateType::IGenericStructInstance {
+            module_id,
+            index,
+            types,
+            ..
+        } if OwnedStorageObject::is_vm_type(module_id, *index, compilation_ctx)?
+            || SharedStorageObject::is_vm_type(module_id, *index, compilation_ctx)?
+            || FrozenStorageObject::is_vm_type(module_id, *index, compilation_ctx)? =>
+        {
+            if types.len() != 1 {
+                return Err(AbiError::StorageObjectHasInvalidType);
+            }
+
+            let Some(inner_type) = types.first() else {
+                return Err(AbiError::StorageObjectHasInvalidType);
+            };
+
+            solidity_name(inner_type, compilation_ctx)?
         }
         IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
             let struct_ = compilation_ctx.get_struct_by_intermediate_type(argument)?;
