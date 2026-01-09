@@ -221,6 +221,11 @@ pub fn locate_struct_slot(
 }
 
 /// Calculates the slot from the slot mapping
+///
+/// # WASM Function Arguments
+/// * `owner_ptr` - (i32): pointer to the 32 bytes owner id
+/// * `uid_ptr` - (i32): pointer to the 32 bytes object id
+/// * `slot_ptr` - (i32): pointer where the slot number is going to be written
 pub fn write_object_slot(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -616,6 +621,7 @@ pub fn add_encode_and_save_into_storage_fn(
 /// # WASM Function Arguments
 /// * `slot_ptr` - (i32): pointer to the storage slot
 /// * `uid_ptr` - (i32): pointer to the UID
+/// * `owner_ptr` - (i32): pointer to the owner id
 ///
 /// # WASM Function Returns
 /// * `struct_ptr` - (i32): pointer to the struct

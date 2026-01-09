@@ -5,11 +5,7 @@ use crate::{
         ModuleId,
         reserved_modules::{SF_MODULE_NAME_DYNAMIC_FIELD, STYLUS_FRAMEWORK_ADDRESS},
     },
-    data::{
-        DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
-        DATA_SLOT_DATA_PTR_OFFSET,
-        // DATA_STORAGE_OBJECT_OWNER_OFFSET,
-    },
+    data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET},
     hostio::host_functions::{native_keccak256, storage_load_bytes32},
     runtime::RuntimeFunction,
     translation::intermediate_types::error::IntermediateTypeError,

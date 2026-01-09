@@ -43,6 +43,8 @@ pub const DATA_ENUM_STORAGE_SIZE_OFFSET: i32 = 260;
 /// 8 bytes: [data_length][data_pointer]
 pub const DATA_CALLDATA_OFFSET: i32 = 396;
 
+/// Used to derive storage mapping slots for data structures. Here we save the data that will be
+/// hashed with keccak256 to derive the storage slot.
 pub const DATA_DERIVED_MAPPING_SLOT: i32 = 404;
 
 /// Amount of memory reserved starting from offset 0.
