@@ -403,8 +403,19 @@ pub fn process_special_attributes(
                                 .flat_map(|s| FunctionModifier::parse_modifiers(&s.value))
                                 .collect::<VecDeque<FunctionModifier>>();
 
+                            println!(
+                                "Found modifiers for function {}: {:?}",
+                                f.name.0.value, modifiers
+                            );
+
                             let first_modifier = modifiers.pop_front();
                             match first_modifier {
+                                Some(FunctionModifier::SharedObjects) => {
+                                    println!(
+                                        "\n\nShared objects modifier found on function {}\n\n",
+                                        f.name.0.value
+                                    );
+                                }
                                 // TODO: Process this only if test mode is enabled
                                 Some(FunctionModifier::Test) => {
                                     let modifiers =

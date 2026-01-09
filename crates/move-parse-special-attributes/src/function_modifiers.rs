@@ -50,6 +50,10 @@ pub enum FunctionModifier {
     Test,
     Skip,
     ExpectedFailure,
+    OwnedObjects,
+    SharedObjects,
+    FrozenObjects,
+    Identifier(Symbol),
 }
 
 impl Function {
@@ -73,7 +77,7 @@ impl Function {
 }
 
 impl FunctionModifier {
-    pub fn as_str(&self) -> &'static str {
+    pub fn as_str(&self) -> &str {
         match self {
             Self::Pure => "pure",
             Self::View => "view",
@@ -83,28 +87,53 @@ impl FunctionModifier {
             Self::Test => "test",
             Self::Skip => "skip",
             Self::ExpectedFailure => "expected_failure",
+            Self::OwnedObjects => "owned_objects",
+            Self::SharedObjects => "shared_objects",
+            Self::FrozenObjects => "frozen_objects",
+            Self::Identifier(id) => id.as_str(),
         }
     }
 
     pub fn parse_modifiers(attribute: &Attribute_) -> Vec<Self> {
+        let mut result = Vec::new();
+
         match attribute {
-            Attribute_::Parameterized(_, spanned1) => spanned1
-                .value
-                .iter()
-                .flat_map(|s| Self::parse_modifiers(&s.value))
-                .collect::<Vec<FunctionModifier>>(),
+            Attribute_::Parameterized(name, spanned1) => {
+                match name.value.as_str() {
+                    "owned_objects" => {
+                        result.push(Self::SharedObjects);
+                    }
+                    "shared_objects" => {
+                        result.push(Self::SharedObjects);
+                    }
+                    "frozen_objects" => {
+                        result.push(Self::SharedObjects);
+                    }
+                    _ => (),
+                }
+
+                result.extend(
+                    spanned1
+                        .value
+                        .iter()
+                        .flat_map(|s| Self::parse_modifiers(&s.value))
+                        .collect::<Vec<FunctionModifier>>(),
+                );
+            }
             Attribute_::Name(name) => match name.value.as_str() {
-                "pure" => vec![Self::Pure],
-                "view" => vec![Self::View],
-                "payable" => vec![Self::Payable],
-                "external_call" => vec![Self::ExternalCall],
-                "abi" => vec![Self::Abi],
-                "test" => vec![Self::Test],
-                "skip" => vec![Self::Skip],
-                "expected_failure" => vec![Self::ExpectedFailure],
-                _ => vec![],
+                "pure" => result.push(Self::Pure),
+                "view" => result.push(Self::View),
+                "payable" => result.push(Self::Payable),
+                "external_call" => result.push(Self::ExternalCall),
+                "abi" => result.push(Self::Abi),
+                "test" => result.push(Self::Test),
+                "skip" => result.push(Self::Skip),
+                "expected_failure" => result.push(Self::ExpectedFailure),
+                _ => result.push(Self::Identifier(name.value)),
             },
-            _ => vec![],
+            _ => (),
         }
+
+        result
     }
 }
