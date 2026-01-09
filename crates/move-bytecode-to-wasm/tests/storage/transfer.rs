@@ -95,6 +95,7 @@ sol!(
     function incrementValue(bytes32 id) public view;
     function deleteObj(bytes32 id) public view;
     function freezeObj(bytes32 id) public view;
+    function callIndirectFreezeObj(bytes32 id) public view;
     function shareObj(bytes32 id) public view;
     function transferObj(bytes32 id, address recipient) public view;
     function getFoo(bytes32 id) public view returns (Foo);
@@ -511,7 +512,17 @@ fn test_freeze_not_owned_object(
 
     // Freeze the object. Only possible if the object is owned by the signer!
     let call_data = freezeObjCall::new((object_id,)).abi_encode();
-    runtime.call_entrypoint(call_data).unwrap();
+    let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+
+    let error_message = RuntimeError::ObjectNotFound.to_string();
+    let expected_data = [
+        keccak256(b"Error(string)")[..4].to_vec(),
+        <sol!((string,))>::abi_encode_params(&(error_message,)),
+    ]
+    .concat();
+
+    assert_eq!(1, result);
+    assert_eq!(expected_data, return_data);
 }
 
 // Tests the freeze of a shared object.
@@ -539,6 +550,12 @@ fn test_freeze_shared_object(
     ]
     .concat();
 
+    assert_eq!(1, result);
+    assert_eq!(expected_data, return_data);
+
+    // Indirect call
+    let call_data = callIndirectFreezeObjCall::new((object_id,)).abi_encode();
+    let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(1, result);
     assert_eq!(expected_data, return_data);
 }
