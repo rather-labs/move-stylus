@@ -8,6 +8,24 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg},
 };
 
+/// Generates a WASM function that packs a Move string into Solidity ABI string format.
+///
+/// Move strings are represented as structs containing a vector of u8 bytes. This function
+/// unpacks the inner vector, allocates memory at the end of calldata with proper 32-byte
+/// alignment, writes an offset at writer_pointer, then writes the string length and data.
+///
+/// The packed format consists of:
+/// 1. An offset value at writer_pointer (32 bytes)
+/// 2. The string length at the allocated location (32 bytes)
+/// 3. The UTF-8 string data, padded to the next 32-byte boundary
+///
+/// # WASM Function Arguments:
+/// * `string_pointer` (i32) - pointer to the Move string structure (contains pointer to inner vector)
+/// * `writer_pointer` (i32) - pointer where the offset to the packed string should be written
+/// * `calldata_reference_pointer` (i32) - reference point for calculating relative offsets
+///
+/// # WASM Function Returns:
+/// * None - the result is written directly to memory, with an offset at writer_pointer and the string data at the end of calldata
 pub fn pack_string_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,

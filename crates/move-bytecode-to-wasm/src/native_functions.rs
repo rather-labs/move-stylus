@@ -9,6 +9,7 @@ mod dynamic_field;
 pub mod error;
 mod event;
 pub mod object;
+mod peep;
 mod string;
 mod tests;
 mod transaction;
@@ -28,10 +29,10 @@ use crate::{
         ModuleId,
         reserved_modules::{
             SF_MODULE_NAME_ACCOUNT, SF_MODULE_NAME_DYNAMIC_FIELD, SF_MODULE_NAME_ERROR,
-            SF_MODULE_NAME_EVENT, SF_MODULE_NAME_OBJECT, SF_MODULE_NAME_SOL_TYPES,
-            SF_MODULE_NAME_TRANSFER, SF_MODULE_NAME_TX_CONTEXT, SF_MODULE_NAME_TYPES,
-            SF_MODULE_TEST_SCENARIO, STANDARD_LIB_ADDRESS, STDLIB_MODULE_NAME_STRING,
-            STDLIB_MODULE_UNIT_TEST, STYLUS_FRAMEWORK_ADDRESS,
+            SF_MODULE_NAME_EVENT, SF_MODULE_NAME_OBJECT, SF_MODULE_NAME_PEEP,
+            SF_MODULE_NAME_SOL_TYPES, SF_MODULE_NAME_TRANSFER, SF_MODULE_NAME_TX_CONTEXT,
+            SF_MODULE_NAME_TYPES, SF_MODULE_TEST_SCENARIO, STANDARD_LIB_ADDRESS,
+            STDLIB_MODULE_NAME_STRING, STDLIB_MODULE_UNIT_TEST, STYLUS_FRAMEWORK_ADDRESS,
         },
     },
     hasher::get_hasher,
@@ -82,6 +83,8 @@ impl NativeFunction {
     pub const NATIVE_COMPUTE_NAMED_ID: &str = "compute_named_id";
     pub const NATIVE_AS_UID: &str = "as_uid";
     pub const NATIVE_AS_UID_MUT: &str = "as_uid_mut";
+    // Peep function
+    pub const NATIVE_PEEP: &str = "peep";
 
     // Dynamic fields
     #[cfg(debug_assertions)]
@@ -588,6 +591,10 @@ impl NativeFunction {
                     &generics[0],
                     module_id,
                 )?
+            }
+            (Self::NATIVE_PEEP, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_PEEP) => {
+                Self::assert_generics_length(generics.len(), 1, name, module_id)?;
+                peep::add_peep_fn(module, compilation_ctx, &generics[0], module_id)?
             }
 
             _ => {
