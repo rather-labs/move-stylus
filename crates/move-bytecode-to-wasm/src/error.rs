@@ -4,13 +4,20 @@ use move_compiler::{diagnostics::Diagnostic, shared::files::MappedFiles};
 use move_parse_special_attributes::SpecialAttributeError;
 
 use crate::{
+    CompilationContext,
     abi_types::error::AbiError,
     compilation_context::{CompilationContextError, ModuleId},
     constructor::ConstructorError,
+    data::DATA_ABORT_MESSAGE_PTR_OFFSET,
     hostio::error::HostIOError,
     native_functions::error::NativeFunctionError,
     translation::{TranslationError, table::FunctionTableError},
     wasm_validation::WasmValidationError,
+};
+
+use walrus::{
+    InstrSeqBuilder, LocalId,
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
 #[derive(thiserror::Error, Debug)]
@@ -166,4 +173,53 @@ pub enum RuntimeError {
 
     #[error("object not found under the provided address")]
     ObjectNotFound,
+}
+
+/// Adds the instructions to store the error message pointer at DATA_ABORT_MESSAGE_PTR_OFFSET and return 1 to indicate an error occurred.
+pub fn add_handle_error_instructions(
+    builder: &mut InstrSeqBuilder,
+    compilation_ctx: &CompilationContext,
+    encoded_error_ptr: LocalId,
+) {
+    // Store the ptr at DATA_ABORT_MESSAGE_PTR_OFFSET
+    builder
+        .i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)
+        .local_get(encoded_error_ptr)
+        .store(
+            compilation_ctx.memory_id,
+            StoreKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
+
+    // Return 1 to indicate an error occurred
+    builder.i32_const(1);
+    builder.return_();
+}
+
+/// Adds the instructions to propagate the error by returning if the error message pointer at DATA_ABORT_MESSAGE_PTR_OFFSET is not null.
+pub fn add_propagate_error_instructions<'a, 'b>(
+    builder: &'a mut InstrSeqBuilder<'b>,
+    compilation_ctx: &CompilationContext,
+) -> &'a mut InstrSeqBuilder<'b> {
+    // If the function aborts, propagate the error
+    builder.block(None, |b| {
+        let block_id = b.id();
+        b.i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .i32_const(0)
+            .binop(BinaryOp::I32Eq)
+            .br_if(block_id);
+
+        b.i32_const(1).return_();
+    })
 }

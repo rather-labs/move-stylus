@@ -1,13 +1,11 @@
-use walrus::{
-    FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{MemArg, StoreKind},
-};
+use walrus::{FunctionBuilder, FunctionId, Module, ValType};
 
 use crate::{
     CompilationContext,
     abi_types::error_encoding::build_custom_error_message,
     compilation_context::ModuleId,
-    data::{DATA_ABORT_MESSAGE_PTR_OFFSET, RuntimeErrorData},
+    data::RuntimeErrorData,
+    error::add_handle_error_instructions,
     translation::intermediate_types::{IntermediateType, structs::IStructType},
 };
 
@@ -60,27 +58,4 @@ pub fn add_revert_fn(
     add_handle_error_instructions(&mut builder, compilation_ctx, encoded_error_ptr);
 
     Ok(function.finish(vec![error_struct_ptr], &mut module.funcs))
-}
-
-pub fn add_handle_error_instructions(
-    builder: &mut InstrSeqBuilder,
-    compilation_ctx: &CompilationContext,
-    encoded_error_ptr: LocalId,
-) {
-    // Store the ptr at DATA_ABORT_MESSAGE_PTR_OFFSET
-    builder
-        .i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)
-        .local_get(encoded_error_ptr)
-        .store(
-            compilation_ctx.memory_id,
-            StoreKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        );
-
-    // Return 1 to indicate an error occurred
-    builder.i32_const(1);
-    builder.return_();
 }

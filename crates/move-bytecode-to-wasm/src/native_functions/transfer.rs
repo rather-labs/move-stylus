@@ -5,7 +5,7 @@ use crate::{
         DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
         DATA_SHARED_OBJECTS_KEY_OFFSET, RuntimeErrorData,
     },
-    error::RuntimeError,
+    error::{RuntimeError, add_handle_error_instructions},
     runtime::RuntimeFunction,
     translation::intermediate_types::IntermediateType,
 };
@@ -14,7 +14,7 @@ use walrus::{
     ir::{BinaryOp, UnaryOp},
 };
 
-use super::{NativeFunction, abi_error::add_handle_error_instructions, error::NativeFunctionError};
+use super::{NativeFunction, error::NativeFunctionError};
 
 /// Adds the instructions to transfer an object to a recipient.
 /// This implies deleting the object from the original owner's mapping and adding it to the recipient's mapping.

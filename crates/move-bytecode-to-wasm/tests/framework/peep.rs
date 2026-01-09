@@ -112,8 +112,7 @@ fn test_peep(#[with("peep", "tests/framework/move_sources/peep.move")] runtime: 
     assert_eq!(expected_data, return_data);
 
     // call_peep_foo
-    let call_data =
-        callIndirectPeepFooCall::new((owner_address.into(), foo_id.into())).abi_encode();
+    let call_data = callIndirectPeepFooCall::new((owner_address.into(), foo_id)).abi_encode();
     let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
     let return_data = callIndirectPeepFooCall::abi_decode_returns(&return_data).unwrap();
     assert_eq!(100, return_data);

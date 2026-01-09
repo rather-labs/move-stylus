@@ -36,6 +36,7 @@ use crate::{
     abi_types::error_encoding::build_abort_error_message,
     compilation_context::{ModuleData, ModuleId},
     data::{DATA_ABORT_MESSAGE_PTR_OFFSET, RuntimeErrorData},
+    error::add_propagate_error_instructions,
     generics::{replace_type_parameters, type_contains_generics},
     hostio::host_functions::storage_flush_cache,
     native_functions::NativeFunction,
@@ -2861,24 +2862,7 @@ fn call_indirect(
         .i32_const(function_entry.index)
         .call_indirect(function_entry.type_id, wasm_table_id);
 
-    // If the function aborts, propagate the error
-    builder.block(None, |b| {
-        let block_id = b.id();
-        b.i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)
-            .load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            )
-            .i32_const(0)
-            .binop(BinaryOp::I32Eq)
-            .br_if(block_id);
-
-        b.i32_const(1).return_();
-    });
+    add_propagate_error_instructions(builder, compilation_ctx);
 
     add_unpack_function_return_values_instructions(
         builder,

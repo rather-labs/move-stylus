@@ -1,13 +1,11 @@
 use walrus::{
     FunctionId, InstrSeqBuilder, LocalId,
-    ir::{BinaryOp, LoadKind, MemArg, UnaryOp},
+    ir::{BinaryOp, UnaryOp},
 };
 
 use crate::{
-    CompilationContext,
-    compilation_context::ModuleId,
-    data::{DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_SLOT_DATA_PTR_OFFSET},
-    native_functions::NativeFunction,
+    CompilationContext, compilation_context::ModuleId, data::DATA_SLOT_DATA_PTR_OFFSET,
+    error::add_propagate_error_instructions, native_functions::NativeFunction,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -213,29 +211,7 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
 
         // If the function may result in a runtime error, we need to handle it
         if NativeFunction::can_abort(function_name, module_id) {
-            self.block(None, |b| {
-                // Load the abort message pointer from DATA_ABORT_MESSAGE_PTR_OFFSET
-                // If not null, an error occured in the callee and we need to return to propagate it
-
-                let block_id = b.id();
-                b.i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    )
-                    .i32_const(0)
-                    .binop(BinaryOp::I32Eq)
-                    .br_if(block_id);
-
-                // It is not really important what we return here, as long as we keep the stack balanced.
-                // Functions return either nothing or a single local. If we push a local to the stack and the function returns nothing, it will be discarded.
-                // TODO: what about i64?
-                b.i32_const(1).return_();
-            })
+            add_propagate_error_instructions(self, compilation_ctx)
         } else {
             self
         }

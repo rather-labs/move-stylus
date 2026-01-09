@@ -790,9 +790,25 @@ impl NativeFunction {
             module_name,
         } = module_id;
 
-        match (name, *address, module_name.as_str()) {
-            (Self::NATIVE_PEEP, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_PEEP) => true,
-            _ => false,
-        }
+        matches!(
+            (name, *address, module_name.as_str()),
+            (
+                Self::NATIVE_PEEP,
+                STYLUS_FRAMEWORK_ADDRESS,
+                SF_MODULE_NAME_PEEP
+            ) | (
+                Self::NATIVE_SHARE_OBJECT,
+                STYLUS_FRAMEWORK_ADDRESS,
+                SF_MODULE_NAME_TRANSFER
+            ) | (
+                Self::NATIVE_FREEZE_OBJECT,
+                STYLUS_FRAMEWORK_ADDRESS,
+                SF_MODULE_NAME_TRANSFER
+            ) | (
+                Self::NATIVE_TRANSFER_OBJECT,
+                STYLUS_FRAMEWORK_ADDRESS,
+                SF_MODULE_NAME_TRANSFER
+            )
+        )
     }
 }
