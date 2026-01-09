@@ -24,9 +24,7 @@ sol!(
 
         function constructor() public view;
         function mint(address to, uint256 amount) external view;
-        // function mintTo(address to, uint256 amount) external view;
         function burn(address from, uint256 amount) external view;
-        // function burn(uint256 amount) external view;
         function balanceOf(address account) public view returns (uint256);
         function totalSupply() external view returns (uint256);
         function transfer(address recipient, uint256 amount) external returns (bool);
@@ -38,10 +36,6 @@ sol!(
         function decimals() external view returns (uint8);
     }
 );
-
-fn gas_used(receipt: &alloy::rpc::types::TransactionReceipt) {
-    println!("\x1b[35mGas used: {}\x1b[0m", receipt.gas_used);
-}
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
@@ -105,7 +99,6 @@ async fn main() -> eyre::Result<()> {
 
     let _pending_tx_ = example.constructor().send().await?;
     println!("✓ Contract initialized");
-    gas_used(&_pending_tx_.get_receipt().await?);
 
     // ==================== Contract Info ====================
     println!("\n╔══════════════════════════════════════╗");
@@ -113,11 +106,11 @@ async fn main() -> eyre::Result<()> {
     println!("╚══════════════════════════════════════╝");
 
     let res = example.totalSupply().call().await?;
-    // //assert_eq!(res, U256::from(0));
+    assert_eq!(res, U256::from(0));
     println!("  Total Supply:      {res}");
 
     let res = example.decimals().call().await?;
-    //assert_eq!(res, 18);
+    assert_eq!(res, 18);
     println!("  Decimals:          {res}");
 
     let res = example.name().call().await?;
@@ -133,27 +126,25 @@ async fn main() -> eyre::Result<()> {
 
     println!("\n  Initial balances:");
     let res = example.balanceOf(sender).call().await?;
-    //assert_eq!(res, U256::from(0));
+    assert_eq!(res, U256::from(0));
     println!("    {sender_short}: {res} TST");
 
     let res = example.balanceOf(sender_2).call().await?;
-    //assert_eq!(res, U256::from(0));
+    assert_eq!(res, U256::from(0));
     println!("    {sender_2_short}: {res} TST");
 
     println!("\n  Minting 555555 TST to {sender_short}...");
-    // let pending_tx = example.mintTo(sender, U256::from(555555)).send().await?;
     let pending_tx = example.mint(sender, U256::from(555555)).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    gas_used(&receipt);
+    pending_tx.get_receipt().await?;
     println!("  ✓ Mint complete");
 
     let res = example.totalSupply().call().await?;
-    //assert_eq!(res, U256::from(555555));
+    assert_eq!(res, U256::from(555555));
     println!("    Total Supply: {res}");
 
     println!("\n  Balances after minting:");
     let res = example.balanceOf(sender).call().await?;
-    //assert_eq!(res, U256::from(555555));
+    assert_eq!(res, U256::from(555555));
     println!("    {sender_short}: {res} TST");
 
     // ==================== Transfer ====================
@@ -165,25 +156,24 @@ async fn main() -> eyre::Result<()> {
 
     println!("\n  Balances before transfer:");
     let res = example.balanceOf(sender).call().await?;
-    //assert_eq!(res, U256::from(555555));
+    assert_eq!(res, U256::from(555555));
     println!("    {sender_short}: {res} TST");
 
     let res = example.balanceOf(sender_2).call().await?;
-    //assert_eq!(res, U256::from(0));
+    assert_eq!(res, U256::from(0));
     println!("    {sender_2_short}: {res} TST");
 
     let pending_tx = example.transfer(sender_2, U256::from(1000)).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    gas_used(&receipt);
+    pending_tx.get_receipt().await?;
     println!("  ✓ Transfer complete");
 
     println!("\n  Balances after transfer:");
     let res = example.balanceOf(sender).call().await?;
-    //assert_eq!(res, U256::from(554555));
+    assert_eq!(res, U256::from(554555));
     println!("    {sender_short}: {res} TST");
 
     let res = example.balanceOf(sender_2).call().await?;
-    //assert_eq!(res, U256::from(1000));
+    assert_eq!(res, U256::from(1000));
     println!("    {sender_2_short}: {res} TST");
 
     // ==================== Burn ====================
@@ -193,18 +183,16 @@ async fn main() -> eyre::Result<()> {
 
     println!("\n  Burning 11111 TST from {sender_short}...");
     let pending_tx = example.burn(sender, U256::from(11111)).send().await?;
-    // let pending_tx = example.burn(U256::from(11111)).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    gas_used(&receipt);
+    pending_tx.get_receipt().await?;
     println!("  ✓ Burn complete");
 
     let res = example.totalSupply().call().await?;
-    //assert_eq!(res, U256::from(544444));
+    assert_eq!(res, U256::from(544444));
     println!("    Total Supply: {res}");
 
     println!("\n  Balances after burning:");
     let res = example.balanceOf(sender).call().await?;
-    //assert_eq!(res, U256::from(543444));
+    assert_eq!(res, U256::from(543444));
     println!("    {sender_short}: {res} TST");
 
     // ==================== Allowance & TransferFrom ====================
@@ -214,32 +202,30 @@ async fn main() -> eyre::Result<()> {
 
     println!("\n  Before approval:");
     let res = example.allowance(sender_2, sender).call().await?;
-    //assert_eq!(res, U256::from(0));
+    assert_eq!(res, U256::from(0));
     println!("    Allowance ({sender_2_short} → {sender_short}): {res} TST");
 
     println!("\n  Approving {sender_short} to spend 100 TST from {sender_2_short}...");
     let pending_tx = example_2.approve(sender, U256::from(100)).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    gas_used(&receipt);
-
+    pending_tx.get_receipt().await?;
     println!("  ✓ Approval granted");
 
     println!("\n  After approval:");
     let res = example.allowance(sender_2, sender).call().await?;
-    //assert_eq!(res, U256::from(100));
+    assert_eq!(res, U256::from(100));
     println!("    Allowance ({sender_2_short} → {sender_short}): {res} TST");
 
     println!("\n  Balances before transferFrom:");
     let res = example.balanceOf(sender).call().await?;
-    //assert_eq!(res, U256::from(543444));
+    assert_eq!(res, U256::from(543444));
     println!("    {sender_short}: {res} TST");
 
     let res = example.balanceOf(sender_2).call().await?;
-    //assert_eq!(res, U256::from(1000));
+    assert_eq!(res, U256::from(1000));
     println!("    {sender_2_short}: {res} TST");
 
     let res = example.balanceOf(address_3).call().await?;
-    //assert_eq!(res, U256::from(0));
+    assert_eq!(res, U256::from(0));
     println!("    {address_3_short}: {res} TST");
 
     println!("\n  Using transferFrom: {sender_2_short} → {address_3_short} (100 TST)");
@@ -248,26 +234,25 @@ async fn main() -> eyre::Result<()> {
         .transferFrom(sender_2, address_3, U256::from(100))
         .send()
         .await?;
-    let receipt = pending_tx.get_receipt().await?;
-    gas_used(&receipt);
+    pending_tx.get_receipt().await?;
     println!("  ✓ TransferFrom complete");
 
     println!("\n  After transferFrom:");
     let res = example.allowance(sender_2, sender).call().await?;
-    //assert_eq!(res, U256::from(0));
+    assert_eq!(res, U256::from(0));
     println!("    Allowance ({sender_2_short} → {sender_short}): {res} TST (depleted)");
 
     println!("\n  Balances after transferFrom:");
     let res = example.balanceOf(sender).call().await?;
-    //assert_eq!(res, U256::from(543444));
+    assert_eq!(res, U256::from(543444));
     println!("    {sender_short}: {res} TST");
 
     let res = example.balanceOf(sender_2).call().await?;
-    //assert_eq!(res, U256::from(900));
+    assert_eq!(res, U256::from(900));
     println!("    {sender_2_short}: {res} TST");
 
     let res = example.balanceOf(address_3).call().await?;
-    //assert_eq!(res, U256::from(100));
+    assert_eq!(res, U256::from(100));
     println!("    {address_3_short}: {res} TST");
 
     // ==================== Done ====================
