@@ -43,7 +43,7 @@ fn test_dynamic_table(
     }
 
     // Read the object id emmited from the contract's events
-    let object_id = runtime.obtain_uid();
+    let object_id = runtime.obtain_uid().unwrap();
 
     let key_1 = address!("0x1234567890abcdef1234567890abcdef12345678");
     let key_2 = address!("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd");

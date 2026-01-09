@@ -147,7 +147,7 @@ fn test_frozen_object(
     assert_eq!(0, result);
 
     // Read the object id emmited from the contract's events
-    let object_id = runtime.obtain_uid();
+    let object_id = runtime.obtain_uid().unwrap();
 
     // Read value
     let call_data = readValueCall::new((object_id,)).abi_encode();
@@ -168,7 +168,7 @@ fn test_shared_object(
     assert_eq!(0, result);
 
     // Read the object id emmited from the contract's events
-    let object_id = runtime.obtain_uid();
+    let object_id = runtime.obtain_uid().unwrap();
 
     // Read initial value (should be 101)
     let call_data = readValueCall::new((object_id,)).abi_encode();
@@ -269,7 +269,7 @@ fn test_owned_object(
     assert_eq!(0, result);
 
     // Read the object id emmited from the contract's events
-    let object_id = runtime.obtain_uid();
+    let object_id = runtime.obtain_uid().unwrap();
 
     // Read initial value (should be 101)
     let call_data = readValueCall::new((object_id,)).abi_encode();
@@ -347,7 +347,7 @@ fn test_share_owned_object(
     assert_eq!(0, result);
 
     // Read the object id emmited from the contract's events
-    let object_id = runtime.obtain_uid();
+    let object_id = runtime.obtain_uid().unwrap();
 
     // Compute the object slot using the owner and the object id
     let owner = runtime.get_tx_origin();
@@ -408,7 +408,7 @@ fn test_freeze_owned_object(
     assert_eq!(0, result);
 
     // Read the object id emmited from the contract's events
-    let object_id = runtime.obtain_uid();
+    let object_id = runtime.obtain_uid().unwrap();
 
     // Compute the object slot using the owner and the object id
     let owner = runtime.get_tx_origin();
@@ -477,7 +477,7 @@ fn test_signer_owner_mismatch(
     assert_eq!(0, result);
 
     // Read the object id emmited from the contract's events
-    let object_id = runtime.obtain_uid();
+    let object_id = runtime.obtain_uid().unwrap();
 
     // Read initial value (should be 101)
     let call_data = readValueCall::new((object_id,)).abi_encode();
@@ -505,7 +505,7 @@ fn test_freeze_not_owned_object(
     assert_eq!(0, result);
 
     // Read the object id emmited from the contract's events
-    let object_id = runtime.obtain_uid();
+    let object_id = runtime.obtain_uid().unwrap();
 
     runtime.set_tx_origin(address!("0x00000000000000000000000000000000abababab").0.0);
 
@@ -525,7 +525,7 @@ fn test_freeze_shared_object(
     assert_eq!(0, result);
 
     // Read the object id emmited from the contract's events
-    let object_id = runtime.obtain_uid();
+    let object_id = runtime.obtain_uid().unwrap();
 
     // Freeze the object. Only possible if the object is owned by the signer!
     let call_data = freezeObjCall::new((object_id,)).abi_encode();
@@ -558,7 +558,7 @@ fn test_share_or_transfer_frozen(
     assert_eq!(0, result);
 
     // Read the object id emmited from the contract's events
-    let object_id = runtime.obtain_uid();
+    let object_id = runtime.obtain_uid().unwrap();
 
     // Freeze the object. Only possible if the object is owned by the signer!
     let call_data = freezeObjCall::new((object_id,)).abi_encode();
@@ -585,7 +585,7 @@ fn test_delete_frozen_object(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let object_id = runtime.obtain_uid();
+    let object_id = runtime.obtain_uid().unwrap();
 
     // Read value before delete
     let call_data = readValueCall::new((object_id,)).abi_encode();
@@ -608,7 +608,7 @@ fn test_delete_owned_object(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let object_id = runtime.obtain_uid();
+    let object_id = runtime.obtain_uid().unwrap();
 
     // Read value before delete
     let call_data = readValueCall::new((object_id,)).abi_encode();
@@ -637,7 +637,7 @@ fn test_delete_shared_object(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let object_id = runtime.obtain_uid();
+    let object_id = runtime.obtain_uid().unwrap();
 
     // Read value before delete
     let call_data = readValueCall::new((object_id,)).abi_encode();
@@ -668,7 +668,7 @@ fn test_get_foo(
     assert_eq!(0, result);
 
     // Read the object id emmited from the contract's events
-    let object_id = runtime.obtain_uid();
+    let object_id = runtime.obtain_uid().unwrap();
 
     // Set value to 111 with a sender that is not the owner
     let call_data = getFooCall::new((object_id,)).abi_encode();
@@ -693,7 +693,7 @@ fn test_delete_bar(
 
     let storage_before_delete = runtime.get_storage();
 
-    let object_id = runtime.obtain_uid();
+    let object_id = runtime.obtain_uid().unwrap();
 
     let call_data = getBarCall::new((object_id,)).abi_encode();
     let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -730,7 +730,7 @@ fn test_delete_baz(
 
     let storage_before_delete = runtime.get_storage();
 
-    let object_id = runtime.obtain_uid();
+    let object_id = runtime.obtain_uid().unwrap();
 
     let call_data = getBazCall::new((object_id,)).abi_encode();
     let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -768,7 +768,7 @@ fn test_delete_bez(
 
     let storage_before_delete = runtime.get_storage();
 
-    let object_id = runtime.obtain_uid();
+    let object_id = runtime.obtain_uid().unwrap();
 
     let call_data = getBezCall::new((object_id,)).abi_encode();
     let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -833,7 +833,7 @@ fn test_delete_biz(
 
     let storage_before_delete = runtime.get_storage();
 
-    let object_id = runtime.obtain_uid();
+    let object_id = runtime.obtain_uid().unwrap();
 
     let call_data = getBizCall::new((object_id,)).abi_encode();
     let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -899,13 +899,13 @@ fn test_delete_many(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let object_1_id = runtime.obtain_uid();
+    let object_1_id = runtime.obtain_uid().unwrap();
 
     let call_data = createSharedCall::new(()).abi_encode();
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let object_2_id = runtime.obtain_uid();
+    let object_2_id = runtime.obtain_uid().unwrap();
 
     let storage_before_delete = runtime.get_storage();
 
@@ -927,7 +927,7 @@ fn test_delete_owned_var(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let object_id = runtime.obtain_uid();
+    let object_id = runtime.obtain_uid().unwrap();
 
     let call_data = getVarCall::new((object_id,)).abi_encode();
     let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -982,7 +982,7 @@ fn test_delete_shared_var(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let object_id = runtime.obtain_uid();
+    let object_id = runtime.obtain_uid().unwrap();
 
     let call_data = getVarCall::new((object_id,)).abi_encode();
     let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -1256,7 +1256,7 @@ fn test_delete_vaz(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let object_id = runtime.obtain_uid();
+    let object_id = runtime.obtain_uid().unwrap();
 
     let call_data = getVazCall::new((object_id,)).abi_encode();
     let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -1325,7 +1325,7 @@ fn test_delete_epic_var(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let object_id = runtime.obtain_uid();
+    let object_id = runtime.obtain_uid().unwrap();
 
     let call_data = getEpicVarCall::new((object_id,)).abi_encode();
     let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();

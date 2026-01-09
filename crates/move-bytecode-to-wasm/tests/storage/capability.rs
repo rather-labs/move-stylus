@@ -26,7 +26,7 @@ fn test_capability(
     assert_eq!(0, result);
 
     // Read the object id emmited from the contract's events
-    let object_id = runtime.obtain_uid();
+    let object_id = runtime.obtain_uid().unwrap();
 
     // Set value to 111 with a sender that is not the owner
     let call_data = adminCapFnCall::new((object_id,)).abi_encode();

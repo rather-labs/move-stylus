@@ -89,7 +89,7 @@ fn test_peep(#[with("peep", "tests/framework/move_sources/peep.move")] runtime: 
 
     // Read the object id emmited from the contract's events
     let bar_id = runtime.obtain_uid().unwrap();
-    let _ = runtime.obtain_uid(); // the nested foo object
+    let _ = runtime.obtain_uid().unwrap(); // the nested foo object
 
     // Peep into the Bar struct
     let call_data = peepBarCall::new((owner_address.into(), bar_id)).abi_encode();
@@ -118,8 +118,9 @@ fn test_peep(#[with("peep", "tests/framework/move_sources/peep.move")] runtime: 
     let return_data = callIndirectPeepFooCall::abi_decode_returns(&return_data).unwrap();
     assert_eq!(100, return_data);
     assert_eq!(0, result);
+
     // A foo is created if the foo is found
-    let foo_id = runtime.obtain_uid().unwrap();
+    let _ = runtime.obtain_uid().unwrap();
 
     // Call peep_foo
     let call_data =
@@ -133,4 +134,11 @@ fn test_peep(#[with("peep", "tests/framework/move_sources/peep.move")] runtime: 
     ]
     .concat();
     assert_eq!(expected_data, return_data);
+
+    // Here we should expect no new uid event currently available
+    let err = runtime.obtain_uid().unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "No NewUID(address) event currently available"
+    );
 }
