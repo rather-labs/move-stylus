@@ -769,7 +769,12 @@ fn translate_instruction(
                         type_instantiations,
                     )?;
 
-                    builder.call(native_function_id);
+                    builder.call_native_function(
+                        compilation_ctx,
+                        &function_id.identifier,
+                        &function_id.module_id,
+                        native_function_id,
+                    );
                 } else {
                     let table_id = function_table.get_table_id();
 
@@ -997,7 +1002,12 @@ fn translate_instruction(
                             )?
                         };
 
-                    builder.call(native_function_id);
+                    builder.call_native_function(
+                        compilation_ctx,
+                        &function_information.function_id.identifier,
+                        &function_information.function_id.module_id,
+                        native_function_id,
+                    );
                 } else {
                     let table_id = function_table.get_table_id();
 
@@ -2850,6 +2860,25 @@ fn call_indirect(
     builder
         .i32_const(function_entry.index)
         .call_indirect(function_entry.type_id, wasm_table_id);
+
+    // If the function aborts, propagate the error
+    builder.block(None, |b| {
+        let block_id = b.id();
+        b.i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .i32_const(0)
+            .binop(BinaryOp::I32Eq)
+            .br_if(block_id);
+
+        b.i32_const(1).return_();
+    });
 
     add_unpack_function_return_values_instructions(
         builder,

@@ -783,4 +783,16 @@ impl NativeFunction {
 
         Ok(format!("___{name}_{hash}_{:x}", module_id.hash()))
     }
+
+    pub fn can_abort(name: &str, module_id: &ModuleId) -> bool {
+        let ModuleId {
+            address,
+            module_name,
+        } = module_id;
+
+        match (name, *address, module_name.as_str()) {
+            (Self::NATIVE_PEEP, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_PEEP) => true,
+            _ => false,
+        }
+    }
 }

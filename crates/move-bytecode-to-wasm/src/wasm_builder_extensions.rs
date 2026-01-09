@@ -1,9 +1,14 @@
 use walrus::{
-    InstrSeqBuilder, LocalId,
-    ir::{BinaryOp, UnaryOp},
+    FunctionId, InstrSeqBuilder, LocalId,
+    ir::{BinaryOp, LoadKind, MemArg, UnaryOp},
 };
 
-use crate::{CompilationContext, data::DATA_SLOT_DATA_PTR_OFFSET};
+use crate::{
+    CompilationContext,
+    compilation_context::ModuleId,
+    data::{DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_SLOT_DATA_PTR_OFFSET},
+    native_functions::NativeFunction,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum WasmBuilderExtensionError {
@@ -82,6 +87,15 @@ pub trait WasmBuilderExtension {
 
     /// Leaves in the stack the current position of the linear memory.
     fn get_memory_curret_position(&mut self, compilation_ctx: &CompilationContext) -> &mut Self;
+
+    /// Calls a function and handles the error.
+    fn call_native_function(
+        &mut self,
+        compilation_ctx: &CompilationContext,
+        function_name: &str,
+        module_id: &ModuleId,
+        function_id: FunctionId,
+    ) -> &mut Self;
 }
 
 impl WasmBuilderExtension for InstrSeqBuilder<'_> {
@@ -185,5 +199,45 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
 
     fn get_memory_curret_position(&mut self, compilation_ctx: &CompilationContext) -> &mut Self {
         self.i32_const(0).call(compilation_ctx.allocator)
+    }
+
+    fn call_native_function(
+        &mut self,
+        compilation_ctx: &CompilationContext,
+        function_name: &str,
+        module_id: &ModuleId,
+        function_id: FunctionId,
+    ) -> &mut Self {
+        // Call the function
+        self.call(function_id);
+
+        // If the function may result in a runtime error, we need to handle it
+        if NativeFunction::can_abort(function_name, module_id) {
+            self.block(None, |b| {
+                // Load the abort message pointer from DATA_ABORT_MESSAGE_PTR_OFFSET
+                // If not null, an error occured in the callee and we need to return to propagate it
+
+                let block_id = b.id();
+                b.i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .i32_const(0)
+                    .binop(BinaryOp::I32Eq)
+                    .br_if(block_id);
+
+                // It is not really important what we return here, as long as we keep the stack balanced.
+                // Functions return either nothing or a single local. If we push a local to the stack and the function returns nothing, it will be discarded.
+                // TODO: what about i64?
+                b.i32_const(1).return_();
+            })
+        } else {
+            self
+        }
     }
 }

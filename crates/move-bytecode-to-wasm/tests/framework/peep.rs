@@ -33,6 +33,7 @@ sol!(
     function createOwnedFoo(address owner) external;
     function ownerPeepFoo(bytes32 foo) external returns (uint32);
     function peepFoo(address owner, bytes32 id) external returns (Foo);
+    function callIndirectPeepFoo(address owner, bytes32 id) external returns (uint32);
     function createOwnedBar(address owner) external;
     function peepBar(address owner, bytes32 id) external returns (Bar);
 );
@@ -51,7 +52,7 @@ fn test_peep(#[with("peep", "tests/framework/move_sources/peep.move")] runtime: 
     assert_eq!(0, result);
 
     // Read the object id emmited from the contract's events
-    let foo_id = runtime.obtain_uid();
+    let foo_id = runtime.obtain_uid().unwrap();
 
     // Owner peeps into the Foo struct
     let call_data = ownerPeepFooCall::new((foo_id,)).abi_encode();
@@ -87,7 +88,8 @@ fn test_peep(#[with("peep", "tests/framework/move_sources/peep.move")] runtime: 
     assert_eq!(0, result);
 
     // Read the object id emmited from the contract's events
-    let bar_id = runtime.obtain_uid();
+    let bar_id = runtime.obtain_uid().unwrap();
+    let _ = runtime.obtain_uid(); // the nested foo object
 
     // Peep into the Bar struct
     let call_data = peepBarCall::new((owner_address.into(), bar_id)).abi_encode();
@@ -99,6 +101,29 @@ fn test_peep(#[with("peep", "tests/framework/move_sources/peep.move")] runtime: 
 
     // Peep into a non-existent object
     let call_data = peepFooCall::new((owner_address.into(), [0; 32].into())).abi_encode();
+    let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+    assert_eq!(1, result);
+    let error_message = RuntimeError::ObjectNotFound.to_string();
+    let expected_data = [
+        keccak256(b"Error(string)")[..4].to_vec(),
+        <sol!((string,))>::abi_encode_params(&(error_message,)),
+    ]
+    .concat();
+    assert_eq!(expected_data, return_data);
+
+    // call_peep_foo
+    let call_data =
+        callIndirectPeepFooCall::new((owner_address.into(), foo_id.into())).abi_encode();
+    let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+    let return_data = callIndirectPeepFooCall::abi_decode_returns(&return_data).unwrap();
+    assert_eq!(100, return_data);
+    assert_eq!(0, result);
+    // A foo is created if the foo is found
+    let foo_id = runtime.obtain_uid().unwrap();
+
+    // Call peep_foo
+    let call_data =
+        callIndirectPeepFooCall::new((owner_address.into(), [0; 32].into())).abi_encode();
     let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(1, result);
     let error_message = RuntimeError::ObjectNotFound.to_string();
