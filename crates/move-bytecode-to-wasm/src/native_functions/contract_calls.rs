@@ -63,8 +63,8 @@ pub fn add_external_contract_call_fn(
     let (call_contract, _) = call_contract(module);
     let (delegate_call_contract, _) = delegate_call_contract(module);
     let (static_call_contract, _) = static_call_contract(module);
-    let swap_i32 = RuntimeFunction::SwapI32Bytes.get(module, None)?;
-    let swap = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx))?;
+    let swap_i32 = RuntimeFunction::SwapI32Bytes.get(module, None, None)?;
+    let swap = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx), None)?;
 
     let mut arguments = function_information.signature.get_argument_wasm_types()?;
 
@@ -74,7 +74,7 @@ pub fn add_external_contract_call_fn(
 
     let mut function = FunctionBuilder::new(&mut module.types, &arguments, &[ValType::I32]);
     let mut builder = function.name(name.clone()).func_body();
-
+    let return_block_id = builder.id();
     // Arguments
     let function_args: Vec<LocalId> = arguments.iter().map(|a| module.locals.add(*a)).collect();
     let self_ = function_args
@@ -467,6 +467,7 @@ pub fn add_external_contract_call_fn(
                             None,
                             block,
                             module,
+                            return_block_id,
                             return_data_abi_encoded_ptr,
                             calldata_reader_pointer,
                             compilation_ctx,
@@ -649,8 +650,11 @@ pub fn add_external_contract_call_fn(
     storage_objects.extend(named_ids_storage_objects);
 
     if !storage_objects.is_empty() {
-        let locate_storage_data_fn =
-            RuntimeFunction::LocateStorageData.get(module, Some(compilation_ctx))?;
+        let locate_storage_data_fn = RuntimeFunction::LocateStorageData.get(
+            module,
+            Some(compilation_ctx),
+            Some(runtime_error_data),
+        )?;
 
         let mut inner_result = Ok(());
         builder.block(None, |block| {

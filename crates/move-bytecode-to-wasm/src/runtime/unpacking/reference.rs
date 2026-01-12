@@ -26,7 +26,7 @@ pub fn unpack_reference_function(
         &[ValType::I32],
     );
     let mut builder = function.name(name).func_body();
-
+    let return_block_id = builder.id();
     // Arguments
     let reader_pointer = module.locals.add(ValType::I32);
     let calldata_reader_pointer = module.locals.add(ValType::I32);
@@ -50,6 +50,7 @@ pub fn unpack_reference_function(
                 None,
                 &mut builder,
                 module,
+                return_block_id,
                 reader_pointer,
                 calldata_reader_pointer,
                 compilation_ctx,
@@ -128,6 +129,7 @@ mod tests {
         let mut func_body = function_builder.func_body();
         let args_pointer = raw_module.locals.add(ValType::I32);
         let calldata_reader_pointer = raw_module.locals.add(ValType::I32);
+        let return_block_id = func_body.id();
 
         func_body.i32_const(0);
         func_body.local_tee(args_pointer);
@@ -138,6 +140,7 @@ mod tests {
                 Some(&ref_type),
                 &mut func_body,
                 &mut raw_module,
+                return_block_id,
                 args_pointer,
                 calldata_reader_pointer,
                 &compilation_ctx,

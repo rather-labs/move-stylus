@@ -176,7 +176,8 @@ pub fn build_abort_error_message(
     compilation_ctx: &CompilationContext,
 ) -> Result<LocalId, AbiError> {
     // Convert error code to decimal string
-    let u64_to_dec_ascii = RuntimeFunction::U64ToAsciiBase10.get(module, Some(compilation_ctx))?;
+    let u64_to_dec_ascii =
+        RuntimeFunction::U64ToAsciiBase10.get(module, Some(compilation_ctx), None)?;
     let error_ptr = module.locals.add(ValType::I32);
     let error_len = module.locals.add(ValType::I32);
 
@@ -273,7 +274,7 @@ pub fn build_abort_error_message(
 
     // Write message length in big-endian format
     const LENGTH_WORD_END: i32 = 64; // last 4 bytes of the 32 bytes length word (offset 68 = 4 + 64)
-    let swap_i32 = RuntimeFunction::SwapI32Bytes.get(module, None)?;
+    let swap_i32 = RuntimeFunction::SwapI32Bytes.get(module, None, None)?;
     builder
         .local_get(ptr)
         .local_get(error_len)

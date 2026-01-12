@@ -160,7 +160,7 @@ pub fn vec_swap_function(
     let idx1 = module.locals.add(ValType::I32);
     let len = module.locals.add(ValType::I32);
 
-    let downcast_f = RuntimeFunction::DowncastU64ToU32.get(module, None)?;
+    let downcast_f = RuntimeFunction::DowncastU64ToU32.get(module, None, None)?;
 
     builder.local_get(idx1_i64).call(downcast_f).local_set(idx1);
     builder.local_get(idx2_i64).call(downcast_f).local_set(idx2);
@@ -304,7 +304,7 @@ pub fn vec_pop_back_function(
     }
 
     let decrement_vec_len_function =
-        RuntimeFunction::VecDecrementLen.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::VecDecrementLen.get(module, Some(compilation_ctx), None)?;
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[return_type]);
     let mut builder = function.name(name).func_body();
@@ -511,7 +511,7 @@ pub fn vec_push_back_function(
 
     // length++
     let vec_increment_len_fn =
-        RuntimeFunction::VecIncrementLen.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::VecIncrementLen.get(module, Some(compilation_ctx), None)?;
     builder.local_get(vec_ptr).call(vec_increment_len_fn);
 
     Ok(function.finish(vec![vec_ref, elem], &mut module.funcs))
@@ -869,7 +869,7 @@ pub fn copy_local_function(
 
     // Allocate memory and write length and capacity at the beginning
     let allocate_vector_with_header_function =
-        RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx), None)?;
     builder
         .local_get(len)
         .local_get(capacity)
@@ -1184,8 +1184,11 @@ pub fn equality_function(
                     | IntermediateType::IU32
                     | IntermediateType::IU64 => {
                         // Call the generic equality function
-                        let equality_f =
-                            RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx))?;
+                        let equality_f = RuntimeFunction::HeapTypeEquality.get(
+                            module,
+                            Some(compilation_ctx),
+                            None,
+                        )?;
                         then.skip_vec_header(v1_ptr)
                             .skip_vec_header(v2_ptr)
                             .local_get(len)
@@ -1309,7 +1312,7 @@ pub fn bytes_to_vec_function(
     let vector_ptr = module.locals.add(ValType::I32);
 
     let allocate_vector_with_header_function =
-        RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx), None)?;
     builder
         .local_get(n)
         .local_get(n)

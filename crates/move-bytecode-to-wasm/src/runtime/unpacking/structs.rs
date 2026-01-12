@@ -4,6 +4,7 @@ use crate::{
     data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, RuntimeErrorData},
     runtime::{RuntimeFunction, RuntimeFunctionError},
     translation::intermediate_types::IntermediateType,
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
@@ -95,6 +96,7 @@ pub fn unpack_struct_function(
         &[ValType::I32],
     );
     let mut builder = function.name(name).func_body();
+    let return_block_id = builder.id();
 
     // Arguments
     let reader_pointer = module.locals.add(ValType::I32);
@@ -111,11 +113,11 @@ pub fn unpack_struct_function(
     // In a dynamic struct, the first value is where the values are packed in the calldata
     if struct_.solidity_abi_encode_is_dynamic(compilation_ctx)? {
         // Big-endian to Little-endian
-        let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
+        let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None, None)?;
 
         // Validate that the pointer fits in 32 bits
         let validate_pointer_fn =
-            RuntimeFunction::ValidatePointer32Bit.get(module, Some(compilation_ctx))?;
+            RuntimeFunction::ValidatePointer32Bit.get(module, Some(compilation_ctx), None)?;
         builder.local_get(reader_pointer).call(validate_pointer_fn);
 
         builder
@@ -157,6 +159,7 @@ pub fn unpack_struct_function(
             Some(itype),
             &mut builder,
             module,
+            return_block_id, // TODO: here we can just pass None
             data_reader_pointer,
             calldata_ptr,
             compilation_ctx,
@@ -257,13 +260,20 @@ pub fn unpack_storage_struct_function(
     let unpack_frozen = module.locals.add(ValType::I32);
 
     // Search for the object in the objects mappings
-    let locate_storage_data_fn =
-        RuntimeFunction::LocateStorageData.get(module, Some(compilation_ctx))?;
+    let locate_storage_data_fn = RuntimeFunction::LocateStorageData.get(
+        module,
+        Some(compilation_ctx),
+        Some(runtime_error_data),
+    )?;
 
     builder
         .local_get(uid_ptr)
         .local_get(unpack_frozen)
-        .call(locate_storage_data_fn);
+        .call_runtime_function(
+            compilation_ctx,
+            locate_storage_data_fn,
+            &RuntimeFunction::LocateStorageData,
+        );
 
     // Read the object
     let read_and_decode_from_storage_fn = RuntimeFunction::ReadAndDecodeFromStorage.get_generic(

@@ -23,7 +23,7 @@ pub fn pack_u32_function(
     compilation_ctx: &CompilationContext,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     // Little-endian to Big-endian
-    let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
+    let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None, None)?;
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
     let mut builder = function
@@ -72,7 +72,7 @@ pub fn pack_u64_function(
     compilation_ctx: &CompilationContext,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     // Little-endian to Big-endian
-    let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None)?;
+    let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None, None)?;
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I64, ValType::I32], &[]);
 
     let mut builder = function

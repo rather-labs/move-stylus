@@ -47,9 +47,10 @@ pub fn add_child_object_fn(
         return Ok(function);
     };
 
-    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx))?;
+    let get_id_bytes_ptr_fn =
+        RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx), None)?;
     let write_object_slot_fn =
-        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx), None)?;
     let save_struct_into_storage_fn = RuntimeFunction::EncodeAndSaveInStorage.get_generic(
         module,
         compilation_ctx,
@@ -122,7 +123,7 @@ pub fn add_borrow_object_fn(
         return Ok(function);
     };
     let write_object_slot_fn =
-        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx), None)?;
     let read_and_decode_from_storage_fn = RuntimeFunction::ReadAndDecodeFromStorage.get_generic(
         module,
         compilation_ctx,
@@ -294,8 +295,8 @@ pub fn add_has_child_object_fn(
 
     let (storage_load, _) = storage_load_bytes32(module);
     let write_object_slot_fn =
-        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
-    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx), None)?;
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx), None)?;
 
     // Arguments
     let parent_uid = module.locals.add(ValType::I32);

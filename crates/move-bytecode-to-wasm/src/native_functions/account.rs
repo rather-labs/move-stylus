@@ -44,7 +44,7 @@ pub fn add_native_account_balance_fn(
 ) -> Result<FunctionId, NativeFunctionError> {
     let (account_balance_function_id, _) = account_balance(module);
     let swap_i256_bytes_function =
-        RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx), None)?;
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
 

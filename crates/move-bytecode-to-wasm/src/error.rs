@@ -157,24 +157,34 @@ impl From<&CodeError> for Diagnostic {
     }
 }
 
-#[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RuntimeError {
-    #[error("frozen objects cannot be shared")]
     FrozenObjectsCannotBeShared,
-
-    #[error("shared objects cannot be frozen")]
     SharedObjectsCannotBeFrozen,
-
-    #[error("frozen objects cannot be transferred")]
     FrozenObjectsCannotBeTransferred,
-
-    #[error("shared objects cannot be transferred")]
     SharedObjectsCannotBeTransferred,
-
-    #[error("object not found under the provided address")]
-    ObjectNotFound,
+    StorageObjectNotFound,
+    Overflow,
+    Underflow,
 }
 
+impl RuntimeError {
+    pub fn as_bytes(&self) -> &[u8] {
+        match self {
+            RuntimeError::FrozenObjectsCannotBeShared => b"Frozen objects cannot be shared",
+            RuntimeError::SharedObjectsCannotBeFrozen => b"Shared objects cannot be frozen",
+            RuntimeError::FrozenObjectsCannotBeTransferred => {
+                b"Frozen objects cannot be transferred"
+            }
+            RuntimeError::SharedObjectsCannotBeTransferred => {
+                b"Shared objects cannot be transferred"
+            }
+            RuntimeError::StorageObjectNotFound => b"Object not found",
+            RuntimeError::Overflow => b"Overflow",
+            RuntimeError::Underflow => b"Underflow",
+        }
+    }
+}
 /// Adds the instructions to store the error message pointer at DATA_ABORT_MESSAGE_PTR_OFFSET and return 1 to indicate an error occurred.
 pub fn add_handle_error_instructions(
     builder: &mut InstrSeqBuilder,
@@ -200,10 +210,10 @@ pub fn add_handle_error_instructions(
 }
 
 /// Adds the instructions to propagate the error by returning if the error message pointer at DATA_ABORT_MESSAGE_PTR_OFFSET is not null.
-pub fn add_propagate_error_instructions<'a, 'b>(
-    builder: &'a mut InstrSeqBuilder<'b>,
+pub fn add_propagate_error_instructions(
+    builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
-) -> &'a mut InstrSeqBuilder<'b> {
+) {
     // If the function aborts, propagate the error
     builder.block(None, |b| {
         let block_id = b.id();
@@ -221,5 +231,5 @@ pub fn add_propagate_error_instructions<'a, 'b>(
             .br_if(block_id);
 
         b.i32_const(1).return_();
-    })
+    });
 }

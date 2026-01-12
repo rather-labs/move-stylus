@@ -1,11 +1,15 @@
 use walrus::{
     FunctionId, InstrSeqBuilder, LocalId,
-    ir::{BinaryOp, UnaryOp},
+    ir::{BinaryOp, InstrSeqId, LoadKind, MemArg, UnaryOp},
 };
 
 use crate::{
-    CompilationContext, compilation_context::ModuleId, data::DATA_SLOT_DATA_PTR_OFFSET,
-    error::add_propagate_error_instructions, native_functions::NativeFunction,
+    CompilationContext,
+    compilation_context::ModuleId,
+    data::{DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_SLOT_DATA_PTR_OFFSET},
+    error::add_propagate_error_instructions,
+    native_functions::NativeFunction,
+    runtime::RuntimeFunction,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -93,6 +97,21 @@ pub trait WasmBuilderExtension {
         function_name: &str,
         module_id: &ModuleId,
         function_id: FunctionId,
+    ) -> &mut Self;
+
+    fn call_runtime_function(
+        &mut self,
+        compilation_ctx: &CompilationContext,
+        function_id: FunctionId,
+        runtime_fn: &RuntimeFunction,
+    ) -> &mut Self;
+
+    fn call_unpack_function(
+        &mut self,
+        compilation_ctx: &CompilationContext,
+        function_id: FunctionId,
+        runtime_fn: &RuntimeFunction,
+        return_block_id: InstrSeqId,
     ) -> &mut Self;
 }
 
@@ -211,9 +230,59 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
 
         // If the function may result in a runtime error, we need to handle it
         if NativeFunction::can_abort(function_name, module_id) {
-            add_propagate_error_instructions(self, compilation_ctx)
-        } else {
-            self
+            add_propagate_error_instructions(self, compilation_ctx);
         }
+
+        self
+    }
+
+    fn call_runtime_function(
+        &mut self,
+        compilation_ctx: &CompilationContext,
+        function_id: FunctionId,
+        runtime_fn: &RuntimeFunction,
+    ) -> &mut Self {
+        self.call(function_id);
+
+        // If the function may result in a runtime error, we need to handle it
+        if runtime_fn.can_abort() {
+            add_propagate_error_instructions(self, compilation_ctx);
+        }
+
+        self
+    }
+
+    fn call_unpack_function(
+        &mut self,
+        compilation_ctx: &CompilationContext,
+        function_id: FunctionId,
+        runtime_fn: &RuntimeFunction,
+        return_block_id: InstrSeqId,
+    ) -> &mut Self {
+        self.call(function_id);
+
+        // If the function may result in a runtime error, we need to handle it
+        if runtime_fn.can_abort() {
+            // If the function aborts, propagate the error
+            self.block(None, |b| {
+                let block_id = b.id();
+                b.i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .i32_const(0)
+                    .binop(BinaryOp::I32Eq)
+                    .br_if(block_id)
+                    .i32_const(1)
+                    .br(return_block_id);
+            });
+        }
+
+        self
     }
 }

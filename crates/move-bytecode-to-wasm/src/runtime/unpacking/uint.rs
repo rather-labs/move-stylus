@@ -14,7 +14,7 @@ pub fn unpack_u32_function(
     compilation_ctx: &CompilationContext,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     // Big-endian to Little-endian
-    let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
+    let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None, None)?;
 
     let mut function = FunctionBuilder::new(
         &mut module.types,
@@ -56,7 +56,7 @@ pub fn unpack_u64_function(
     compilation_ctx: &CompilationContext,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     // Big-endian to Little-endian
-    let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None)?;
+    let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None, None)?;
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I64]);
     let mut builder = function
@@ -120,6 +120,7 @@ mod tests {
         let args_pointer = raw_module.locals.add(ValType::I32);
 
         let mut func_body = function_builder.func_body();
+        let return_block_id = func_body.id();
         func_body.i32_const(0);
         func_body.local_set(args_pointer);
 
@@ -128,6 +129,7 @@ mod tests {
                 None,
                 &mut func_body,
                 &mut raw_module,
+                return_block_id,
                 args_pointer,
                 args_pointer,
                 &compilation_ctx,

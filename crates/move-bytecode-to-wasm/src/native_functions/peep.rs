@@ -39,9 +39,9 @@ pub fn add_peep_fn(
     };
 
     let (storage_load, _) = storage_load_bytes32(module);
-    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx))?;
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx), None)?;
     let write_object_slot_fn =
-        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx), None)?;
 
     let owner_address_ptr = module.locals.add(ValType::I32);
     let uid_ptr = module.locals.add(ValType::I32);
@@ -101,7 +101,7 @@ pub fn add_peep_fn(
         let encoded_error_offset = runtime_error_data.get(
             module,
             compilation_ctx.memory_id,
-            RuntimeError::ObjectNotFound,
+            RuntimeError::StorageObjectNotFound,
         );
         let encoded_error_ptr = module.locals.add(ValType::I32);
 

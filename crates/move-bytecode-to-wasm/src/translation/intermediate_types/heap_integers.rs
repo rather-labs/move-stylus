@@ -268,7 +268,8 @@ impl IU128 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
-        let add_function_id = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx))?;
+        let add_function_id =
+            RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx), None)?;
         // Alocate space for the result
         builder
             .i32_const(Self::HEAP_SIZE)
@@ -284,7 +285,7 @@ impl IU128 {
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
         let shift_left_function_id =
-            RuntimeFunction::HeapIntShiftLeft.get(module, Some(compilation_ctx))?;
+            RuntimeFunction::HeapIntShiftLeft.get(module, Some(compilation_ctx), None)?;
         builder
             .i32_const(Self::HEAP_SIZE)
             .call(shift_left_function_id);
@@ -298,7 +299,7 @@ impl IU128 {
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
         let shift_right_function_id =
-            RuntimeFunction::HeapIntShiftRight.get(module, Some(compilation_ctx))?;
+            RuntimeFunction::HeapIntShiftRight.get(module, Some(compilation_ctx), None)?;
         builder
             .i32_const(Self::HEAP_SIZE)
             .call(shift_right_function_id);
@@ -311,7 +312,8 @@ impl IU128 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
-        let sub_function_id = RuntimeFunction::HeapIntSub.get(module, Some(compilation_ctx))?;
+        let sub_function_id =
+            RuntimeFunction::HeapIntSub.get(module, Some(compilation_ctx), None)?;
         // Alocate space for the result
         builder
             .i32_const(Self::HEAP_SIZE)
@@ -326,7 +328,8 @@ impl IU128 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
-        let mul_function_id = RuntimeFunction::HeapIntMul.get(module, Some(compilation_ctx))?;
+        let mul_function_id =
+            RuntimeFunction::HeapIntMul.get(module, Some(compilation_ctx), None)?;
 
         builder.i32_const(Self::HEAP_SIZE).call(mul_function_id);
 
@@ -339,7 +342,7 @@ impl IU128 {
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
         let div_mod_function_id =
-            RuntimeFunction::HeapIntDivMod.get(module, Some(compilation_ctx))?;
+            RuntimeFunction::HeapIntDivMod.get(module, Some(compilation_ctx), None)?;
 
         builder
             .i32_const(128)
@@ -355,7 +358,7 @@ impl IU128 {
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
         let div_mod_function_id =
-            RuntimeFunction::HeapIntDivMod.get(module, Some(compilation_ctx))?;
+            RuntimeFunction::HeapIntDivMod.get(module, Some(compilation_ctx), None)?;
 
         builder
             .i32_const(128)
@@ -370,7 +373,8 @@ impl IU128 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
-        let equality_f_id = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx))?;
+        let equality_f_id =
+            RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx), None)?;
         builder.i32_const(Self::HEAP_SIZE).call(equality_f_id);
         Ok(())
     }
@@ -562,7 +566,8 @@ impl IU256 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
-        let add_function_id = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx))?;
+        let add_function_id =
+            RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx), None)?;
         builder
             .i32_const(Self::HEAP_SIZE)
             .call(compilation_ctx.allocator);
@@ -577,7 +582,7 @@ impl IU256 {
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
         let shift_left_function_id =
-            RuntimeFunction::HeapIntShiftLeft.get(module, Some(compilation_ctx))?;
+            RuntimeFunction::HeapIntShiftLeft.get(module, Some(compilation_ctx), None)?;
         builder
             .i32_const(Self::HEAP_SIZE)
             .call(shift_left_function_id);
@@ -591,7 +596,7 @@ impl IU256 {
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
         let shift_right_function_id =
-            RuntimeFunction::HeapIntShiftRight.get(module, Some(compilation_ctx))?;
+            RuntimeFunction::HeapIntShiftRight.get(module, Some(compilation_ctx), None)?;
         builder
             .i32_const(Self::HEAP_SIZE)
             .call(shift_right_function_id);
@@ -604,7 +609,8 @@ impl IU256 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
-        let sub_function_id = RuntimeFunction::HeapIntSub.get(module, Some(compilation_ctx))?;
+        let sub_function_id =
+            RuntimeFunction::HeapIntSub.get(module, Some(compilation_ctx), None)?;
         builder
             .i32_const(Self::HEAP_SIZE)
             .call(compilation_ctx.allocator);
@@ -618,7 +624,8 @@ impl IU256 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
-        let mul_function_id = RuntimeFunction::HeapIntMul.get(module, Some(compilation_ctx))?;
+        let mul_function_id =
+            RuntimeFunction::HeapIntMul.get(module, Some(compilation_ctx), None)?;
         builder.i32_const(Self::HEAP_SIZE).call(mul_function_id);
         Ok(())
     }
@@ -629,7 +636,7 @@ impl IU256 {
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
         let div_mod_function_id =
-            RuntimeFunction::HeapIntDivMod.get(module, Some(compilation_ctx))?;
+            RuntimeFunction::HeapIntDivMod.get(module, Some(compilation_ctx), None)?;
 
         builder
             .i32_const(256)
@@ -645,7 +652,7 @@ impl IU256 {
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
         let div_mod_function_id =
-            RuntimeFunction::HeapIntDivMod.get(module, Some(compilation_ctx))?;
+            RuntimeFunction::HeapIntDivMod.get(module, Some(compilation_ctx), None)?;
 
         builder
             .i32_const(256)
@@ -660,7 +667,8 @@ impl IU256 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
-        let equality_f_id = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx))?;
+        let equality_f_id =
+            RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx), None)?;
         builder.i32_const(Self::HEAP_SIZE).call(equality_f_id);
 
         Ok(())

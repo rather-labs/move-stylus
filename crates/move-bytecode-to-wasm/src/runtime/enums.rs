@@ -119,8 +119,8 @@ pub fn compute_enum_storage_tail_position(
         Some(runtime_error_data),
         &[itype],
     )?;
-    let swap_256_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx))?;
-    let add_u256_fn = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx))?;
+    let swap_256_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx), None)?;
+    let add_u256_fn = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx), None)?;
 
     // Compute enum_size using the offset
     let enum_size = module.locals.add(ValType::I32);

@@ -1,7 +1,8 @@
 use crate::common::runtime;
 use alloy_primitives::address;
-use alloy_sol_types::SolCall;
-use alloy_sol_types::sol;
+use alloy_primitives::keccak256;
+use alloy_sol_types::{SolCall, SolType, sol};
+use move_bytecode_to_wasm::error::RuntimeError;
 use move_test_runner::constants::SIGNER_ADDRESS;
 use move_test_runner::wasm_runner::RuntimeSandbox;
 use rstest::rstest;
@@ -38,6 +39,13 @@ fn test_capability(
 
     // This call should fails as it did not find the admin
     let call_data = adminCapFnCall::new((object_id,)).abi_encode();
-    let result = runtime.call_entrypoint(call_data);
-    assert!(result.is_err());
+    let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+    let error_message = String::from_utf8_lossy(RuntimeError::StorageObjectNotFound.as_bytes());
+    let expected_data = [
+        keccak256(b"Error(string)")[..4].to_vec(),
+        <sol!((string,))>::abi_encode_params(&(error_message,)),
+    ]
+    .concat();
+    assert_eq!(1, result);
+    assert_eq!(expected_data, return_data);
 }

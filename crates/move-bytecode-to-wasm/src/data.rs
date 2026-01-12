@@ -118,6 +118,9 @@ impl RuntimeErrorData {
         let encoded_error = Self::abi_encode_error_message(error);
         let offset = self.next_offset;
         let data_size = encoded_error.len() as i32;
+        if data_size > 256 {
+            panic!("Error message is too long");
+        }
 
         module.data.add(
             DataKind::Active {
@@ -145,8 +148,7 @@ impl RuntimeErrorData {
         const LENGTH_HEADER_SIZE: usize = 4;
         const ABI_HEADER_SIZE: usize = 4 + 32 + 32; // selector(4) + head(32) + length(32)
 
-        let error_message = error.to_string();
-        let error_bytes = error_message.as_bytes();
+        let error_bytes = error.as_bytes();
         let error_len = error_bytes.len();
 
         // Round up message length to 32-byte boundary for ABI alignment

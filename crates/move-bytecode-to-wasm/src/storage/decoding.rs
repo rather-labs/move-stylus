@@ -51,7 +51,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
 
     // Runtime functions
     let accumulate_or_advance_slot_read_fn =
-        RuntimeFunction::AccumulateOrAdvanceSlotRead.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::AccumulateOrAdvanceSlotRead.get(module, Some(compilation_ctx), None)?;
 
     // Get the IStruct representation
     let struct_ = compilation_ctx.get_struct_by_intermediate_type(itype)?;
@@ -251,7 +251,7 @@ pub fn add_read_and_decode_storage_enum_instructions(
 ) -> Result<LocalId, StorageError> {
     // Runtime functions
     let accumulate_or_advance_slot_read_fn =
-        RuntimeFunction::AccumulateOrAdvanceSlotRead.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::AccumulateOrAdvanceSlotRead.get(module, Some(compilation_ctx), None)?;
     let compute_enum_storage_tail_position_fn = RuntimeFunction::ComputeEnumStorageTailPosition
         .get_generic(module, compilation_ctx, Some(runtime_error_data), &[itype])?;
 
@@ -414,9 +414,9 @@ pub fn add_read_and_decode_storage_vector_instructions(
     let (native_keccak, _) = native_keccak256(module);
 
     // Runtime functions
-    let swap_fn = RuntimeFunction::SwapI32Bytes.get(module, None)?;
+    let swap_fn = RuntimeFunction::SwapI32Bytes.get(module, None, None)?;
     let accumulate_or_advance_slot_read_fn =
-        RuntimeFunction::AccumulateOrAdvanceSlotRead.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::AccumulateOrAdvanceSlotRead.get(module, Some(compilation_ctx), None)?;
 
     // Locals
     let len = module.locals.add(ValType::I32);
@@ -464,7 +464,7 @@ pub fn add_read_and_decode_storage_vector_instructions(
 
     // Allocate memory for the vector and write the header data
     let allocate_vector_with_header_function =
-        RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx), None)?;
     builder
         .local_get(len)
         .local_get(len)
@@ -630,7 +630,7 @@ pub fn add_decode_intermediate_type_instructions(
 
     // Runtime functions
     let write_object_slot_fn =
-        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx), None)?;
 
     match itype {
         IntermediateType::IBool
@@ -641,12 +641,12 @@ pub fn add_decode_intermediate_type_instructions(
             let (store_kind, swap_fn) = if data_size == 8 {
                 (
                     StoreKind::I64 { atomic: false },
-                    RuntimeFunction::SwapI64Bytes.get(module, None)?,
+                    RuntimeFunction::SwapI64Bytes.get(module, None, None)?,
                 )
             } else {
                 (
                     StoreKind::I32 { atomic: false },
-                    RuntimeFunction::SwapI32Bytes.get(module, None)?,
+                    RuntimeFunction::SwapI32Bytes.get(module, None, None)?,
                 )
             };
 
@@ -699,8 +699,9 @@ pub fn add_decode_intermediate_type_instructions(
             );
         }
         IntermediateType::IU128 => {
-            let copy_fn = RuntimeFunction::CopyU128.get(module, Some(compilation_ctx))?;
-            let swap_fn = RuntimeFunction::SwapI128Bytes.get(module, Some(compilation_ctx))?;
+            let copy_fn = RuntimeFunction::CopyU128.get(module, Some(compilation_ctx), None)?;
+            let swap_fn =
+                RuntimeFunction::SwapI128Bytes.get(module, Some(compilation_ctx), None)?;
 
             // Copy 16 bytes from the slot data pointer (plus offset)
             builder
@@ -715,8 +716,9 @@ pub fn add_decode_intermediate_type_instructions(
                 .call(swap_fn);
         }
         IntermediateType::IU256 => {
-            let copy_fn = RuntimeFunction::CopyU256.get(module, Some(compilation_ctx))?;
-            let swap_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx))?;
+            let copy_fn = RuntimeFunction::CopyU256.get(module, Some(compilation_ctx), None)?;
+            let swap_fn =
+                RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx), None)?;
 
             // Copy 32 bytes from the slot data pointer
             builder

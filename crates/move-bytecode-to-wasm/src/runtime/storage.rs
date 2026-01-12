@@ -6,6 +6,8 @@ use crate::{
         DATA_OBJECTS_SLOT_OFFSET, DATA_SHARED_OBJECTS_KEY_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
         DATA_STORAGE_OBJECT_OWNER_OFFSET, DATA_U256_ONE_OFFSET, DATA_ZERO_OFFSET, RuntimeErrorData,
     },
+    error::RuntimeError,
+    error::add_handle_error_instructions,
     hostio::host_functions::{
         self, storage_cache_bytes32, storage_flush_cache, storage_load_bytes32, tx_origin,
     },
@@ -46,11 +48,12 @@ use walrus::{
 pub fn locate_storage_data(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     // Runtime functions
-    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx))?;
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx), None)?;
     let write_object_slot_fn =
-        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx), None)?;
 
     // Host functions
     let (tx_origin, _) = tx_origin(module);
@@ -172,7 +175,17 @@ pub fn locate_storage_data(
         });
 
         // If we get here means the object was not found
-        block.unreachable();
+        let encoded_error_offset = runtime_error_data.get(
+            module,
+            compilation_ctx.memory_id,
+            RuntimeError::StorageObjectNotFound,
+        );
+        let encoded_error_ptr = module.locals.add(ValType::I32);
+        block
+            .i32_const(encoded_error_offset)
+            .local_set(encoded_error_ptr);
+
+        add_handle_error_instructions(block, compilation_ctx, encoded_error_ptr);
     });
 
     Ok(function.finish(vec![uid_ptr, search_frozen], &mut module.funcs))
@@ -198,9 +211,10 @@ pub fn locate_struct_slot(
         .func_body();
 
     let write_object_slot_fn =
-        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
-    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx))?;
-    let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, None)?;
+        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx), None)?;
+    let get_id_bytes_ptr_fn =
+        RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx), None)?;
+    let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, None, None)?;
 
     let struct_ptr = module.locals.add(ValType::I32);
 
@@ -230,7 +244,8 @@ pub fn write_object_slot(
     let owner_ptr = module.locals.add(ValType::I32);
 
     // Calculate the slot address
-    let derive_slot_fn = RuntimeFunction::DeriveMappingSlot.get(module, Some(compilation_ctx))?;
+    let derive_slot_fn =
+        RuntimeFunction::DeriveMappingSlot.get(module, Some(compilation_ctx), None)?;
 
     // Derive the slot for the first mapping
     builder
@@ -260,8 +275,8 @@ pub fn storage_next_slot_function(
 
     let slot_ptr = module.locals.add(ValType::I32);
 
-    let swap_256_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx))?;
-    let add_u256_fn = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx))?;
+    let swap_256_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx), None)?;
+    let add_u256_fn = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx), None)?;
 
     // BE to LE ptr so we can make the addition
     builder
@@ -437,8 +452,8 @@ pub fn derive_dyn_array_slot(
     let derived_elem_slot_ptr = module.locals.add(ValType::I32);
 
     let (native_keccak, _) = host_functions::native_keccak256(module);
-    let swap_i32_bytes_fn = RuntimeFunction::SwapI32Bytes.get(module, None)?;
-    let add_u256_fn = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx))?;
+    let swap_i32_bytes_fn = RuntimeFunction::SwapI32Bytes.get(module, None, None)?;
+    let add_u256_fn = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx), None)?;
 
     // Guard: check elem_size is greater than 0
     builder
@@ -700,9 +715,9 @@ pub fn add_delete_struct_from_storage_fn(
     let struct_ = compilation_ctx.get_struct_by_intermediate_type(itype)?;
 
     let locate_struct_slot_fn =
-        RuntimeFunction::LocateStructSlot.get(module, Some(compilation_ctx))?;
-    let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, None)?;
-    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::LocateStructSlot.get(module, Some(compilation_ctx), None)?;
+    let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, None, None)?;
+    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx), None)?;
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
     let mut builder = function.name(name).func_body();
@@ -997,10 +1012,11 @@ pub fn add_delete_tto_object_fn(
         return Ok(function);
     };
 
-    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx))?;
-    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx))?;
-    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx))?;
-    let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, None)?;
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx), None)?;
+    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx), None)?;
+    let get_id_bytes_ptr_fn =
+        RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx), None)?;
+    let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, None, None)?;
     let delete_wrapped_object_fn = RuntimeFunction::DeleteFromStorage.get_generic(
         module,
         compilation_ctx,
@@ -1097,12 +1113,12 @@ pub fn add_commit_changes_to_storage_fn(
 
     // If we have dynamic fields to process, we put the code to process them.
     if !dynamic_fields_global_variables.is_empty() {
-        let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, None)?;
+        let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, None, None)?;
         let get_id_bytes_ptr_fn =
-            RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx))?;
+            RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx), None)?;
         let write_object_slot_fn =
-            RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
-        let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx))?;
+            RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx), None)?;
+        let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx), None)?;
 
         let owner_ptr = module.locals.add(ValType::I32);
         for (dynamic_field_ptr, itype) in dynamic_fields_global_variables {
@@ -1186,7 +1202,7 @@ pub fn accumulate_or_advance_slot_delete(
     compilation_ctx: &CompilationContext,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let (storage_cache_fn, _) = storage_cache_bytes32(module);
-    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx))?;
+    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx), None)?;
 
     Ok(build_accumulate_or_advance_slot(
         module,
@@ -1224,7 +1240,7 @@ pub fn accumulate_or_advance_slot_read(
     compilation_ctx: &CompilationContext,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let (storage_load, _) = storage_load_bytes32(module);
-    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx))?;
+    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx), None)?;
 
     Ok(build_accumulate_or_advance_slot(
         module,
@@ -1260,7 +1276,7 @@ pub fn accumulate_or_advance_slot_write(
     compilation_ctx: &CompilationContext,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let (storage_cache_fn, _) = storage_cache_bytes32(module);
-    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx))?;
+    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx), None)?;
 
     Ok(build_accumulate_or_advance_slot(
         module,
@@ -1366,8 +1382,9 @@ pub fn cache_storage_object_changes(
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
     let mut builder = function.name(name).func_body();
 
-    let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, None)?;
-    let locate_struct_fn = RuntimeFunction::LocateStructSlot.get(module, Some(compilation_ctx))?;
+    let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, None, None)?;
+    let locate_struct_fn =
+        RuntimeFunction::LocateStructSlot.get(module, Some(compilation_ctx), None)?;
     let save_in_slot_fn = RuntimeFunction::EncodeAndSaveInStorage.get_generic(
         module,
         compilation_ctx,
@@ -1398,7 +1415,7 @@ pub fn cache_storage_object_changes(
     builder.call(locate_struct_fn);
 
     // Check if the object owner is zero
-    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx))?;
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx), None)?;
     builder
         .local_get(struct_ptr)
         .call(get_struct_owner_fn)

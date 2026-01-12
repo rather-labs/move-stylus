@@ -822,8 +822,11 @@ fn translate_instruction(
                     // After the call, check if any argument is a mutable reference to a vector
                     // and update it if needed.
                     if !mut_ref_vec_locals.is_empty() {
-                        let update_mut_ref_fn =
-                            RuntimeFunction::VecUpdateMutRef.get(module, Some(compilation_ctx))?;
+                        let update_mut_ref_fn = RuntimeFunction::VecUpdateMutRef.get(
+                            module,
+                            Some(compilation_ctx),
+                            None,
+                        )?;
                         for &local in mut_ref_vec_locals.iter() {
                             builder.local_get(local).call(update_mut_ref_fn);
                         }
@@ -1036,8 +1039,11 @@ fn translate_instruction(
                 // After the call, check if any argument is a mutable reference to a vector
                 // and update it if needed.
                 if !mut_ref_vec_locals.is_empty() {
-                    let update_mut_ref_fn =
-                        RuntimeFunction::VecUpdateMutRef.get(module, Some(compilation_ctx))?;
+                    let update_mut_ref_fn = RuntimeFunction::VecUpdateMutRef.get(
+                        module,
+                        Some(compilation_ctx),
+                        None,
+                    )?;
                     for &local in mut_ref_vec_locals.iter() {
                         builder.local_get(local).call(update_mut_ref_fn);
                     }
@@ -1979,13 +1985,13 @@ fn translate_instruction(
                 }
                 IntermediateType::IU128 => {
                     let less_than_f =
-                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None)?;
 
                     builder.i32_const(IU128::HEAP_SIZE).call(less_than_f);
                 }
                 IntermediateType::IU256 => {
                     let less_than_f =
-                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None)?;
 
                     builder.i32_const(IU256::HEAP_SIZE).call(less_than_f);
                 }
@@ -2018,7 +2024,7 @@ fn translate_instruction(
                 // we can reuse the LessThan function
                 IntermediateType::IU128 => {
                     let less_than_f =
-                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None)?;
 
                     // Temp variables to perform the swap
                     let a = module.locals.add(ValType::I32);
@@ -2032,7 +2038,7 @@ fn translate_instruction(
                 }
                 IntermediateType::IU256 => {
                     let less_than_f =
-                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None)?;
 
                     // Temp variables to perform the swap
                     let a = module.locals.add(ValType::I32);
@@ -2073,7 +2079,7 @@ fn translate_instruction(
                 // LessThan function
                 IntermediateType::IU128 => {
                     let less_than_f =
-                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None)?;
 
                     let a = module.locals.add(ValType::I32);
                     let b = module.locals.add(ValType::I32);
@@ -2085,7 +2091,7 @@ fn translate_instruction(
                 }
                 IntermediateType::IU256 => {
                     let less_than_f =
-                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None)?;
 
                     let a = module.locals.add(ValType::I32);
                     let b = module.locals.add(ValType::I32);
@@ -2124,7 +2130,7 @@ fn translate_instruction(
                 // LessThan function
                 IntermediateType::IU128 => {
                     let less_than_f =
-                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None)?;
 
                     // Compare
                     builder
@@ -2134,7 +2140,7 @@ fn translate_instruction(
                 }
                 IntermediateType::IU256 => {
                     let less_than_f =
-                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None)?;
 
                     builder
                         .i32_const(IU256::HEAP_SIZE)

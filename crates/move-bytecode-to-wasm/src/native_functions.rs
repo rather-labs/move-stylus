@@ -646,7 +646,7 @@ impl NativeFunction {
                 STYLUS_FRAMEWORK_ADDRESS,
                 SF_MODULE_NAME_SOL_TYPES,
                 _,
-            ) => RuntimeFunction::BytesToVec.get(module, Some(compilation_ctx))?,
+            ) => RuntimeFunction::BytesToVec.get(module, Some(compilation_ctx), None)?,
 
             // This native function is only available in debug mode to help with testing. It should
             // not be compiled in release mode.

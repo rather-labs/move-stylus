@@ -44,15 +44,16 @@ pub fn unpack_vector_function(
         &[ValType::I32],
     );
     let mut builder = function.name(name).func_body();
+    let return_block_id = builder.id();
 
     // Arguments
     let reader_pointer = module.locals.add(ValType::I32);
     let calldata_base_pointer = module.locals.add(ValType::I32);
 
     // Runtime functions
-    let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
+    let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None, None)?;
     let validate_pointer_fn =
-        RuntimeFunction::ValidatePointer32Bit.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::ValidatePointer32Bit.get(module, Some(compilation_ctx), None)?;
 
     let data_reader_pointer = module.locals.add(ValType::I32);
 
@@ -123,7 +124,7 @@ pub fn unpack_vector_function(
 
     // Allocate space for the vector
     let allocate_vector_with_header_function =
-        RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx), None)?;
     builder
         .local_get(length)
         .local_get(length)
@@ -156,6 +157,7 @@ pub fn unpack_vector_function(
                 None,
                 loop_block,
                 module,
+                return_block_id,
                 data_reader_pointer,
                 calldata_base_pointer_,
                 compilation_ctx,
@@ -232,10 +234,11 @@ mod tests {
         let mut runtime_error_data = test_runtime_error_data!();
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
-
         let args_pointer = raw_module.locals.add(ValType::I32);
         let calldata_reader_pointer = raw_module.locals.add(ValType::I32);
         let mut func_body = function_builder.func_body();
+        let return_block_id = func_body.id();
+
         func_body.i32_const(0);
         func_body.local_tee(args_pointer);
         func_body.local_set(calldata_reader_pointer);
@@ -245,6 +248,7 @@ mod tests {
                 None,
                 &mut func_body,
                 &mut raw_module,
+                return_block_id,
                 args_pointer,
                 calldata_reader_pointer,
                 &compilation_ctx,

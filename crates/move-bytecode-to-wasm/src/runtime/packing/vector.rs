@@ -82,7 +82,7 @@ pub fn pack_vector_function(
         .binop(BinaryOp::I32Sub)
         .local_set(reference_value);
 
-    let pack_u32_function = RuntimeFunction::PackU32.get(module, Some(compilation_ctx))?;
+    let pack_u32_function = RuntimeFunction::PackU32.get(module, Some(compilation_ctx), None)?;
     builder
         .local_get(reference_value)
         .local_get(writer_pointer)
@@ -98,7 +98,7 @@ pub fn pack_vector_function(
      */
 
     // Length
-    let pack_u32_function = RuntimeFunction::PackU32.get(module, Some(compilation_ctx))?;
+    let pack_u32_function = RuntimeFunction::PackU32.get(module, Some(compilation_ctx), None)?;
     builder
         .local_get(len)
         .local_get(data_pointer)

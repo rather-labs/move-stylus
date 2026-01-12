@@ -115,6 +115,7 @@ impl<'a> PublicFunction<'a> {
                 inner_result = self.wrap_public_function(
                     module,
                     block,
+                    return_block_id,
                     data_pointer,
                     compilation_ctx,
                     runtime_error_data,
@@ -139,6 +140,7 @@ impl<'a> PublicFunction<'a> {
         &self,
         module: &mut Module,
         block: &mut InstrSeqBuilder,
+        return_block_id: InstrSeqId,
         args_pointer: LocalId,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
@@ -146,6 +148,7 @@ impl<'a> PublicFunction<'a> {
         // Unpack function arguments
         build_unpack_instructions(
             block,
+            return_block_id,
             module,
             &self.signature.arguments,
             args_pointer,

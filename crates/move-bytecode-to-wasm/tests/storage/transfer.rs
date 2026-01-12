@@ -469,7 +469,6 @@ fn test_freeze_owned_object(
 
 // Tests trying to read an owned object with a signer that is not the owner.
 #[rstest]
-#[should_panic(expected = "unreachable")]
 fn test_signer_owner_mismatch(
     #[with("transfer", "tests/storage/move_sources/transfer.move")] runtime: RuntimeSandbox,
 ) {
@@ -492,12 +491,20 @@ fn test_signer_owner_mismatch(
 
     // This should hit an unreachable due to the signer differing from the owner!
     let call_data = readValueCall::new((object_id,)).abi_encode();
-    runtime.call_entrypoint(call_data).unwrap();
+    let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+    let error_message = String::from_utf8_lossy(RuntimeError::StorageObjectNotFound.as_bytes());
+    let expected_data = [
+        keccak256(b"Error(string)")[..4].to_vec(),
+        <sol!((string,))>::abi_encode_params(&(error_message,)),
+    ]
+    .concat();
+
+    assert_eq!(1, result);
+    assert_eq!(expected_data, return_data);
 }
 
 // Tests the freeze of an object that is not owned by the signer.
 #[rstest]
-#[should_panic(expected = "unreachable")]
 fn test_freeze_not_owned_object(
     #[with("transfer", "tests/storage/move_sources/transfer.move")] runtime: RuntimeSandbox,
 ) {
@@ -513,8 +520,7 @@ fn test_freeze_not_owned_object(
     // Freeze the object. Only possible if the object is owned by the signer!
     let call_data = freezeObjCall::new((object_id,)).abi_encode();
     let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
-
-    let error_message = RuntimeError::ObjectNotFound.to_string();
+    let error_message = String::from_utf8_lossy(RuntimeError::StorageObjectNotFound.as_bytes());
     let expected_data = [
         keccak256(b"Error(string)")[..4].to_vec(),
         <sol!((string,))>::abi_encode_params(&(error_message,)),
@@ -542,7 +548,8 @@ fn test_freeze_shared_object(
     let call_data = freezeObjCall::new((object_id,)).abi_encode();
     let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
 
-    let error_message = RuntimeError::SharedObjectsCannotBeFrozen.to_string();
+    let error_message =
+        String::from_utf8_lossy(RuntimeError::SharedObjectsCannotBeFrozen.as_bytes());
     // let error_message = "shared objects cannot be frozen";
     let expected_data = [
         keccak256(b"Error(string)")[..4].to_vec(),
@@ -562,9 +569,7 @@ fn test_freeze_shared_object(
 
 // Freeze and then try to share or transfer the object.
 #[rstest]
-#[should_panic(expected = "unreachable")]
 #[case(false)]
-#[should_panic(expected = "unreachable")]
 #[case(true)]
 fn test_share_or_transfer_frozen(
     #[with("transfer", "tests/storage/move_sources/transfer.move")] runtime: RuntimeSandbox,
@@ -582,19 +587,28 @@ fn test_share_or_transfer_frozen(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    if share {
+    let call_data = if share {
         // Try to share the object.
-        let call_data = shareObjCall::new((object_id,)).abi_encode();
-        runtime.call_entrypoint(call_data).unwrap();
+        shareObjCall::new((object_id,)).abi_encode()
     } else {
         // Try to transfer the object.
-        let call_data = transferObjCall::new((object_id, SIGNER_ADDRESS.into())).abi_encode();
-        runtime.call_entrypoint(call_data).unwrap();
-    }
+        transferObjCall::new((object_id, SIGNER_ADDRESS.into())).abi_encode()
+    };
+
+    let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+    // The error stems from the unpacking, since we only look for frozen objs on the storage when behind an immutable reference
+    let error_message = String::from_utf8_lossy(RuntimeError::StorageObjectNotFound.as_bytes());
+    let expected_data = [
+        keccak256(b"Error(string)")[..4].to_vec(),
+        <sol!((string,))>::abi_encode_params(&(error_message,)),
+    ]
+    .concat();
+
+    assert_eq!(1, result);
+    assert_eq!(expected_data, return_data);
 }
 
 #[rstest]
-#[should_panic(expected = "unreachable")]
 fn test_delete_frozen_object(
     #[with("transfer", "tests/storage/move_sources/transfer.move")] runtime: RuntimeSandbox,
 ) {
@@ -613,7 +627,16 @@ fn test_delete_frozen_object(
 
     // Try to delete the object
     let call_data = deleteObjCall::new((object_id,)).abi_encode();
-    runtime.call_entrypoint(call_data).unwrap();
+    let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+    let error_message = String::from_utf8_lossy(RuntimeError::StorageObjectNotFound.as_bytes());
+    let expected_data = [
+        keccak256(b"Error(string)")[..4].to_vec(),
+        <sol!((string,))>::abi_encode_params(&(error_message,)),
+    ]
+    .concat();
+
+    assert_eq!(1, result);
+    assert_eq!(expected_data, return_data);
 }
 
 // Test delete owned object

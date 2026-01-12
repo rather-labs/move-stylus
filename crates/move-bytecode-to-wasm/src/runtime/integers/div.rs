@@ -48,9 +48,10 @@ pub fn heap_integers_div_mod(
         &[ValType::I32],
     );
 
-    let check_if_a_less_than_b_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
-    let sub_f = RuntimeFunction::HeapIntSub.get(module, Some(compilation_ctx))?;
-    let is_zero = RuntimeFunction::IsZero.get(module, Some(compilation_ctx))?;
+    let check_if_a_less_than_b_f =
+        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None)?;
+    let sub_f = RuntimeFunction::HeapIntSub.get(module, Some(compilation_ctx), None)?;
+    let is_zero = RuntimeFunction::IsZero.get(module, Some(compilation_ctx), None)?;
     let left_shift_number = shift_1bit_left(module, compilation_ctx);
     let get_bit = get_bit(module, compilation_ctx);
     let set_bit = set_bit(module, compilation_ctx);

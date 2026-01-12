@@ -103,7 +103,7 @@ fn test_peep(#[with("peep", "tests/framework/move_sources/peep.move")] runtime: 
     let call_data = peepFooCall::new((owner_address.into(), [0; 32].into())).abi_encode();
     let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(1, result);
-    let error_message = RuntimeError::ObjectNotFound.to_string();
+    let error_message = String::from_utf8_lossy(RuntimeError::StorageObjectNotFound.as_bytes());
     let expected_data = [
         keccak256(b"Error(string)")[..4].to_vec(),
         <sol!((string,))>::abi_encode_params(&(error_message,)),
@@ -126,7 +126,7 @@ fn test_peep(#[with("peep", "tests/framework/move_sources/peep.move")] runtime: 
         callIndirectPeepFooCall::new((owner_address.into(), [0; 32].into())).abi_encode();
     let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(1, result);
-    let error_message = RuntimeError::ObjectNotFound.to_string();
+    let error_message = String::from_utf8_lossy(RuntimeError::StorageObjectNotFound.as_bytes());
     let expected_data = [
         keccak256(b"Error(string)")[..4].to_vec(),
         <sol!((string,))>::abi_encode_params(&(error_message,)),

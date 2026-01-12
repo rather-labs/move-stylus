@@ -34,7 +34,7 @@ impl IVector {
         let needed_bytes = 4 + 4 + data_size * (*len as usize);
 
         let allocate_vector_with_header_function =
-            RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx))?;
+            RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx), None)?;
 
         builder
             .local_get(len_local)
@@ -86,7 +86,7 @@ impl IVector {
         let len_local = module.locals.add(ValType::I32);
         let data_size = inner.wasm_memory_data_size()?;
         let allocate_vector_with_header_function =
-            RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx))?;
+            RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx), None)?;
 
         if num_elements == 0 {
             // Set length
@@ -217,7 +217,7 @@ impl IVector {
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
-        let downcast_f = RuntimeFunction::DowncastU64ToU32.get(module, None)?;
+        let downcast_f = RuntimeFunction::DowncastU64ToU32.get(module, None, None)?;
 
         match inner {
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -252,7 +252,7 @@ impl IVector {
 
         builder.i32_const(inner.wasm_memory_data_size()?);
 
-        let borrow_f = RuntimeFunction::VecBorrow.get(module, Some(compilation_ctx))?;
+        let borrow_f = RuntimeFunction::VecBorrow.get(module, Some(compilation_ctx), None)?;
         builder.call(borrow_f);
 
         Ok(())

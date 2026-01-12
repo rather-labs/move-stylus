@@ -83,7 +83,7 @@ pub fn build_constructor(
     const FLAG: i32 = 1;
 
     // Host function for checking if all bytes are zero
-    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx))?;
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx), None)?;
 
     // Host functions for storage operations
     let (storage_load_fn, _) = host_functions::storage_load_bytes32(module);

@@ -1,15 +1,12 @@
 use walrus::{
-    FunctionBuilder, FunctionId, GlobalId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
+    ConstExpr, FunctionBuilder, FunctionId, GlobalId, GlobalKind, Module, ValType,
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp, Value},
 };
 
 use crate::{
     CompilationContext,
     abi_types::{error_encoding::build_abort_error_message, public_function::PublicFunction},
-    data::{
-        DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_CALLDATA_OFFSET, RuntimeErrorData,
-        TOTAL_RESERVED_MEMORY,
-    },
+    data::{DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_CALLDATA_OFFSET, RuntimeErrorData},
     memory::MEMORY_PAGE_SIZE,
     runtime::RuntimeFunction,
     translation::intermediate_types::IntermediateType,
@@ -35,22 +32,6 @@ pub fn build_entrypoint_router(
 
     let mut router = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
     let mut router_builder = router.func_body();
-
-    // Set the next_free_memory_pointer global to the current next_offset from runtime_error_data
-    // This ensures the memory allocator starts after all error data that was added during compilation
-    let next_offset_value = runtime_error_data.get_next_offset();
-    router_builder
-        .i32_const(next_offset_value)
-        .global_set(compilation_ctx.globals.next_free_memory_pointer);
-
-    // Update the available_memory global to account for the memory used by error data
-    // available_memory starts at MEMORY_PAGE_SIZE and we need to reduce it by the amount
-    // of memory used for errors (from initial_offset to next_offset)
-    let memory_used_for_errors = next_offset_value - TOTAL_RESERVED_MEMORY;
-    let updated_available_memory = MEMORY_PAGE_SIZE - memory_used_for_errors;
-    router_builder
-        .i32_const(updated_available_memory)
-        .global_set(compilation_ctx.globals.available_memory);
 
     // Arguments
     let data_len = module.locals.add(ValType::I32); // Length of the calldata
@@ -173,7 +154,6 @@ pub fn build_entrypoint_router(
                     runtime_error_data,
                 );
             }
-
             // If no function matched we might be in the fallback case:
             if let Some(fallback_fn) = functions
                 .iter()
@@ -190,6 +170,7 @@ pub fn build_entrypoint_router(
                 inner_result = fallback_fn.wrap_public_function(
                     module,
                     return_block,
+                    return_block_id,
                     data_pointer,
                     compilation_ctx,
                     runtime_error_data,
@@ -314,6 +295,24 @@ pub fn build_entrypoint_router(
             },
             |_| {},
         );
+
+    // Update the next_free_memory_pointer global to the current next_offset from runtime_error_data
+    let next_free_memory_pointer = module
+        .globals
+        .get_mut(compilation_ctx.globals.next_free_memory_pointer);
+
+    next_free_memory_pointer.kind = GlobalKind::Local(ConstExpr::Value(Value::I32(
+        runtime_error_data.get_next_offset(),
+    )));
+
+    // Update the available_memory global to account for the memory used by error data
+    let available_memory = module
+        .globals
+        .get_mut(compilation_ctx.globals.available_memory);
+
+    available_memory.kind = GlobalKind::Local(ConstExpr::Value(Value::I32(
+        MEMORY_PAGE_SIZE - runtime_error_data.get_next_offset(),
+    )));
 
     // 4. Return
     router_builder.local_get(status).return_();

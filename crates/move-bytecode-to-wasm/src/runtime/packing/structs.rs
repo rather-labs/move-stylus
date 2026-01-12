@@ -86,7 +86,7 @@ pub fn pack_struct_function(
 
     // Compute the size before the closure since closures that return () cannot use ?
     let struct_size = struct_.solidity_abi_encode_size(compilation_ctx)? as i32;
-    let pack_u32_function = RuntimeFunction::PackU32.get(module, Some(compilation_ctx))?;
+    let pack_u32_function = RuntimeFunction::PackU32.get(module, Some(compilation_ctx), None)?;
 
     // If is_nested is 1, means we are packing an struct inside a struct and that the struct is dynamic.
     builder.local_get(is_nested).if_else(

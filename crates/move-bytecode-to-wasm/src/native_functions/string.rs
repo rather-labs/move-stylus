@@ -32,7 +32,7 @@ pub fn add_internal_check_utf8(
     let i = module.locals.add(ValType::I32);
     let current_char = module.locals.add(ValType::I32);
 
-    let swap_i32_fn = RuntimeFunction::SwapI32Bytes.get(module, None)?;
+    let swap_i32_fn = RuntimeFunction::SwapI32Bytes.get(module, None, None)?;
 
     // Load vector's length
     builder

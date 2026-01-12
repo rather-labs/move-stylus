@@ -226,7 +226,7 @@ impl Packable for IntermediateType {
             | IntermediateType::IU16
             | IntermediateType::IU32 => {
                 let pack_u32_function =
-                    RuntimeFunction::PackU32.get(module, Some(compilation_ctx))?;
+                    RuntimeFunction::PackU32.get(module, Some(compilation_ctx), None)?;
                 builder
                     .local_get(local)
                     .local_get(writer_pointer)
@@ -234,7 +234,7 @@ impl Packable for IntermediateType {
             }
             IntermediateType::IU64 => {
                 let pack_u64_function =
-                    RuntimeFunction::PackU64.get(module, Some(compilation_ctx))?;
+                    RuntimeFunction::PackU64.get(module, Some(compilation_ctx), None)?;
                 builder
                     .local_get(local)
                     .local_get(writer_pointer)
@@ -242,7 +242,7 @@ impl Packable for IntermediateType {
             }
             IntermediateType::IU128 => {
                 let pack_u128_function =
-                    RuntimeFunction::PackU128.get(module, Some(compilation_ctx))?;
+                    RuntimeFunction::PackU128.get(module, Some(compilation_ctx), None)?;
                 builder
                     .local_get(local)
                     .local_get(writer_pointer)
@@ -250,7 +250,7 @@ impl Packable for IntermediateType {
             }
             IntermediateType::IU256 => {
                 let pack_u256_function =
-                    RuntimeFunction::PackU256.get(module, Some(compilation_ctx))?;
+                    RuntimeFunction::PackU256.get(module, Some(compilation_ctx), None)?;
                 builder
                     .local_get(local)
                     .local_get(writer_pointer)
@@ -258,7 +258,7 @@ impl Packable for IntermediateType {
             }
             IntermediateType::IAddress => {
                 let pack_address_function =
-                    RuntimeFunction::PackAddress.get(module, Some(compilation_ctx))?;
+                    RuntimeFunction::PackAddress.get(module, Some(compilation_ctx), None)?;
                 builder
                     .local_get(local)
                     .local_get(writer_pointer)
@@ -313,7 +313,7 @@ impl Packable for IntermediateType {
                     )))?;
                 }
                 let pack_enum_function =
-                    RuntimeFunction::PackEnum.get(module, Some(compilation_ctx))?;
+                    RuntimeFunction::PackEnum.get(module, Some(compilation_ctx), None)?;
                 builder
                     .local_get(local)
                     .local_get(writer_pointer)
@@ -372,7 +372,7 @@ impl Packable for IntermediateType {
                 module_id, index, ..
             } if String_::is_vm_type(module_id, *index, compilation_ctx)? => {
                 let pack_string_function =
-                    RuntimeFunction::PackString.get(module, Some(compilation_ctx))?;
+                    RuntimeFunction::PackString.get(module, Some(compilation_ctx), None)?;
                 builder
                     .local_get(local)
                     .local_get(writer_pointer)
