@@ -175,17 +175,12 @@ pub fn locate_storage_data(
         });
 
         // If we get here means the object was not found
-        let encoded_error_offset = runtime_error_data.get(
+        block.i32_const(runtime_error_data.get(
             module,
             compilation_ctx.memory_id,
             RuntimeError::StorageObjectNotFound,
-        );
-        let encoded_error_ptr = module.locals.add(ValType::I32);
-        block
-            .i32_const(encoded_error_offset)
-            .local_set(encoded_error_ptr);
-
-        add_handle_error_instructions(block, compilation_ctx, encoded_error_ptr);
+        ));
+        add_handle_error_instructions(module, block, compilation_ctx);
     });
 
     Ok(function.finish(vec![uid_ptr, search_frozen], &mut module.funcs))

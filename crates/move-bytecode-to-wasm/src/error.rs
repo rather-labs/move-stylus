@@ -16,7 +16,7 @@ use crate::{
 };
 
 use walrus::{
-    InstrSeqBuilder, LocalId,
+    InstrSeqBuilder, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
@@ -187,10 +187,13 @@ impl RuntimeError {
 }
 /// Adds the instructions to store the error message pointer at DATA_ABORT_MESSAGE_PTR_OFFSET and return 1 to indicate an error occurred.
 pub fn add_handle_error_instructions(
+    module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
-    encoded_error_ptr: LocalId,
 ) {
+    let encoded_error_ptr = module.locals.add(ValType::I32);
+    builder.local_set(encoded_error_ptr);
+
     // Store the ptr at DATA_ABORT_MESSAGE_PTR_OFFSET
     builder
         .i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)
