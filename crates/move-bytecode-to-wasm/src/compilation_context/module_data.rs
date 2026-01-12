@@ -36,7 +36,7 @@ use move_package::{
 };
 use move_parse_special_attributes::{
     SpecialAttributes,
-    function_modifiers::{Function, FunctionModifier},
+    function_modifiers::{Function, SolidityFunctionModifier},
 };
 use move_symbol_pool::Symbol;
 use std::{
@@ -1130,7 +1130,10 @@ impl ModuleData<'_> {
         }
 
         // Must be payable
-        if !function_sa.modifiers.contains(&FunctionModifier::Payable) {
+        if !function_sa
+            .modifiers
+            .contains(&SolidityFunctionModifier::Payable)
+        {
             return Err(CompilationContextError::ReceiveFunctionIsNotPayable);
         }
 

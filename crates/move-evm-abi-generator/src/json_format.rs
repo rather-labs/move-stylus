@@ -1,7 +1,7 @@
 use crate::abi::{Abi, FunctionType};
 use crate::common::snake_to_upper_camel;
 use crate::types::Type;
-use move_parse_special_attributes::function_modifiers::FunctionModifier;
+use move_parse_special_attributes::function_modifiers::SolidityFunctionModifier;
 use move_symbol_pool::Symbol;
 use serde::Serialize;
 
@@ -263,13 +263,13 @@ fn process_functions(abi: &Abi) -> Vec<JsonAbiItem> {
     functions
 }
 
-fn map_state_mutability(mods: &[FunctionModifier]) -> &'static str {
-    if mods.contains(&FunctionModifier::Pure) {
-        "pure"
-    } else if mods.contains(&FunctionModifier::View) {
-        "view"
-    } else if mods.contains(&FunctionModifier::Payable) {
-        "payable"
+fn map_state_mutability(mods: &[SolidityFunctionModifier]) -> &'static str {
+    if mods.contains(&SolidityFunctionModifier::Pure) {
+        SolidityFunctionModifier::Pure.as_str()
+    } else if mods.contains(&SolidityFunctionModifier::View) {
+        SolidityFunctionModifier::View.as_str()
+    } else if mods.contains(&SolidityFunctionModifier::Payable) {
+        SolidityFunctionModifier::Payable.as_str()
     } else {
         "nonpayable"
     }

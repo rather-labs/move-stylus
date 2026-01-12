@@ -377,6 +377,9 @@ pub fn process_special_attributes(
                         let visibility: Visibility = (&f.visibility).into();
                         let signature = Function::parse_signature(&f.signature);
 
+                        let mut function =
+                            Function::new(f.name.0.value, signature.clone(), visibility);
+
                         // Function validation checks:
                         // - Entry functions must not be generic.
                         // - Functions with an Event parameter are only allowed if they are native emit functions.
@@ -396,107 +399,84 @@ pub fn process_special_attributes(
                             module_errors.push(error);
                         }
 
-                        if let Some(attributes) = f.attributes.first() {
-                            let mut modifiers = attributes
+                        for attributes in &f.attributes {
+                            let modifiers = attributes
                                 .value
                                 .iter()
                                 .flat_map(|s| FunctionModifier::parse_modifiers(&s.value))
                                 .collect::<VecDeque<FunctionModifier>>();
 
-                            println!(
-                                "Found modifiers for function {}: {:?}",
-                                f.name.0.value, modifiers
-                            );
-
-                            let first_modifier = modifiers.pop_front();
-                            match first_modifier {
-                                Some(FunctionModifier::SharedObjects) => {
-                                    println!(
-                                        "\n\nShared objects modifier found on function {}\n\n",
-                                        f.name.0.value
-                                    );
-                                }
-                                // TODO: Process this only if test mode is enabled
-                                Some(FunctionModifier::Test) => {
-                                    let modifiers =
-                                        modifiers.into_iter().collect::<Vec<FunctionModifier>>();
-
-                                    result.test_functions.push(TestFunction {
-                                        name: f.name.0.value,
-                                        skip: modifiers.contains(&FunctionModifier::Skip),
-                                        expect_failure: modifiers
-                                            .contains(&FunctionModifier::ExpectedFailure),
-                                    });
-
-                                    result.functions.push(Function {
-                                        name: f.name.0.value,
-                                        modifiers: vec![],
-                                        signature,
-                                        visibility,
-                                    });
-                                }
-                                Some(FunctionModifier::ExternalCall) => {
-                                    let modifiers =
-                                        modifiers.into_iter().collect::<Vec<FunctionModifier>>();
-
-                                    let errors = validate_external_call_function(
-                                        f,
-                                        &modifiers,
-                                        &result.external_call_structs,
-                                    );
-
-                                    if let Err(errors) = errors {
-                                        found_error = true;
-                                        module_errors.extend(errors);
-                                    } else if !found_error {
-                                        result.external_calls.insert(
-                                            f.name.0.value,
-                                            Function {
-                                                name: f.name.0.value,
-                                                modifiers,
-                                                signature,
-                                                visibility,
-                                            },
-                                        );
+                            for modifier in modifiers {
+                                match modifier {
+                                    FunctionModifier::OwnedObjects(owned_objects) => {
+                                        // TODO: Check declared attributes exist
+                                        function.owned_objects.extend(owned_objects);
                                     }
-                                }
-                                Some(FunctionModifier::Abi) => {
-                                    let modifiers =
-                                        modifiers.into_iter().collect::<Vec<FunctionModifier>>();
-
-                                    if !found_error {
-                                        result.functions.push(Function {
-                                            name: f.name.0.value,
-                                            modifiers,
-                                            signature,
-                                            visibility,
-                                        });
+                                    FunctionModifier::SharedObjects(shared_objects) => {
+                                        // TODO: Check declared attributes exist
+                                        function.shared_objects.extend(shared_objects);
                                     }
-                                }
-                                _ => {
-                                    if !found_error {
-                                        if let Some(modifier) = first_modifier {
-                                            modifiers.push_front(modifier);
-                                        }
+                                    FunctionModifier::FrozenObjects(frozen_objects) => {
+                                        // TODO: Check declared attributes exist
+                                        function.frozen_objects.extend(frozen_objects);
+                                    }
+                                    // TODO: Process this only if test mode is enabled
+                                    /*
+                                    FunctionModifier::Test => {
                                         let modifiers = modifiers
                                             .into_iter()
                                             .collect::<Vec<FunctionModifier>>();
-                                        result.functions.push(Function {
+
+                                        result.test_functions.push(TestFunction {
                                             name: f.name.0.value,
-                                            modifiers,
-                                            signature,
-                                            visibility,
+                                            skip: modifiers.contains(&FunctionModifier::Skip),
+                                            expect_failure: modifiers
+                                                .contains(&FunctionModifier::ExpectedFailure),
                                         });
                                     }
+                                    */
+                                    FunctionModifier::ExternalCall(solidity_modifiers) => {
+                                        let errors = validate_external_call_function(
+                                            f,
+                                            &solidity_modifiers,
+                                            &result.external_call_structs,
+                                        );
+
+                                        if let Err(errors) = errors {
+                                            found_error = true;
+                                            module_errors.extend(errors);
+                                        } else if !found_error {
+                                            result.external_calls.insert(
+                                                f.name.0.value,
+                                                Function {
+                                                    name: f.name.0.value,
+                                                    modifiers: solidity_modifiers,
+                                                    owned_objects: vec![],
+                                                    shared_objects: vec![],
+                                                    frozen_objects: vec![],
+                                                    signature: signature.clone(),
+                                                    visibility,
+                                                },
+                                            );
+                                        }
+                                    }
+                                    FunctionModifier::Abi(solidity_modifiers) => {
+                                        // TODO
+
+                                        if !found_error {
+                                            function.modifiers.extend(solidity_modifiers);
+                                        }
+                                    }
+                                    _ => {}
                                 }
                             }
-                        } else if !found_error {
-                            result.functions.push(Function {
-                                name: f.name.0.value,
-                                modifiers: Vec::new(),
-                                signature,
-                                visibility,
-                            });
+                        }
+                        if !found_error {
+                            println!(
+                                "\n\nAdding function {:#?} to special attributes\n\n",
+                                function
+                            );
+                            result.functions.push(function);
                         }
                     }
                     _ => continue,

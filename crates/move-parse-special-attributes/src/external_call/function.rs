@@ -4,8 +4,10 @@ use move_compiler::parser::ast::{Function, FunctionBody_, NameAccessChain_, Type
 use move_symbol_pool::Symbol;
 
 use crate::{
-    ExternalCallFunctionError, SpecialAttributeError, error::SpecialAttributeErrorKind,
-    function_modifiers::FunctionModifier, shared::get_single_type_name,
+    ExternalCallFunctionError, SpecialAttributeError,
+    error::SpecialAttributeErrorKind,
+    function_modifiers::{FunctionModifier, SolidityFunctionModifier},
+    shared::get_single_type_name,
 };
 
 const FN_RESULT_EMPTY_STRUCT_NAME: &str = "ContractCallEmptyResult";
@@ -68,7 +70,7 @@ fn check_first_parameter_is_external_struct(
 
 pub(crate) fn validate_external_call_function(
     function: &Function,
-    _modifiers: &[FunctionModifier],
+    _modifiers: &[SolidityFunctionModifier],
     external_call_structs: &HashSet<Symbol>,
 ) -> Result<(), Vec<SpecialAttributeError>> {
     let mut errors = Vec::new();
