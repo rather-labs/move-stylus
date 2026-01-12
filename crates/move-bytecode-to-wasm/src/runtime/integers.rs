@@ -10,7 +10,12 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, UnaryOp},
 };
 
-use crate::{CompilationContext, translation::intermediate_types::simple_integers::IU32};
+use crate::{
+    CompilationContext,
+    data::RuntimeErrorData,
+    error::{RuntimeError, add_handle_error_instructions},
+    translation::intermediate_types::simple_integers::IU32,
+};
 
 use super::RuntimeFunction;
 
@@ -24,7 +29,11 @@ use super::RuntimeFunction;
 ///
 /// # WASM Function Returns
 /// * the numeber passed as argument
-pub fn check_overflow_u8_u16(module: &mut Module) -> FunctionId {
+pub fn check_overflow_u8_u16(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
+) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32],
@@ -44,7 +53,13 @@ pub fn check_overflow_u8_u16(module: &mut Module) -> FunctionId {
         .if_else(
             Some(ValType::I32),
             |then| {
-                then.unreachable();
+                then.i32_const(runtime_error_data.get(
+                    module,
+                    compilation_ctx.memory_id,
+                    RuntimeError::Overflow,
+                ));
+
+                add_handle_error_instructions(module, then, compilation_ctx);
             },
             |else_| {
                 else_.local_get(n);
