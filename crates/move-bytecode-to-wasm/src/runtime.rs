@@ -248,7 +248,9 @@ impl RuntimeFunction {
                 (Self::AddU64, _, _) => integers::add::add_u64(module),
                 (Self::SubU32, _, _) => integers::sub::sub_u32(module),
                 (Self::SubU64, _, _) => integers::sub::sub_u64(module),
-                (Self::CheckOverflowU8U16, _, _) => integers::check_overflow_u8_u16(module),
+                (Self::CheckOverflowU8U16, Some(compilation_ctx), Some(runtime_error_data)) => {
+                    integers::check_overflow_u8_u16(module, compilation_ctx, runtime_error_data)
+                }
                 (Self::DowncastU64ToU32, _, _) => integers::downcast_u64_to_u32(module),
                 (Self::DowncastU128U256ToU32, Some(ctx), _) => {
                     integers::downcast_u128_u256_to_u32(module, ctx)
@@ -280,11 +282,11 @@ impl RuntimeFunction {
                     Self::SwapI256Bytes.name().to_owned(),
                 )?,
                 // Bitwise
-                (Self::HeapIntShiftLeft, Some(ctx), _) => {
-                    integers::bitwise::heap_int_shift_left(module, ctx)?
+                (Self::HeapIntShiftLeft, Some(ctx), Some(runtime_error_data)) => {
+                    integers::bitwise::heap_int_shift_left(module, ctx, runtime_error_data)?
                 }
-                (Self::HeapIntShiftRight, Some(ctx), _) => {
-                    integers::bitwise::heap_int_shift_right(module, ctx)?
+                (Self::HeapIntShiftRight, Some(ctx), Some(runtime_error_data)) => {
+                    integers::bitwise::heap_int_shift_right(module, ctx, runtime_error_data)?
                 }
                 // Copy
                 (Self::CopyU128, Some(ctx), _) => copy::copy_heap_int_function::<

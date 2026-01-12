@@ -3,7 +3,7 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
 };
 
-use crate::{CompilationContext, runtime::error::RuntimeFunctionError};
+use crate::{CompilationContext, data::RuntimeErrorData, runtime::error::RuntimeFunctionError};
 
 use super::RuntimeFunction;
 
@@ -19,6 +19,7 @@ use super::RuntimeFunction;
 pub fn heap_int_shift_left(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let mut function = FunctionBuilder::new(
         &mut module.types,
@@ -35,7 +36,11 @@ pub fn heap_int_shift_left(
         .name(RuntimeFunction::HeapIntShiftLeft.name().to_owned())
         .func_body();
 
-    let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None, None)?;
+    let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(
+        module,
+        Some(compilation_ctx),
+        Some(runtime_error_data),
+    )?;
 
     // Max value for the shift amount should be 127 for u128 and 255 for u256
     builder
@@ -271,6 +276,7 @@ pub fn heap_int_shift_left(
 pub fn heap_int_shift_right(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let mut function = FunctionBuilder::new(
         &mut module.types,
@@ -287,7 +293,11 @@ pub fn heap_int_shift_right(
         .name(RuntimeFunction::HeapIntShiftRight.name().to_owned())
         .func_body();
 
-    let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None, None)?;
+    let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(
+        module,
+        Some(compilation_ctx),
+        Some(runtime_error_data),
+    )?;
     // Max value for the shift amount should be 127 for u128 and 255 for u256
     builder
         .local_get(shift_amount)
@@ -515,9 +525,13 @@ mod tests {
     use std::panic::AssertUnwindSafe;
     use std::rc::Rc;
 
+    use crate::error::RuntimeError;
     use crate::test_compilation_context;
+    use crate::test_runtime_error_data;
     use crate::test_tools::{build_module, setup_wasmtime_module};
     use alloy_primitives::U256;
+    use alloy_primitives::keccak256;
+    use alloy_sol_types::{SolType, sol};
     use rstest::rstest;
     use walrus::{FunctionBuilder, ValType};
 
@@ -534,7 +548,7 @@ mod tests {
     #[case(u128::MAX, 180, 0)]
     fn test_u128_shift_left(#[case] n: u128, #[case] shift_amount: i32, #[case] expected: u128) {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
             build_module(Some(TYPE_HEAP_SIZE));
 
         let mut function_builder = FunctionBuilder::new(
@@ -554,9 +568,11 @@ mod tests {
         // Heap size
         func_body.i32_const(TYPE_HEAP_SIZE);
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let shift_left_f = heap_int_shift_left(&mut raw_module, &compilation_ctx).unwrap();
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
+        let mut runtime_error_data = test_runtime_error_data!();
+        let shift_left_f =
+            heap_int_shift_left(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
+                .unwrap();
         // Shift left
         func_body.call(shift_left_f);
 
@@ -584,7 +600,7 @@ mod tests {
     #[test]
     fn test_u128_shift_left_fuzz() {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
             build_module(Some(TYPE_HEAP_SIZE));
 
         let mut function_builder = FunctionBuilder::new(
@@ -605,9 +621,11 @@ mod tests {
             // Heap size
             .i32_const(TYPE_HEAP_SIZE);
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let shift_left_f = heap_int_shift_left(&mut raw_module, &compilation_ctx).unwrap();
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
+        let mut runtime_error_data = test_runtime_error_data!();
+        let shift_left_f =
+            heap_int_shift_left(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
+                .unwrap();
         // Shift left
         func_body.call(shift_left_f);
 
@@ -667,7 +685,7 @@ mod tests {
     #[case(U256::MAX, 256, U256::ZERO)]
     fn test_u256_shift_left(#[case] n: U256, #[case] shift_amount: i32, #[case] expected: U256) {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
             build_module(Some(TYPE_HEAP_SIZE));
 
         let mut function_builder = FunctionBuilder::new(
@@ -687,9 +705,11 @@ mod tests {
         // Heap size
         func_body.i32_const(TYPE_HEAP_SIZE);
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let shift_left_f = heap_int_shift_left(&mut raw_module, &compilation_ctx).unwrap();
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
+        let mut runtime_error_data = test_runtime_error_data!();
+        let shift_left_f =
+            heap_int_shift_left(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
+                .unwrap();
         // Shift left
         func_body.call(shift_left_f);
 
@@ -740,7 +760,10 @@ mod tests {
 
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let shift_left_f = heap_int_shift_left(&mut raw_module, &compilation_ctx).unwrap();
+        let mut runtime_error_data = test_runtime_error_data!();
+        let shift_left_f =
+            heap_int_shift_left(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
+                .unwrap();
         // Shift left
         func_body.call(shift_left_f);
 
@@ -795,13 +818,9 @@ mod tests {
     #[case(128128u128, 110, 128128u128 >> 110)]
     #[case(u128::MAX, 110, u128::MAX >> 110)]
     #[case(u128::MAX, 127, u128::MAX >> 127)]
-    #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
-    #[case(u128::MAX, 128, 0)]
-    #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
-    #[case(u128::MAX, 180, 0)]
     fn test_u128_shift_right(#[case] n: u128, #[case] shift_amount: i32, #[case] expected: u128) {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
             build_module(Some(TYPE_HEAP_SIZE));
 
         let mut function_builder = FunctionBuilder::new(
@@ -821,9 +840,11 @@ mod tests {
         // Heap size
         func_body.i32_const(TYPE_HEAP_SIZE);
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let shift_right_f = heap_int_shift_right(&mut raw_module, &compilation_ctx).unwrap();
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
+        let mut runtime_error_data = test_runtime_error_data!();
+        let shift_right_f =
+            heap_int_shift_right(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
+                .unwrap();
         // Shift right
         func_body.call(shift_right_f);
 
@@ -846,10 +867,77 @@ mod tests {
         assert_eq!(result_memory_data, expected.to_le_bytes().to_vec());
     }
 
+    #[rstest]
+    #[case(u128::MAX, 128)]
+    #[case(u128::MAX, 180)]
+    fn test_u128_shift_right_overflow(#[case] n: u128, #[case] shift_amount: i32) {
+        const TYPE_HEAP_SIZE: i32 = 16;
+        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
+            build_module(Some(TYPE_HEAP_SIZE));
+
+        let mut function_builder = FunctionBuilder::new(
+            &mut raw_module.types,
+            &[ValType::I32, ValType::I32],
+            &[ValType::I32],
+        );
+
+        let shift_amount_local = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        // Number to shift pointer
+        func_body.i32_const(0);
+        // Shift left amount
+        func_body.local_get(shift_amount_local);
+        // Heap size
+        func_body.i32_const(TYPE_HEAP_SIZE);
+
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
+        let mut runtime_error_data = test_runtime_error_data!();
+        let shift_right_f =
+            heap_int_shift_right(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
+                .unwrap();
+        // Shift right
+        func_body.call(shift_right_f);
+
+        let function = function_builder.finish(vec![shift_amount_local], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let data = [n.to_le_bytes()].concat();
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
+
+        let pointer: i32 = entrypoint
+            .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
+            .unwrap();
+
+        println!("pointer: {:?}", pointer);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+        let overflow_error_offset = runtime_error_data.get(
+            &mut raw_module,
+            compilation_ctx.memory_id,
+            RuntimeError::Overflow,
+        );
+        println!("overflow_error_offset: {:?}", overflow_error_offset);
+        let mut result_memory_data = vec![0u8; 120 as usize];
+        memory
+            .read(&mut store, pointer as usize, &mut result_memory_data)
+            .unwrap();
+
+        let error_message = String::from_utf8_lossy(RuntimeError::Overflow.as_bytes());
+        let expected = [
+            keccak256(b"Error(string)")[..4].to_vec(),
+            <sol!((string,))>::abi_encode_params(&(error_message,)),
+        ]
+        .concat();
+        assert_eq!(result_memory_data, expected);
+    }
+
     #[test]
     fn test_u128_shift_right_fuzz() {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
             build_module(Some(TYPE_HEAP_SIZE));
 
         let mut function_builder = FunctionBuilder::new(
@@ -870,9 +958,11 @@ mod tests {
             // Heap size
             .i32_const(TYPE_HEAP_SIZE);
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let shift_left_f = heap_int_shift_right(&mut raw_module, &compilation_ctx).unwrap();
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
+        let mut runtime_error_data = test_runtime_error_data!();
+        let shift_left_f =
+            heap_int_shift_right(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
+                .unwrap();
         // Shift left
         func_body.call(shift_left_f);
 
@@ -932,7 +1022,7 @@ mod tests {
     #[case(U256::MAX, 256, U256::ZERO)]
     fn test_u256_shift_right(#[case] n: U256, #[case] shift_amount: i32, #[case] expected: U256) {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
             build_module(Some(TYPE_HEAP_SIZE));
 
         let mut function_builder = FunctionBuilder::new(
@@ -952,9 +1042,11 @@ mod tests {
         // Heap size
         func_body.i32_const(TYPE_HEAP_SIZE);
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let shift_right_f = heap_int_shift_right(&mut raw_module, &compilation_ctx).unwrap();
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
+        let mut runtime_error_data = test_runtime_error_data!();
+        let shift_right_f =
+            heap_int_shift_right(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
+                .unwrap();
         // Shift right
         func_body.call(shift_right_f);
 
@@ -982,7 +1074,7 @@ mod tests {
     #[test]
     fn test_u256_shift_right_fuzz() {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
             build_module(Some(TYPE_HEAP_SIZE));
 
         let mut function_builder = FunctionBuilder::new(
@@ -1003,9 +1095,11 @@ mod tests {
             // Heap size
             .i32_const(TYPE_HEAP_SIZE);
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let shift_left_f = heap_int_shift_right(&mut raw_module, &compilation_ctx).unwrap();
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
+        let mut runtime_error_data = test_runtime_error_data!();
+        let shift_left_f =
+            heap_int_shift_right(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
+                .unwrap();
         // Shift left
         func_body.call(shift_left_f);
 
