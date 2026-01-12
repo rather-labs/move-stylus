@@ -145,7 +145,6 @@ mod tests {
         let args_pointer = raw_module.locals.add(ValType::I32);
 
         let mut func_body = function_builder.func_body();
-        let return_block_id = func_body.id();
         func_body.i32_const(0);
         func_body.local_set(args_pointer);
 
@@ -154,7 +153,7 @@ mod tests {
                 None,
                 &mut func_body,
                 &mut raw_module,
-                return_block_id,
+                None,
                 args_pointer,
                 args_pointer,
                 &compilation_ctx,

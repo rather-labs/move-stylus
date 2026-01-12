@@ -96,7 +96,6 @@ pub fn unpack_struct_function(
         &[ValType::I32],
     );
     let mut builder = function.name(name).func_body();
-    let return_block_id = builder.id();
 
     // Arguments
     let reader_pointer = module.locals.add(ValType::I32);
@@ -159,7 +158,7 @@ pub fn unpack_struct_function(
             Some(itype),
             &mut builder,
             module,
-            return_block_id, // TODO: here we can just pass None
+            None,
             data_reader_pointer,
             calldata_ptr,
             compilation_ctx,

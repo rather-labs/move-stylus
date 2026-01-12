@@ -74,7 +74,7 @@ pub fn add_external_contract_call_fn(
 
     let mut function = FunctionBuilder::new(&mut module.types, &arguments, &[ValType::I32]);
     let mut builder = function.name(name.clone()).func_body();
-    let return_block_id = builder.id();
+
     // Arguments
     let function_args: Vec<LocalId> = arguments.iter().map(|a| module.locals.add(*a)).collect();
     let self_ = function_args
@@ -467,7 +467,7 @@ pub fn add_external_contract_call_fn(
                             None,
                             block,
                             module,
-                            return_block_id,
+                            None,
                             return_data_abi_encoded_ptr,
                             calldata_reader_pointer,
                             compilation_ctx,

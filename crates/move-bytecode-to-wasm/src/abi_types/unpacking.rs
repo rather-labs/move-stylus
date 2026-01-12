@@ -35,7 +35,7 @@ pub trait Unpackable {
         parent_type: Option<&IntermediateType>,
         function_builder: &mut InstrSeqBuilder,
         module: &mut Module,
-        return_block_id: InstrSeqId,
+        return_block_id: Option<InstrSeqId>,
         reader_pointer: LocalId,
         calldata_base_pointer: LocalId,
         compilation_ctx: &CompilationContext,
@@ -76,7 +76,7 @@ pub fn build_unpack_instructions<T: Unpackable>(
             None,
             function_builder,
             module,
-            return_block_id,
+            Some(return_block_id),
             reader_pointer,
             calldata_base_pointer,
             compilation_ctx,
@@ -93,7 +93,7 @@ impl Unpackable for IntermediateType {
         parent_type: Option<&IntermediateType>,
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
-        return_block_id: InstrSeqId,
+        return_block_id: Option<InstrSeqId>,
         reader_pointer: LocalId,
         calldata_base_pointer: LocalId,
         compilation_ctx: &CompilationContext,
@@ -186,15 +186,18 @@ impl Unpackable for IntermediateType {
                         // which has the instructions to allocate a middle pointer to the unpacked value
                         let unpack_reference_function = RuntimeFunction::UnpackReference
                             .get_generic(module, compilation_ctx, runtime_error_data, &[inner])?;
+
                         builder
                             .local_get(reader_pointer)
-                            .local_get(calldata_base_pointer)
-                            .call_unpack_function(
-                                compilation_ctx,
-                                unpack_reference_function,
-                                &RuntimeFunction::UnpackReference,
-                                return_block_id,
-                            );
+                            .local_get(calldata_base_pointer);
+
+                        call_unpack_or_runtime_function(
+                            builder,
+                            compilation_ctx,
+                            unpack_reference_function,
+                            &RuntimeFunction::UnpackReference,
+                            return_block_id,
+                        );
                     }
                 }
             }
@@ -247,7 +250,8 @@ impl Unpackable for IntermediateType {
                         .get_generic(module, compilation_ctx, runtime_error_data, &[self])?;
 
                     // Unpack the storage struct
-                    builder.call_unpack_function(
+                    call_unpack_or_runtime_function(
+                        builder,
                         compilation_ctx,
                         unpack_storage_struct_function,
                         &RuntimeFunction::UnpackStorageStruct,
@@ -263,13 +267,15 @@ impl Unpackable for IntermediateType {
 
                     builder
                         .local_get(reader_pointer)
-                        .local_get(calldata_base_pointer)
-                        .call_unpack_function(
-                            compilation_ctx,
-                            unpack_struct_function,
-                            &RuntimeFunction::UnpackStruct,
-                            return_block_id,
-                        );
+                        .local_get(calldata_base_pointer);
+
+                    call_unpack_or_runtime_function(
+                        builder,
+                        compilation_ctx,
+                        unpack_struct_function,
+                        &RuntimeFunction::UnpackStruct,
+                        return_block_id,
+                    );
                 }
             }
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
@@ -350,6 +356,21 @@ fn load_struct_storage_id(
     Ok(())
 }
 
+/// Helper function to conditionally call either `call_unpack_function` or `call_runtime_function`
+/// based on whether a return block ID is provided.
+fn call_unpack_or_runtime_function(
+    builder: &mut InstrSeqBuilder,
+    compilation_ctx: &CompilationContext,
+    function_id: walrus::FunctionId,
+    runtime_fn: &RuntimeFunction,
+    return_block_id: Option<InstrSeqId>,
+) {
+    if let Some(return_block_id) = return_block_id {
+        builder.call_unpack_function(compilation_ctx, function_id, runtime_fn, return_block_id);
+    } else {
+        builder.call_runtime_function(compilation_ctx, function_id, runtime_fn);
+    }
+}
 #[cfg(test)]
 mod tests {
     use alloy_sol_types::{SolType, sol};
