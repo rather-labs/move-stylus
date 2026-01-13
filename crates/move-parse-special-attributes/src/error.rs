@@ -54,6 +54,9 @@ pub enum SpecialAttributeErrorKind {
 
     #[error("Named address '{0}' not found in address_alias_instantiation")]
     NamedAddressNotFound(Symbol),
+
+    #[error("Test function is marked as expected failure but it is not #[test].")]
+    ExpectedFailureWithoutTest,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -79,6 +82,13 @@ impl From<&SpecialAttributeError> for Diagnostic {
             SpecialAttributeErrorKind::AbiError(e) => e.into(),
             SpecialAttributeErrorKind::FunctionValidation(e) => e.into(),
             SpecialAttributeErrorKind::StructValidation(e) => e.into(),
+            SpecialAttributeErrorKind::ExpectedFailureWithoutTest => custom(
+                "Function attribute error",
+                Severity::BlockingError,
+                3,
+                3,
+                Box::leak(value.to_string().into_boxed_str()),
+            ),
             SpecialAttributeErrorKind::TooManyAttributes => custom(
                 "Special attributes error",
                 Severity::BlockingError,

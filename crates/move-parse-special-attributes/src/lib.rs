@@ -55,7 +55,6 @@ pub struct Struct_ {
 #[derive(Debug)]
 pub struct TestFunction {
     pub name: Symbol,
-    pub skip: bool,
     pub expect_failure: bool,
 }
 
@@ -160,105 +159,80 @@ pub fn process_special_attributes(
                             has_key: s.abilities.iter().any(|a| a.value == Ability_::Key),
                         });
 
-                        let mut found_modifier: bool = false;
-                        'loop_att: for attributes in &s.attributes {
-                            if let Some(att) = attributes.value.first() {
-                                let modifier = StructModifier::parse_struct_modifier(&att.value);
-                                if let Some(modifier) = modifier {
-                                    if found_modifier {
-                                        // Found a second match
+                        for attributes in &s.attributes {
+                            let mut modifiers: Vec<StructModifier> = Vec::new();
+                            for attr in &attributes.value {
+                                match StructModifier::parse_struct_modifier(&attr.value) {
+                                    Ok(Some(modifier)) => modifiers.push(modifier),
+                                    Ok(None) => {}
+                                    Err(e) => {
                                         found_error = true;
-                                        module_errors.push(SpecialAttributeError {
-                                            kind: SpecialAttributeErrorKind::TooManyAttributes,
-                                            line_of_code: s.loc,
-                                        });
-                                        break 'loop_att;
+                                        module_errors.push(e);
                                     }
+                                }
+                            }
 
-                                    match modifier {
-                                        StructModifier::ExternalCall => {
-                                            match validate_external_call_struct(s) {
-                                                Ok(_)
-                                                    if !result
-                                                        .external_call_structs
-                                                        .contains(&struct_name) =>
-                                                {
-                                                    result.external_call_structs.insert(struct_name);
-                                                    found_modifier = true;
-                                                }
-                                                Ok(_) => {
-                                                    found_modifier = true;
-                                                }
-                                                Err(e) => {
-                                                    found_error = true;
-                                                    module_errors.extend(e);
-                                                    break 'loop_att;
-                                                }
+                            println!("Struct {} has modifiers: {:?}", struct_name, modifiers);
+                            for modifier in modifiers {
+                                match modifier {
+                                    StructModifier::ExternalStruct => todo!(),
+                                    StructModifier::ExternalCall => {
+                                        match validate_external_call_struct(s) {
+                                            Ok(_)
+                                                if !result
+                                                    .external_call_structs
+                                                    .contains(&struct_name) =>
+                                            {
+                                                result.external_call_structs.insert(struct_name);
                                             }
-                                        }
-                                        StructModifier::ExternalStruct => {
-                                            match ExternalStruct::try_from(s) {
-                                                Ok(external_struct) => {
-                                                    result
-                                                        .external_struct
-                                                        .insert(struct_name, external_struct);
-                                                    found_modifier = true;
-                                                }
-                                                Err(SpecialAttributeError {
-                                                    kind:
-                                                        SpecialAttributeErrorKind::ExternalStruct(
-                                                            ExternalStructError::NotAnExternalStruct,
-                                                        ),
-                                                    ..
-                                                }) => {}
-                                                Err(e) => {
-                                                    found_error = true;
-                                                    module_errors.push(e);
-                                                    break 'loop_att;
-                                                }
-                                            }
-                                        }
-                                        StructModifier::Event => {
-                                            match Event::try_from(s) {
-                                                Ok(event) => {
-                                                    result.events.insert(struct_name, event);
-                                                    found_modifier = true;
-                                                }
-                                                Err(SpecialAttributeError {
-                                                    kind:
-                                                        SpecialAttributeErrorKind::Event(
-                                                            EventParseError::NotAnEvent,
-                                                        ),
-                                                    ..
-                                                }) => {}
-                                                Err(e) => {
-                                                    found_error = true;
-                                                    module_errors.push(e);
-                                                    break 'loop_att;
-                                                }
-                                            }
-                                        }
-                                        StructModifier::AbiError => {
-                                            match AbiError::try_from(s) {
-                                                Ok(abi_error) => {
-                                                    result.abi_errors.insert(struct_name, abi_error);
-                                                    found_modifier = true;
-                                                }
-                                                Err(SpecialAttributeError {
-                                                    kind:
-                                                        SpecialAttributeErrorKind::AbiError(
-                                                            AbiErrorParseError::NotAnAbiError,
-                                                        ),
-                                                    ..
-                                                }) => {}
-                                                Err(e) => {
-                                                    found_error = true;
-                                                    module_errors.push(e);
-                                                    break 'loop_att;
-                                                }
+                                            Ok(_) => {}
+                                            Err(e) => {
+                                                found_error = true;
+                                                module_errors.extend(e);
                                             }
                                         }
                                     }
+                                    StructModifier::Event {
+                                        is_anonymous,
+                                        indexes,
+                                    } => {
+                                        // Check if the event has the key ability
+                                        if s.abilities.iter().any(|a| a.value == Ability_::Key) {
+                                            module_errors.push(SpecialAttributeError {
+                                                kind: SpecialAttributeErrorKind::Event(
+                                                    EventParseError::EventWithKey,
+                                                ),
+                                                line_of_code: s.loc,
+                                            });
+                                            found_error = true;
+                                            continue;
+                                        }
+
+                                        result.events.insert(
+                                            struct_name,
+                                            Event {
+                                                name: struct_name,
+                                                is_anonymous,
+                                                indexes,
+                                            },
+                                        );
+                                    }
+                                    StructModifier::AbiError => match AbiError::try_from(s) {
+                                        Ok(abi_error) => {
+                                            result.abi_errors.insert(struct_name, abi_error);
+                                        }
+                                        Err(SpecialAttributeError {
+                                            kind:
+                                                SpecialAttributeErrorKind::AbiError(
+                                                    AbiErrorParseError::NotAnAbiError,
+                                                ),
+                                            ..
+                                        }) => {}
+                                        Err(e) => {
+                                            found_error = true;
+                                            module_errors.push(e);
+                                        }
+                                    },
                                 }
                             }
                         }
@@ -421,20 +395,27 @@ pub fn process_special_attributes(
                                         function.frozen_objects.extend(frozen_objects);
                                     }
                                     // TODO: Process this only if test mode is enabled
-                                    /*
                                     FunctionModifier::Test => {
-                                        let modifiers = modifiers
-                                            .into_iter()
-                                            .collect::<Vec<FunctionModifier>>();
-
                                         result.test_functions.push(TestFunction {
                                             name: f.name.0.value,
-                                            skip: modifiers.contains(&FunctionModifier::Skip),
-                                            expect_failure: modifiers
-                                                .contains(&FunctionModifier::ExpectedFailure),
+                                            expect_failure: false,
                                         });
                                     }
-                                    */
+                                    FunctionModifier::ExpectedFailure => {
+                                        if let Some(test_function) = result
+                                            .test_functions
+                                            .iter_mut()
+                                            .find(|tf| tf.name == f.name.0.value)
+                                        {
+                                            test_function.expect_failure = true;
+                                        } else {
+                                            found_error = true;
+                                            module_errors.push(SpecialAttributeError {
+                                                kind: SpecialAttributeErrorKind::ExpectedFailureWithoutTest,
+                                                line_of_code: f.loc,
+                                            });
+                                        }
+                                    }
                                     FunctionModifier::ExternalCall(solidity_modifiers) => {
                                         let errors = validate_external_call_function(
                                             f,
@@ -461,8 +442,6 @@ pub fn process_special_attributes(
                                         }
                                     }
                                     FunctionModifier::Abi(solidity_modifiers) => {
-                                        // TODO
-
                                         if !found_error {
                                             function.modifiers.extend(solidity_modifiers);
                                         }
@@ -472,10 +451,6 @@ pub fn process_special_attributes(
                             }
                         }
                         if !found_error {
-                            println!(
-                                "\n\nAdding function {:#?} to special attributes\n\n",
-                                function
-                            );
                             result.functions.push(function);
                         }
                     }

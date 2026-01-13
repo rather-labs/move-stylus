@@ -123,8 +123,6 @@ impl FunctionModifier {
     pub fn parse_modifiers(attribute: &Attribute_) -> Vec<Self> {
         let mut result = Vec::new();
 
-        println!("Parsing attribute: {:?}", attribute);
-
         match attribute {
             Attribute_::Parameterized(name, spanned1) => match name.value.as_str() {
                 "owned_objects" => {
@@ -185,10 +183,7 @@ impl FunctionModifier {
                 "test" => result.push(Self::Test),
                 "skip" => result.push(Self::Skip),
                 "expected_failure" => result.push(Self::ExpectedFailure),
-                _ => panic!(
-                    "Unsupported attribute name for function modifier: {:?}",
-                    name
-                ),
+                _ => (),
             },
             _ => (),
         }
