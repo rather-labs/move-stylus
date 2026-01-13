@@ -18,6 +18,7 @@ pub use event::Event;
 use event::EventParseError;
 pub use external_call::error::{ExternalCallFunctionError, ExternalCallStructError};
 pub use function_validation::FunctionValidationError;
+use function_validation::check_storage_object_param;
 use move_symbol_pool::Symbol;
 pub use reserved_modules::{SF_ADDRESS, SF_RESERVED_STRUCTS};
 pub use struct_validation::StructValidationError;
@@ -392,14 +393,64 @@ pub fn process_special_attributes(
                                 match modifier {
                                     FunctionModifier::OwnedObjects(owned_objects) => {
                                         // TODO: Check declared attributes exist
+
+                                        for owned_object_identifier in &owned_objects {
+                                            if let Err(e) = check_storage_object_param(
+                                                &signature,
+                                                *owned_object_identifier,
+                                                f.loc,
+                                                &result.structs,
+                                            ) {
+                                                found_error = true;
+                                                module_errors.push(e);
+                                                continue;
+                                            }
+                                        }
+
+                                        if found_error {
+                                            continue;
+                                        }
+
                                         function.owned_objects.extend(owned_objects);
                                     }
                                     FunctionModifier::SharedObjects(shared_objects) => {
-                                        // TODO: Check declared attributes exist
+                                        for shared_object_identifier in &shared_objects {
+                                            if let Err(e) = check_storage_object_param(
+                                                &signature,
+                                                *shared_object_identifier,
+                                                f.loc,
+                                                &result.structs,
+                                            ) {
+                                                found_error = true;
+                                                module_errors.push(e);
+                                                continue;
+                                            }
+                                        }
+
+                                        if found_error {
+                                            continue;
+                                        }
+
                                         function.shared_objects.extend(shared_objects);
                                     }
                                     FunctionModifier::FrozenObjects(frozen_objects) => {
-                                        // TODO: Check declared attributes exist
+                                        for frozen_object_identifier in &frozen_objects {
+                                            if let Err(e) = check_storage_object_param(
+                                                &signature,
+                                                *frozen_object_identifier,
+                                                f.loc,
+                                                &result.structs,
+                                            ) {
+                                                found_error = true;
+                                                module_errors.push(e);
+                                                continue;
+                                            }
+                                        }
+
+                                        if found_error {
+                                            continue;
+                                        }
+
                                         function.frozen_objects.extend(frozen_objects);
                                     }
                                     // TODO: Process this only if test mode is enabled

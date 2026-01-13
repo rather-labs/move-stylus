@@ -2,11 +2,13 @@ use move_compiler::{
     diagnostics::codes::{DiagnosticInfo, Severity, custom},
     parser::ast::{Function, FunctionBody_},
 };
+use move_ir_types::location::Loc;
 use move_symbol_pool::Symbol;
 
 use crate::{
     AbiError, Event, Struct_,
     error::{SpecialAttributeError, SpecialAttributeErrorKind},
+    function_modifiers::Signature,
     types::Type,
 };
 
@@ -33,6 +35,15 @@ pub enum FunctionValidationError {
         "Invalid NamedId argument. NamedId is a reserved type and cannot be used as an argument."
     )]
     InvalidNamedIdArgument,
+
+    #[error("Storage object '{0}' must be a struct with the key ability")]
+    StorageObjectNotKeyedStruct(Symbol),
+
+    #[error("Storage object struct '{0}' not found")]
+    StorageObjectStructNotFound(Symbol),
+
+    #[error("Parameter '{0}' not found in function signature")]
+    ParameterNotFound(Symbol),
 
     #[error("Struct not found in local or imported modules")]
     StructNotFound,
@@ -285,6 +296,65 @@ pub fn validate_function(
         if is_abi_error_type(&param.type_, abi_errors) {
             return validate_revert_function(function, abi_errors);
         }
+    }
+
+    Ok(())
+}
+
+pub fn check_storage_object_param(
+    signature: &Signature,
+    identifier: Symbol,
+    identifier_loc: Loc,
+    module_structs: &[Struct_],
+) -> Result<(), SpecialAttributeError> {
+    if let Some(param_type_name) = signature.parameters.iter().find_map(|p| {
+        if p.name == identifier {
+            match &p.type_ {
+                Type::UserDataType(name, _) => Some(name),
+                Type::Ref(inner) => {
+                    if let Type::UserDataType(name, _) = &**inner {
+                        Some(name)
+                    } else {
+                        None
+                    }
+                }
+                Type::MutRef(inner) => {
+                    if let Type::UserDataType(name, _) = &**inner {
+                        Some(name)
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }) {
+        if let Some(struct_) = module_structs.iter().find(|s| s.name == *param_type_name) {
+            if !struct_.has_key {
+                return Err(SpecialAttributeError {
+                    kind: SpecialAttributeErrorKind::FunctionValidation(
+                        FunctionValidationError::StorageObjectNotKeyedStruct(identifier),
+                    ),
+                    line_of_code: identifier_loc,
+                });
+            }
+        } else {
+            return Err(SpecialAttributeError {
+                kind: SpecialAttributeErrorKind::FunctionValidation(
+                    FunctionValidationError::StorageObjectStructNotFound(identifier),
+                ),
+                line_of_code: identifier_loc,
+            });
+        }
+    } else {
+        return Err(SpecialAttributeError {
+            kind: SpecialAttributeErrorKind::FunctionValidation(
+                FunctionValidationError::ParameterNotFound(identifier),
+            ),
+            line_of_code: identifier_loc,
+        });
     }
 
     Ok(())

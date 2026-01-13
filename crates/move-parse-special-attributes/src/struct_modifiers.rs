@@ -28,9 +28,7 @@ impl StructModifier {
                 "event" => {
                     let mut is_anonymous = false;
                     let mut indexes = 0;
-                    println!("Parsing event attributes: {:?}", spanned1.value);
                     for attr in &spanned1.value {
-                        println!("Parsing event attribute: {:?}", attr);
                         match &attr.value {
                             Attribute_::Name(n) if n.value.as_str() == "anonymous" => {
                                 is_anonymous = true;
