@@ -82,9 +82,9 @@ pub enum FunctionModifier {
     Test,
     Skip,
     ExpectedFailure,
-    OwnedObjects(Vec<Symbol>),
-    SharedObjects(Vec<Symbol>),
-    FrozenObjects(Vec<Symbol>),
+    OwnedObjects(Vec<(Symbol, Loc)>),
+    SharedObjects(Vec<(Symbol, Loc)>),
+    FrozenObjects(Vec<(Symbol, Loc)>),
 }
 
 impl Function {
@@ -132,7 +132,7 @@ impl FunctionModifier {
                             .value
                             .iter()
                             .map(|s| Self::parse_identifiers(&s.value, s.loc))
-                            .collect::<Result<Vec<Symbol>, SpecialAttributeError>>()?;
+                            .collect::<Result<Vec<(Symbol, Loc)>, SpecialAttributeError>>()?;
                         result.push(Self::OwnedObjects(ids));
                     }
                     "shared_objects" => {
@@ -140,7 +140,7 @@ impl FunctionModifier {
                             .value
                             .iter()
                             .map(|s| Self::parse_identifiers(&s.value, s.loc))
-                            .collect::<Result<Vec<Symbol>, SpecialAttributeError>>()?;
+                            .collect::<Result<Vec<(Symbol, Loc)>, SpecialAttributeError>>()?;
                         result.push(Self::SharedObjects(ids));
                     }
                     "frozen_objects" => {
@@ -148,7 +148,7 @@ impl FunctionModifier {
                             .value
                             .iter()
                             .map(|s| Self::parse_identifiers(&s.value, s.loc))
-                            .collect::<Result<Vec<Symbol>, SpecialAttributeError>>()?;
+                            .collect::<Result<Vec<(Symbol, Loc)>, SpecialAttributeError>>()?;
                         result.push(Self::FrozenObjects(ids));
                     }
                     "abi" => {
@@ -193,9 +193,9 @@ impl FunctionModifier {
     fn parse_identifiers(
         attribute: &Attribute_,
         loc: Loc,
-    ) -> Result<Symbol, SpecialAttributeError> {
+    ) -> Result<(Symbol, Loc), SpecialAttributeError> {
         match attribute {
-            Attribute_::Name(name) => Ok(name.value),
+            Attribute_::Name(name) => Ok((name.value, loc)),
             a => Err(SpecialAttributeError {
                 kind: SpecialAttributeErrorKind::UnsupportedAttributeForIdentifiers(
                     a.attribute_name().value,

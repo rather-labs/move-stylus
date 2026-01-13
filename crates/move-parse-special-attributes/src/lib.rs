@@ -394,11 +394,11 @@ pub fn process_special_attributes(
                                     FunctionModifier::OwnedObjects(owned_objects) => {
                                         // TODO: Check declared attributes exist
 
-                                        for owned_object_identifier in &owned_objects {
+                                        for (owned_object_identifier, loc) in &owned_objects {
                                             if let Err(e) = check_storage_object_param(
                                                 &signature,
                                                 *owned_object_identifier,
-                                                f.loc,
+                                                *loc,
                                                 &result.structs,
                                             ) {
                                                 found_error = true;
@@ -411,14 +411,16 @@ pub fn process_special_attributes(
                                             continue;
                                         }
 
-                                        function.owned_objects.extend(owned_objects);
+                                        function
+                                            .owned_objects
+                                            .extend(owned_objects.iter().map(|(id, _)| *id));
                                     }
                                     FunctionModifier::SharedObjects(shared_objects) => {
-                                        for shared_object_identifier in &shared_objects {
+                                        for (shared_object_identifier, loc) in &shared_objects {
                                             if let Err(e) = check_storage_object_param(
                                                 &signature,
                                                 *shared_object_identifier,
-                                                f.loc,
+                                                *loc,
                                                 &result.structs,
                                             ) {
                                                 found_error = true;
@@ -431,14 +433,16 @@ pub fn process_special_attributes(
                                             continue;
                                         }
 
-                                        function.shared_objects.extend(shared_objects);
+                                        function
+                                            .shared_objects
+                                            .extend(shared_objects.iter().map(|(id, _)| *id));
                                     }
                                     FunctionModifier::FrozenObjects(frozen_objects) => {
-                                        for frozen_object_identifier in &frozen_objects {
+                                        for (frozen_object_identifier, loc) in &frozen_objects {
                                             if let Err(e) = check_storage_object_param(
                                                 &signature,
                                                 *frozen_object_identifier,
-                                                f.loc,
+                                                *loc,
                                                 &result.structs,
                                             ) {
                                                 found_error = true;
@@ -451,7 +455,9 @@ pub fn process_special_attributes(
                                             continue;
                                         }
 
-                                        function.frozen_objects.extend(frozen_objects);
+                                        function
+                                            .frozen_objects
+                                            .extend(frozen_objects.iter().map(|(id, _)| *id));
                                     }
                                     // TODO: Process this only if test mode is enabled
                                     FunctionModifier::Test => {
