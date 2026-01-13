@@ -1,6 +1,6 @@
 module test::receive;
 
-#[ext(payable)]
+#[ext(abi(payable))]
 entry fun receive() {
   // Do nothing
 }
