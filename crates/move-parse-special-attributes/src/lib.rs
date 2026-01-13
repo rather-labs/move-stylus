@@ -24,8 +24,7 @@ pub use struct_validation::StructValidationError;
 // TODO: Create error struct with LOC and error info
 
 use external_call::{
-    external_struct::{ExternalStruct, ExternalStructError},
-    validate_external_call_function, validate_external_call_struct,
+    external_struct::ExternalStruct, validate_external_call_function, validate_external_call_struct,
 };
 use function_modifiers::{Function, FunctionModifier, Visibility};
 use function_validation::validate_function;
@@ -36,7 +35,7 @@ use move_compiler::{
 };
 use move_ir_types::location::Loc;
 use std::{
-    collections::{BTreeMap, HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, HashMap, HashSet},
     path::Path,
 };
 use struct_modifiers::StructModifier;
@@ -172,7 +171,7 @@ pub fn process_special_attributes(
                                 }
                             }
 
-                            println!("Struct {} has modifiers: {:?}", struct_name, modifiers);
+                            // println!("Struct {} has modifiers: {:?}", struct_name, modifiers);
                             for modifier in modifiers {
                                 match modifier {
                                     StructModifier::ExternalStruct => todo!(),
@@ -377,8 +376,17 @@ pub fn process_special_attributes(
                             let modifiers = attributes
                                 .value
                                 .iter()
-                                .flat_map(|s| FunctionModifier::parse_modifiers(&s.value))
-                                .collect::<VecDeque<FunctionModifier>>();
+                                .map(|s| FunctionModifier::parse_modifiers(&s.value))
+                                .collect::<Result<Vec<Vec<FunctionModifier>>, SpecialAttributeError>>();
+
+                            let modifiers = match modifiers {
+                                Ok(modifiers) => modifiers.concat(),
+                                Err(e) => {
+                                    found_error = true;
+                                    module_errors.push(e);
+                                    continue;
+                                }
+                            };
 
                             for modifier in modifiers {
                                 match modifier {

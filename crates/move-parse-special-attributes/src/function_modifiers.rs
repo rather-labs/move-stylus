@@ -1,8 +1,9 @@
-use crate::types::Type;
+use crate::{SpecialAttributeError, error::SpecialAttributeErrorKind, types::Type};
 use move_compiler::{
     parser::ast::{Attribute_, FunctionSignature},
     shared::Identifier,
 };
+use move_ir_types::location::Loc;
 use move_symbol_pool::Symbol;
 
 #[derive(Debug)]
@@ -120,64 +121,62 @@ impl FunctionModifier {
         }
     }
 
-    pub fn parse_modifiers(attribute: &Attribute_) -> Vec<Self> {
+    pub fn parse_modifiers(attribute: &Attribute_) -> Result<Vec<Self>, SpecialAttributeError> {
         let mut result = Vec::new();
 
         match attribute {
-            Attribute_::Parameterized(name, spanned1) => match name.value.as_str() {
-                "owned_objects" => {
-                    result.push(Self::OwnedObjects(
-                        spanned1
+            Attribute_::Parameterized(name, spanned1) => {
+                match name.value.as_str() {
+                    "owned_objects" => {
+                        let ids = spanned1
                             .value
                             .iter()
-                            .map(|s| Self::parse_identifiers(&s.value))
-                            .collect::<Vec<Symbol>>(),
-                    ));
-                }
-                "shared_objects" => {
-                    result.push(Self::SharedObjects(
-                        spanned1
+                            .map(|s| Self::parse_identifiers(&s.value, s.loc))
+                            .collect::<Result<Vec<Symbol>, SpecialAttributeError>>()?;
+                        result.push(Self::OwnedObjects(ids));
+                    }
+                    "shared_objects" => {
+                        let ids = spanned1
                             .value
                             .iter()
-                            .map(|s| Self::parse_identifiers(&s.value))
-                            .collect::<Vec<Symbol>>(),
-                    ));
-                }
-                "frozen_objects" => {
-                    result.push(Self::FrozenObjects(
-                        spanned1
+                            .map(|s| Self::parse_identifiers(&s.value, s.loc))
+                            .collect::<Result<Vec<Symbol>, SpecialAttributeError>>()?;
+                        result.push(Self::SharedObjects(ids));
+                    }
+                    "frozen_objects" => {
+                        let ids = spanned1
                             .value
                             .iter()
-                            .map(|s| Self::parse_identifiers(&s.value))
-                            .collect::<Vec<Symbol>>(),
-                    ));
-                }
-                "abi" => {
-                    result.push(Self::Abi(
-                        spanned1
-                            .value
-                            .iter()
-                            .map(|s| Self::parse_solidity_modifier(&s.value))
-                            .collect::<Vec<SolidityFunctionModifier>>(),
-                    ));
-                }
-                "external_call" => {
-                    result.push(Self::ExternalCall(
-                        spanned1
-                            .value
-                            .iter()
-                            .map(|s| Self::parse_solidity_modifier(&s.value))
-                            .collect::<Vec<SolidityFunctionModifier>>(),
-                    ));
-                }
-                _ => result.extend(
-                    spanned1
+                            .map(|s| Self::parse_identifiers(&s.value, s.loc))
+                            .collect::<Result<Vec<Symbol>, SpecialAttributeError>>()?;
+                        result.push(Self::FrozenObjects(ids));
+                    }
+                    "abi" => {
+                        let modifiers = spanned1
                         .value
                         .iter()
-                        .flat_map(|s| Self::parse_modifiers(&s.value))
-                        .collect::<Vec<FunctionModifier>>(),
-                ),
-            },
+                        .map(|s| Self::parse_solidity_modifier(&s.value, s.loc))
+                        .collect::<Result<Vec<SolidityFunctionModifier>, SpecialAttributeError>>()?;
+                        result.push(Self::Abi(modifiers));
+                    }
+                    "external_call" => {
+                        let modifiers = spanned1
+                        .value
+                        .iter()
+                        .map(|s| Self::parse_solidity_modifier(&s.value, s.loc))
+                        .collect::<Result<Vec<SolidityFunctionModifier>, SpecialAttributeError>>()?;
+                        result.push(Self::ExternalCall(modifiers));
+                    }
+                    _ => result.extend(
+                        spanned1
+                            .value
+                            .iter()
+                            .map(|s| Self::parse_modifiers(&s.value))
+                            .collect::<Result<Vec<Vec<FunctionModifier>>, SpecialAttributeError>>()?
+                            .concat(),
+                    ),
+                }
+            }
             Attribute_::Name(name) => match name.value.as_str() {
                 "external_call" => result.push(Self::ExternalCall(Vec::new())),
                 "test" => result.push(Self::Test),
@@ -188,28 +187,46 @@ impl FunctionModifier {
             _ => (),
         }
 
-        result
+        Ok(result)
     }
 
-    fn parse_identifiers(attribute: &Attribute_) -> Symbol {
+    fn parse_identifiers(
+        attribute: &Attribute_,
+        loc: Loc,
+    ) -> Result<Symbol, SpecialAttributeError> {
         match attribute {
-            Attribute_::Name(name) => name.value,
-            a => panic!("Unsupported attribute for identifiers: {:?}", a),
+            Attribute_::Name(name) => Ok(name.value),
+            a => Err(SpecialAttributeError {
+                kind: SpecialAttributeErrorKind::UnsupportedAttributeForIdentifiers(
+                    a.attribute_name().value,
+                ),
+                line_of_code: loc,
+            }),
         }
     }
 
-    fn parse_solidity_modifier(attribute: &Attribute_) -> SolidityFunctionModifier {
+    fn parse_solidity_modifier(
+        attribute: &Attribute_,
+        loc: Loc,
+    ) -> Result<SolidityFunctionModifier, SpecialAttributeError> {
         match attribute {
             Attribute_::Name(name) => match name.value.as_str() {
-                "pure" => SolidityFunctionModifier::Pure,
-                "view" => SolidityFunctionModifier::View,
-                "payable" => SolidityFunctionModifier::Payable,
-                _ => panic!("Unsupported solidity function modifier: {:?}", name),
+                "pure" => Ok(SolidityFunctionModifier::Pure),
+                "view" => Ok(SolidityFunctionModifier::View),
+                "payable" => Ok(SolidityFunctionModifier::Payable),
+                _ => Err(SpecialAttributeError {
+                    kind: SpecialAttributeErrorKind::UnsupportedSolidityFunctionModifier(
+                        name.value,
+                    ),
+                    line_of_code: loc,
+                }),
             },
-            _ => panic!(
-                "Unsupported attribute for solidity function modifier: {:?}",
-                attribute
-            ),
+            a => Err(SpecialAttributeError {
+                kind: SpecialAttributeErrorKind::UnsupportedAttributeForSolidityFunctionModifier(
+                    a.attribute_name().value,
+                ),
+                line_of_code: loc,
+            }),
         }
     }
 }

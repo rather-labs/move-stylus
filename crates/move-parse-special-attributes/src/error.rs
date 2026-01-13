@@ -55,6 +55,15 @@ pub enum SpecialAttributeErrorKind {
     #[error("Named address '{0}' not found in address_alias_instantiation")]
     NamedAddressNotFound(Symbol),
 
+    #[error("Unsupported attribute for identifiers: {0}")]
+    UnsupportedAttributeForIdentifiers(Symbol),
+
+    #[error("Unsupported solidity function modifier: {0}")]
+    UnsupportedSolidityFunctionModifier(Symbol),
+
+    #[error("Unsupported attribute for solidity function modifier: {0}")]
+    UnsupportedAttributeForSolidityFunctionModifier(Symbol),
+
     #[error("Test function is marked as expected failure but it is not #[test].")]
     ExpectedFailureWithoutTest,
 }
@@ -110,6 +119,29 @@ impl From<&SpecialAttributeError> for Diagnostic {
                 3,
                 Box::leak(value.to_string().into_boxed_str()),
             ),
+            SpecialAttributeErrorKind::UnsupportedAttributeForIdentifiers(_) => custom(
+                "Function attribute error",
+                Severity::BlockingError,
+                3,
+                3,
+                Box::leak(value.to_string().into_boxed_str()),
+            ),
+            SpecialAttributeErrorKind::UnsupportedSolidityFunctionModifier(_) => custom(
+                "Function attribute error",
+                Severity::BlockingError,
+                3,
+                3,
+                Box::leak(value.to_string().into_boxed_str()),
+            ),
+            SpecialAttributeErrorKind::UnsupportedAttributeForSolidityFunctionModifier(_) => {
+                custom(
+                    "Function attribute error",
+                    Severity::BlockingError,
+                    3,
+                    3,
+                    Box::leak(value.to_string().into_boxed_str()),
+                )
+            }
         };
 
         diag!(diagnostic_info, (value.line_of_code, "".to_string()))
