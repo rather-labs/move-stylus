@@ -5,6 +5,7 @@ use walrus::{
 
 use super::{IntermediateType, error::IntermediateTypeError};
 use crate::CompilationContext;
+use crate::data::RuntimeErrorData;
 use crate::runtime::RuntimeFunction;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 
@@ -216,8 +217,13 @@ impl IVector {
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
+        runtime_error_data: &mut RuntimeErrorData,
     ) -> Result<(), IntermediateTypeError> {
-        let downcast_f = RuntimeFunction::DowncastU64ToU32.get(module, None, None)?;
+        let downcast_f = RuntimeFunction::DowncastU64ToU32.get(
+            module,
+            Some(compilation_ctx),
+            Some(runtime_error_data),
+        )?;
 
         match inner {
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {

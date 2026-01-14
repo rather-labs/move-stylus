@@ -95,7 +95,7 @@ pub fn add_transfer_object_fn(
             RuntimeError::SharedObjectsCannotBeTransferred,
         ));
 
-        add_handle_error_instructions(module, block, compilation_ctx);
+        add_handle_error_instructions(module, block, compilation_ctx, false);
     });
 
     // Check that the object is not frozen
@@ -114,7 +114,7 @@ pub fn add_transfer_object_fn(
             compilation_ctx.memory_id,
             RuntimeError::FrozenObjectsCannotBeTransferred,
         ));
-        add_handle_error_instructions(module, block, compilation_ctx);
+        add_handle_error_instructions(module, block, compilation_ctx, false);
     });
 
     // Delete the object from the owner mapping on the storage
@@ -254,7 +254,7 @@ pub fn add_share_object_fn(
                         compilation_ctx.memory_id,
                         RuntimeError::FrozenObjectsCannotBeShared,
                     ));
-                    add_handle_error_instructions(module, then, compilation_ctx);
+                    add_handle_error_instructions(module, then, compilation_ctx, false);
                 },
                 |else_| {
                     // Delete the object from owner mapping on the storage
@@ -398,7 +398,7 @@ pub fn add_freeze_object_fn(
                         compilation_ctx.memory_id,
                         RuntimeError::SharedObjectsCannotBeFrozen,
                     ));
-                    add_handle_error_instructions(module, then, compilation_ctx);
+                    add_handle_error_instructions(module, then, compilation_ctx, false);
                 },
                 |else_| {
                     // Delete the object from the owner mapping on the storage

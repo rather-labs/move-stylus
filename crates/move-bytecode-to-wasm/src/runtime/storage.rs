@@ -180,7 +180,7 @@ pub fn locate_storage_data(
             compilation_ctx.memory_id,
             RuntimeError::StorageObjectNotFound,
         ));
-        add_handle_error_instructions(module, block, compilation_ctx);
+        add_handle_error_instructions(module, block, compilation_ctx, false);
     });
 
     Ok(function.finish(vec![uid_ptr, search_frozen], &mut module.funcs))

@@ -129,6 +129,7 @@ pub fn decrement_vec_len_function(
 pub fn vec_swap_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     inner_type: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let element_size = inner_type.wasm_memory_data_size()?;
@@ -160,7 +161,11 @@ pub fn vec_swap_function(
     let idx1 = module.locals.add(ValType::I32);
     let len = module.locals.add(ValType::I32);
 
-    let downcast_f = RuntimeFunction::DowncastU64ToU32.get(module, None, None)?;
+    let downcast_f = RuntimeFunction::DowncastU64ToU32.get(
+        module,
+        Some(compilation_ctx),
+        Some(runtime_error_data),
+    )?;
 
     builder.local_get(idx1_i64).call(downcast_f).local_set(idx1);
     builder.local_get(idx2_i64).call(downcast_f).local_set(idx2);

@@ -165,7 +165,7 @@ pub enum RuntimeError {
     SharedObjectsCannotBeTransferred,
     StorageObjectNotFound,
     Overflow,
-    Underflow,
+    OutOfBounds,
 }
 
 impl RuntimeError {
@@ -181,7 +181,7 @@ impl RuntimeError {
             }
             RuntimeError::StorageObjectNotFound => b"Object not found",
             RuntimeError::Overflow => b"Overflow",
-            RuntimeError::Underflow => b"Underflow",
+            RuntimeError::OutOfBounds => b"Out of bounds",
         }
     }
 }
@@ -190,6 +190,7 @@ pub fn add_handle_error_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
+    return_i64: bool,
 ) {
     let encoded_error_ptr = module.locals.add(ValType::I32);
     builder.local_set(encoded_error_ptr);
@@ -208,7 +209,12 @@ pub fn add_handle_error_instructions(
         );
 
     // Return 1 to indicate an error occurred
-    builder.i32_const(1);
+    if return_i64 {
+        builder.i64_const(1);
+    } else {
+        builder.i32_const(1);
+    }
+
     builder.return_();
 }
 

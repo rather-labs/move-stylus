@@ -1489,7 +1489,13 @@ fn translate_instruction(
                 });
             }
 
-            IVector::vec_borrow_instructions(&vec_inner, module, builder, compilation_ctx)?;
+            IVector::vec_borrow_instructions(
+                &vec_inner,
+                module,
+                builder,
+                compilation_ctx,
+                runtime_error_data,
+            )?;
 
             types_stack.push(IntermediateType::IRef(vec_inner.clone()));
         }
@@ -1522,7 +1528,13 @@ fn translate_instruction(
                 });
             }
 
-            IVector::vec_borrow_instructions(&vec_inner, module, builder, compilation_ctx)?;
+            IVector::vec_borrow_instructions(
+                &vec_inner,
+                module,
+                builder,
+                compilation_ctx,
+                runtime_error_data,
+            )?;
 
             types_stack.push(IntermediateType::IMutRef(vec_inner.clone()));
         }
@@ -1860,12 +1872,24 @@ fn translate_instruction(
         }
         Bytecode::CastU32 => {
             let original_type = types_stack.pop()?;
-            IU32::cast_from(builder, module, original_type, compilation_ctx)?;
+            IU32::cast_from(
+                builder,
+                module,
+                original_type,
+                compilation_ctx,
+                runtime_error_data,
+            )?;
             types_stack.push(IntermediateType::IU32);
         }
         Bytecode::CastU64 => {
             let original_type = types_stack.pop()?;
-            IU64::cast_from(builder, module, original_type, compilation_ctx)?;
+            IU64::cast_from(
+                builder,
+                module,
+                original_type,
+                compilation_ctx,
+                runtime_error_data,
+            )?;
             types_stack.push(IntermediateType::IU64);
         }
         Bytecode::CastU128 => {

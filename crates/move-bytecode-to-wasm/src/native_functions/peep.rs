@@ -104,7 +104,7 @@ pub fn add_peep_fn(
             RuntimeError::StorageObjectNotFound,
         ));
 
-        add_handle_error_instructions(module, block, compilation_ctx);
+        add_handle_error_instructions(module, block, compilation_ctx, false);
     });
 
     // Decode the storage object into the internal representation
