@@ -19,7 +19,7 @@ public struct UID has store {
     id: ID,
 }
 
-#[ext(event, indexes = 1)]
+#[ext(event(indexes = 1))]
 public struct NewUID has copy, drop {
     uid: address
 }

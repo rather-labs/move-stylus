@@ -31,14 +31,14 @@ public struct Info has key {
     decimals: u8,
 }
 
-#[ext(event, indexes = 2)]
+#[ext(event(indexes = 2))]
 public struct Transfer has copy, drop {
     from: address,
     to: address,
     value: u256
 }
 
-#[ext(event, indexes = 2)]
+#[ext(event(indexes = 2))]
 public struct Approval has copy, drop {
     owner: address,
     spender: address,
@@ -97,6 +97,7 @@ entry fun mint(
     });
 }
 
+#[ext(shared_objects = total_supply, balance)]
 entry fun burn(
     from: address,
     amount: u256,
