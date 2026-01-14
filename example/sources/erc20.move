@@ -97,7 +97,6 @@ entry fun mint(
     });
 }
 
-#[ext(shared_objects = total_supply, balance)]
 entry fun burn(
     from: address,
     amount: u256,

@@ -17,13 +17,13 @@ use error::SpecialAttributeErrorKind;
 pub use event::Event;
 use event::EventParseError;
 pub use external_call::error::{ExternalCallFunctionError, ExternalCallStructError};
+use external_call::external_struct::ExternalStructError;
 pub use function_validation::FunctionValidationError;
 use function_validation::check_repeated_storage_object_param;
 use function_validation::check_storage_object_param;
 use move_symbol_pool::Symbol;
 pub use reserved_modules::{SF_ADDRESS, SF_RESERVED_STRUCTS};
 pub use struct_validation::StructValidationError;
-// TODO: Create error struct with LOC and error info
 
 use external_call::{
     external_struct::ExternalStruct, validate_external_call_function, validate_external_call_struct,
@@ -176,7 +176,27 @@ pub fn process_special_attributes(
                             // println!("Struct {} has modifiers: {:?}", struct_name, modifiers);
                             for modifier in modifiers {
                                 match modifier {
-                                    StructModifier::ExternalStruct => todo!(),
+                                    StructModifier::ExternalStruct => {
+                                        match ExternalStruct::try_from(s) {
+                                            Ok(external_struct) => {
+                                                result
+                                                    .external_struct
+                                                    .insert(struct_name, external_struct);
+                                            }
+                                            Err(SpecialAttributeError {
+                                                kind:
+                                                    SpecialAttributeErrorKind::ExternalStruct(
+                                                        ExternalStructError::NotAnExternalStruct,
+                                                    ),
+                                                ..
+                                            }) => {}
+                                            Err(e) => {
+                                                found_error = true;
+                                                module_errors.push(e);
+                                                continue;
+                                            }
+                                        }
+                                    }
                                     StructModifier::ExternalCall => {
                                         match validate_external_call_struct(s) {
                                             Ok(_)
