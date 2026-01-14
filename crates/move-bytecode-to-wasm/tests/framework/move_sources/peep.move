@@ -43,10 +43,10 @@ entry fun owner_peep_foo(foo: &Foo, ctx: &TxContext): u32 {
     foo_.secret
 }
 
-entry fun peep_foo(owner: address,foo_id: &UID, ctx: &TxContext): &Foo {
+entry fun peep_foo(owner: address,foo_id: &UID): &Foo {
     stylus_peep::peep<Foo>(owner, foo_id)
 }
 
-entry fun peep_bar(owner: address, bar_id: &UID, ctx: &TxContext): &Bar {
+entry fun peep_bar(owner: address, bar_id: &UID): &Bar {
     stylus_peep::peep<Bar>(owner, bar_id)
 }

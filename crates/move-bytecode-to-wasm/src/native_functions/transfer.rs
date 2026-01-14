@@ -1,10 +1,7 @@
 use crate::{
     CompilationContext,
     compilation_context::ModuleId,
-    data::{
-        DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
-        DATA_SHARED_OBJECTS_KEY_OFFSET,
-    },
+    data::{DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_SHARED_OBJECTS_KEY_OFFSET},
     runtime::RuntimeFunction,
     translation::intermediate_types::IntermediateType,
 };
@@ -124,21 +121,17 @@ pub fn add_transfer_object_fn(
         .call(get_id_bytes_ptr_fn)
         .local_set(id_bytes_ptr);
 
+    builder
+        .i32_const(32)
+        .call(compilation_ctx.allocator)
+        .local_set(slot_ptr);
+
     // Calculate the slot number corresponding to the (recipient, struct_id) tuple
     builder
         .local_get(recipient_ptr)
         .local_get(id_bytes_ptr)
+        .local_get(slot_ptr)
         .call(write_object_slot_fn);
-
-    // Allocate 32 bytes for the slot pointer and copy the DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET to it
-    // This is needed because DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET might be overwritten later on
-    builder
-        .i32_const(32)
-        .call(compilation_ctx.allocator)
-        .local_tee(slot_ptr)
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .i32_const(32)
-        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
     // Store the struct in the slot associated with the new owner's mapping
     builder
@@ -243,22 +236,18 @@ pub fn add_share_object_fn(
                     .i32_const(32)
                     .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
+                else_
+                    .i32_const(32)
+                    .call(compilation_ctx.allocator)
+                    .local_set(slot_ptr);
+
                 // Calculate the slot number in the shared objects mapping
                 else_
                     .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
                     .local_get(struct_ptr)
                     .call(get_id_bytes_ptr_fn)
+                    .local_get(slot_ptr)
                     .call(write_object_slot_fn);
-
-                // Allocate 32 bytes for the slot pointer and copy the DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET to it
-                // This is needed because DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET might be overwritten later on
-                else_
-                    .i32_const(32)
-                    .call(compilation_ctx.allocator)
-                    .local_tee(slot_ptr)
-                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                    .i32_const(32)
-                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
                 // Save the struct in the shared objects mapping
                 else_
@@ -375,21 +364,18 @@ pub fn add_freeze_object_fn(
                     .i32_const(32)
                     .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
+                else_
+                    .i32_const(32)
+                    .call(compilation_ctx.allocator)
+                    .local_set(slot_ptr);
+
                 // Calculate the struct slot in the frozen objects mapping
                 else_
                     .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
                     .local_get(struct_ptr)
                     .call(get_id_bytes_ptr_fn)
+                    .local_get(slot_ptr)
                     .call(write_object_slot_fn);
-
-                // Allocate 32 bytes for the slot pointer and copy the DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET to it
-                else_
-                    .i32_const(32)
-                    .call(compilation_ctx.allocator)
-                    .local_tee(slot_ptr)
-                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                    .i32_const(32)
-                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
                 // Save the struct into the frozen objects mapping
                 else_

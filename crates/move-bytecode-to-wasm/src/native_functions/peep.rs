@@ -1,11 +1,8 @@
 use super::NativeFunction;
 use crate::{
-    CompilationContext, IntermediateType, Module, ModuleId,
-    data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET},
-    hostio::host_functions::storage_load_bytes32,
-    native_functions::error::NativeFunctionError,
-    runtime::RuntimeFunction,
-    wasm_builder_extensions::WasmBuilderExtension,
+    CompilationContext, IntermediateType, Module, ModuleId, data::DATA_SLOT_DATA_PTR_OFFSET,
+    hostio::host_functions::storage_load_bytes32, native_functions::error::NativeFunctionError,
+    runtime::RuntimeFunction, wasm_builder_extensions::WasmBuilderExtension,
 };
 use walrus::{
     FunctionBuilder, FunctionId, ValType,
@@ -43,6 +40,8 @@ pub fn add_peep_fn(
     let owner_address_ptr = module.locals.add(ValType::I32);
     let uid_ptr = module.locals.add(ValType::I32);
 
+    let slot_ptr = module.locals.add(ValType::I32);
+
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32],
@@ -71,6 +70,11 @@ pub fn add_peep_fn(
         )
         .local_set(uid_ptr);
 
+    builder
+        .i32_const(32)
+        .call(compilation_ctx.allocator)
+        .local_set(slot_ptr);
+
     // Search for the object in the owner's address mapping
     builder.block(None, |block| {
         let exit_block = block.id();
@@ -78,11 +82,12 @@ pub fn add_peep_fn(
         block
             .local_get(owner_address_ptr)
             .local_get(uid_ptr)
+            .local_get(slot_ptr)
             .call(write_object_slot_fn);
 
         // Load data from slot
         block
-            .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+            .local_get(slot_ptr)
             .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
             .call(storage_load);
 
@@ -103,16 +108,6 @@ pub fn add_peep_fn(
     let read_and_decode_from_storage_fn =
         RuntimeFunction::ReadAndDecodeFromStorage.get_generic(module, compilation_ctx, &[itype])?;
 
-    // Copy the slot number into a local to avoid overwriting it later
-    let slot_ptr = module.locals.add(ValType::I32);
-    builder
-        .i32_const(32)
-        .call(compilation_ctx.allocator)
-        .local_tee(slot_ptr)
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .i32_const(32)
-        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-
     // Allocate memory for the reference to the object
     let ref_ptr = module.locals.add(ValType::I32);
     builder
@@ -124,6 +119,7 @@ pub fn add_peep_fn(
     builder
         .local_get(slot_ptr)
         .local_get(uid_ptr)
+        .local_get(owner_address_ptr)
         .call(read_and_decode_from_storage_fn);
 
     // Store the ptr to the decoded object into the reference
