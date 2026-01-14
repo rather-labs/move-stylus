@@ -251,12 +251,14 @@ impl RuntimeFunction {
                 (Self::CheckOverflowU8U16, Some(compilation_ctx), Some(runtime_error_data)) => {
                     integers::check_overflow_u8_u16(module, compilation_ctx, runtime_error_data)
                 }
-                (Self::DowncastU64ToU32, _, _) => integers::downcast_u64_to_u32(module),
-                (Self::DowncastU128U256ToU32, Some(ctx), _) => {
-                    integers::downcast_u128_u256_to_u32(module, ctx)
+                (Self::DowncastU64ToU32, Some(ctx), Some(runtime_error_data)) => {
+                    integers::downcast_u64_to_u32(module, ctx, runtime_error_data)
                 }
-                (Self::DowncastU128U256ToU64, Some(ctx), _) => {
-                    integers::downcast_u128_u256_to_u64(module, ctx)
+                (Self::DowncastU128U256ToU32, Some(ctx), Some(runtime_error_data)) => {
+                    integers::downcast_u128_u256_to_u32(module, ctx, runtime_error_data)
+                }
+                (Self::DowncastU128U256ToU64, Some(ctx), Some(runtime_error_data)) => {
+                    integers::downcast_u128_u256_to_u64(module, ctx, runtime_error_data)
                 }
                 (Self::MulU32, _, _) => integers::mul::mul_u32(module),
                 (Self::MulU64, _, _) => integers::mul::mul_u64(module),
@@ -490,9 +492,9 @@ impl RuntimeFunction {
                     generics[0],
                 )?
             }
-            (Self::VecSwap, _) => {
+            (Self::VecSwap, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
-                vector::vec_swap_function(module, compilation_ctx, generics[0])?
+                vector::vec_swap_function(module, compilation_ctx, runtime_error_data, generics[0])?
             }
             (Self::VecPopBack, _) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;

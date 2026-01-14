@@ -122,7 +122,7 @@ impl IU8 {
                 let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32.get(
                     module,
                     Some(compilation_ctx),
-                    None,
+                    Some(runtime_error_data),
                 )?;
                 builder
                     .i32_const(IU128::HEAP_SIZE)
@@ -132,7 +132,7 @@ impl IU8 {
                 let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32.get(
                     module,
                     Some(compilation_ctx),
-                    None,
+                    Some(runtime_error_data),
                 )?;
                 builder
                     .i32_const(IU256::HEAP_SIZE)
@@ -303,7 +303,7 @@ impl IU16 {
                 let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32.get(
                     module,
                     Some(compilation_ctx),
-                    None,
+                    Some(runtime_error_data),
                 )?;
                 builder
                     .i32_const(IU128::HEAP_SIZE)
@@ -313,7 +313,7 @@ impl IU16 {
                 let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32.get(
                     module,
                     Some(compilation_ctx),
-                    None,
+                    Some(runtime_error_data),
                 )?;
                 builder
                     .i32_const(IU256::HEAP_SIZE)
@@ -443,19 +443,23 @@ impl IU32 {
         module: &mut walrus::Module,
         original_type: IntermediateType,
         compilation_ctx: &CompilationContext,
+        runtime_error_data: &mut RuntimeErrorData,
     ) -> Result<(), IntermediateTypeError> {
         match original_type {
             IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {}
             IntermediateType::IU64 => {
-                let downcast_u64_to_u32_f =
-                    RuntimeFunction::DowncastU64ToU32.get(module, None, None)?;
+                let downcast_u64_to_u32_f = RuntimeFunction::DowncastU64ToU32.get(
+                    module,
+                    Some(compilation_ctx),
+                    Some(runtime_error_data),
+                )?;
                 builder.call(downcast_u64_to_u32_f);
             }
             IntermediateType::IU128 => {
                 let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32.get(
                     module,
                     Some(compilation_ctx),
-                    None,
+                    Some(runtime_error_data),
                 )?;
                 builder
                     .i32_const(IU128::HEAP_SIZE)
@@ -465,7 +469,7 @@ impl IU32 {
                 let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32.get(
                     module,
                     Some(compilation_ctx),
-                    None,
+                    Some(runtime_error_data),
                 )?;
                 builder
                     .i32_const(IU256::HEAP_SIZE)
@@ -584,6 +588,7 @@ impl IU64 {
         module: &mut walrus::Module,
         original_type: IntermediateType,
         compilation_ctx: &CompilationContext,
+        runtime_error_data: &mut RuntimeErrorData,
     ) -> Result<(), IntermediateTypeError> {
         match original_type {
             IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {
@@ -594,7 +599,7 @@ impl IU64 {
                 let downcast_u128_u256_to_u64_f = RuntimeFunction::DowncastU128U256ToU64.get(
                     module,
                     Some(compilation_ctx),
-                    None,
+                    Some(runtime_error_data),
                 )?;
                 builder
                     .i32_const(IU128::HEAP_SIZE)
@@ -604,7 +609,7 @@ impl IU64 {
                 let downcast_u128_u256_to_u64_f = RuntimeFunction::DowncastU128U256ToU64.get(
                     module,
                     Some(compilation_ctx),
-                    None,
+                    Some(runtime_error_data),
                 )?;
                 builder
                     .i32_const(IU256::HEAP_SIZE)
