@@ -1,6 +1,8 @@
 use crate::common::run_test;
 use crate::declare_fixture;
+use alloy_primitives::keccak256;
 use alloy_sol_types::{SolCall, SolType, SolValue, abi::TokenSeq, sol};
+use move_bytecode_to_wasm::error::RuntimeError;
 use move_test_runner::wasm_runner::RuntimeSandbox;
 use rstest::{fixture, rstest};
 
@@ -28,8 +30,6 @@ sol!(
 #[case(echoCall::new((255,)), (255,))]
 #[case(echo2Call::new((111, 222)), (222,))]
 #[case(sumCall::new((42, 42)), (84,))]
-#[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
-#[case(sumCall::new((255, 1)), ((),))]
 #[case(subCall::new((84, 42)), (42,))]
 #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
 #[case(subCall::new((42, 84)), ((),))]
@@ -46,6 +46,21 @@ fn test_uint_8<T: SolCall, V: SolValue>(
         expected_result.abi_encode(),
     )
     .unwrap();
+}
+
+#[rstest]
+#[case(sumCall::new((255, 1)))]
+fn test_uint_8_overflow<T: SolCall>(#[by_ref] runtime: &RuntimeSandbox, #[case] call_data: T) {
+    let (result, return_data) = runtime.call_entrypoint(call_data.abi_encode()).unwrap();
+    // Functions should return 1 in case of overflow
+    assert_eq!(result, 1_i32);
+    let error_message = String::from_utf8_lossy(RuntimeError::Overflow.as_bytes());
+    let expected_data = [
+        keccak256(b"Error(string)")[..4].to_vec(),
+        <sol!((string,))>::abi_encode_params(&(error_message,)),
+    ]
+    .concat();
+    assert_eq!(return_data, expected_data);
 }
 
 #[rstest]
@@ -107,12 +122,6 @@ fn test_uint_8_mod(
 #[case(u8::MAX, 1, u8::MAX as i32)]
 #[case(127, 2, 254)]
 #[case(21, 4, 84)]
-#[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
-#[case(u8::MAX, 2, -1)]
-#[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
-#[case(16, 16, -1)]
-#[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
-#[case(17, 17, -1)]
 fn test_uint_8_mul(
     #[by_ref] runtime: &RuntimeSandbox,
     #[case] n1: u8,
@@ -125,4 +134,23 @@ fn test_uint_8_mul(
         <(&i32,)>::abi_encode(&(&expected_result,)),
     )
     .unwrap();
+}
+
+#[rstest]
+#[case(u8::MAX, 2)]
+#[case(16, 16)]
+#[case(17, 17)]
+fn test_uint_8_mul_overflow(#[by_ref] runtime: &RuntimeSandbox, #[case] n1: u8, #[case] n2: u8) {
+    let (result, return_data) = runtime
+        .call_entrypoint(mulCall::new((n1, n2)).abi_encode())
+        .unwrap();
+    // Functions should return 1 in case of overflow
+    assert_eq!(result, 1_i32);
+    let error_message = String::from_utf8_lossy(RuntimeError::Overflow.as_bytes());
+    let expected_data = [
+        keccak256(b"Error(string)")[..4].to_vec(),
+        <sol!((string,))>::abi_encode_params(&(error_message,)),
+    ]
+    .concat();
+    assert_eq!(return_data, expected_data);
 }

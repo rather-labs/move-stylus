@@ -1,6 +1,9 @@
 use crate::common::run_test;
 use crate::declare_fixture;
+use alloy_primitives::keccak256;
+
 use alloy_sol_types::{SolCall, SolType, sol};
+use move_bytecode_to_wasm::error::RuntimeError;
 use move_test_runner::wasm_runner::RuntimeSandbox;
 use rstest::{fixture, rstest};
 
@@ -75,19 +78,11 @@ fn test_uint_64_and<T: SolCall>(
 #[case(shiftLeftCall::new((6463, 7)), 6463 << 7)]
 #[case(shiftLeftCall::new((6458, 0)), 6458)]
 #[case(shiftLeftCall::new((6458, 4)), 6458 << 4)]
-#[should_panic(expected = "wasm `unreachable` instruction executed")]
-#[case(shiftLeftCall::new((6400, 64)), 0)]
-#[should_panic(expected = "wasm `unreachable` instruction executed")]
-#[case(shiftLeftCall::new((6400, 100)), 0)]
 #[case(shiftRightCall::new((6464, 7)), 6464 >> 7)]
 #[case(shiftRightCall::new((6464, 1)), 6464 >> 1)]
 #[case(shiftRightCall::new((6463, 7)), 6463 >> 7)]
 #[case(shiftRightCall::new((6458, 0)), 6458)]
 #[case(shiftRightCall::new((6458, 4)), 6458 >> 4)]
-#[should_panic(expected = "wasm `unreachable` instruction executed")]
-#[case(shiftRightCall::new((6400, 64)), 0)]
-#[should_panic(expected = "wasm `unreachable` instruction executed")]
-#[case(shiftRightCall::new((6400, 100)), 0)]
 fn test_uint_64_shift<T: SolCall>(
     #[by_ref] runtime: &RuntimeSandbox,
     #[case] call_data: T,
@@ -95,4 +90,25 @@ fn test_uint_64_shift<T: SolCall>(
 ) {
     let expected_result = <sol!((uint64,))>::abi_encode(&(expected_result,));
     run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+}
+
+#[rstest]
+#[case(shiftLeftCall::new((6400, 64)))]
+#[case(shiftLeftCall::new((6400, 100)))]
+#[case(shiftRightCall::new((6400, 64)))]
+#[case(shiftRightCall::new((6400, 100)))]
+fn test_uint_64_shift_overflow<T: SolCall>(
+    #[by_ref] runtime: &RuntimeSandbox,
+    #[case] call_data: T,
+) {
+    let (result, return_data) = runtime.call_entrypoint(call_data.abi_encode()).unwrap();
+    // Functions should return 1 in case of overflow
+    assert_eq!(result, 1_i32);
+    let error_message = String::from_utf8_lossy(RuntimeError::Overflow.as_bytes());
+    let expected_data = [
+        keccak256(b"Error(string)")[..4].to_vec(),
+        <sol!((string,))>::abi_encode_params(&(error_message,)),
+    ]
+    .concat();
+    assert_eq!(return_data, expected_data);
 }
