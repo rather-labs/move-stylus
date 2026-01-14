@@ -4,10 +4,8 @@ use move_compiler::parser::ast::{Function, FunctionBody_, NameAccessChain_, Type
 use move_symbol_pool::Symbol;
 
 use crate::{
-    ExternalCallFunctionError, SpecialAttributeError,
-    error::SpecialAttributeErrorKind,
-    function_modifiers::{FunctionModifier, SolidityFunctionModifier},
-    shared::get_single_type_name,
+    ExternalCallFunctionError, SpecialAttributeError, error::SpecialAttributeErrorKind,
+    function_modifiers::SolidityFunctionModifier, shared::get_single_type_name,
 };
 
 const FN_RESULT_EMPTY_STRUCT_NAME: &str = "ContractCallEmptyResult";

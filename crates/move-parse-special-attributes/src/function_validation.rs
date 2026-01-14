@@ -13,7 +13,7 @@ use crate::{
 };
 
 use crate::ModuleId;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 #[derive(thiserror::Error, Debug)]
 pub enum FunctionValidationError {
     #[error("Function with Event type parameter must be a native emit function")]
@@ -358,4 +358,21 @@ pub fn check_storage_object_param(
     }
 
     Ok(())
+}
+
+pub fn check_repeated_storage_object_param(
+    processed_storage_objects: &mut HashSet<Symbol>,
+    identifier: Symbol,
+    identifier_loc: Loc,
+) -> Result<(), SpecialAttributeError> {
+    if processed_storage_objects.contains(&identifier) {
+        Err(SpecialAttributeError {
+            kind: SpecialAttributeErrorKind::RepeatedStorageObject(identifier),
+            line_of_code: identifier_loc,
+        })
+    } else {
+        // Add to processed storage objects
+        processed_storage_objects.insert(identifier);
+        Ok(())
+    }
 }

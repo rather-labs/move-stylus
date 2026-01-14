@@ -18,6 +18,7 @@ pub use event::Event;
 use event::EventParseError;
 pub use external_call::error::{ExternalCallFunctionError, ExternalCallStructError};
 pub use function_validation::FunctionValidationError;
+use function_validation::check_repeated_storage_object_param;
 use function_validation::check_storage_object_param;
 use move_symbol_pool::Symbol;
 pub use reserved_modules::{SF_ADDRESS, SF_RESERVED_STRUCTS};
@@ -348,6 +349,10 @@ pub fn process_special_attributes(
             for module_member in module.members {
                 match module_member {
                     ModuleMember::Function(ref f) => {
+                        // This hashset is used to detect repeated storage object identifiers when declaring
+                        // owned/shared/frozen objects
+                        let mut processed_storage_objects: HashSet<Symbol> = HashSet::new();
+
                         let visibility: Visibility = (&f.visibility).into();
                         let signature = Function::parse_signature(&f.signature);
 
@@ -395,6 +400,15 @@ pub fn process_special_attributes(
                                         // TODO: Check declared attributes exist
 
                                         for (owned_object_identifier, loc) in &owned_objects {
+                                            if let Err(e) = check_repeated_storage_object_param(
+                                                &mut processed_storage_objects,
+                                                *owned_object_identifier,
+                                                *loc,
+                                            ) {
+                                                found_error = true;
+                                                module_errors.push(e);
+                                            }
+
                                             if let Err(e) = check_storage_object_param(
                                                 &signature,
                                                 *owned_object_identifier,
@@ -417,6 +431,15 @@ pub fn process_special_attributes(
                                     }
                                     FunctionModifier::SharedObjects(shared_objects) => {
                                         for (shared_object_identifier, loc) in &shared_objects {
+                                            if let Err(e) = check_repeated_storage_object_param(
+                                                &mut processed_storage_objects,
+                                                *shared_object_identifier,
+                                                *loc,
+                                            ) {
+                                                found_error = true;
+                                                module_errors.push(e);
+                                            }
+
                                             if let Err(e) = check_storage_object_param(
                                                 &signature,
                                                 *shared_object_identifier,
@@ -439,6 +462,15 @@ pub fn process_special_attributes(
                                     }
                                     FunctionModifier::FrozenObjects(frozen_objects) => {
                                         for (frozen_object_identifier, loc) in &frozen_objects {
+                                            if let Err(e) = check_repeated_storage_object_param(
+                                                &mut processed_storage_objects,
+                                                *frozen_object_identifier,
+                                                *loc,
+                                            ) {
+                                                found_error = true;
+                                                module_errors.push(e);
+                                            }
+
                                             if let Err(e) = check_storage_object_param(
                                                 &signature,
                                                 *frozen_object_identifier,

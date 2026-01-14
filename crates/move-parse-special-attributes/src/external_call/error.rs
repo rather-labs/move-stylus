@@ -1,5 +1,7 @@
 use move_compiler::diagnostics::codes::{DiagnosticInfo, Severity, custom};
 
+use crate::error::DIAGNOSTIC_CATEGORY;
+
 // TODO: Change string for symbols
 #[derive(thiserror::Error, Debug)]
 pub enum ExternalCallFunctionError {
@@ -20,7 +22,7 @@ pub enum ExternalCallFunctionError {
 impl From<&ExternalCallFunctionError> for DiagnosticInfo {
     fn from(value: &ExternalCallFunctionError) -> Self {
         custom(
-            "",
+            DIAGNOSTIC_CATEGORY,
             Severity::BlockingError,
             3,
             1,
@@ -53,7 +55,7 @@ pub enum ExternalCallStructError {
 impl From<&ExternalCallStructError> for DiagnosticInfo {
     fn from(value: &ExternalCallStructError) -> Self {
         custom(
-            "External call struct error",
+            DIAGNOSTIC_CATEGORY,
             Severity::BlockingError,
             2,
             2,

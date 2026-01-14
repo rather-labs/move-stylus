@@ -21,6 +21,8 @@ use crate::{
     struct_validation::StructValidationError,
 };
 
+pub const DIAGNOSTIC_CATEGORY: &str = "Stylus ";
+
 #[derive(thiserror::Error, Debug)]
 pub enum SpecialAttributeErrorKind {
     #[error("Abi error: {0}")]
@@ -64,6 +66,9 @@ pub enum SpecialAttributeErrorKind {
     #[error("Unsupported attribute for solidity function modifier: {0}")]
     UnsupportedAttributeForSolidityFunctionModifier(Symbol),
 
+    #[error("Storage object '{0}' is declared multiple times")]
+    RepeatedStorageObject(Symbol),
+
     #[error("Test function is marked as expected failure but it is not #[test].")]
     ExpectedFailureWithoutTest,
 }
@@ -92,42 +97,42 @@ impl From<&SpecialAttributeError> for Diagnostic {
             SpecialAttributeErrorKind::FunctionValidation(e) => e.into(),
             SpecialAttributeErrorKind::StructValidation(e) => e.into(),
             SpecialAttributeErrorKind::ExpectedFailureWithoutTest => custom(
-                "Function attribute error",
+                DIAGNOSTIC_CATEGORY,
                 Severity::BlockingError,
                 3,
                 3,
                 Box::leak(value.to_string().into_boxed_str()),
             ),
             SpecialAttributeErrorKind::TooManyAttributes => custom(
-                "Special attributes error",
+                DIAGNOSTIC_CATEGORY,
                 Severity::BlockingError,
                 3,
                 3,
                 Box::leak(value.to_string().into_boxed_str()),
             ),
             SpecialAttributeErrorKind::FrameworkReservedStruct(_, _) => custom(
-                "Struct validation error",
+                DIAGNOSTIC_CATEGORY,
                 Severity::BlockingError,
                 3,
                 3,
                 Box::leak(value.to_string().into_boxed_str()),
             ),
             SpecialAttributeErrorKind::NamedAddressNotFound(_) => custom(
-                "Address resolution error",
+                DIAGNOSTIC_CATEGORY,
                 Severity::BlockingError,
                 3,
                 3,
                 Box::leak(value.to_string().into_boxed_str()),
             ),
             SpecialAttributeErrorKind::UnsupportedAttributeForIdentifiers(_) => custom(
-                "Function attribute error",
+                DIAGNOSTIC_CATEGORY,
                 Severity::BlockingError,
                 3,
                 3,
                 Box::leak(value.to_string().into_boxed_str()),
             ),
             SpecialAttributeErrorKind::UnsupportedSolidityFunctionModifier(_) => custom(
-                "Function attribute error",
+                DIAGNOSTIC_CATEGORY,
                 Severity::BlockingError,
                 3,
                 3,
@@ -135,13 +140,20 @@ impl From<&SpecialAttributeError> for Diagnostic {
             ),
             SpecialAttributeErrorKind::UnsupportedAttributeForSolidityFunctionModifier(_) => {
                 custom(
-                    "Function attribute error",
+                    DIAGNOSTIC_CATEGORY,
                     Severity::BlockingError,
                     3,
                     3,
                     Box::leak(value.to_string().into_boxed_str()),
                 )
             }
+            SpecialAttributeErrorKind::RepeatedStorageObject(_) => custom(
+                DIAGNOSTIC_CATEGORY,
+                Severity::BlockingError,
+                3,
+                3,
+                Box::leak(value.to_string().into_boxed_str()),
+            ),
         };
 
         diag!(diagnostic_info, (value.line_of_code, "".to_string()))
