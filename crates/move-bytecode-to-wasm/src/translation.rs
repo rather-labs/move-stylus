@@ -1838,12 +1838,24 @@ fn translate_instruction(
         }
         Bytecode::CastU8 => {
             let original_type = types_stack.pop()?;
-            IU8::cast_from(builder, module, original_type, compilation_ctx)?;
+            IU8::cast_from(
+                builder,
+                module,
+                original_type,
+                compilation_ctx,
+                runtime_error_data,
+            )?;
             types_stack.push(IntermediateType::IU8);
         }
         Bytecode::CastU16 => {
             let original_type = types_stack.pop()?;
-            IU16::cast_from(builder, module, original_type, compilation_ctx)?;
+            IU16::cast_from(
+                builder,
+                module,
+                original_type,
+                compilation_ctx,
+                runtime_error_data,
+            )?;
             types_stack.push(IntermediateType::IU16);
         }
         Bytecode::CastU32 => {
@@ -1877,8 +1889,12 @@ fn translate_instruction(
             }
 
             match t1 {
-                IntermediateType::IU8 => IU8::add(builder, module)?,
-                IntermediateType::IU16 => IU16::add(builder, module)?,
+                IntermediateType::IU8 => {
+                    IU8::add(builder, module, compilation_ctx, runtime_error_data)?
+                }
+                IntermediateType::IU16 => {
+                    IU16::add(builder, module, compilation_ctx, runtime_error_data)?
+                }
                 IntermediateType::IU32 => IU32::add(builder, module)?,
                 IntermediateType::IU64 => IU64::add(builder, module)?,
                 IntermediateType::IU128 => IU128::add(builder, module, compilation_ctx)?,
@@ -1927,8 +1943,12 @@ fn translate_instruction(
             }
 
             match t1 {
-                IntermediateType::IU8 => IU8::mul(builder, module)?,
-                IntermediateType::IU16 => IU16::mul(builder, module)?,
+                IntermediateType::IU8 => {
+                    IU8::mul(builder, module, compilation_ctx, runtime_error_data)?
+                }
+                IntermediateType::IU16 => {
+                    IU16::mul(builder, module, compilation_ctx, runtime_error_data)?
+                }
                 IntermediateType::IU32 => IU32::mul(builder, module)?,
                 IntermediateType::IU64 => IU64::mul(builder, module)?,
                 IntermediateType::IU128 => IU128::mul(builder, module, compilation_ctx)?,
@@ -2350,12 +2370,24 @@ fn translate_instruction(
             types_stack.pop_expecting(&IntermediateType::IU8)?;
             let t = types_stack.pop()?;
             match t {
-                IntermediateType::IU8 => IU8::bit_shift_left(builder, module)?,
-                IntermediateType::IU16 => IU16::bit_shift_left(builder, module)?,
-                IntermediateType::IU32 => IU32::bit_shift_left(builder, module)?,
-                IntermediateType::IU64 => IU64::bit_shift_left(builder, module)?,
-                IntermediateType::IU128 => IU128::bit_shift_left(builder, module, compilation_ctx)?,
-                IntermediateType::IU256 => IU256::bit_shift_left(builder, module, compilation_ctx)?,
+                IntermediateType::IU8 => {
+                    IU8::bit_shift_left(builder, module, compilation_ctx, runtime_error_data)?
+                }
+                IntermediateType::IU16 => {
+                    IU16::bit_shift_left(builder, module, compilation_ctx, runtime_error_data)?
+                }
+                IntermediateType::IU32 => {
+                    IU32::bit_shift_left(builder, module, compilation_ctx, runtime_error_data)?
+                }
+                IntermediateType::IU64 => {
+                    IU64::bit_shift_left(builder, module, compilation_ctx, runtime_error_data)?
+                }
+                IntermediateType::IU128 => {
+                    IU128::bit_shift_left(builder, module, compilation_ctx, runtime_error_data)?
+                }
+                IntermediateType::IU256 => {
+                    IU256::bit_shift_left(builder, module, compilation_ctx, runtime_error_data)?
+                }
                 _ => Err(TranslationError::InvalidOperation {
                     operation: Bytecode::Shl,
                     operand_type: t.clone(),
@@ -2367,15 +2399,23 @@ fn translate_instruction(
             types_stack.pop_expecting(&IntermediateType::IU8)?;
             let t = types_stack.pop()?;
             match t {
-                IntermediateType::IU8 => IU8::bit_shift_right(builder, module)?,
-                IntermediateType::IU16 => IU16::bit_shift_right(builder, module)?,
-                IntermediateType::IU32 => IU32::bit_shift_right(builder, module)?,
-                IntermediateType::IU64 => IU64::bit_shift_right(builder, module)?,
+                IntermediateType::IU8 => {
+                    IU8::bit_shift_right(builder, module, compilation_ctx, runtime_error_data)?
+                }
+                IntermediateType::IU16 => {
+                    IU16::bit_shift_right(builder, module, compilation_ctx, runtime_error_data)?
+                }
+                IntermediateType::IU32 => {
+                    IU32::bit_shift_right(builder, module, compilation_ctx, runtime_error_data)?
+                }
+                IntermediateType::IU64 => {
+                    IU64::bit_shift_right(builder, module, compilation_ctx, runtime_error_data)?
+                }
                 IntermediateType::IU128 => {
-                    IU128::bit_shift_right(builder, module, compilation_ctx)?
+                    IU128::bit_shift_right(builder, module, compilation_ctx, runtime_error_data)?
                 }
                 IntermediateType::IU256 => {
-                    IU256::bit_shift_right(builder, module, compilation_ctx)?
+                    IU256::bit_shift_right(builder, module, compilation_ctx, runtime_error_data)?
                 }
                 _ => Err(TranslationError::InvalidOperation {
                     operation: Bytecode::Shr,

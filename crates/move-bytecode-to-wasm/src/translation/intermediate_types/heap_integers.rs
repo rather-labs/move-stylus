@@ -3,7 +3,7 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
-use crate::{CompilationContext, runtime::RuntimeFunction};
+use crate::{CompilationContext, data::RuntimeErrorData, runtime::RuntimeFunction};
 
 use super::{IntermediateType, error::IntermediateTypeError};
 
@@ -283,9 +283,13 @@ impl IU128 {
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
+        runtime_error_data: &mut RuntimeErrorData,
     ) -> Result<(), IntermediateTypeError> {
-        let shift_left_function_id =
-            RuntimeFunction::HeapIntShiftLeft.get(module, Some(compilation_ctx), None)?;
+        let shift_left_function_id = RuntimeFunction::HeapIntShiftLeft.get(
+            module,
+            Some(compilation_ctx),
+            Some(runtime_error_data),
+        )?;
         builder
             .i32_const(Self::HEAP_SIZE)
             .call(shift_left_function_id);
@@ -297,9 +301,13 @@ impl IU128 {
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
+        runtime_error_data: &mut RuntimeErrorData,
     ) -> Result<(), IntermediateTypeError> {
-        let shift_right_function_id =
-            RuntimeFunction::HeapIntShiftRight.get(module, Some(compilation_ctx), None)?;
+        let shift_right_function_id = RuntimeFunction::HeapIntShiftRight.get(
+            module,
+            Some(compilation_ctx),
+            Some(runtime_error_data),
+        )?;
         builder
             .i32_const(Self::HEAP_SIZE)
             .call(shift_right_function_id);
@@ -580,9 +588,13 @@ impl IU256 {
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
+        runtime_error_data: &mut RuntimeErrorData,
     ) -> Result<(), IntermediateTypeError> {
-        let shift_left_function_id =
-            RuntimeFunction::HeapIntShiftLeft.get(module, Some(compilation_ctx), None)?;
+        let shift_left_function_id = RuntimeFunction::HeapIntShiftLeft.get(
+            module,
+            Some(compilation_ctx),
+            Some(runtime_error_data),
+        )?;
         builder
             .i32_const(Self::HEAP_SIZE)
             .call(shift_left_function_id);
@@ -594,9 +606,13 @@ impl IU256 {
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
+        runtime_error_data: &mut RuntimeErrorData,
     ) -> Result<(), IntermediateTypeError> {
-        let shift_right_function_id =
-            RuntimeFunction::HeapIntShiftRight.get(module, Some(compilation_ctx), None)?;
+        let shift_right_function_id = RuntimeFunction::HeapIntShiftRight.get(
+            module,
+            Some(compilation_ctx),
+            Some(runtime_error_data),
+        )?;
         builder
             .i32_const(Self::HEAP_SIZE)
             .call(shift_right_function_id);
