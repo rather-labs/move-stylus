@@ -7,7 +7,7 @@ use move_symbol_pool::Symbol;
 
 use crate::{
     AbiError, Event, Struct_,
-    error::{SpecialAttributeError, SpecialAttributeErrorKind},
+    error::{DIAGNOSTIC_CATEGORY, SpecialAttributeError, SpecialAttributeErrorKind},
     function_modifiers::Signature,
     types::Type,
 };
@@ -52,7 +52,7 @@ pub enum FunctionValidationError {
 impl From<&FunctionValidationError> for DiagnosticInfo {
     fn from(value: &FunctionValidationError) -> Self {
         custom(
-            "Function validation error",
+            DIAGNOSTIC_CATEGORY,
             Severity::BlockingError,
             3,
             3,

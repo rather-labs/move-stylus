@@ -1,6 +1,8 @@
 use move_compiler::diagnostics::codes::{DiagnosticInfo, Severity, custom};
 use move_symbol_pool::Symbol;
 
+use crate::error::DIAGNOSTIC_CATEGORY;
+
 #[derive(Debug)]
 /// This struct represents the properties of a event struct.
 pub struct Event {
@@ -42,7 +44,7 @@ pub enum EventParseError {
 impl From<&EventParseError> for DiagnosticInfo {
     fn from(value: &EventParseError) -> Self {
         custom(
-            "Event struct error",
+            DIAGNOSTIC_CATEGORY,
             Severity::BlockingError,
             3,
             3,
