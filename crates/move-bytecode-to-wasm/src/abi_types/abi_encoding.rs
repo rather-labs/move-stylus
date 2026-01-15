@@ -5,8 +5,8 @@ use crate::{
     CompilationContext,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
     vm_handled_types::{
-        VmHandledType, bytes::Bytes, named_id::NamedId, string::String_, tx_context::TxContext,
-        uid::Uid,
+        VmHandledType, bytes::Bytes, id::Id, named_id::NamedId, string::String_,
+        tx_context::TxContext, uid::Uid,
     },
 };
 
@@ -89,7 +89,9 @@ fn solidity_name(
         }
         IntermediateType::IStruct {
             module_id, index, ..
-        } if Uid::is_vm_type(module_id, *index, compilation_ctx)? => {
+        } if Uid::is_vm_type(module_id, *index, compilation_ctx)?
+            || Id::is_vm_type(module_id, *index, compilation_ctx)? =>
+        {
             Some(sol_data::FixedBytes::<32>::SOL_NAME.to_string())
         }
         IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {

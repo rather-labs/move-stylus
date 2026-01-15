@@ -13,7 +13,7 @@ use move_symbol_pool::Symbol;
 use crate::{
     ErrorStruct, EventStruct,
     common::snake_to_camel,
-    special_types::{is_named_id, is_string, is_uid},
+    special_types::{is_id, is_named_id, is_string, is_uid},
     types::Type,
 };
 
@@ -653,6 +653,7 @@ impl Abi {
                 // True if the struct is not a named_id, uid or string
                 !is_named_id(&struct_.identifier, module_id)
                     && !is_uid(&struct_.identifier, module_id)
+                    && !is_id(&struct_.identifier, module_id)
                     && !is_string(&struct_.identifier, module_id)
             }
             _ => false,
