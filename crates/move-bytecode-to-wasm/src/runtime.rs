@@ -329,14 +329,14 @@ impl RuntimeFunction {
                     vector::allocate_vector_with_header_function(module, ctx)
                 }
                 // Storage
-                (Self::StorageNextSlot, Some(ctx), _) => {
-                    storage::storage_next_slot_function(module, ctx)?
+                (Self::StorageNextSlot, Some(ctx), Some(runtime_error_data)) => {
+                    storage::storage_next_slot_function(module, ctx, runtime_error_data)?
                 }
                 (Self::DeriveMappingSlot, Some(ctx), _) => {
                     storage::derive_mapping_slot(module, ctx)
                 }
-                (Self::DeriveDynArraySlot, Some(ctx), _) => {
-                    storage::derive_dyn_array_slot(module, ctx)?
+                (Self::DeriveDynArraySlot, Some(ctx), Some(runtime_error_data)) => {
+                    storage::derive_dyn_array_slot(module, ctx, runtime_error_data)?
                 }
                 (Self::WriteObjectSlot, Some(ctx), _) => storage::write_object_slot(module, ctx)?,
                 (Self::LocateStorageData, Some(ctx), Some(runtime_error_data)) => {
@@ -345,14 +345,14 @@ impl RuntimeFunction {
                 (Self::LocateStructSlot, Some(ctx), _) => storage::locate_struct_slot(module, ctx)?,
                 (Self::GetIdBytesPtr, Some(ctx), _) => storage::get_id_bytes_ptr(module, ctx),
                 (Self::GetStructOwner, None, _) => storage::get_struct_owner_fn(module),
-                (Self::AccumulateOrAdvanceSlotDelete, Some(ctx), _) => {
-                    storage::accumulate_or_advance_slot_delete(module, ctx)?
+                (Self::AccumulateOrAdvanceSlotDelete, Some(ctx), Some(runtime_error_data)) => {
+                    storage::accumulate_or_advance_slot_delete(module, ctx, runtime_error_data)?
                 }
-                (Self::AccumulateOrAdvanceSlotRead, Some(ctx), _) => {
-                    storage::accumulate_or_advance_slot_read(module, ctx)?
+                (Self::AccumulateOrAdvanceSlotRead, Some(ctx), Some(runtime_error_data)) => {
+                    storage::accumulate_or_advance_slot_read(module, ctx, runtime_error_data)?
                 }
-                (Self::AccumulateOrAdvanceSlotWrite, Some(ctx), _) => {
-                    storage::accumulate_or_advance_slot_write(module, ctx)?
+                (Self::AccumulateOrAdvanceSlotWrite, Some(ctx), Some(runtime_error_data)) => {
+                    storage::accumulate_or_advance_slot_write(module, ctx, runtime_error_data)?
                 }
                 // ASCII conversion
                 (Self::U64ToAsciiBase10, Some(ctx), _) => {

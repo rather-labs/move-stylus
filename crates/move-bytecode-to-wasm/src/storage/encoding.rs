@@ -57,8 +57,11 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
     // Runtime functions
     let get_struct_id_fn =
         RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx), None)?;
-    let accumulate_or_advance_slot_write_fn =
-        RuntimeFunction::AccumulateOrAdvanceSlotWrite.get(module, Some(compilation_ctx), None)?;
+    let accumulate_or_advance_slot_write_fn = RuntimeFunction::AccumulateOrAdvanceSlotWrite.get(
+        module,
+        Some(compilation_ctx),
+        Some(runtime_error_data),
+    )?;
 
     // Get the IStruct representation
     let struct_ = compilation_ctx.get_struct_by_intermediate_type(itype)?;
@@ -177,10 +180,17 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
     let (storage_cache, _) = storage_cache_bytes32(module);
 
     // Runtime functions
-    let accumulate_or_advance_slot_write_fn =
-        RuntimeFunction::AccumulateOrAdvanceSlotWrite.get(module, Some(compilation_ctx), None)?;
+    let accumulate_or_advance_slot_write_fn = RuntimeFunction::AccumulateOrAdvanceSlotWrite.get(
+        module,
+        Some(compilation_ctx),
+        Some(runtime_error_data),
+    )?;
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx), None)?;
-    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx), None)?;
+    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(
+        module,
+        Some(compilation_ctx),
+        Some(runtime_error_data),
+    )?;
     let compute_enum_storage_tail_position_fn = RuntimeFunction::ComputeEnumStorageTailPosition
         .get_generic(module, compilation_ctx, Some(runtime_error_data), &[itype])?;
 
@@ -411,10 +421,16 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
 
     // Runtime functions
     let swap_fn = RuntimeFunction::SwapI32Bytes.get(module, None, None)?;
-    let derive_dyn_array_slot_fn =
-        RuntimeFunction::DeriveDynArraySlot.get(module, Some(compilation_ctx), None)?;
-    let accumulate_or_advance_slot_write_fn =
-        RuntimeFunction::AccumulateOrAdvanceSlotWrite.get(module, Some(compilation_ctx), None)?;
+    let derive_dyn_array_slot_fn = RuntimeFunction::DeriveDynArraySlot.get(
+        module,
+        Some(compilation_ctx),
+        Some(runtime_error_data),
+    )?;
+    let accumulate_or_advance_slot_write_fn = RuntimeFunction::AccumulateOrAdvanceSlotWrite.get(
+        module,
+        Some(compilation_ctx),
+        Some(runtime_error_data),
+    )?;
 
     // Locals
     let elem_slot_ptr = module.locals.add(ValType::I32);

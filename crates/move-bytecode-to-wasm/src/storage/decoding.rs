@@ -50,8 +50,11 @@ pub fn add_read_and_decode_storage_struct_instructions(
     let (storage_load, _) = storage_load_bytes32(module);
 
     // Runtime functions
-    let accumulate_or_advance_slot_read_fn =
-        RuntimeFunction::AccumulateOrAdvanceSlotRead.get(module, Some(compilation_ctx), None)?;
+    let accumulate_or_advance_slot_read_fn = RuntimeFunction::AccumulateOrAdvanceSlotRead.get(
+        module,
+        Some(compilation_ctx),
+        Some(runtime_error_data),
+    )?;
 
     // Get the IStruct representation
     let struct_ = compilation_ctx.get_struct_by_intermediate_type(itype)?;
@@ -250,8 +253,11 @@ pub fn add_read_and_decode_storage_enum_instructions(
     itype: &IntermediateType,
 ) -> Result<LocalId, StorageError> {
     // Runtime functions
-    let accumulate_or_advance_slot_read_fn =
-        RuntimeFunction::AccumulateOrAdvanceSlotRead.get(module, Some(compilation_ctx), None)?;
+    let accumulate_or_advance_slot_read_fn = RuntimeFunction::AccumulateOrAdvanceSlotRead.get(
+        module,
+        Some(compilation_ctx),
+        Some(runtime_error_data),
+    )?;
     let compute_enum_storage_tail_position_fn = RuntimeFunction::ComputeEnumStorageTailPosition
         .get_generic(module, compilation_ctx, Some(runtime_error_data), &[itype])?;
 
@@ -415,8 +421,11 @@ pub fn add_read_and_decode_storage_vector_instructions(
 
     // Runtime functions
     let swap_fn = RuntimeFunction::SwapI32Bytes.get(module, None, None)?;
-    let accumulate_or_advance_slot_read_fn =
-        RuntimeFunction::AccumulateOrAdvanceSlotRead.get(module, Some(compilation_ctx), None)?;
+    let accumulate_or_advance_slot_read_fn = RuntimeFunction::AccumulateOrAdvanceSlotRead.get(
+        module,
+        Some(compilation_ctx),
+        Some(runtime_error_data),
+    )?;
 
     // Locals
     let len = module.locals.add(ValType::I32);
