@@ -32,16 +32,22 @@ impl Test {
 
         let build_directory = get_build_directory(&rerooted_path, &package, &install_dir);
 
-        if let Err(compilation_error) =
-            translate_package_cli(&package, &rerooted_path, install_dir, false, verbose, false)
-        {
+        if let Err(compilation_error) = translate_package_cli(
+            &package,
+            &rerooted_path,
+            install_dir,
+            false,
+            verbose,
+            false,
+            true,
+        ) {
             print_error_diagnostic(*compilation_error)
         }
 
         let root_compiled_units: Vec<&CompiledUnitWithSource> =
             package.root_compiled_units.iter().collect();
 
-        let package_modules = package_module_data(&package, &root_compiled_units, verbose)
+        let package_modules = package_module_data(&package, &root_compiled_units, verbose, true)
             .map_err(print_error_diagnostic)?;
 
         let mut test_failed = false;

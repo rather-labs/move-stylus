@@ -186,18 +186,19 @@ pub fn translate_test_package(path: &'static str, module_name: &str) -> Arc<Vec<
     let package: &'static CompiledPackage = Box::leak(Box::new(package));
 
     // println!("Translating package at path: {}", rerooted_path.display());
-    let compiled_modules = match translate_package(package, None, &mut dependencies_cache, false) {
-        Ok(modules) => modules,
-        Err(err) => {
-            drop(cache);
-            drop(dependencies_cache);
-            panic!(
-                "Failed to translate package at path: {}\nError: {:?}",
-                rerooted_path.display(),
-                err
-            );
-        }
-    };
+    let compiled_modules =
+        match translate_package(package, None, &mut dependencies_cache, false, true) {
+            Ok(modules) => modules,
+            Err(err) => {
+                drop(cache);
+                drop(dependencies_cache);
+                panic!(
+                    "Failed to translate package at path: {}\nError: {:?}",
+                    rerooted_path.display(),
+                    err
+                );
+            }
+        };
 
     for (module_name, mut module) in compiled_modules.into_iter() {
         // println!("CACHE INSERT for {}::{}", path, module_name);

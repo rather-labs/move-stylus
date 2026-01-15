@@ -49,8 +49,13 @@ pub fn translate_single_module<'move_compiled_package>(
     module_name: &str,
     modules_data: &mut HashMap<ModuleId, ModuleData<'move_compiled_package>>,
 ) -> Result<Module, CompilationError> {
-    let mut modules =
-        translate_package(package, Some(module_name.to_string()), modules_data, false)?;
+    let mut modules = translate_package(
+        package,
+        Some(module_name.to_string()),
+        modules_data,
+        false,
+        true,
+    )?;
 
     Ok(modules
         .remove(module_name)
@@ -62,6 +67,7 @@ pub fn translate_package<'move_package>(
     module_name: Option<String>,
     modules_data: &mut HashMap<ModuleId, ModuleData<'move_package>>,
     verbose: bool,
+    test_mode: bool,
 ) -> Result<HashMap<String, Module>, CompilationError> {
     // HashMap of package name to address
     // This includes all the dependencies of the root package
@@ -130,6 +136,7 @@ pub fn translate_package<'move_package>(
             &root_compiled_module_unit.immediate_dependencies(),
             &address_alias_instantiation,
             verbose,
+            test_mode,
         ) {
             match dependencies_errors {
                 DependencyProcessingError::ICE(ice_error) => {
@@ -165,6 +172,7 @@ pub fn translate_package<'move_package>(
             &package.deps_compiled_units,
             &root_compiled_units,
             special_attributes,
+            test_mode,
         )?;
 
         let calldata_reader_pointer_global =
@@ -251,6 +259,7 @@ pub fn package_module_data<'move_package>(
     package: &'move_package CompiledPackage,
     root_compiled_units: &'move_package [&CompiledUnitWithSource],
     verbose: bool,
+    test_mode: bool,
 ) -> Result<PackageModuleData<'move_package>, CompilationError> {
     // HashMap of package name to address
     let address_alias_instantiation: HashMap<Symbol, [u8; 32]> = package
@@ -279,6 +288,7 @@ pub fn package_module_data<'move_package>(
             &root_compiled_module_unit.immediate_dependencies(),
             &address_alias_instantiation,
             verbose,
+            test_mode,
         ) {
             match dependencies_errors {
                 DependencyProcessingError::ICE(ice_error) => {
@@ -314,6 +324,7 @@ pub fn package_module_data<'move_package>(
             &package.deps_compiled_units,
             root_compiled_units,
             special_attributes,
+            test_mode,
         )?;
 
         modules_data.insert(root_module_id, root_module_data);
@@ -343,6 +354,7 @@ pub fn process_dependency_tree<'move_package>(
     dependencies: &[move_core_types::language_storage::ModuleId],
     address_alias_instantiation: &HashMap<Symbol, [u8; 32]>,
     verbose: bool,
+    test_mode: bool,
 ) -> Result<(), DependencyProcessingError> {
     let mut errors = Vec::new();
     for dependency in dependencies {
@@ -381,6 +393,7 @@ pub fn process_dependency_tree<'move_package>(
                 immediate_dependencies,
                 address_alias_instantiation,
                 verbose,
+                test_mode,
             )
         } else {
             Ok(())
@@ -421,6 +434,7 @@ pub fn process_dependency_tree<'move_package>(
             deps_compiled_units,
             root_compiled_units,
             special_attributes,
+            test_mode,
         )
         .map_err(|e| {
             DependencyProcessingError::ICE(ICEError::new(ICEErrorKind::CompilationContext(e)))
