@@ -236,12 +236,24 @@ impl RuntimeFunction {
         } else {
             let function_id = match (self, compilation_ctx, runtime_error_data) {
                 // Integers
-                (Self::HeapIntSum, Some(ctx), _) => integers::add::heap_integers_add(module, ctx),
-                (Self::HeapIntSub, Some(ctx), _) => integers::sub::heap_integers_sub(module, ctx),
-                (Self::AddU32, _, _) => integers::add::add_u32(module),
-                (Self::AddU64, _, _) => integers::add::add_u64(module),
-                (Self::SubU32, _, _) => integers::sub::sub_u32(module),
-                (Self::SubU64, _, _) => integers::sub::sub_u64(module),
+                (Self::HeapIntSum, Some(ctx), Some(runtime_error_data)) => {
+                    integers::add::heap_integers_add(module, ctx, runtime_error_data)
+                }
+                (Self::HeapIntSub, Some(ctx), Some(runtime_error_data)) => {
+                    integers::sub::heap_integers_sub(module, ctx, runtime_error_data)
+                }
+                (Self::AddU32, Some(ctx), Some(runtime_error_data)) => {
+                    integers::add::add_u32(module, ctx, runtime_error_data)
+                }
+                (Self::AddU64, Some(ctx), Some(runtime_error_data)) => {
+                    integers::add::add_u64(module, ctx, runtime_error_data)
+                }
+                (Self::SubU32, Some(ctx), Some(runtime_error_data)) => {
+                    integers::sub::sub_u32(module, ctx, runtime_error_data)
+                }
+                (Self::SubU64, Some(ctx), Some(runtime_error_data)) => {
+                    integers::sub::sub_u64(module, ctx, runtime_error_data)
+                }
                 (Self::CheckOverflowU8U16, Some(compilation_ctx), Some(runtime_error_data)) => {
                     integers::check_overflow_u8_u16(module, compilation_ctx, runtime_error_data)
                 }
