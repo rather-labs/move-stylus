@@ -272,7 +272,7 @@ sol!(
         0xff,
         address!("0xcafecafecafecafecafecafecafecafecafecafe"),
     )), vec![
-        U256::from_str_radix("000000000000000000000000000000000000000000000000befe6eaf1b07b760", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000000000da3b039f3b767d4d", 16).unwrap().to_be_bytes(),
         [0xaa; 32],
         U256::from_str_radix("ffeeeeddddddddccccccccccccccccbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
@@ -298,7 +298,7 @@ sol!(
         6,
         address!("0xcafecafecafecafecafecafecafecafecafecafe"),
     )), vec![
-        U256::from_str_radix("000000000000000000000000000000000000000000000000befe6eaf1b07b760", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000000000da3b039f3b767d4d", 16).unwrap().to_be_bytes(),
         U256::from(1).to_be_bytes(),
         U256::from_str_radix("06000500000004000000000000000300000000000000000000000000000002", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
@@ -322,7 +322,7 @@ sol!(
         0xeeee,
         0xff,
     )), vec![
-        U256::from_str_radix("000000cafecafecafecafecafecafecafecafecafecafeff8302f0af284e5ac4", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000cafecafecafecafecafecafecafecafecafecafeffb9818d466d119af7", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000000000000000000000ffeeeecccccccccccccccc", 16).unwrap().to_be_bytes(),
     ],
         readStaticFields2Call::new((U256::from_le_bytes(hex!("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb")),)),
@@ -342,7 +342,7 @@ sol!(
         3,
         4,
     )), vec![
-        U256::from_str_radix("000000cafecafecafecafecafecafecafecafecafecafe018302f0af284e5ac4", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000cafecafecafecafecafecafecafecafecafecafe01b9818d466d119af7", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000400030000000000000002", 16).unwrap().to_be_bytes(),
     ],
         readStaticFields2Call::new((U256::from_le_bytes(hex!("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb")),)),
@@ -361,7 +361,7 @@ sol!(
         2,
         address!("0xbeefbeefbeefbeefbeefbeefbeefbeefbeefbeef"),
     )), vec![
-        U256::from_str_radix("000000cafecafecafecafecafecafecafecafecafecafe01b3f6054d24105600", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000cafecafecafecafecafecafecafecafecafecafe01aba4dab37080822a", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("00000000beefbeefbeefbeefbeefbeefbeefbeefbeefbeef0000000000000002", 16).unwrap().to_be_bytes(),
     ],
         readStaticFields3Call::new((U256::from_le_bytes(hex!("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb")),)),
@@ -379,7 +379,7 @@ sol!(
         0xcccccccccccccccc,
         address!("0xbeefbeefbeefbeefbeefbeefbeefbeefbeefbeef"),
     )), vec![
-        U256::from_str_radix("000000cafecafecafecafecafecafecafecafecafecafeffb3f6054d24105600", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000cafecafecafecafecafecafecafecafecafecafeffaba4dab37080822a", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("00000000beefbeefbeefbeefbeefbeefbeefbeefbeefbeefcccccccccccccccc", 16).unwrap().to_be_bytes(),
     ],
         readStaticFields3Call::new((U256::from_le_bytes(hex!("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb")),)),
@@ -399,7 +399,7 @@ sol!(
         3,
         4
     )), vec![
-        U256::from_str_radix("000000000000000000000000000002010000000000000001ab422efcbfadd563", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000020100000000000000012d7ba8bfbb75aa1b", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000400000000000000000000000000000003", 16).unwrap().to_be_bytes(),
     ],
@@ -424,7 +424,7 @@ sol!(
         0xcccccccccccccccccccccccccccccccc,
         0xdddddddd,
     )), vec![
-        U256::from_str_radix("00000000000000bbbbbbbbbbbbbbbb01aaaaaaaaaaaaaaaaab422efcbfadd563", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000000000bbbbbbbbbbbbbbbb01aaaaaaaaaaaaaaaa2d7ba8bfbb75aa1b", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000ddddddddcccccccccccccccccccccccccccccccc", 16).unwrap().to_be_bytes(),
     ],
@@ -492,7 +492,7 @@ fn test_static_fields<T: SolCall, U: SolCall, V: SolValue>(
 
     ],
     vec![
-        U256::from_str_radix("00000000000000000000000000000000000000010000002e83f4d1b6a8351bb2", 16).unwrap().to_be_bytes(), // type hash + u32 + bool
+        U256::from_str_radix("00000000000000000000000000000000000000010000002e8b51f1c0eaf0a4e3", 16).unwrap().to_be_bytes(), // type hash + u32 + bool
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000005", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000000000000000000000000030000000000000002f", 16).unwrap().to_be_bytes(),
@@ -534,7 +534,7 @@ fn test_static_fields<T: SolCall, U: SolCall, V: SolValue>(
         U256::from_str_radix("405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5acf", 16).unwrap().to_be_bytes(),
     ],
     vec![
-        U256::from_str_radix("0000000000000000000000000000000000000001ffffffff83f4d1b6a8351bb2", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000001ffffffff8b51f1c0eaf0a4e3", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000000", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("00000000000000000000000000000000000000000000030ffffffffffffffff", 16).unwrap().to_be_bytes(),
@@ -588,7 +588,7 @@ fn test_static_fields<T: SolCall, U: SolCall, V: SolValue>(
         U256::from_str_radix("f3f7a9fe364faab93b216da50a3214154f22a0a2b415b23a84c8169e8b636ee4", 16).unwrap().to_be_bytes(), // address vec, elem slot #2
     ],
     vec![
-        U256::from_str_radix("000000000000000000000000000000000000000000000000c459c3743aeb04b6", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000002f093a11b671c4bf", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000010001", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000005", 16).unwrap().to_be_bytes(),
@@ -658,7 +658,7 @@ fn test_static_fields<T: SolCall, U: SolCall, V: SolValue>(
         U256::from_str_radix("c167b0e3c82238f4f2d1a50a8b3a44f96311d77b148c30dc0ef863e1a060dcb7", 16).unwrap().to_be_bytes(), // u128[] elements slot #2
     ],
     vec![
-        U256::from_str_radix("000000000000000000000000000000000000000000000000ebc75c981e6b1aa3", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000003dbcd75f64945893", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(), // u32[][] len
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), // first u8[] len
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000030201", 16).unwrap().to_be_bytes(), // first u8[] elements
@@ -721,7 +721,7 @@ fn test_static_fields<T: SolCall, U: SolCall, V: SolValue>(
         U256::from_str_radix("405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ad0", 16).unwrap().to_be_bytes(), // Third element
     ],
     vec![
-        U256::from_str_radix("0000000000000000000000000000000000000000000000007509f0567373e5f0", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000000000ebebcbd6455c0890", 16).unwrap().to_be_bytes(),
         // Field a: DynamicNestedStructChild[]
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
         // First element
@@ -756,7 +756,7 @@ fn test_static_fields<T: SolCall, U: SolCall, V: SolValue>(
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(), // Header slot
     ],
     vec![
-        U256::from_str_radix("0000000000000000000000000000000000000000000000003a71241b10e629e0", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000000000f9c87e6942ed1f5d", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
     ],
         readDynamicStruct5Call::new((U256::from_le_bytes(hex!("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb")),)),
@@ -798,7 +798,7 @@ fn test_static_fields<T: SolCall, U: SolCall, V: SolValue>(
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(), // uint32 b
     ],
     vec![
-        U256::from_str_radix("0000000000000000000000000000000000000000000000007767397bdbd83f17", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000000000e926c0e2f5491027", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), // Header slot
         U256::from_str_radix("0000000000000000000000000000000000000000000000030000000200000001", 16).unwrap().to_be_bytes(), // First element
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(), // Second element
@@ -847,11 +847,11 @@ fn test_dynamic_fields<T: SolCall, U: SolCall, V: SolValue>(
         U256::from_str_radix("544b730dcadfbf3c87d176fbcee0c1f462952c8bc9747841d1bfff2c9f84c07d", 16).unwrap().to_be_bytes(),
     ],
     vec![
-        U256::from_str_radix("0000000000000000000000000000000000000000000000653d02a210b08857c8", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000000065c4a544c2e5b9f0a9", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000066", 16).unwrap().to_be_bytes(),
 
-        U256::from_str_radix("00000000000000000000000000000000000000000000002a1afe8c88bc2c2d3f", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000000000000000000000000000000000000000002a7d4b6c5ec9959670", 16).unwrap().to_be_bytes(),
     ],
         readFooCall::new((U256::from_le_bytes(hex!("e014f8017b7a8c4a930b9b7fcf7731e1a3d955813e4d729c5abf81df5adb08a7")),)),
         Foo {
@@ -879,15 +879,15 @@ fn test_dynamic_fields<T: SolCall, U: SolCall, V: SolValue>(
     ],
     vec![
         // MegaFoo
-        U256::from_str_radix("00000000000000000000000000000000000000000000004d68e61705cbfc7a75", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000000000000000000000000000000000000000004d07b0556aa8b8d2d2", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("e014f8017b7a8c4a930b9b7fcf7731e1a3d955813e4d729c5abf81df5adb08a7", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000058", 16).unwrap().to_be_bytes(),
         // Foo
-        U256::from_str_radix("0000000000000000000000000000000000000000000000653d02a210b08857c8", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000000065c4a544c2e5b9f0a9", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000066", 16).unwrap().to_be_bytes(),
         // Bar
-        U256::from_str_radix("00000000000000000000000000000000000000000000002a1afe8c88bc2c2d3f", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000000000000000000000000000000000000000002a7d4b6c5ec9959670", 16).unwrap().to_be_bytes(),
 
     ],
         readMegaFooCall::new((U256::from_le_bytes(hex!("79f6f905732424817cc3297d425cd1313a7afd112df46d08303219989d6a7b09")),)),
@@ -935,28 +935,28 @@ fn test_dynamic_fields<T: SolCall, U: SolCall, V: SolValue>(
         ],
         vec![
             // Var
-            U256::from_str_radix("000000000000000000000000000000000000000000000000a05005766d1c7798", 16).unwrap().to_be_bytes(),
+            U256::from_str_radix("000000000000000000000000000000000000000000000000c208b5ff54db6c91", 16).unwrap().to_be_bytes(),
             U256::from_str_radix("e014f8017b7a8c4a930b9b7fcf7731e1a3d955813e4d729c5abf81df5adb08a7", 16).unwrap().to_be_bytes(),
             U256::from_str_radix("0f10fee34b569ef88274c8700225c115c5bc8e1db0ffddd1133715912144d3ee", 16).unwrap().to_be_bytes(),
             U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
             // Bar
-            U256::from_str_radix("00000000000000000000000000000000000000000000002a1afe8c88bc2c2d3f", 16).unwrap().to_be_bytes(),
+            U256::from_str_radix("00000000000000000000000000000000000000000000002a7d4b6c5ec9959670", 16).unwrap().to_be_bytes(),
             // Foo
-            U256::from_str_radix("0000000000000000000000000000000000000000000000653d02a210b08857c8", 16).unwrap().to_be_bytes(),
+            U256::from_str_radix("000000000000000000000000000000000000000000000065c4a544c2e5b9f0a9", 16).unwrap().to_be_bytes(),
             U256::from_str_radix("facda8b03f21c31df6f060ec021902355a60f784caacfca695acb879d66e76cb", 16).unwrap().to_be_bytes(),
             U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000066", 16).unwrap().to_be_bytes(),
             // Bar in Foo
-            U256::from_str_radix("0000000000000000000000000000000000000000000000291afe8c88bc2c2d3f", 16).unwrap().to_be_bytes(),
+            U256::from_str_radix("0000000000000000000000000000000000000000000000297d4b6c5ec9959670", 16).unwrap().to_be_bytes(),
             // Bar vector
             U256::from_str_radix("79f6f905732424817cc3297d425cd1313a7afd112df46d08303219989d6a7b09", 16).unwrap().to_be_bytes(),
             U256::from_str_radix("12b23b08610619d2c73d9c594768afa7bcc248bd34e1f202173e5c92014ae02e", 16).unwrap().to_be_bytes(),
             U256::from_str_radix("b082f003cf7e89a005efbd95cd08519ae08b6e8e31de5fed37659f47fc64181d", 16).unwrap().to_be_bytes(),
 
-            U256::from_str_radix("00000000000000000000000000000000000000000000002b1afe8c88bc2c2d3f", 16).unwrap().to_be_bytes(),
+            U256::from_str_radix("00000000000000000000000000000000000000000000002b7d4b6c5ec9959670", 16).unwrap().to_be_bytes(),
 
-            U256::from_str_radix("00000000000000000000000000000000000000000000002c1afe8c88bc2c2d3f", 16).unwrap().to_be_bytes(),
+            U256::from_str_radix("00000000000000000000000000000000000000000000002c7d4b6c5ec9959670", 16).unwrap().to_be_bytes(),
 
-            U256::from_str_radix("00000000000000000000000000000000000000000000002d1afe8c88bc2c2d3f", 16).unwrap().to_be_bytes(),
+            U256::from_str_radix("00000000000000000000000000000000000000000000002d7d4b6c5ec9959670", 16).unwrap().to_be_bytes(),
 
         ],
         readVarCall::new((U256::from_le_bytes(hex!("8148947c60769a1ac082a29bf80e4ff473e568ad39ff9bc45c3144244974525f")),)),
@@ -1004,11 +1004,11 @@ fn test_dynamic_fields<T: SolCall, U: SolCall, V: SolValue>(
         U256::from_str_radix("0922fff1cd0697e05be30fd001a86b5e89506d7c8304ebb077dc95f3791d7e86", 16).unwrap().to_be_bytes(),
     ],
     vec![
-        U256::from_str_radix("000000000000000000000000000000000000000000000065d0ae4436393e9304", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000657540b759386a85d0", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("e014f8017b7a8c4a930b9b7fcf7731e1a3d955813e4d729c5abf81df5adb08a7", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000066", 16).unwrap().to_be_bytes(),
 
-        U256::from_str_radix("0000000000000000000000000000000000000000000000007767397bdbd83f17", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000000000e926c0e2f5491027", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("00000000000000000000000000000000000000000000000000000000000004d2", 16).unwrap().to_be_bytes(),
 
@@ -1069,15 +1069,14 @@ fn test_wrapped_objects<T: SolCall, U: SolCall, V: SolValue>(
 
     ],
     vec![
-        U256::from_str_radix("000000000000000000000000000000000000000000000000e44c0fd261f480c4", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000004e3a3639944ad360", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("e014f8017b7a8c4a930b9b7fcf7731e1a3d955813e4d729c5abf81df5adb08a7", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000002a01000000000000006300000058004d01", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000000000010000000000000000000000000000002b", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000006f", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000000000000000000000000000016345785d89ffff", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
-
-        U256::from_str_radix("000000000000000000000000000000000000000000000201c80310b81e98abde", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000000000000000000000000000000000000000020106dce3d30b7932fe", 16).unwrap().to_be_bytes(),
 
     ],)]
 #[case(saveFooAStructACall::new(()),
@@ -1087,7 +1086,7 @@ fn test_wrapped_objects<T: SolCall, U: SolCall, V: SolValue>(
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
     ],
     vec![
-        U256::from_str_radix("00000000000000000000000000000000000000002b002a000f5c34f504c75160", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000000000000000000000000000000000002b002a00181038ad7354ad5b", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000000", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
     ],)]
@@ -1098,7 +1097,7 @@ fn test_wrapped_objects<T: SolCall, U: SolCall, V: SolValue>(
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
     ],
     vec![
-        U256::from_str_radix("000000000000000000000000000000000000000000002a010f5c34f504c75160", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000002a01181038ad7354ad5b", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000000000010000000000000000000000000000002b", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
     ],)]
@@ -1109,7 +1108,7 @@ fn test_wrapped_objects<T: SolCall, U: SolCall, V: SolValue>(
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
     ],
     vec![
-        U256::from_str_radix("0000000000000000000000000000000000000000000201020f5c34f504c75160", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000020102181038ad7354ad5b", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000000", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
     ],)]
@@ -1119,7 +1118,7 @@ fn test_wrapped_objects<T: SolCall, U: SolCall, V: SolValue>(
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(),
     ],
     vec![
-        U256::from_str_radix("00002a00cafecafecafecafecafecafecafecafecafecafec753ec561841836f", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00002a00cafecafecafecafecafecafecafecafecafecafe097b7c37e842ee57", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("01002d0000002c0000000000000000000000000000000000000000000000002b", 16).unwrap().to_be_bytes(),
     ],)]
 #[case(saveFooBStructBCall::new(()),
@@ -1128,7 +1127,7 @@ fn test_wrapped_objects<T: SolCall, U: SolCall, V: SolValue>(
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(),
     ],
     vec![
-        U256::from_str_radix("00000001cafecafecafecafecafecafecafecafecafecafec753ec561841836f", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000001cafecafecafecafecafecafecafecafecafecafe097b7c37e842ee57", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("00002d0000002c010000000000000000000000000000002b000000000000002a", 16).unwrap().to_be_bytes(),
     ],)]
 #[case(saveFooBStructCCall::new(()),
@@ -1137,7 +1136,7 @@ fn test_wrapped_objects<T: SolCall, U: SolCall, V: SolValue>(
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(),
     ],
     vec![
-        U256::from_str_radix("00020102cafecafecafecafecafecafecafecafecafecafec753ec561841836f", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00020102cafecafecafecafecafecafecafecafecafecafe097b7c37e842ee57", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("00002d0000002c00000000000000000000000000000000000000000000000000", 16).unwrap().to_be_bytes(),
     ],)]
 fn test_structs_with_enums<T: SolCall>(
