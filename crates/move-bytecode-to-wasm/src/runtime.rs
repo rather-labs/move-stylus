@@ -269,8 +269,8 @@ impl RuntimeFunction {
                 (Self::MulU32, _, _) => integers::mul::mul_u32(module),
                 (Self::MulU64, _, _) => integers::mul::mul_u64(module),
                 (Self::HeapIntMul, Some(ctx), _) => integers::mul::heap_integers_mul(module, ctx),
-                (Self::HeapIntDivMod, Some(ctx), _) => {
-                    integers::div::heap_integers_div_mod(module, ctx)?
+                (Self::HeapIntDivMod, Some(ctx), Some(runtime_error_data)) => {
+                    integers::div::heap_integers_div_mod(module, ctx, runtime_error_data)?
                 }
                 (Self::LessThan, Some(ctx), _) => integers::check_if_a_less_than_b(module, ctx),
                 // Swap
