@@ -1,6 +1,8 @@
 use crate::common::run_test;
 use crate::declare_fixture;
+use alloy_primitives::keccak256;
 use alloy_sol_types::{SolCall, SolType, SolValue, abi::TokenSeq, sol};
+use move_bytecode_to_wasm::error::RuntimeError;
 use move_test_runner::wasm_runner::RuntimeSandbox;
 use rstest::{fixture, rstest};
 
@@ -29,11 +31,7 @@ sol!(
 #[case(echo2Call::new((111, 222)), (222,))]
 #[case(sumCall::new((65535, 65535)), (131070,))]
 #[case(sumCall::new((0, 1)), (1,))]
-#[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
-#[case(sumCall::new((u32::MAX, 1)), ((),))]
 #[case(subCall::new((131070, 65535)), (65535,))]
-#[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
-#[case(subCall::new((65535, 131070)), ((),))]
 fn test_uint_32<T: SolCall, V: SolValue>(
     #[by_ref] runtime: &RuntimeSandbox,
     #[case] call_data: T,
@@ -47,6 +45,36 @@ fn test_uint_32<T: SolCall, V: SolValue>(
         expected_result.abi_encode(),
     )
     .unwrap();
+}
+
+#[rstest]
+#[case(sumCall::new((u32::MAX, 1)))]
+fn test_uint_32_sum_overflow<T: SolCall>(#[by_ref] runtime: &RuntimeSandbox, #[case] call_data: T) {
+    let (result, return_data) = runtime.call_entrypoint(call_data.abi_encode()).unwrap();
+    // Functions should return 1 in case of overflow
+    assert_eq!(result, 1_i32);
+    let error_message = String::from_utf8_lossy(RuntimeError::Overflow.as_bytes());
+    let expected_data = [
+        keccak256(b"Error(string)")[..4].to_vec(),
+        <sol!((string,))>::abi_encode_params(&(error_message,)),
+    ]
+    .concat();
+    assert_eq!(return_data, expected_data);
+}
+
+#[rstest]
+#[case(subCall::new((65535, 131070)))]
+fn test_uint_32_sub_overflow<T: SolCall>(#[by_ref] runtime: &RuntimeSandbox, #[case] call_data: T) {
+    let (result, return_data) = runtime.call_entrypoint(call_data.abi_encode()).unwrap();
+    // Functions should return 1 in case of overflow
+    assert_eq!(result, 1_i32);
+    let error_message = String::from_utf8_lossy(RuntimeError::Overflow.as_bytes());
+    let expected_data = [
+        keccak256(b"Error(string)")[..4].to_vec(),
+        <sol!((string,))>::abi_encode_params(&(error_message,)),
+    ]
+    .concat();
+    assert_eq!(return_data, expected_data);
 }
 
 #[rstest]

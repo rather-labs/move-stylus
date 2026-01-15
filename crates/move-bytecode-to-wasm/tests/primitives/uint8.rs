@@ -31,8 +31,6 @@ sol!(
 #[case(echo2Call::new((111, 222)), (222,))]
 #[case(sumCall::new((42, 42)), (84,))]
 #[case(subCall::new((84, 42)), (42,))]
-#[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
-#[case(subCall::new((42, 84)), ((),))]
 fn test_uint_8<T: SolCall, V: SolValue>(
     #[by_ref] runtime: &RuntimeSandbox,
     #[case] call_data: T,
@@ -50,7 +48,22 @@ fn test_uint_8<T: SolCall, V: SolValue>(
 
 #[rstest]
 #[case(sumCall::new((255, 1)))]
-fn test_uint_8_overflow<T: SolCall>(#[by_ref] runtime: &RuntimeSandbox, #[case] call_data: T) {
+fn test_uint_8_sum_overflow<T: SolCall>(#[by_ref] runtime: &RuntimeSandbox, #[case] call_data: T) {
+    let (result, return_data) = runtime.call_entrypoint(call_data.abi_encode()).unwrap();
+    // Functions should return 1 in case of overflow
+    assert_eq!(result, 1_i32);
+    let error_message = String::from_utf8_lossy(RuntimeError::Overflow.as_bytes());
+    let expected_data = [
+        keccak256(b"Error(string)")[..4].to_vec(),
+        <sol!((string,))>::abi_encode_params(&(error_message,)),
+    ]
+    .concat();
+    assert_eq!(return_data, expected_data);
+}
+
+#[rstest]
+#[case(subCall::new((42, 84)))]
+fn test_uint_8_sub_overflow<T: SolCall>(#[by_ref] runtime: &RuntimeSandbox, #[case] call_data: T) {
     let (result, return_data) = runtime.call_entrypoint(call_data.abi_encode()).unwrap();
     // Functions should return 1 in case of overflow
     assert_eq!(result, 1_i32);

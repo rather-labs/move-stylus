@@ -60,8 +60,11 @@ impl IU8 {
     pub fn sub(
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
+        compilation_ctx: &CompilationContext,
+        runtime_error_data: &mut RuntimeErrorData,
     ) -> Result<(), IntermediateTypeError> {
-        let sub_u32_f = RuntimeFunction::SubU32.get(module, None, None)?;
+        let sub_u32_f =
+            RuntimeFunction::SubU32.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
         builder.call(sub_u32_f);
         Ok(())
     }
@@ -238,8 +241,11 @@ impl IU16 {
     pub fn sub(
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
+        compilation_ctx: &CompilationContext,
+        runtime_error_data: &mut RuntimeErrorData,
     ) -> Result<(), IntermediateTypeError> {
-        let sub_u32_f = RuntimeFunction::SubU32.get(module, None, None)?;
+        let sub_u32_f =
+            RuntimeFunction::SubU32.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
         builder.call(sub_u32_f);
 
         Ok(())
@@ -392,8 +398,11 @@ impl IU32 {
     pub fn add(
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
+        compilation_ctx: &CompilationContext,
+        runtime_error_data: &mut RuntimeErrorData,
     ) -> Result<(), IntermediateTypeError> {
-        let add_function_id = RuntimeFunction::AddU32.get(module, None, None)?;
+        let add_function_id =
+            RuntimeFunction::AddU32.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
         builder.call(add_function_id);
         Ok(())
     }
@@ -404,8 +413,11 @@ impl IU32 {
     pub fn sub(
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
+        compilation_ctx: &CompilationContext,
+        runtime_error_data: &mut RuntimeErrorData,
     ) -> Result<(), IntermediateTypeError> {
-        let sub_u32_f = RuntimeFunction::SubU32.get(module, None, None)?;
+        let sub_u32_f =
+            RuntimeFunction::SubU32.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
         builder.call(sub_u32_f);
         Ok(())
     }
@@ -537,8 +549,11 @@ impl IU64 {
     pub fn add(
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
+        compilation_ctx: &CompilationContext,
+        runtime_error_data: &mut RuntimeErrorData,
     ) -> Result<(), IntermediateTypeError> {
-        let add_function_id = RuntimeFunction::AddU64.get(module, None, None)?;
+        let add_function_id =
+            RuntimeFunction::AddU64.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
         builder.call(add_function_id);
         Ok(())
     }
@@ -549,8 +564,11 @@ impl IU64 {
     pub fn sub(
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
+        compilation_ctx: &CompilationContext,
+        runtime_error_data: &mut RuntimeErrorData,
     ) -> Result<(), IntermediateTypeError> {
-        let sub_u64_f = RuntimeFunction::SubU64.get(module, None, None)?;
+        let sub_u64_f =
+            RuntimeFunction::SubU64.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
         builder.call(sub_u64_f);
         Ok(())
     }

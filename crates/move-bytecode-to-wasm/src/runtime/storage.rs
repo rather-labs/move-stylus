@@ -509,6 +509,7 @@ pub fn write_object_slot(
 pub fn storage_next_slot_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
     let mut builder = function
@@ -518,7 +519,8 @@ pub fn storage_next_slot_function(
     let slot_ptr = module.locals.add(ValType::I32);
 
     let swap_256_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx), None)?;
-    let add_u256_fn = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx), None)?;
+    let add_u256_fn =
+        RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
 
     // BE to LE ptr so we can make the addition
     builder
@@ -666,6 +668,7 @@ pub fn derive_mapping_slot(
 pub fn derive_dyn_array_slot(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let mut function = FunctionBuilder::new(
         &mut module.types,
@@ -685,7 +688,8 @@ pub fn derive_dyn_array_slot(
 
     let (native_keccak, _) = host_functions::native_keccak256(module);
     let swap_i32_bytes_fn = RuntimeFunction::SwapI32Bytes.get(module, None, None)?;
-    let add_u256_fn = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx), None)?;
+    let add_u256_fn =
+        RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
 
     // Guard: check elem_size is greater than 0
     builder
@@ -1421,9 +1425,14 @@ pub fn add_commit_changes_to_storage_fn(
 pub fn accumulate_or_advance_slot_delete(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let (storage_cache_fn, _) = storage_cache_bytes32(module);
-    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx), None)?;
+    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(
+        module,
+        Some(compilation_ctx),
+        Some(runtime_error_data),
+    )?;
 
     Ok(build_accumulate_or_advance_slot(
         module,
@@ -1459,9 +1468,14 @@ pub fn accumulate_or_advance_slot_delete(
 pub fn accumulate_or_advance_slot_read(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let (storage_load, _) = storage_load_bytes32(module);
-    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx), None)?;
+    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(
+        module,
+        Some(compilation_ctx),
+        Some(runtime_error_data),
+    )?;
 
     Ok(build_accumulate_or_advance_slot(
         module,
@@ -1495,9 +1509,14 @@ pub fn accumulate_or_advance_slot_read(
 pub fn accumulate_or_advance_slot_write(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let (storage_cache_fn, _) = storage_cache_bytes32(module);
-    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx), None)?;
+    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(
+        module,
+        Some(compilation_ctx),
+        Some(runtime_error_data),
+    )?;
 
     Ok(build_accumulate_or_advance_slot(
         module,
@@ -1680,6 +1699,7 @@ pub fn cache_storage_object_changes(
 #[cfg(test)]
 mod tests {
     use crate::test_compilation_context;
+    use crate::test_runtime_error_data;
     use crate::test_tools::{
         build_module, get_linker_with_native_keccak256, setup_wasmtime_module,
     };
@@ -1953,8 +1973,10 @@ mod tests {
         #[case] element_size: u32,
         #[case] expected: U256,
     ) {
-        let (mut module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(Some(40)); // slot (32 bytes) + index (4 bytes) + elem_size (4 bytes)
+        let (mut module, allocator_func, memory_id, compilation_ctx) = build_module(Some(40)); // slot (32 bytes) + index (4 bytes) + elem_size (4 bytes)
+
+        let ctx = test_compilation_context!(memory_id, allocator_func, compilation_ctx);
+        let mut runtime_error_data = test_runtime_error_data!();
 
         let slot_ptr = module.locals.add(ValType::I32);
         let index = module.locals.add(ValType::I32);
@@ -1973,15 +1995,12 @@ mod tests {
             .call(allocator_func)
             .local_set(result_ptr);
 
-        let ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-
         func_body
             .local_get(slot_ptr)
             .local_get(index)
             .local_get(elem_size)
             .local_get(result_ptr)
-            .call(derive_dyn_array_slot(&mut module, &ctx).unwrap());
+            .call(derive_dyn_array_slot(&mut module, &ctx, &mut runtime_error_data).unwrap());
 
         func_body.local_get(result_ptr);
         let function = builder.finish(vec![slot_ptr, index, elem_size], &mut module.funcs);
@@ -2040,8 +2059,9 @@ mod tests {
         #[case] expected: U256,
     ) {
         // slot (32 bytes) + outer_index (4 bytes) + inner_index (4 bytes) + elem_size (4 bytes)
-        let (mut module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(Some(44));
+        let (mut module, allocator_func, memory_id, compilation_ctx) = build_module(Some(44));
+        let ctx = test_compilation_context!(memory_id, allocator_func, compilation_ctx);
+        let mut runtime_error_data = test_runtime_error_data!();
 
         let slot_ptr = module.locals.add(ValType::I32);
         let outer_index = module.locals.add(ValType::I32);
@@ -2066,23 +2086,20 @@ mod tests {
             .i32_const(32)
             .local_set(array_header_size);
 
-        let ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-
         // Call derive_dyn_array_slot_for_index with the proper arguments
         func_body
             .local_get(slot_ptr)
             .local_get(outer_index)
             .local_get(array_header_size)
             .local_get(result_ptr)
-            .call(derive_dyn_array_slot(&mut module, &ctx).unwrap());
+            .call(derive_dyn_array_slot(&mut module, &ctx, &mut runtime_error_data).unwrap());
 
         func_body
             .local_get(result_ptr)
             .local_get(inner_index)
             .local_get(elem_size)
             .local_get(result_ptr)
-            .call(derive_dyn_array_slot(&mut module, &ctx).unwrap());
+            .call(derive_dyn_array_slot(&mut module, &ctx, &mut runtime_error_data).unwrap());
 
         func_body.local_get(result_ptr);
         let function = builder.finish(

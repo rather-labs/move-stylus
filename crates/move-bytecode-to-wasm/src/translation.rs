@@ -1928,10 +1928,18 @@ fn translate_instruction(
                 IntermediateType::IU16 => {
                     IU16::add(builder, module, compilation_ctx, runtime_error_data)?
                 }
-                IntermediateType::IU32 => IU32::add(builder, module)?,
-                IntermediateType::IU64 => IU64::add(builder, module)?,
-                IntermediateType::IU128 => IU128::add(builder, module, compilation_ctx)?,
-                IntermediateType::IU256 => IU256::add(builder, module, compilation_ctx)?,
+                IntermediateType::IU32 => {
+                    IU32::add(builder, module, compilation_ctx, runtime_error_data)?
+                }
+                IntermediateType::IU64 => {
+                    IU64::add(builder, module, compilation_ctx, runtime_error_data)?
+                }
+                IntermediateType::IU128 => {
+                    IU128::add(builder, module, compilation_ctx, runtime_error_data)?
+                }
+                IntermediateType::IU256 => {
+                    IU256::add(builder, module, compilation_ctx, runtime_error_data)?
+                }
                 _ => Err(TranslationError::InvalidBinaryOperation {
                     operation: Bytecode::Add,
                     operands_types: t1,
@@ -1951,12 +1959,24 @@ fn translate_instruction(
             }
 
             match t1 {
-                IntermediateType::IU8 => IU8::sub(builder, module)?,
-                IntermediateType::IU16 => IU16::sub(builder, module)?,
-                IntermediateType::IU32 => IU32::sub(builder, module)?,
-                IntermediateType::IU64 => IU64::sub(builder, module)?,
-                IntermediateType::IU128 => IU128::sub(builder, module, compilation_ctx)?,
-                IntermediateType::IU256 => IU256::sub(builder, module, compilation_ctx)?,
+                IntermediateType::IU8 => {
+                    IU8::sub(builder, module, compilation_ctx, runtime_error_data)?
+                }
+                IntermediateType::IU16 => {
+                    IU16::sub(builder, module, compilation_ctx, runtime_error_data)?
+                }
+                IntermediateType::IU32 => {
+                    IU32::sub(builder, module, compilation_ctx, runtime_error_data)?
+                }
+                IntermediateType::IU64 => {
+                    IU64::sub(builder, module, compilation_ctx, runtime_error_data)?
+                }
+                IntermediateType::IU128 => {
+                    IU128::sub(builder, module, compilation_ctx, runtime_error_data)?
+                }
+                IntermediateType::IU256 => {
+                    IU256::sub(builder, module, compilation_ctx, runtime_error_data)?
+                }
                 _ => Err(TranslationError::InvalidBinaryOperation {
                     operation: Bytecode::Sub,
                     operands_types: t1,
@@ -2009,8 +2029,12 @@ fn translate_instruction(
                 IntermediateType::IU16 => IU16::div(builder),
                 IntermediateType::IU32 => IU32::div(builder),
                 IntermediateType::IU64 => IU64::div(builder),
-                IntermediateType::IU128 => IU128::div(builder, module, compilation_ctx)?,
-                IntermediateType::IU256 => IU256::div(builder, module, compilation_ctx)?,
+                IntermediateType::IU128 => {
+                    IU128::div(builder, module, compilation_ctx, runtime_error_data)?
+                }
+                IntermediateType::IU256 => {
+                    IU256::div(builder, module, compilation_ctx, runtime_error_data)?
+                }
                 _ => Err(TranslationError::InvalidBinaryOperation {
                     operation: Bytecode::Div,
                     operands_types: t1,
@@ -2223,8 +2247,12 @@ fn translate_instruction(
                 IntermediateType::IU16 => IU16::remainder(builder),
                 IntermediateType::IU32 => IU32::remainder(builder),
                 IntermediateType::IU64 => IU64::remainder(builder),
-                IntermediateType::IU128 => IU128::remainder(builder, module, compilation_ctx)?,
-                IntermediateType::IU256 => IU256::remainder(builder, module, compilation_ctx)?,
+                IntermediateType::IU128 => {
+                    IU128::remainder(builder, module, compilation_ctx, runtime_error_data)?
+                }
+                IntermediateType::IU256 => {
+                    IU256::remainder(builder, module, compilation_ctx, runtime_error_data)?
+                }
                 _ => Err(TranslationError::InvalidBinaryOperation {
                     operation: Bytecode::Mod,
                     operands_types: t1,
