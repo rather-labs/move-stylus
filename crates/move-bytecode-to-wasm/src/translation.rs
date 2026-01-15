@@ -1993,10 +1993,18 @@ fn translate_instruction(
                 IntermediateType::IU16 => {
                     IU16::mul(builder, module, compilation_ctx, runtime_error_data)?
                 }
-                IntermediateType::IU32 => IU32::mul(builder, module)?,
-                IntermediateType::IU64 => IU64::mul(builder, module)?,
-                IntermediateType::IU128 => IU128::mul(builder, module, compilation_ctx)?,
-                IntermediateType::IU256 => IU256::mul(builder, module, compilation_ctx)?,
+                IntermediateType::IU32 => {
+                    IU32::mul(builder, module, compilation_ctx, runtime_error_data)?
+                }
+                IntermediateType::IU64 => {
+                    IU64::mul(builder, module, compilation_ctx, runtime_error_data)?
+                }
+                IntermediateType::IU128 => {
+                    IU128::mul(builder, module, compilation_ctx, runtime_error_data)?
+                }
+                IntermediateType::IU256 => {
+                    IU256::mul(builder, module, compilation_ctx, runtime_error_data)?
+                }
                 _ => Err(TranslationError::InvalidBinaryOperation {
                     operation: Bytecode::Mul,
                     operands_types: t1,

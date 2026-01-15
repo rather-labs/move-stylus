@@ -272,19 +272,6 @@ fn test_uint_256_sub_overflow<T: SolCall>(
         U256::from(u128::MAX) + U256::from(1),
         (U256::from(u128::MAX) + U256::from(1)) * U256::from(2)
     )]
-// asd
-#[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
-#[case(U256::MAX, U256::from(2), U256::from(0))]
-#[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
-#[case(U256::MAX, U256::from(5), U256::from(0))]
-#[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
-#[case(U256::MAX, U256::MAX, U256::from(0))]
-#[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
-#[case(
-        U256::from(u128::MAX) * U256::from(2),
-        U256::from(u128::MAX) * U256::from(2),
-        U256::from(0),
-    )]
 fn test_uint_256_mul(
     #[by_ref] runtime: &RuntimeSandbox,
     #[case] n1: U256,
@@ -297,6 +284,34 @@ fn test_uint_256_mul(
         <(&U256,)>::abi_encode(&(&expected_result,)),
     )
     .unwrap();
+}
+
+// asd
+#[rstest]
+#[case(U256::MAX, U256::from(2))]
+#[case(U256::MAX, U256::from(5))]
+#[case(U256::MAX, U256::MAX)]
+#[case(
+        U256::from(u128::MAX) * U256::from(2),
+        U256::from(u128::MAX) * U256::from(2),
+    )]
+fn test_uint_256_mul_overflow(
+    #[by_ref] runtime: &RuntimeSandbox,
+    #[case] n1: U256,
+    #[case] n2: U256,
+) {
+    let (result, return_data) = runtime
+        .call_entrypoint(mulCall::new((n1, n2)).abi_encode())
+        .unwrap();
+    // Functions should return 1 in case of overflow
+    assert_eq!(result, 1_i32);
+    let error_message = String::from_utf8_lossy(RuntimeError::Overflow.as_bytes());
+    let expected_data = [
+        keccak256(b"Error(string)")[..4].to_vec(),
+        <sol!((string,))>::abi_encode_params(&(error_message,)),
+    ]
+    .concat();
+    assert_eq!(return_data, expected_data);
 }
 
 #[rstest]

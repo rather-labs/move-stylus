@@ -3,7 +3,11 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
 };
 
-use crate::CompilationContext;
+use crate::{
+    CompilationContext,
+    data::RuntimeErrorData,
+    error::{RuntimeError, add_handle_error_instructions},
+};
 
 use super::RuntimeFunction;
 
@@ -55,7 +59,11 @@ use super::RuntimeFunction;
 ///
 /// # WASM Function Returns
 /// * `pointer` (i32) - Pointer to the result
-pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
+pub fn heap_integers_mul(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
+) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32, ValType::I32],
@@ -159,7 +167,17 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
                                             .if_else(
                                                 None,
                                                 |then| {
-                                                    then.unreachable();
+                                                    then.i32_const(runtime_error_data.get(
+                                                        module,
+                                                        compilation_ctx.memory_id,
+                                                        RuntimeError::Overflow,
+                                                    ));
+                                                    add_handle_error_instructions(
+                                                        module,
+                                                        then,
+                                                        compilation_ctx,
+                                                        false,
+                                                    );
                                                 },
                                                 |else_| {
                                                     else_.br(inner_block_id);
@@ -308,7 +326,11 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
 ///
 /// # WASM Function Returns
 /// * multiplication of the arguments
-pub fn mul_u32(module: &mut Module) -> FunctionId {
+pub fn mul_u32(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
+) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32],
@@ -339,7 +361,12 @@ pub fn mul_u32(module: &mut Module) -> FunctionId {
                     .if_else(
                         Some(ValType::I32),
                         |then| {
-                            then.unreachable();
+                            then.i32_const(runtime_error_data.get(
+                                module,
+                                compilation_ctx.memory_id,
+                                RuntimeError::Overflow,
+                            ));
+                            add_handle_error_instructions(module, then, compilation_ctx, false);
                         },
                         |else_| {
                             else_.local_get(n1).local_get(n2).binop(BinaryOp::I32Mul);
@@ -369,7 +396,11 @@ pub fn mul_u32(module: &mut Module) -> FunctionId {
 ///
 /// # WASM Function Returns
 /// * multiplication of the arguments
-pub fn mul_u64(module: &mut Module) -> FunctionId {
+pub fn mul_u64(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
+) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I64, ValType::I64],
@@ -400,7 +431,12 @@ pub fn mul_u64(module: &mut Module) -> FunctionId {
                     .if_else(
                         Some(ValType::I64),
                         |then| {
-                            then.unreachable();
+                            then.i32_const(runtime_error_data.get(
+                                module,
+                                compilation_ctx.memory_id,
+                                RuntimeError::Overflow,
+                            ));
+                            add_handle_error_instructions(module, then, compilation_ctx, true);
                         },
                         |else_| {
                             else_.local_get(n1).local_get(n2).binop(BinaryOp::I64Mul);
@@ -417,17 +453,17 @@ pub fn mul_u64(module: &mut Module) -> FunctionId {
 
 #[cfg(test)]
 mod tests {
-    use std::cell::RefCell;
-    use std::panic::AssertUnwindSafe;
-    use std::rc::Rc;
-
-    use crate::test_compilation_context;
-    use crate::test_tools::{build_module, setup_wasmtime_module};
-    use alloy_primitives::U256;
-    use rstest::rstest;
-    use walrus::{FunctionBuilder, ValType};
-
     use super::*;
+    use crate::{
+        data::DATA_ABORT_MESSAGE_PTR_OFFSET,
+        test_compilation_context, test_runtime_error_data,
+        test_tools::{build_module, setup_wasmtime_module},
+    };
+    use alloy_primitives::{U256, keccak256};
+    use alloy_sol_types::{SolType, sol};
+    use rstest::rstest;
+    use std::{cell::RefCell, panic::AssertUnwindSafe, rc::Rc};
+    use walrus::{FunctionBuilder, ValType};
 
     #[rstest]
     #[case(2, 2, 4)]
@@ -444,111 +480,46 @@ mod tests {
         9_223_372_036_854_775_808,
         85_070_591_730_234_615_865_843_651_857_942_052_864
     )]
-    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
-    #[case(u128::MAX, 2, 0)]
-    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
-    #[case(u128::MAX, 5, 0)]
-    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
-    #[case(u128::MAX, u64::MAX as u128, 0)]
-    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
-    #[case(u64::MAX as u128 * 2, u64::MAX as u128 * 2, 0)]
     fn test_heap_mul_u128(#[case] n1: u128, #[case] n2: u128, #[case] expected: u128) {
-        const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(Some(TYPE_HEAP_SIZE * 2));
+        const SIZE: i32 = 16;
+        let (mut store, instance, entrypoint) =
+            setup_heap_mul_test(n1.to_le_bytes().to_vec(), n2.to_le_bytes().to_vec(), SIZE);
 
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
-        );
-
-        let n1_ptr = raw_module.locals.add(ValType::I32);
-        let n2_ptr = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
-        func_body
-            .i32_const(0)
-            .i32_const(TYPE_HEAP_SIZE)
-            .i32_const(TYPE_HEAP_SIZE);
-
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let heap_integers_add_f = heap_integers_mul(&mut raw_module, &compilation_ctx);
-        func_body.call(heap_integers_add_f);
-
-        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        // display_module(&mut raw_module);
-
-        let data = [n1.to_le_bytes(), n2.to_le_bytes()].concat();
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
-
-        let pointer: i32 = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
-
-        let memory = instance.get_memory(&mut store, "memory").unwrap();
-        let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
-        memory
-            .read(&mut store, pointer as usize, &mut result_memory_data)
+        let result_ptr: i32 = entrypoint.call(&mut store, (0, SIZE)).unwrap();
+        let mut actual = vec![0; SIZE as usize];
+        instance
+            .get_memory(&mut store, "memory")
+            .unwrap()
+            .read(&mut store, result_ptr as usize, &mut actual)
             .unwrap();
 
-        let mut buff = vec![0; TYPE_HEAP_SIZE as usize * 3];
-        memory.read(&mut store, 0, &mut buff).unwrap();
+        assert_eq!(actual, expected.to_le_bytes().to_vec());
+    }
 
-        assert_eq!(result_memory_data, expected.to_le_bytes().to_vec());
+    #[rstest]
+    #[case(u128::MAX, 2)]
+    #[case(u128::MAX, 5)]
+    #[case(u128::MAX, u64::MAX as u128)]
+    #[case(u64::MAX as u128 * 2, u64::MAX as u128 * 2)]
+    fn test_heap_mul_u128_overflow(#[case] n1: u128, #[case] n2: u128) {
+        const SIZE: i32 = 16;
+        let (mut store, instance, entrypoint) =
+            setup_heap_mul_test(n1.to_le_bytes().to_vec(), n2.to_le_bytes().to_vec(), SIZE);
+
+        let _: i32 = entrypoint.call(&mut store, (0, SIZE)).unwrap();
+
+        assert_overflow_error(store, &instance);
     }
 
     #[test]
     fn test_heap_mul_u128_fuzz() {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(Some(TYPE_HEAP_SIZE * 2));
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
+        let (mut store, instance, entrypoint) = setup_heap_mul_test(
+            vec![0; TYPE_HEAP_SIZE as usize],
+            vec![0; TYPE_HEAP_SIZE as usize],
+            TYPE_HEAP_SIZE,
         );
-
-        let n1_ptr = raw_module.locals.add(ValType::I32);
-        let n2_ptr = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
-        func_body
-            .i32_const(0)
-            .i32_const(TYPE_HEAP_SIZE)
-            .i32_const(TYPE_HEAP_SIZE);
-
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let heap_integers_add_f = heap_integers_mul(&mut raw_module, &compilation_ctx);
-        func_body.call(heap_integers_add_f);
-
-        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        // display_module(&mut raw_module);
-
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
-
-        let pointer: i32 = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
-
         let memory = instance.get_memory(&mut store, "memory").unwrap();
-        let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
-        memory
-            .read(&mut store, pointer as usize, &mut result_memory_data)
-            .unwrap();
-
-        let mut buff = vec![0; TYPE_HEAP_SIZE as usize * 3];
-        memory.read(&mut store, 0, &mut buff).unwrap();
-
         let reset_memory = Rc::new(AssertUnwindSafe(
             instance
                 .get_typed_func::<(), ()>(&mut store, "reset_memory")
@@ -563,7 +534,9 @@ mod tests {
                 let data = [a.to_le_bytes(), b.to_le_bytes()].concat();
                 memory.write(&mut *store.borrow_mut(), 0, &data).unwrap();
 
-                let expected = a.wrapping_mul(b);
+                let overflowing_mul = a.overflowing_mul(b);
+                let expected = overflowing_mul.0;
+                let overflows = overflowing_mul.1;
 
                 let result: Result<i32, _> =
                     entrypoint.call(&mut *store.borrow_mut(), (0, TYPE_HEAP_SIZE));
@@ -571,15 +544,18 @@ mod tests {
                 match result {
                     Ok(pointer) => {
                         let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
-                        memory
-                            .read(
-                                &mut *store.borrow_mut(),
-                                pointer as usize,
-                                &mut result_memory_data,
-                            )
-                            .unwrap();
-
-                        assert_eq!(result_memory_data, expected.to_le_bytes().to_vec());
+                        if !overflows {
+                            memory
+                                .read(
+                                    &mut *store.0.borrow_mut(),
+                                    pointer as usize,
+                                    &mut result_memory_data,
+                                )
+                                .unwrap();
+                            assert_eq!(result_memory_data, expected.to_le_bytes().to_vec());
+                        } else {
+                            assert_eq!(1, pointer);
+                        }
                     }
                     Err(_) => {
                         assert!(a.checked_mul(b).is_none());
@@ -638,115 +614,49 @@ mod tests {
         U256::from(u128::MAX) + U256::from(1),
         (U256::from(u128::MAX) + U256::from(1)) * U256::from(2)
     )]
-    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
-    #[case(U256::MAX, U256::from(2), U256::from(0))]
-    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
-    #[case(U256::MAX, U256::from(5), U256::from(0))]
-    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
-    #[case(U256::MAX, U256::MAX, U256::from(0))]
-    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
-    #[case(
-        U256::from(u128::MAX) * U256::from(2),
-        U256::from(u128::MAX) * U256::from(2),
-        U256::from(0),
-    )]
     fn test_heap_mul_u256(#[case] n1: U256, #[case] n2: U256, #[case] expected: U256) {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(Some(TYPE_HEAP_SIZE * 2));
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
+        let (mut store, instance, entrypoint) = setup_heap_mul_test(
+            n1.to_le_bytes::<32>().to_vec(),
+            n2.to_le_bytes::<32>().to_vec(),
+            TYPE_HEAP_SIZE,
         );
 
-        let n1_ptr = raw_module.locals.add(ValType::I32);
-        let n2_ptr = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
-        func_body
-            .i32_const(0)
-            .i32_const(TYPE_HEAP_SIZE)
-            .i32_const(TYPE_HEAP_SIZE);
-
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let heap_integers_add_f = heap_integers_mul(&mut raw_module, &compilation_ctx);
-        // Shift left
-        func_body.call(heap_integers_add_f);
-
-        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        // display_module(&mut raw_module);
-
-        let data = [n1.to_le_bytes::<32>(), n2.to_le_bytes::<32>()].concat();
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
-
-        let pointer: i32 = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
-
+        let result: i32 = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
         memory
-            .read(&mut store, pointer as usize, &mut result_memory_data)
+            .read(&mut store, result as usize, &mut result_memory_data)
             .unwrap();
 
-        let mut buff = vec![0; TYPE_HEAP_SIZE as usize * 3];
-        memory.read(&mut store, 0, &mut buff).unwrap();
-
         assert_eq!(result_memory_data, expected.to_le_bytes::<32>().to_vec());
+    }
+
+    #[rstest]
+    #[case(U256::MAX, U256::from(2))]
+    #[case(U256::MAX, U256::from(5))]
+    #[case(U256::MAX, U256::MAX)]
+    fn test_heap_mul_u256_overflow(#[case] n1: U256, #[case] n2: U256) {
+        const TYPE_HEAP_SIZE: i32 = 32;
+        let (mut store, instance, entrypoint) = setup_heap_mul_test(
+            n1.to_le_bytes::<32>().to_vec(),
+            n2.to_le_bytes::<32>().to_vec(),
+            TYPE_HEAP_SIZE,
+        );
+        let _: i32 = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
+        assert_overflow_error(store, &instance);
     }
 
     #[test]
     fn test_heap_mul_u256_fuzz() {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(Some(TYPE_HEAP_SIZE * 2));
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
+        let (mut store, instance, entrypoint) = setup_heap_mul_test(
+            vec![0; TYPE_HEAP_SIZE as usize],
+            vec![0; TYPE_HEAP_SIZE as usize],
+            TYPE_HEAP_SIZE,
         );
 
-        let n1_ptr = raw_module.locals.add(ValType::I32);
-        let n2_ptr = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
-        func_body
-            .i32_const(0)
-            .i32_const(TYPE_HEAP_SIZE)
-            .i32_const(TYPE_HEAP_SIZE);
-
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let heap_integers_add_f = heap_integers_mul(&mut raw_module, &compilation_ctx);
-        func_body.call(heap_integers_add_f);
-
-        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        // display_module(&mut raw_module);
-
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
-
-        let pointer: i32 = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
-
         let memory = instance.get_memory(&mut store, "memory").unwrap();
-        let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
-        memory
-            .read(&mut store, pointer as usize, &mut result_memory_data)
-            .unwrap();
-
-        let mut buff = vec![0; TYPE_HEAP_SIZE as usize * 3];
-        memory.read(&mut store, 0, &mut buff).unwrap();
 
         let reset_memory = Rc::new(AssertUnwindSafe(
             instance
@@ -763,7 +673,9 @@ mod tests {
                 let b = U256::from_le_bytes::<32>(b);
                 memory.write(&mut *store.borrow_mut(), 0, &data).unwrap();
 
-                let expected = a.wrapping_mul(b);
+                let overflowing_mul = a.overflowing_mul(b);
+                let expected = overflowing_mul.0;
+                let overflows = overflowing_mul.1;
 
                 let result: Result<i32, _> =
                     entrypoint.call(&mut *store.borrow_mut(), (0, TYPE_HEAP_SIZE));
@@ -771,15 +683,19 @@ mod tests {
                 match result {
                     Ok(pointer) => {
                         let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
-                        memory
-                            .read(
-                                &mut *store.borrow_mut(),
-                                pointer as usize,
-                                &mut result_memory_data,
-                            )
-                            .unwrap();
+                        if !overflows {
+                            memory
+                                .read(
+                                    &mut *store.0.borrow_mut(),
+                                    pointer as usize,
+                                    &mut result_memory_data,
+                                )
+                                .unwrap();
 
-                        assert_eq!(result_memory_data, expected.to_le_bytes::<32>().to_vec());
+                            assert_eq!(result_memory_data, expected.to_le_bytes::<32>().to_vec());
+                        } else {
+                            assert_eq!(1, pointer);
+                        }
                     }
                     Err(_) => {
                         assert!(a.checked_mul(b).is_none());
@@ -798,67 +714,27 @@ mod tests {
     #[case(u32::MAX as i32, 0, 0)]
     #[case(1, u32::MAX as i32, u32::MAX as i32)]
     #[case(u16::MAX as i32, u16::MAX as i32, (u16::MAX as u32 * u16::MAX as u32) as i32)]
-    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
-    #[case(u32::MAX as i32, 2, -1)]
-    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
-    #[case(2, u32::MAX as i32, -1)]
     fn test_mul_u32(#[case] n1: i32, #[case] n2: i32, #[case] expected: i32) {
-        let (mut raw_module, _, _, _) = build_module(None);
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
-        );
-
-        let n1_l = raw_module.locals.add(ValType::I32);
-        let n2_l = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
-        func_body.local_get(n1_l).local_get(n2_l);
-
-        let mul_u32_f = mul_u32(&mut raw_module);
-        func_body.call(mul_u32_f);
-
-        let function = function_builder.finish(vec![n1_l, n2_l], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        let (_, _, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
-
+        let (mut store, _instance, entrypoint) =
+            setup_stack_mul_test::<(i32, i32), i32>(mul_u32, ValType::I32);
         let result: i32 = entrypoint.call(&mut store, (n1, n2)).unwrap();
-
         assert_eq!(expected, result);
+    }
+
+    #[rstest]
+    #[case(u32::MAX as i32, 2)]
+    #[case(2, u32::MAX as i32)]
+    fn test_mul_u32_overflow(#[case] n1: i32, #[case] n2: i32) {
+        let (mut store, instance, entrypoint) =
+            setup_stack_mul_test::<(i32, i32), i32>(mul_u32, ValType::I32);
+        let _: i32 = entrypoint.call(&mut store, (n1, n2)).unwrap();
+        assert_overflow_error(store, &instance);
     }
 
     #[test]
     fn test_mul_u32_fuzz() {
-        let (mut raw_module, _, _, _) = build_module(None);
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
-        );
-
-        let n1_l = raw_module.locals.add(ValType::I32);
-        let n2_l = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
-        func_body.local_get(n1_l).local_get(n2_l);
-
-        let mul_u32_f = mul_u32(&mut raw_module);
-        func_body.call(mul_u32_f);
-
-        let function = function_builder.finish(vec![n1_l, n2_l], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
+        let (mut store, instance, entrypoint) =
+            setup_stack_mul_test::<(u32, u32), u32>(mul_u32, ValType::I32);
 
         let reset_memory = Rc::new(AssertUnwindSafe(
             instance
@@ -869,19 +745,25 @@ mod tests {
         let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
 
         bolero::check!()
-            .with_type()
-            .for_each(|&(a, b): &(u32, u32)| {
-                let expected = a.wrapping_mul(b);
+            .with_type::<(u32, u32)>()
+            .cloned()
+            .for_each(|(a, b): (u32, u32)| {
+                let expected = a.overflowing_mul(b).0;
                 let mut store = store.borrow_mut();
-
-                let result: Result<i32, _> = entrypoint.call(&mut *store, (a as i32, b as i32));
+                let result: Result<u32, _> = entrypoint.0.call(&mut *store, (a, b));
 
                 match result {
                     Ok(res) => {
-                        assert_eq!(res, expected as i32);
+                        if a.checked_mul(b).is_none() {
+                            // Overflow case: function should return 1
+                            assert_eq!(1, res);
+                        } else {
+                            // Normal case: function should return the expected result
+                            assert_eq!(expected, res);
+                        }
                     }
                     Err(_) => {
-                        assert!(a.checked_mul(b).is_none());
+                        // Overflows are handled by runtime errors so they dont longer trap
                     }
                 }
 
@@ -896,67 +778,27 @@ mod tests {
     #[case(u64::MAX as i64, 0, 0)]
     #[case(1, u64::MAX as i64, u64::MAX as i64)]
     #[case(u32::MAX as i64, u32::MAX as i64, (u32::MAX as u64 * u32::MAX as u64) as i64)]
-    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
-    #[case(u64::MAX as i64, 2, -1)]
-    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
-    #[case(2, u64::MAX as i64, -1)]
     fn test_mul_u64(#[case] n1: i64, #[case] n2: i64, #[case] expected: i64) {
-        let (mut raw_module, _, _, _) = build_module(None);
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I64, ValType::I64],
-            &[ValType::I64],
-        );
-
-        let n1_l = raw_module.locals.add(ValType::I64);
-        let n2_l = raw_module.locals.add(ValType::I64);
-
-        let mut func_body = function_builder.func_body();
-
-        // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
-        func_body.local_get(n1_l).local_get(n2_l);
-
-        let add_u64_f = mul_u64(&mut raw_module);
-        func_body.call(add_u64_f);
-
-        let function = function_builder.finish(vec![n1_l, n2_l], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        let (_, _, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
-
+        let (mut store, _, entrypoint) =
+            setup_stack_mul_test::<(i64, i64), i64>(mul_u64, ValType::I64);
         let result: i64 = entrypoint.call(&mut store, (n1, n2)).unwrap();
-
         assert_eq!(expected, result);
+    }
+
+    #[rstest]
+    #[case(u64::MAX as i64, 2)]
+    #[case(2, u64::MAX as i64)]
+    fn test_mul_u64_overflow(#[case] n1: i64, #[case] n2: i64) {
+        let (mut store, instance, entrypoint) =
+            setup_stack_mul_test::<(i64, i64), i64>(mul_u64, ValType::I64);
+        let _: i64 = entrypoint.call(&mut store, (n1, n2)).unwrap();
+        assert_overflow_error(store, &instance);
     }
 
     #[test]
     fn test_mul_u64_fuzz() {
-        let (mut raw_module, _, _, _) = build_module(None);
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I64, ValType::I64],
-            &[ValType::I64],
-        );
-
-        let n1_l = raw_module.locals.add(ValType::I64);
-        let n2_l = raw_module.locals.add(ValType::I64);
-
-        let mut func_body = function_builder.func_body();
-
-        // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
-        func_body.local_get(n1_l).local_get(n2_l);
-
-        let add_u64_f = mul_u64(&mut raw_module);
-        func_body.call(add_u64_f);
-
-        let function = function_builder.finish(vec![n1_l, n2_l], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
+        let (mut store, instance, entrypoint) =
+            setup_stack_mul_test::<(u64, u64), u64>(mul_u64, ValType::I64);
 
         let reset_memory = Rc::new(AssertUnwindSafe(
             instance
@@ -967,23 +809,152 @@ mod tests {
         let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
 
         bolero::check!()
-            .with_type()
-            .for_each(|&(a, b): &(u64, u64)| {
-                let expected = a.wrapping_mul(b);
+            .with_type::<(u64, u64)>()
+            .cloned()
+            .for_each(|(a, b): (u64, u64)| {
+                let expected = a.overflowing_mul(b).0;
                 let mut store = store.borrow_mut();
-
-                let result: Result<i64, _> = entrypoint.call(&mut *store, (a as i64, b as i64));
+                let result: Result<u64, _> = entrypoint.0.call(&mut *store, (a, b));
 
                 match result {
                     Ok(res) => {
-                        assert_eq!(res as u64, expected);
+                        if a.checked_mul(b).is_none() {
+                            // Overflow case: function should return 1
+                            assert_eq!(1, res);
+                        } else {
+                            // Normal case: function should return the expected result
+                            assert_eq!(expected, res);
+                        }
                     }
                     Err(_) => {
-                        assert!(a.checked_mul(b).is_none());
+                        // Overflows are handled by runtime errors so they dont longer trap
                     }
                 }
 
                 reset_memory.call(&mut *store, ()).unwrap();
             });
+    }
+
+    fn setup_heap_mul_test(
+        n1_bytes: Vec<u8>,
+        n2_bytes: Vec<u8>,
+        heap_size: i32,
+    ) -> (
+        wasmtime::Store<()>,
+        wasmtime::Instance,
+        wasmtime::TypedFunc<(i32, i32), i32>,
+    ) {
+        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
+            build_module(Some(heap_size * 2));
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
+        let mut runtime_error_data = test_runtime_error_data!();
+
+        let mut function_builder = FunctionBuilder::new(
+            &mut raw_module.types,
+            &[ValType::I32, ValType::I32],
+            &[ValType::I32],
+        );
+
+        let n1_ptr = raw_module.locals.add(ValType::I32);
+        let n2_ptr = raw_module.locals.add(ValType::I32);
+
+        let mul_f = heap_integers_mul(&mut raw_module, &compilation_ctx, &mut runtime_error_data);
+
+        function_builder
+            .func_body()
+            .i32_const(0) // result_ptr
+            .i32_const(heap_size) // left_ptr
+            .i32_const(heap_size) // right_ptr (offset by heap_size)
+            .call(mul_f);
+
+        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let data = [n1_bytes, n2_bytes].concat();
+        let (_, instance, store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, data, "test_function", None);
+
+        (store, instance, entrypoint)
+    }
+
+    fn setup_stack_mul_test<T, R>(
+        mul_fn: impl FnOnce(
+            &mut walrus::Module,
+            &CompilationContext,
+            &mut RuntimeErrorData,
+        ) -> FunctionId,
+        val_type: ValType,
+    ) -> (
+        wasmtime::Store<()>,
+        wasmtime::Instance,
+        wasmtime::TypedFunc<T, R>,
+    )
+    where
+        T: wasmtime::WasmParams,
+        R: wasmtime::WasmResults,
+    {
+        let (mut raw_module, allocator_func, memory_id, ctx_globals) = build_module(None);
+        let mut builder =
+            FunctionBuilder::new(&mut raw_module.types, &[val_type, val_type], &[val_type]);
+
+        let n1_l = raw_module.locals.add(val_type);
+        let n2_l = raw_module.locals.add(val_type);
+
+        let ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
+        let mul_f = mul_fn(&mut raw_module, &ctx, &mut test_runtime_error_data!());
+
+        builder
+            .func_body()
+            .local_get(n1_l)
+            .local_get(n2_l)
+            .call(mul_f);
+
+        let function = builder.finish(vec![n1_l, n2_l], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
+        (store, instance, entrypoint)
+    }
+
+    /// Helper to verify that an overflow error was correctly written to memory
+    fn assert_overflow_error(mut store: wasmtime::Store<()>, instance: &wasmtime::Instance) {
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        // Read the error pointer from the data segment
+        let mut error_ptr_bytes = vec![0; 4];
+        memory
+            .read(
+                &mut store,
+                DATA_ABORT_MESSAGE_PTR_OFFSET as usize,
+                &mut error_ptr_bytes,
+            )
+            .unwrap();
+
+        let error_ptr = i32::from_le_bytes(error_ptr_bytes.try_into().unwrap());
+
+        // If the error pointer is 0, it means that no error occurred
+        assert_ne!(error_ptr, 0);
+
+        // Load the length
+        let mut error_length_bytes = vec![0; 4];
+        memory
+            .read(&mut store, error_ptr as usize, &mut error_length_bytes)
+            .unwrap();
+
+        let error_length = i32::from_le_bytes(error_length_bytes.try_into().unwrap());
+
+        let mut result_data = vec![0; error_length as usize];
+        memory
+            .read(&mut store, (error_ptr + 4) as usize, &mut result_data)
+            .unwrap();
+
+        let error_message = String::from_utf8_lossy(RuntimeError::Overflow.as_bytes());
+        let expected = [
+            keccak256(b"Error(string)")[..4].to_vec(),
+            <sol!((string,))>::abi_encode_params(&(error_message,)),
+        ]
+        .concat();
+        assert_eq!(result_data, expected);
     }
 }

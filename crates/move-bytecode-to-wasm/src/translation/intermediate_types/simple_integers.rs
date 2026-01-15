@@ -444,8 +444,11 @@ impl IU32 {
     pub fn mul(
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
+        compilation_ctx: &CompilationContext,
+        runtime_error_data: &mut RuntimeErrorData,
     ) -> Result<(), IntermediateTypeError> {
-        let mul_f = RuntimeFunction::MulU32.get(module, None, None)?;
+        let mul_f =
+            RuntimeFunction::MulU32.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
         builder.call(mul_f);
         Ok(())
     }
@@ -595,8 +598,11 @@ impl IU64 {
     pub fn mul(
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
+        compilation_ctx: &CompilationContext,
+        runtime_error_data: &mut RuntimeErrorData,
     ) -> Result<(), IntermediateTypeError> {
-        let mul_f = RuntimeFunction::MulU64.get(module, None, None)?;
+        let mul_f =
+            RuntimeFunction::MulU64.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
         builder.call(mul_f);
         Ok(())
     }

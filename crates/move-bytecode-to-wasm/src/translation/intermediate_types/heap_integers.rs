@@ -343,9 +343,13 @@ impl IU128 {
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
+        runtime_error_data: &mut RuntimeErrorData,
     ) -> Result<(), IntermediateTypeError> {
-        let mul_function_id =
-            RuntimeFunction::HeapIntMul.get(module, Some(compilation_ctx), None)?;
+        let mul_function_id = RuntimeFunction::HeapIntMul.get(
+            module,
+            Some(compilation_ctx),
+            Some(runtime_error_data),
+        )?;
 
         builder.i32_const(Self::HEAP_SIZE).call(mul_function_id);
 
@@ -663,9 +667,13 @@ impl IU256 {
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
+        runtime_error_data: &mut RuntimeErrorData,
     ) -> Result<(), IntermediateTypeError> {
-        let mul_function_id =
-            RuntimeFunction::HeapIntMul.get(module, Some(compilation_ctx), None)?;
+        let mul_function_id = RuntimeFunction::HeapIntMul.get(
+            module,
+            Some(compilation_ctx),
+            Some(runtime_error_data),
+        )?;
         builder.i32_const(Self::HEAP_SIZE).call(mul_function_id);
         Ok(())
     }

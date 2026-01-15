@@ -266,9 +266,15 @@ impl RuntimeFunction {
                 (Self::DowncastU128U256ToU64, Some(ctx), Some(runtime_error_data)) => {
                     integers::downcast_u128_u256_to_u64(module, ctx, runtime_error_data)
                 }
-                (Self::MulU32, _, _) => integers::mul::mul_u32(module),
-                (Self::MulU64, _, _) => integers::mul::mul_u64(module),
-                (Self::HeapIntMul, Some(ctx), _) => integers::mul::heap_integers_mul(module, ctx),
+                (Self::MulU32, Some(ctx), Some(runtime_error_data)) => {
+                    integers::mul::mul_u32(module, ctx, runtime_error_data)
+                }
+                (Self::MulU64, Some(ctx), Some(runtime_error_data)) => {
+                    integers::mul::mul_u64(module, ctx, runtime_error_data)
+                }
+                (Self::HeapIntMul, Some(ctx), Some(runtime_error_data)) => {
+                    integers::mul::heap_integers_mul(module, ctx, runtime_error_data)
+                }
                 (Self::HeapIntDivMod, Some(ctx), Some(runtime_error_data)) => {
                     integers::div::heap_integers_div_mod(module, ctx, runtime_error_data)?
                 }
