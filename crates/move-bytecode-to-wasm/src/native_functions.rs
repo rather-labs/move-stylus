@@ -668,13 +668,12 @@ impl NativeFunction {
             (Self::READ_SLOT, _, _, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, name, module_id)?;
 
-                // In this case the native function implementation is the same as the runtime one.
-                // So we reuse the runtime function.
-                RuntimeFunction::ReadAndDecodeFromStorage.get_generic(
+                tests::add_read_slot_fn(
                     module,
                     compilation_ctx,
-                    Some(runtime_error_data),
-                    &[&generics[0]],
+                    runtime_error_data,
+                    &generics[0],
+                    module_id,
                 )?
             }
             #[cfg(debug_assertions)]
