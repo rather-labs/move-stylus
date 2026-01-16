@@ -37,7 +37,6 @@ use crate::{
     abi_types::error_encoding::build_abort_error_message,
     compilation_context::{ModuleData, ModuleId},
     data::{DATA_ABORT_MESSAGE_PTR_OFFSET, RuntimeErrorData},
-    error::add_propagate_error_instructions,
     generics::{replace_type_parameters, type_contains_generics},
     hasher::get_hasher,
     hostio::host_functions::storage_flush_cache,
@@ -2878,7 +2877,7 @@ fn call_indirect(
         .i32_const(function_entry.index)
         .call_indirect(function_entry.type_id, wasm_table_id);
 
-    add_propagate_error_instructions(builder, compilation_ctx);
+    builder.add_propagate_error_instructions(compilation_ctx);
 
     add_unpack_function_return_values_instructions(
         builder,

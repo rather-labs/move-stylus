@@ -8,7 +8,6 @@ use crate::{
         DATA_STORAGE_OBJECT_OWNER_OFFSET, DATA_U256_ONE_OFFSET, DATA_ZERO_OFFSET, RuntimeErrorData,
     },
     error::RuntimeError,
-    error::add_handle_error_instructions,
     hostio::host_functions::{
         self, storage_cache_bytes32, storage_flush_cache, storage_load_bytes32, tx_origin,
     },
@@ -177,12 +176,12 @@ pub fn locate_storage_data(
         });
 
         // If we get here means the object was not found
-        block.i32_const(runtime_error_data.get(
+        block.return_error(
             module,
-            compilation_ctx.memory_id,
+            compilation_ctx,
+            runtime_error_data,
             RuntimeError::StorageObjectNotFound,
-        ));
-        add_handle_error_instructions(module, block, compilation_ctx);
+        );
     });
 
     Ok(function.finish(vec![uid_ptr, search_frozen], &mut module.funcs))

@@ -2,7 +2,7 @@ use super::NativeFunction;
 use crate::{
     CompilationContext, IntermediateType, Module, ModuleId,
     data::{DATA_SLOT_DATA_PTR_OFFSET, RuntimeErrorData},
-    error::{RuntimeError, add_handle_error_instructions},
+    error::RuntimeError,
     hostio::host_functions::storage_load_bytes32,
     native_functions::error::NativeFunctionError,
     runtime::RuntimeFunction,
@@ -105,13 +105,12 @@ pub fn add_peep_fn(
             .br_if(exit_block);
 
         // If we get here means the object was not found
-        block.i32_const(runtime_error_data.get(
+        block.return_error(
             module,
-            compilation_ctx.memory_id,
+            compilation_ctx,
+            runtime_error_data,
             RuntimeError::StorageObjectNotFound,
-        ));
-
-        add_handle_error_instructions(module, block, compilation_ctx);
+        );
     });
 
     // Decode the storage object into the internal representation

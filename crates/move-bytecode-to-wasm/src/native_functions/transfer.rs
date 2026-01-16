@@ -2,9 +2,10 @@ use crate::{
     CompilationContext,
     compilation_context::ModuleId,
     data::{DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_SHARED_OBJECTS_KEY_OFFSET, RuntimeErrorData},
-    error::{RuntimeError, add_handle_error_instructions},
+    error::RuntimeError,
     runtime::RuntimeFunction,
     translation::intermediate_types::IntermediateType,
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
@@ -86,13 +87,12 @@ pub fn add_transfer_object_fn(
             .unop(UnaryOp::I32Eqz)
             .br_if(block_id);
 
-        block.i32_const(runtime_error_data.get(
+        block.return_error(
             module,
-            compilation_ctx.memory_id,
+            compilation_ctx,
+            runtime_error_data,
             RuntimeError::SharedObjectsCannotBeTransferred,
-        ));
-
-        add_handle_error_instructions(module, block, compilation_ctx);
+        );
     });
 
     // Check that the object is not frozen
@@ -106,12 +106,12 @@ pub fn add_transfer_object_fn(
             .call(equality_fn)
             .br_if(block_id);
 
-        block.i32_const(runtime_error_data.get(
+        block.return_error(
             module,
-            compilation_ctx.memory_id,
+            compilation_ctx,
+            runtime_error_data,
             RuntimeError::FrozenObjectsCannotBeTransferred,
-        ));
-        add_handle_error_instructions(module, block, compilation_ctx);
+        );
     });
 
     // Delete the object from the owner mapping on the storage
@@ -242,12 +242,12 @@ pub fn add_share_object_fn(
                 None,
                 |then| {
                     // Build the error message and handle the error
-                    then.i32_const(runtime_error_data.get(
+                    then.return_error(
                         module,
-                        compilation_ctx.memory_id,
+                        compilation_ctx,
+                        runtime_error_data,
                         RuntimeError::FrozenObjectsCannotBeShared,
-                    ));
-                    add_handle_error_instructions(module, then, compilation_ctx);
+                    );
                 },
                 |else_| {
                     // Delete the object from owner mapping on the storage
@@ -382,12 +382,12 @@ pub fn add_freeze_object_fn(
                 None,
                 |then| {
                     // Shared objects cannot be frozen
-                    then.i32_const(runtime_error_data.get(
+                    then.return_error(
                         module,
-                        compilation_ctx.memory_id,
+                        compilation_ctx,
+                        runtime_error_data,
                         RuntimeError::SharedObjectsCannotBeFrozen,
-                    ));
-                    add_handle_error_instructions(module, then, compilation_ctx);
+                    );
                 },
                 |else_| {
                     // Delete the object from the owner mapping on the storage
