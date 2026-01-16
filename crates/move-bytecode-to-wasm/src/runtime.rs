@@ -380,8 +380,8 @@ impl RuntimeFunction {
                     integers::ascii::u64_to_ascii_base_10(module, ctx)
                 }
                 // ABI validation
-                (Self::ValidatePointer32Bit, Some(ctx), _) => {
-                    abi::validate_pointer_32_bit(module, ctx)
+                (Self::ValidatePointer32Bit, Some(ctx), Some(runtime_error_data)) => {
+                    abi::validate_pointer_32_bit(module, ctx, runtime_error_data)
                 }
                 // ABI unpacking
                 (Self::UnpackBytes, Some(ctx), _) => {
@@ -402,8 +402,8 @@ impl RuntimeFunction {
                 (Self::UnpackAddress, Some(ctx), _) => {
                     unpacking::heap_uint::unpack_address_function(module, ctx)?
                 }
-                (Self::UnpackString, Some(ctx), _) => {
-                    unpacking::string::unpack_string_function(module, ctx)?
+                (Self::UnpackString, Some(ctx), Some(runtime_error_data)) => {
+                    unpacking::string::unpack_string_function(module, ctx, runtime_error_data)?
                 }
                 (Self::InjectSigner, Some(ctx), _) => unpacking::signer::inject_signer(module, ctx),
                 // ABI packing
@@ -532,7 +532,7 @@ impl RuntimeFunction {
                 unpacking::vector::unpack_vector_function(
                     module,
                     compilation_ctx,
-                    Some(runtime_error_data),
+                    runtime_error_data,
                     generics[0],
                 )?
             }

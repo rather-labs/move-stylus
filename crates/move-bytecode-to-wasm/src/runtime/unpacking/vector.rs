@@ -29,7 +29,7 @@ use walrus::{
 pub fn unpack_vector_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
-    runtime_error_data: Option<&mut RuntimeErrorData>,
+    runtime_error_data: &mut RuntimeErrorData,
     inner: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let name =
@@ -51,8 +51,11 @@ pub fn unpack_vector_function(
 
     // Runtime functions
     let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None, None)?;
-    let validate_pointer_fn =
-        RuntimeFunction::ValidatePointer32Bit.get(module, Some(compilation_ctx), None)?;
+    let validate_pointer_fn = RuntimeFunction::ValidatePointer32Bit.get(
+        module,
+        Some(compilation_ctx),
+        Some(runtime_error_data),
+    )?;
 
     let data_reader_pointer = module.locals.add(ValType::I32);
 
@@ -60,7 +63,11 @@ pub fn unpack_vector_function(
     // values in the call data.
 
     // Validate that the pointer fits in 32 bits
-    builder.local_get(reader_pointer).call(validate_pointer_fn);
+    builder.local_get(reader_pointer).call_runtime_function(
+        compilation_ctx,
+        validate_pointer_fn,
+        &RuntimeFunction::ValidatePointer32Bit,
+    );
 
     // Load the pointer to the data, swap it to little-endian and add that to the calldata reader pointer.
     builder
@@ -89,7 +96,11 @@ pub fn unpack_vector_function(
     // Validate that the data reader pointer fits in 32 bits
     builder
         .local_get(data_reader_pointer)
-        .call(validate_pointer_fn);
+        .call_runtime_function(
+            compilation_ctx,
+            validate_pointer_fn,
+            &RuntimeFunction::ValidatePointer32Bit,
+        );
 
     // Vector length: current number of elements in the vector
     let length = module.locals.add(ValType::I32);
@@ -160,7 +171,7 @@ pub fn unpack_vector_function(
                 data_reader_pointer,
                 calldata_base_pointer_,
                 compilation_ctx,
-                runtime_error_data,
+                Some(runtime_error_data),
             )?;
 
             // Store the value

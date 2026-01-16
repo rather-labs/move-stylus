@@ -1,5 +1,6 @@
 use crate::{
     CompilationContext,
+    data::RuntimeErrorData,
     runtime::{RuntimeFunction, RuntimeFunctionError},
     wasm_builder_extensions::WasmBuilderExtension,
 };
@@ -11,12 +12,16 @@ use walrus::{
 pub fn unpack_string_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     // Big-endian to Little-endian
     let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None, None)?;
     // Validate that the pointer fits in 32 bits
-    let validate_pointer_fn =
-        RuntimeFunction::ValidatePointer32Bit.get(module, Some(compilation_ctx), None)?;
+    let validate_pointer_fn = RuntimeFunction::ValidatePointer32Bit.get(
+        module,
+        Some(compilation_ctx),
+        Some(runtime_error_data),
+    )?;
 
     let mut function = FunctionBuilder::new(
         &mut module.types,
@@ -35,7 +40,11 @@ pub fn unpack_string_function(
 
     // The ABI encoded value of a dynamic type is a reference to the location of the
     // values in the call data.
-    builder.local_get(reader_pointer).call(validate_pointer_fn);
+    builder.local_get(reader_pointer).call_runtime_function(
+        compilation_ctx,
+        validate_pointer_fn,
+        &RuntimeFunction::ValidatePointer32Bit,
+    );
 
     builder
         .local_get(reader_pointer)
@@ -63,7 +72,11 @@ pub fn unpack_string_function(
     // Validate that the data reader pointer fits in 32 bits
     builder
         .local_get(data_reader_pointer)
-        .call(validate_pointer_fn);
+        .call_runtime_function(
+            compilation_ctx,
+            validate_pointer_fn,
+            &RuntimeFunction::ValidatePointer32Bit,
+        );
 
     // Vector length: current number of elements in the vector
     let length = module.locals.add(ValType::I32);

@@ -115,9 +115,16 @@ pub fn unpack_struct_function(
         let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None, None)?;
 
         // Validate that the pointer fits in 32 bits
-        let validate_pointer_fn =
-            RuntimeFunction::ValidatePointer32Bit.get(module, Some(compilation_ctx), None)?;
-        builder.local_get(reader_pointer).call(validate_pointer_fn);
+        let validate_pointer_fn = RuntimeFunction::ValidatePointer32Bit.get(
+            module,
+            Some(compilation_ctx),
+            Some(runtime_error_data),
+        )?;
+        builder.local_get(reader_pointer).call_runtime_function(
+            compilation_ctx,
+            validate_pointer_fn,
+            &RuntimeFunction::ValidatePointer32Bit,
+        );
 
         builder
             .local_get(reader_pointer)
