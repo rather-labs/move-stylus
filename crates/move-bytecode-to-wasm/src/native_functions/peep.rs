@@ -10,9 +10,11 @@ use walrus::{
 };
 
 /// This function allows to peek into the storage of another address.
+///
 // # WASM Function Aguments:
 // * `owner_address_ptr` - pointer to the owner address
 // * `uid_ptr` - pointer to the object id
+//
 // # WASM Function Returns:
 // * reference to the object in memory
 pub fn add_peep_fn(

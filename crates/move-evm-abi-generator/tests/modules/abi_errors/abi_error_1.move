@@ -8,7 +8,7 @@ use std::ascii::String;
 #[allow(unused_field)]
 public struct SimpleError(String) has copy, drop;
 
-#[ext(pure)]
+#[ext(abi(pure))]
 entry fun revert_simple_error(s: String) {
     let error = SimpleError(s);
     revert(error);
