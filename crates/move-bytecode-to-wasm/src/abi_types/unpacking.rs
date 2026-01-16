@@ -210,8 +210,11 @@ impl Unpackable for IntermediateType {
             IntermediateType::IStruct {
                 module_id, index, ..
             } if String_::is_vm_type(module_id, *index, compilation_ctx)? => {
-                let unpack_string_function =
-                    RuntimeFunction::UnpackString.get(module, Some(compilation_ctx), None)?;
+                let unpack_string_function = RuntimeFunction::UnpackString.get(
+                    module,
+                    Some(compilation_ctx),
+                    runtime_error_data,
+                )?;
                 builder
                     .local_get(reader_pointer)
                     .local_get(calldata_base_pointer)
