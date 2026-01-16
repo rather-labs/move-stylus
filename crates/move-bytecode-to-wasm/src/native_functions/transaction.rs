@@ -104,7 +104,7 @@ pub fn add_native_data_fn(
     module_id: &ModuleId,
 ) -> Result<FunctionId, NativeFunctionError> {
     let bytes_to_vec_fn = RuntimeFunction::BytesToVec
-        .get(module, Some(compilation_ctx))
+        .get(module, Some(compilation_ctx), None)
         .map_err(NativeFunctionError::from)?;
 
     let mut function = FunctionBuilder::new(&mut module.types, &[], &[ValType::I32]);

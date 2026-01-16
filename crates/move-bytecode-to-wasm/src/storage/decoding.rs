@@ -8,7 +8,7 @@ use walrus::{
 
 use crate::{
     CompilationContext,
-    data::DATA_SLOT_DATA_PTR_OFFSET,
+    data::{DATA_SLOT_DATA_PTR_OFFSET, RuntimeErrorData},
     hostio::host_functions::{native_keccak256, storage_load_bytes32},
     runtime::RuntimeFunction,
     storage::storage_layout::field_size,
@@ -39,6 +39,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     slot_ptr: LocalId,
     slot_offset: LocalId,
     owner_ptr: LocalId,
@@ -50,7 +51,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
 
     // Runtime functions
     let accumulate_or_advance_slot_read_fn =
-        RuntimeFunction::AccumulateOrAdvanceSlotRead.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::AccumulateOrAdvanceSlotRead.get(module, Some(compilation_ctx), None)?;
 
     // Get the IStruct representation
     let struct_ = compilation_ctx.get_struct_by_intermediate_type(itype)?;
@@ -201,6 +202,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
                 module,
                 builder,
                 compilation_ctx,
+                runtime_error_data,
                 field_ptr,
                 slot_ptr,
                 slot_offset,
@@ -241,6 +243,7 @@ pub fn add_read_and_decode_storage_enum_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     slot_ptr: LocalId,
     slot_offset: LocalId,
     owner_ptr: LocalId,
@@ -248,9 +251,9 @@ pub fn add_read_and_decode_storage_enum_instructions(
 ) -> Result<LocalId, StorageError> {
     // Runtime functions
     let accumulate_or_advance_slot_read_fn =
-        RuntimeFunction::AccumulateOrAdvanceSlotRead.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::AccumulateOrAdvanceSlotRead.get(module, Some(compilation_ctx), None)?;
     let compute_enum_storage_tail_position_fn = RuntimeFunction::ComputeEnumStorageTailPosition
-        .get_generic(module, compilation_ctx, &[itype])?;
+        .get_generic(module, compilation_ctx, Some(runtime_error_data), &[itype])?;
 
     // Get the IEnum representation
     let enum_ = compilation_ctx.get_enum_by_intermediate_type(itype)?;
@@ -291,7 +294,7 @@ pub fn add_read_and_decode_storage_enum_instructions(
 
     // Read the variant index
     builder
-        .add_slot_data_ptr_plus_offset(slot_offset)
+        .slot_data_ptr_plus_offset(slot_offset)
         .load(
             compilation_ctx.memory_id,
             LoadKind::I32_8 {
@@ -341,6 +344,7 @@ pub fn add_read_and_decode_storage_enum_instructions(
                 module,
                 block,
                 compilation_ctx,
+                runtime_error_data,
                 field_ptr,
                 slot_ptr,
                 slot_offset,
@@ -399,6 +403,7 @@ pub fn add_read_and_decode_storage_vector_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     data_ptr: LocalId,
     slot_ptr: LocalId,
     owner_ptr: LocalId,
@@ -409,9 +414,9 @@ pub fn add_read_and_decode_storage_vector_instructions(
     let (native_keccak, _) = native_keccak256(module);
 
     // Runtime functions
-    let swap_fn = RuntimeFunction::SwapI32Bytes.get(module, None)?;
+    let swap_fn = RuntimeFunction::SwapI32Bytes.get(module, None, None)?;
     let accumulate_or_advance_slot_read_fn =
-        RuntimeFunction::AccumulateOrAdvanceSlotRead.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::AccumulateOrAdvanceSlotRead.get(module, Some(compilation_ctx), None)?;
 
     // Locals
     let len = module.locals.add(ValType::I32);
@@ -459,7 +464,7 @@ pub fn add_read_and_decode_storage_vector_instructions(
 
     // Allocate memory for the vector and write the header data
     let allocate_vector_with_header_function =
-        RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx), None)?;
     builder
         .local_get(len)
         .local_get(len)
@@ -520,6 +525,7 @@ pub fn add_read_and_decode_storage_vector_instructions(
                         module,
                         loop_,
                         compilation_ctx,
+                        runtime_error_data,
                         elem_data_ptr,
                         elem_slot_ptr,
                         slot_offset,
@@ -608,6 +614,7 @@ pub fn add_decode_intermediate_type_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     data_ptr: LocalId,
     slot_ptr: LocalId,
     slot_offset: LocalId,
@@ -623,7 +630,7 @@ pub fn add_decode_intermediate_type_instructions(
 
     // Runtime functions
     let write_object_slot_fn =
-        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx), None)?;
 
     match itype {
         IntermediateType::IBool
@@ -634,12 +641,12 @@ pub fn add_decode_intermediate_type_instructions(
             let (store_kind, swap_fn) = if data_size == 8 {
                 (
                     StoreKind::I64 { atomic: false },
-                    RuntimeFunction::SwapI64Bytes.get(module, None)?,
+                    RuntimeFunction::SwapI64Bytes.get(module, None, None)?,
                 )
             } else {
                 (
                     StoreKind::I32 { atomic: false },
-                    RuntimeFunction::SwapI32Bytes.get(module, None)?,
+                    RuntimeFunction::SwapI32Bytes.get(module, None, None)?,
                 )
             };
 
@@ -663,7 +670,7 @@ pub fn add_decode_intermediate_type_instructions(
 
             // Load and swap the value
             builder
-                .add_slot_data_ptr_plus_offset(slot_offset)
+                .slot_data_ptr_plus_offset(slot_offset)
                 .load(
                     compilation_ctx.memory_id,
                     load_kind,
@@ -692,12 +699,13 @@ pub fn add_decode_intermediate_type_instructions(
             );
         }
         IntermediateType::IU128 => {
-            let copy_fn = RuntimeFunction::CopyU128.get(module, Some(compilation_ctx))?;
-            let swap_fn = RuntimeFunction::SwapI128Bytes.get(module, Some(compilation_ctx))?;
+            let copy_fn = RuntimeFunction::CopyU128.get(module, Some(compilation_ctx), None)?;
+            let swap_fn =
+                RuntimeFunction::SwapI128Bytes.get(module, Some(compilation_ctx), None)?;
 
             // Copy 16 bytes from the slot data pointer (plus offset)
             builder
-                .add_slot_data_ptr_plus_offset(slot_offset)
+                .slot_data_ptr_plus_offset(slot_offset)
                 .call(copy_fn)
                 .local_set(data_ptr);
 
@@ -708,12 +716,13 @@ pub fn add_decode_intermediate_type_instructions(
                 .call(swap_fn);
         }
         IntermediateType::IU256 => {
-            let copy_fn = RuntimeFunction::CopyU256.get(module, Some(compilation_ctx))?;
-            let swap_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx))?;
+            let copy_fn = RuntimeFunction::CopyU256.get(module, Some(compilation_ctx), None)?;
+            let swap_fn =
+                RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx), None)?;
 
             // Copy 32 bytes from the slot data pointer
             builder
-                .add_slot_data_ptr_plus_offset(slot_offset)
+                .slot_data_ptr_plus_offset(slot_offset)
                 .call(copy_fn)
                 .local_set(data_ptr);
 
@@ -733,7 +742,7 @@ pub fn add_decode_intermediate_type_instructions(
             // Add 12 to the offset to write the last 20 bytes of the address
             builder.i32_const(12).binop(BinaryOp::I32Add);
 
-            builder.add_slot_data_ptr_plus_offset(slot_offset);
+            builder.slot_data_ptr_plus_offset(slot_offset);
 
             // Number of bytes to copy
             builder.i32_const(20);
@@ -787,6 +796,7 @@ pub fn add_decode_intermediate_type_instructions(
                     module,
                     builder,
                     compilation_ctx,
+                    runtime_error_data,
                     child_struct_slot_ptr,
                     slot_offset,
                     owner_ptr,
@@ -806,6 +816,7 @@ pub fn add_decode_intermediate_type_instructions(
                     module,
                     builder,
                     compilation_ctx,
+                    runtime_error_data,
                     slot_ptr,
                     slot_offset,
                     owner_ptr,
@@ -822,6 +833,7 @@ pub fn add_decode_intermediate_type_instructions(
                 module,
                 builder,
                 compilation_ctx,
+                runtime_error_data,
                 slot_ptr,
                 slot_offset,
                 owner_ptr,
@@ -836,6 +848,7 @@ pub fn add_decode_intermediate_type_instructions(
                 module,
                 builder,
                 compilation_ctx,
+                runtime_error_data,
                 data_ptr,
                 slot_ptr,
                 owner_ptr,

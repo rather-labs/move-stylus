@@ -1,6 +1,7 @@
 use crate::{
     CompilationContext,
     abi_types::{error::AbiError, unpacking::Unpackable},
+    data::RuntimeErrorData,
     runtime::{RuntimeFunction, RuntimeFunctionError},
     translation::intermediate_types::IntermediateType,
     wasm_builder_extensions::WasmBuilderExtension,
@@ -28,6 +29,7 @@ use walrus::{
 pub fn unpack_vector_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: Option<&mut RuntimeErrorData>,
     inner: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let name =
@@ -48,9 +50,9 @@ pub fn unpack_vector_function(
     let calldata_base_pointer = module.locals.add(ValType::I32);
 
     // Runtime functions
-    let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
+    let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None, None)?;
     let validate_pointer_fn =
-        RuntimeFunction::ValidatePointer32Bit.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::ValidatePointer32Bit.get(module, Some(compilation_ctx), None)?;
 
     let data_reader_pointer = module.locals.add(ValType::I32);
 
@@ -82,7 +84,7 @@ pub fn unpack_vector_function(
         .local_get(reader_pointer)
         .i32_const(32)
         .binop(BinaryOp::I32Add)
-        .global_set(compilation_ctx.calldata_reader_pointer);
+        .global_set(compilation_ctx.globals.calldata_reader_pointer);
 
     // Validate that the data reader pointer fits in 32 bits
     builder
@@ -121,7 +123,7 @@ pub fn unpack_vector_function(
 
     // Allocate space for the vector
     let allocate_vector_with_header_function =
-        RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx), None)?;
     builder
         .local_get(length)
         .local_get(length)
@@ -154,9 +156,11 @@ pub fn unpack_vector_function(
                 None,
                 loop_block,
                 module,
+                None,
                 data_reader_pointer,
                 calldata_base_pointer_,
                 compilation_ctx,
+                runtime_error_data,
             )?;
 
             // Store the value
@@ -193,7 +197,7 @@ pub fn unpack_vector_function(
         .local_get(reader_pointer)
         .i32_const(32)
         .binop(BinaryOp::I32Add)
-        .global_set(compilation_ctx.calldata_reader_pointer);
+        .global_set(compilation_ctx.globals.calldata_reader_pointer);
 
     builder.local_get(vector_pointer);
 
@@ -208,31 +212,30 @@ pub fn unpack_vector_function(
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
-    use alloy_primitives::{U256, address};
-    use alloy_sol_types::{SolType, sol};
-    use walrus::{FunctionBuilder, ValType};
-
     use crate::{
         abi_types::unpacking::Unpackable,
+        data::RuntimeErrorData,
         test_compilation_context,
         test_tools::{build_module, setup_wasmtime_module},
         translation::intermediate_types::IntermediateType,
     };
+    use alloy_primitives::{U256, address};
+    use alloy_sol_types::{SolType, sol};
+    use std::sync::Arc;
+    use walrus::{FunctionBuilder, ValType};
 
     /// Test helper for unpacking vector types
     fn unpack_vec(data: &[u8], int_type: IntermediateType, expected_result_bytes: &[u8]) {
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+        let (mut raw_module, allocator, memory_id, ctx_globals) =
             build_module(Some(data.len() as i32));
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+        let mut runtime_error_data = RuntimeErrorData::new();
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
-
         let args_pointer = raw_module.locals.add(ValType::I32);
         let calldata_reader_pointer = raw_module.locals.add(ValType::I32);
         let mut func_body = function_builder.func_body();
+
         func_body.i32_const(0);
         func_body.local_tee(args_pointer);
         func_body.local_set(calldata_reader_pointer);
@@ -242,9 +245,11 @@ mod tests {
                 None,
                 &mut func_body,
                 &mut raw_module,
+                None,
                 args_pointer,
                 calldata_reader_pointer,
                 &compilation_ctx,
+                Some(&mut runtime_error_data),
             )
             .unwrap();
 

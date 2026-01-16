@@ -10,6 +10,7 @@ use crate::{
     CompilationContext,
     abi_types::{event_encoding::move_signature_to_event_signature_hash, packing::Packable},
     compilation_context::ModuleId,
+    data::RuntimeErrorData,
     hostio::host_functions::{emit_log, native_keccak256},
     runtime::RuntimeFunction,
     translation::intermediate_types::{
@@ -34,6 +35,7 @@ use super::{NativeFunction, error::NativeFunctionError};
 pub fn add_emit_log_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     itype: &IntermediateType,
     module_id: &ModuleId,
 ) -> Result<FunctionId, NativeFunctionError> {
@@ -118,6 +120,7 @@ pub fn add_emit_log_fn(
                     module,
                     &mut builder,
                     compilation_ctx,
+                    runtime_error_data,
                     inner,
                     local,
                 )?;
@@ -198,6 +201,7 @@ pub fn add_emit_log_fn(
                     module,
                     &mut builder,
                     compilation_ctx,
+                    runtime_error_data,
                     struct_,
                     local,
                 )?;
@@ -315,6 +319,7 @@ pub fn add_emit_log_fn(
                     writer_pointer,
                     calldata_reference_pointer,
                     compilation_ctx,
+                    Some(runtime_error_data),
                 )?;
             }
 
@@ -422,8 +427,12 @@ pub fn add_emit_log_fn(
             .local_tee(writer_pointer)
             .local_set(abi_encoded_data_calldata_reference_pointer);
 
-        let pack_struct_function =
-            RuntimeFunction::PackStruct.get_generic(module, compilation_ctx, &[itype])?;
+        let pack_struct_function = RuntimeFunction::PackStruct.get_generic(
+            module,
+            compilation_ctx,
+            Some(runtime_error_data),
+            &[itype],
+        )?;
         if data_struct.solidity_abi_encode_is_dynamic(compilation_ctx)? {
             builder
                 .local_get(data_struct_ptr)
@@ -494,6 +503,7 @@ fn add_encode_indexed_vector_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     inner: &IntermediateType,
     vector_ptr: LocalId,
 ) -> Result<(), NativeFunctionError> {
@@ -553,6 +563,7 @@ fn add_encode_indexed_vector_instructions(
                         writer_pointer,
                         writer_pointer,
                         compilation_ctx,
+                        Some(runtime_error_data),
                     )?;
 
                     loop_
@@ -598,6 +609,7 @@ fn add_encode_indexed_vector_instructions(
                         module,
                         loop_,
                         compilation_ctx,
+                        runtime_error_data,
                         nested_inner,
                         value,
                     )?;
@@ -717,6 +729,7 @@ fn add_encode_indexed_vector_instructions(
                         writer_pointer,
                         writer_pointer,
                         compilation_ctx,
+                        None,
                     )?;
 
                     loop_
@@ -757,6 +770,7 @@ fn add_encode_indexed_struct_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     struct_: &IStruct,
     struct_ptr: LocalId,
 ) -> Result<(), NativeFunctionError> {
@@ -811,6 +825,7 @@ fn add_encode_indexed_struct_instructions(
                     writer_pointer,
                     writer_pointer,
                     compilation_ctx,
+                    None,
                 )?;
             }
             IntermediateType::IVector(inner) => {
@@ -832,6 +847,7 @@ fn add_encode_indexed_struct_instructions(
                     module,
                     builder,
                     compilation_ctx,
+                    runtime_error_data,
                     inner,
                     value,
                 )?;
@@ -900,6 +916,7 @@ fn add_encode_indexed_struct_instructions(
                     module,
                     builder,
                     compilation_ctx,
+                    runtime_error_data,
                     child_struct,
                     value,
                 )?;
@@ -953,6 +970,7 @@ fn add_encode_indexed_struct_instructions(
                     writer_pointer,
                     writer_pointer,
                     compilation_ctx,
+                    None,
                 )?;
             }
             _ => {

@@ -1,8 +1,12 @@
 use super::NativeFunction;
 use crate::{
-    CompilationContext, IntermediateType, Module, ModuleId, data::DATA_SLOT_DATA_PTR_OFFSET,
-    hostio::host_functions::storage_load_bytes32, native_functions::error::NativeFunctionError,
-    runtime::RuntimeFunction, wasm_builder_extensions::WasmBuilderExtension,
+    CompilationContext, IntermediateType, Module, ModuleId,
+    data::{DATA_SLOT_DATA_PTR_OFFSET, RuntimeErrorData},
+    error::RuntimeError,
+    hostio::host_functions::storage_load_bytes32,
+    native_functions::error::NativeFunctionError,
+    runtime::RuntimeFunction,
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 use walrus::{
     FunctionBuilder, FunctionId, ValType,
@@ -10,14 +14,17 @@ use walrus::{
 };
 
 /// This function allows to peek into the storage of another address.
+///
 // # WASM Function Aguments:
 // * `owner_address_ptr` - pointer to the owner address
 // * `uid_ptr` - pointer to the object id
+//
 // # WASM Function Returns:
 // * reference to the object in memory
 pub fn add_peep_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     itype: &IntermediateType,
     module_id: &ModuleId,
 ) -> Result<FunctionId, NativeFunctionError> {
@@ -33,9 +40,9 @@ pub fn add_peep_fn(
     };
 
     let (storage_load, _) = storage_load_bytes32(module);
-    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx))?;
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx), None)?;
     let write_object_slot_fn =
-        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx), None)?;
 
     let owner_address_ptr = module.locals.add(ValType::I32);
     let uid_ptr = module.locals.add(ValType::I32);
@@ -100,13 +107,22 @@ pub fn add_peep_fn(
             .br_if(exit_block);
 
         // If we get here means the object was not found
-        block.unreachable();
+        block.return_error(
+            module,
+            compilation_ctx,
+            runtime_error_data,
+            RuntimeError::StorageObjectNotFound,
+        );
     });
 
     // Decode the storage object into the internal representation
 
-    let read_and_decode_from_storage_fn =
-        RuntimeFunction::ReadAndDecodeFromStorage.get_generic(module, compilation_ctx, &[itype])?;
+    let read_and_decode_from_storage_fn = RuntimeFunction::ReadAndDecodeFromStorage.get_generic(
+        module,
+        compilation_ctx,
+        Some(runtime_error_data),
+        &[itype],
+    )?;
 
     // Allocate memory for the reference to the object
     let ref_ptr = module.locals.add(ValType::I32);

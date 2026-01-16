@@ -23,6 +23,7 @@ use abi_types::public_function::PublicFunction;
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
 use compilation_context::{ModuleData, ModuleId};
 use constructor::inject_constructor;
+use data::RuntimeErrorData;
 use error::{
     CodeError, CompilationError, DependencyError, DependencyProcessingError, ICEError, ICEErrorKind,
 };
@@ -39,7 +40,7 @@ use translation::{
     translate_and_link_functions,
 };
 
-use walrus::{ConstExpr, GlobalId, Module, RefType, ValType, ir::Value};
+use walrus::{GlobalId, Module, RefType};
 use wasm_validation::validate_stylus_wasm;
 
 pub use translation::functions::MappedFunction;
@@ -88,10 +89,6 @@ pub fn translate_package<'move_package>(
     }
 
     let mut modules = HashMap::new();
-
-    // Contains the module data for all the root package and its dependencies
-    // let mut modules_data: HashMap<ModuleId, ModuleData> = HashMap::new();
-
     let mut errors = Vec::new();
 
     for root_compiled_module in &root_compiled_units {
@@ -113,7 +110,8 @@ pub fn translate_package<'move_package>(
 
         let root_module_id = ModuleId::new(package_address.into(), module_name.as_str());
 
-        let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
+        let (mut module, allocator_func, memory_id, compilation_context_globals) =
+            hostio::new_module_with_host();
 
         #[cfg(feature = "inject-host-debug-fns")]
         crate::test_tools::inject_debug_fns(&mut module);
@@ -167,18 +165,15 @@ pub fn translate_package<'move_package>(
             special_attributes,
         )?;
 
-        let calldata_reader_pointer_global =
-            module
-                .globals
-                .add_local(ValType::I32, true, false, ConstExpr::Value(Value::I32(0)));
-
         let compilation_ctx = CompilationContext::new(
             &root_module_data,
             modules_data,
             memory_id,
             allocator_func,
-            calldata_reader_pointer_global,
+            compilation_context_globals,
         );
+
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let mut public_functions = Vec::new();
         for function_information in root_module_data.functions.information.iter().filter(|fi| {
@@ -190,6 +185,7 @@ pub fn translate_package<'move_package>(
                 modules_data,
                 &mut module,
                 &compilation_ctx,
+                &mut runtime_error_data,
                 &mut dynamic_fields_global_variables,
             )?;
 
@@ -221,6 +217,7 @@ pub fn translate_package<'move_package>(
             &mut module,
             &public_functions,
             &compilation_ctx,
+            &mut runtime_error_data,
             &dynamic_fields_global_variables,
         )?;
 

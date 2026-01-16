@@ -123,9 +123,8 @@ mod tests {
 
     #[test]
     fn test_move_signature_to_event_signature_hash_nested() {
-        let (_, allocator_func, memory_id, calldata_reader_pointer_global) = build_module(None);
-        let mut compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+        let (_, allocator_func, memory_id, ctx_globals) = build_module(None);
+        let mut compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
 
         let struct_1 = IStruct::new(
             StructDefinitionIndex::new(0),
@@ -233,9 +232,8 @@ mod tests {
         #[case] event_struct: &IStruct,
         #[case] expected: AbiEventSignatureHash,
     ) {
-        let (_, allocator_func, memory_id, calldata_reader_pointer_global) = build_module(None);
-        let mut compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+        let (_, allocator_func, memory_id, ctx_globals) = build_module(None);
+        let mut compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
 
         let mut module_data = ModuleData::default();
 

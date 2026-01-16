@@ -1,9 +1,10 @@
 use crate::{
     CompilationContext,
     abi_types::unpacking::Unpackable,
-    data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
+    data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, RuntimeErrorData},
     runtime::{RuntimeFunction, RuntimeFunctionError},
     translation::intermediate_types::IntermediateType,
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
@@ -80,6 +81,7 @@ use walrus::{
 pub fn unpack_struct_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     itype: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let name =
@@ -110,11 +112,11 @@ pub fn unpack_struct_function(
     // In a dynamic struct, the first value is where the values are packed in the calldata
     if struct_.solidity_abi_encode_is_dynamic(compilation_ctx)? {
         // Big-endian to Little-endian
-        let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
+        let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None, None)?;
 
         // Validate that the pointer fits in 32 bits
         let validate_pointer_fn =
-            RuntimeFunction::ValidatePointer32Bit.get(module, Some(compilation_ctx))?;
+            RuntimeFunction::ValidatePointer32Bit.get(module, Some(compilation_ctx), None)?;
         builder.local_get(reader_pointer).call(validate_pointer_fn);
 
         builder
@@ -156,9 +158,11 @@ pub fn unpack_struct_function(
             Some(itype),
             &mut builder,
             module,
+            None,
             data_reader_pointer,
             calldata_ptr,
             compilation_ctx,
+            Some(runtime_error_data),
         )?;
 
         // If the field is stack type, we need to create the intermediate pointer, otherwise
@@ -221,7 +225,7 @@ pub fn unpack_struct_function(
         .local_get(reader_pointer)
         .i32_const(advancement)
         .binop(BinaryOp::I32Add)
-        .global_set(compilation_ctx.calldata_reader_pointer);
+        .global_set(compilation_ctx.globals.calldata_reader_pointer);
 
     builder.local_get(struct_ptr);
 
@@ -234,6 +238,7 @@ pub fn unpack_struct_function(
 pub fn unpack_storage_struct_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     itype: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let name = RuntimeFunction::UnpackStorageStruct
@@ -255,18 +260,29 @@ pub fn unpack_storage_struct_function(
     let owner_id_ptr = module.locals.add(ValType::I32);
 
     // Search for the object in the objects mappings
-    let locate_storage_data_fn =
-        RuntimeFunction::LocateStorageData.get(module, Some(compilation_ctx))?;
+    let locate_storage_data_fn = RuntimeFunction::LocateStorageData.get(
+        module,
+        Some(compilation_ctx),
+        Some(runtime_error_data),
+    )?;
 
     builder
         .local_get(uid_ptr)
         .local_get(unpack_frozen)
-        .call(locate_storage_data_fn)
+        .call_runtime_function(
+            compilation_ctx,
+            locate_storage_data_fn,
+            &RuntimeFunction::LocateStorageData,
+        )
         .local_set(owner_id_ptr);
 
     // Read the object
-    let read_and_decode_from_storage_fn =
-        RuntimeFunction::ReadAndDecodeFromStorage.get_generic(module, compilation_ctx, &[itype])?;
+    let read_and_decode_from_storage_fn = RuntimeFunction::ReadAndDecodeFromStorage.get_generic(
+        module,
+        compilation_ctx,
+        Some(runtime_error_data),
+        &[itype],
+    )?;
 
     // Copy the slot number into a local to avoid overwriting it later
     let slot_ptr = module.locals.add(ValType::I32);

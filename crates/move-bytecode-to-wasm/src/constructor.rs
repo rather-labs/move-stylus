@@ -83,7 +83,7 @@ pub fn build_constructor(
     const FLAG: i32 = 1;
 
     // Host function for checking if all bytes are zero
-    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx))?;
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx), None)?;
 
     // Host functions for storage operations
     let (storage_load_fn, _) = host_functions::storage_load_bytes32(module);
@@ -123,7 +123,7 @@ pub fn build_constructor(
     builder.local_get(value_ptr).i32_const(32).call(is_zero_fn);
 
     // If storage has not been initialized, proceed with initialization
-    let mut inner_result = Ok(());
+    let mut inner_result: Result<(), VmHandledTypeError> = Ok(());
     builder.if_else(
         None,
         |then| {

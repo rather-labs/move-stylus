@@ -34,7 +34,7 @@ impl IVector {
         let needed_bytes = 4 + 4 + data_size * (*len as usize);
 
         let allocate_vector_with_header_function =
-            RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx))?;
+            RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx), None)?;
 
         builder
             .local_get(len_local)
@@ -86,7 +86,7 @@ impl IVector {
         let len_local = module.locals.add(ValType::I32);
         let data_size = inner.wasm_memory_data_size()?;
         let allocate_vector_with_header_function =
-            RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx))?;
+            RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx), None)?;
 
         if num_elements == 0 {
             // Set length
@@ -217,7 +217,7 @@ impl IVector {
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
-        let downcast_f = RuntimeFunction::DowncastU64ToU32.get(module, None)?;
+        let downcast_f = RuntimeFunction::DowncastU64ToU32.get(module, None, None)?;
 
         match inner {
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -252,7 +252,7 @@ impl IVector {
 
         builder.i32_const(inner.wasm_memory_data_size()?);
 
-        let borrow_f = RuntimeFunction::VecBorrow.get(module, Some(compilation_ctx))?;
+        let borrow_f = RuntimeFunction::VecBorrow.get(module, Some(compilation_ctx), None)?;
         builder.call(borrow_f);
 
         Ok(())
@@ -264,6 +264,7 @@ mod tests {
     use std::sync::Arc;
 
     use crate::{
+        data::RuntimeErrorData,
         test_compilation_context,
         test_tools::{build_module, setup_wasmtime_module},
     };
@@ -311,11 +312,11 @@ mod tests {
     }
 
     fn test_vector_copy(data: &[u8], inner_type: IntermediateType, expected_result_bytes: &[u8]) {
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
@@ -336,7 +337,12 @@ mod tests {
 
         // Copy the vector and return the new pointer
         let copy_local_function = RuntimeFunction::VecCopyLocal
-            .get_generic(&mut raw_module, &compilation_ctx, &[&inner_type])
+            .get_generic(
+                &mut raw_module,
+                &compilation_ctx,
+                Some(&mut runtime_error_data),
+                &[&inner_type],
+            )
             .unwrap();
 
         builder.call(copy_local_function);
@@ -412,11 +418,10 @@ mod tests {
         expected_result_bytes: &[u8],
         expected_pop_stack: i32,
     ) {
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
@@ -449,7 +454,12 @@ mod tests {
         builder.local_get(ptr); // this would be the mutable reference to the vector
 
         let pop_back_f = RuntimeFunction::VecPopBack
-            .get_generic(&mut raw_module, &compilation_ctx, &[&inner_type])
+            .get_generic(
+                &mut raw_module,
+                &compilation_ctx,
+                Some(&mut runtime_error_data),
+                &[&inner_type],
+            )
             .unwrap();
         builder.call(pop_back_f);
 
@@ -478,11 +488,10 @@ mod tests {
         inner_type: IntermediateType,
         expected_result_bytes: &[u8],
     ) {
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
@@ -539,7 +548,12 @@ mod tests {
 
         // First push back copies the entire vector, increasing its capacity
         let push_back_f = RuntimeFunction::VecPushBack
-            .get_generic(&mut raw_module, &compilation_ctx, &[&inner_type])
+            .get_generic(
+                &mut raw_module,
+                &compilation_ctx,
+                Some(&mut runtime_error_data),
+                &[&inner_type],
+            )
             .unwrap();
         builder.call(push_back_f);
 
@@ -591,11 +605,10 @@ mod tests {
         idx1: i64,
         idx2: i64,
     ) {
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
@@ -629,7 +642,12 @@ mod tests {
         builder.i64_const(idx2); // idx2
 
         let swap_f = RuntimeFunction::VecSwap
-            .get_generic(&mut raw_module, &compilation_ctx, &[&inner_type])
+            .get_generic(
+                &mut raw_module,
+                &compilation_ctx,
+                Some(&mut runtime_error_data),
+                &[&inner_type],
+            )
             .unwrap();
         builder.call(swap_f);
 

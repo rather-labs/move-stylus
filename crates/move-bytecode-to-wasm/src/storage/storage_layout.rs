@@ -233,20 +233,22 @@ pub fn field_size(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        compilation_context::{ModuleData, ModuleId},
+        data::RuntimeErrorData,
+        runtime::RuntimeFunction,
+        test_tools::build_module,
+        translation::intermediate_types::{
+            VmHandledStruct,
+            enums::IEnumVariant,
+            structs::{IStruct, IStructType},
+        },
+    };
     use alloy_primitives::U256;
     use move_binary_format::file_format::StructDefinitionIndex;
     use rstest::rstest;
     use std::collections::HashMap;
     use std::sync::Arc;
-
-    use crate::compilation_context::{ModuleData, ModuleId};
-    use crate::runtime::RuntimeFunction;
-    use crate::test_tools::build_module;
-    use crate::translation::intermediate_types::{
-        VmHandledStruct,
-        enums::IEnumVariant,
-        structs::{IStruct, IStructType},
-    };
     use walrus::{
         Module, ValType,
         ir::{LoadKind, MemArg},
@@ -290,13 +292,14 @@ mod tests {
     fn execute_compute_enum_storage_tail_position(
         module: &mut Module,
         compilation_ctx: &CompilationContext,
+        runtime_error_data: &mut RuntimeErrorData,
         itype: &IntermediateType,
         head_slot_ptr_data: [u8; 32],
         head_slot_offset_data: u32,
     ) -> Result<([u8; 32], u32), Box<dyn std::error::Error>> {
         // Get the runtime function that will be used by compute_enum_storage_tail_position
         let compute_enum_storage_tail_position_fn = RuntimeFunction::ComputeEnumStorageTailPosition
-            .get_generic(module, compilation_ctx, &[itype])
+            .get_generic(module, compilation_ctx, Some(runtime_error_data), &[itype])
             .unwrap();
 
         // Test function setup
@@ -421,6 +424,7 @@ mod tests {
         .unwrap();
 
         let (ctx, mut module) = create_test_ctx(vec![], vec![enum_.clone()]);
+        let mut runtime_error_data = RuntimeErrorData::new();
         let compilation_ctx = &ctx;
 
         let result = compute_enum_storage_size(&enum_, head_offset, compilation_ctx).unwrap();
@@ -440,6 +444,7 @@ mod tests {
         let (tail_slot_bytes, tail_offset) = execute_compute_enum_storage_tail_position(
             &mut module,
             compilation_ctx,
+            &mut runtime_error_data,
             &itype,
             head_slot,
             head_offset,
@@ -542,7 +547,7 @@ mod tests {
 
         let (ctx, mut module) = create_test_ctx(vec![], vec![enum_.clone()]);
         let compilation_ctx = &ctx;
-
+        let mut runtime_error_data = RuntimeErrorData::new();
         let head_offset_plus_variant = (head_offset + 1) % SLOT_SIZE;
 
         // Test each variant size
@@ -582,6 +587,7 @@ mod tests {
         let (tail_slot, tail_offset) = execute_compute_enum_storage_tail_position(
             &mut module,
             compilation_ctx,
+            &mut runtime_error_data,
             &itype,
             head_slot,
             head_offset,
@@ -685,7 +691,7 @@ mod tests {
             vec![nested_enum_1.clone(), nested_enum_2.clone(), enum_.clone()],
         );
         let compilation_ctx = &ctx;
-
+        let mut runtime_error_data = RuntimeErrorData::new();
         let head_offset_plus_variant = (head_offset + 1) % SLOT_SIZE;
 
         // Test each variant size
@@ -725,6 +731,7 @@ mod tests {
         let (tail_slot, tail_offset) = execute_compute_enum_storage_tail_position(
             &mut module,
             compilation_ctx,
+            &mut runtime_error_data,
             &itype,
             head_slot,
             head_offset,
@@ -853,7 +860,7 @@ mod tests {
             vec![enum_.clone()],
         );
         let compilation_ctx = &ctx;
-
+        let mut runtime_error_data = RuntimeErrorData::new();
         let head_offset_plus_variant = (head_offset + 1) % SLOT_SIZE;
 
         // Test each variant size
@@ -893,6 +900,7 @@ mod tests {
         let (tail_slot, tail_offset) = execute_compute_enum_storage_tail_position(
             &mut module,
             compilation_ctx,
+            &mut runtime_error_data,
             &itype,
             head_slot,
             head_offset,

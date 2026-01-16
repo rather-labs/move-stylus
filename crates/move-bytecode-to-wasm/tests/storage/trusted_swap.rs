@@ -53,7 +53,7 @@ fn test_successful_swap(
     assert_eq!(0, result);
 
     // Read the object id emmited from the contract's events
-    let obj_a_id = runtime.obtain_uid();
+    let obj_a_id = runtime.obtain_uid().unwrap();
 
     let obj_a_slot = derive_object_slot(&OWNER_A, &obj_a_id.0);
 
@@ -75,7 +75,7 @@ fn test_successful_swap(
     assert_eq!(0, result);
 
     // Read the swap request id emmited from the contract's events
-    let swap_request_a_id = runtime.obtain_uid();
+    let swap_request_a_id = runtime.obtain_uid().unwrap();
     println!("Swap Request A ID: {swap_request_a_id:#x}");
 
     // Assert that the slot is empty
@@ -95,7 +95,7 @@ fn test_successful_swap(
     assert_eq!(0, result);
 
     // Read the object id emmited from the contract's events
-    let obj_b_id = runtime.obtain_uid();
+    let obj_b_id = runtime.obtain_uid().unwrap();
 
     let obj_b_slot = derive_object_slot(&OWNER_B, &obj_b_id.0);
 
@@ -116,7 +116,7 @@ fn test_successful_swap(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let swap_request_b_id = runtime.obtain_uid();
+    let swap_request_b_id = runtime.obtain_uid().unwrap();
 
     // Assert that the slot is empty
     assert_eq!(
@@ -182,7 +182,7 @@ fn test_swap_too_cheap(
     assert_eq!(0, result);
 
     // Read the object id emmited from the contract's events
-    let obj_a_id = runtime.obtain_uid();
+    let obj_a_id = runtime.obtain_uid().unwrap();
 
     // Request a swap with a fee too low
     let fee_a = 999;
@@ -206,14 +206,14 @@ fn test_swap_different_scarcity(
     assert_eq!(0, result);
 
     // Read the object id emmited from the contract's events
-    let obj_a_id = runtime.obtain_uid();
+    let obj_a_id = runtime.obtain_uid().unwrap();
 
     let call_data = requestSwapCall::new((obj_a_id, SERVICE.into(), fee_a)).abi_encode();
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
     // Read the swap request id emmited from the contract's events
-    let swap_request_a_id = runtime.obtain_uid();
+    let swap_request_a_id = runtime.obtain_uid().unwrap();
 
     ////// Second owner requests a swap //////
     runtime.set_msg_sender(OWNER_B);
@@ -225,13 +225,13 @@ fn test_swap_different_scarcity(
     assert_eq!(0, result);
 
     // Read the object id emmited from the contract's events
-    let obj_b_id = runtime.obtain_uid();
+    let obj_b_id = runtime.obtain_uid().unwrap();
 
     let call_data = requestSwapCall::new((obj_b_id, SERVICE.into(), fee_b)).abi_encode();
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let swap_request_b_id = runtime.obtain_uid();
+    let swap_request_b_id = runtime.obtain_uid().unwrap();
 
     ////// Execute the swap //////
     runtime.set_msg_sender(SERVICE);
@@ -257,14 +257,14 @@ fn test_swap_same_style(
     assert_eq!(0, result);
 
     // Read the object id emmited from the contract's events
-    let obj_a_id = runtime.obtain_uid();
+    let obj_a_id = runtime.obtain_uid().unwrap();
 
     let call_data = requestSwapCall::new((obj_a_id, SERVICE.into(), fee_a)).abi_encode();
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
     // Read the swap request id emmited from the contract's events
-    let swap_request_a_id = runtime.obtain_uid();
+    let swap_request_a_id = runtime.obtain_uid().unwrap();
 
     ////// Second owner requests a swap //////
     runtime.set_msg_sender(OWNER_B);
@@ -276,13 +276,13 @@ fn test_swap_same_style(
     assert_eq!(0, result);
 
     // Read the object id emmited from the contract's events
-    let obj_b_id = runtime.obtain_uid();
+    let obj_b_id = runtime.obtain_uid().unwrap();
 
     let call_data = requestSwapCall::new((obj_b_id, SERVICE.into(), fee_b)).abi_encode();
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let swap_request_b_id = runtime.obtain_uid();
+    let swap_request_b_id = runtime.obtain_uid().unwrap();
 
     ////// Execute the swap //////
     runtime.set_msg_sender(SERVICE);

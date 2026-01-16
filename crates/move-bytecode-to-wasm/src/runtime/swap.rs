@@ -141,7 +141,7 @@ pub fn swap_bytes_function<const N: u32>(
     let origin_ptr = module.locals.add(ValType::I32);
     let dest_ptr = module.locals.add(ValType::I32);
 
-    let swap_64 = RuntimeFunction::SwapI64Bytes.get(module, None)?;
+    let swap_64 = RuntimeFunction::SwapI64Bytes.get(module, None, None)?;
 
     // We leave in stack
     // dest ptr

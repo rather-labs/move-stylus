@@ -3,7 +3,10 @@ use move_compiler::{
     parser::ast::{Attribute_, AttributeValue_, LeadingNameAccess_, StructDefinition, Value_},
 };
 
-use crate::{SpecialAttributeError, error::SpecialAttributeErrorKind};
+use crate::{
+    SpecialAttributeError,
+    error::{DIAGNOSTIC_CATEGORY, SpecialAttributeErrorKind},
+};
 
 #[derive(Debug)]
 pub struct ExternalStruct {
@@ -45,7 +48,7 @@ pub enum ExternalStructError {
 impl From<&ExternalStructError> for DiagnosticInfo {
     fn from(value: &ExternalStructError) -> Self {
         custom(
-            "External struct error",
+            DIAGNOSTIC_CATEGORY,
             Severity::BlockingError,
             4,
             4,

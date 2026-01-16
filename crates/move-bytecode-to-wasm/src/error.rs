@@ -149,3 +149,32 @@ impl From<&CodeError> for Diagnostic {
         }
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RuntimeError {
+    FrozenObjectsCannotBeShared,
+    SharedObjectsCannotBeFrozen,
+    FrozenObjectsCannotBeTransferred,
+    SharedObjectsCannotBeTransferred,
+    StorageObjectNotFound,
+    Overflow,
+    Underflow,
+}
+
+impl RuntimeError {
+    pub fn as_bytes(&self) -> &[u8] {
+        match self {
+            RuntimeError::FrozenObjectsCannotBeShared => b"Frozen objects cannot be shared",
+            RuntimeError::SharedObjectsCannotBeFrozen => b"Shared objects cannot be frozen",
+            RuntimeError::FrozenObjectsCannotBeTransferred => {
+                b"Frozen objects cannot be transferred"
+            }
+            RuntimeError::SharedObjectsCannotBeTransferred => {
+                b"Shared objects cannot be transferred"
+            }
+            RuntimeError::StorageObjectNotFound => b"Object not found",
+            RuntimeError::Overflow => b"Overflow",
+            RuntimeError::Underflow => b"Underflow",
+        }
+    }
+}

@@ -92,7 +92,7 @@ fn test_struct_with_simple_enums(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let struct_with_simple_enums_id = runtime.obtain_uid();
+    let struct_with_simple_enums_id = runtime.obtain_uid().unwrap();
 
     let call_data = getStructWithSimpleEnumsCall::new((struct_with_simple_enums_id,)).abi_encode();
     let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -155,7 +155,7 @@ fn test_foo_struct(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let foo_struct_id = runtime.obtain_uid();
+    let foo_struct_id = runtime.obtain_uid().unwrap();
 
     let call_data = getVariantACall::new((foo_struct_id,)).abi_encode();
     let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -217,7 +217,7 @@ fn test_bar_struct(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let bar_struct_id = runtime.obtain_uid();
+    let bar_struct_id = runtime.obtain_uid().unwrap();
 
     let call_data = getFooEnumVariantBCall::new((bar_struct_id,)).abi_encode();
     let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -287,7 +287,7 @@ fn test_generic_bar_struct(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let generic_bar_struct_id = runtime.obtain_uid();
+    let generic_bar_struct_id = runtime.obtain_uid().unwrap();
 
     let call_data = getGenericFooEnumVariantBCall::new((generic_bar_struct_id,)).abi_encode();
     let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();

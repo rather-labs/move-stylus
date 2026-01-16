@@ -34,7 +34,8 @@ pub fn unpack_enum_function(
     let encoded_size =
         sol_data::Uint::<8>::ENCODED_SIZE.ok_or(AbiError::UnableToGetTypeAbiSize)? as i32;
 
-    let unpack_u32_function = RuntimeFunction::UnpackU32.get(module, Some(compilation_ctx))?;
+    let unpack_u32_function =
+        RuntimeFunction::UnpackU32.get(module, Some(compilation_ctx), None)?;
 
     // Save the variant to check it later
     let variant_number = module.locals.add(ValType::I32);

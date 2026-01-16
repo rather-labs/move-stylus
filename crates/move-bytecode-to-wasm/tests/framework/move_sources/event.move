@@ -30,13 +30,13 @@ public struct NestedStruct3 has copy, drop {
 }
 
 #[allow(unused_field)]
-#[ext(event, indexes = 1)]
+#[ext(event(indexes = 1))]
 public struct TestEvent1 has copy, drop {
     n: u32
 }
 
 #[allow(unused_field)]
-#[ext(event, indexes = 3)]
+#[ext(event(indexes = 3))]
 public struct TestEvent2 has copy, drop {
     a: u32,
     b: address,
@@ -44,7 +44,7 @@ public struct TestEvent2 has copy, drop {
 }
 
 #[allow(unused_field)]
-#[ext(event, indexes = 2)]
+#[ext(event(indexes = 2))]
 public struct TestEvent3 has copy, drop {
     a: u32,
     b: address,
@@ -53,7 +53,7 @@ public struct TestEvent3 has copy, drop {
 }
 
 #[allow(unused_field)]
-#[ext(event, indexes = 2)]
+#[ext(event(indexes = 2))]
 public struct TestEvent4 has copy, drop {
     a: u32,
     b: address,
@@ -63,7 +63,7 @@ public struct TestEvent4 has copy, drop {
 }
 
 #[allow(unused_field)]
-#[ext(event, indexes = 3)]
+#[ext(event(indexes = 3))]
 public struct TestEvent5 has copy, drop {
     a: u32,
     b: address,
@@ -71,7 +71,7 @@ public struct TestEvent5 has copy, drop {
 }
 
 #[allow(unused_field)]
-#[ext(event, indexes = 3)]
+#[ext(event(indexes = 3))]
 public struct TestEvent6 has copy, drop {
     a: u32,
     b: address,
@@ -79,7 +79,7 @@ public struct TestEvent6 has copy, drop {
 }
 
 #[allow(unused_field)]
-#[ext(event, indexes = 3)]
+#[ext(event(indexes = 3))]
 public struct TestEvent7 has copy, drop {
     a: u32,
     b: vector<u8>,
@@ -87,21 +87,21 @@ public struct TestEvent7 has copy, drop {
 }
 
 #[allow(unused_field)]
-#[ext(event, indexes = 1)]
+#[ext(event(indexes = 1))]
 public struct TestEvent8 has copy, drop {
     a: u64,
     b: std::ascii::String,
 }
 
 #[allow(unused_field)]
-#[ext(event, indexes = 2)]
+#[ext(event(indexes = 2))]
 public struct TestEvent9 has copy, drop {
     a: u64,
     b: std::ascii::String,
 }
 
 #[allow(unused_field)]
-#[ext(event, indexes = 3)]
+#[ext(event(indexes = 3))]
 public struct TestEvent10 has copy, drop {
     a: u32,
     b: address,
@@ -109,7 +109,7 @@ public struct TestEvent10 has copy, drop {
 }
 
 #[allow(unused_field)]
-#[ext(event, indexes = 3)]
+#[ext(event(indexes = 3))]
 public struct TestEvent11 has copy, drop {
     a: u32,
     b: address,
@@ -117,21 +117,21 @@ public struct TestEvent11 has copy, drop {
 }
 
 #[allow(unused_field)]
-#[ext(event, indexes = 2)]
+#[ext(event(indexes = 2))]
 public struct TestEvent12 has copy, drop {
     a: u64,
     b: vector<std::ascii::String>,
 }
 
 #[allow(unused_field)]
-#[ext(event, indexes = 2)]
+#[ext(event(indexes = 2))]
 public struct TestEvent13 has copy, drop {
     a: u64,
     b: vector<TestEnum>,
 }
 
 #[allow(unused_field)]
-#[ext(event, indexes = 3)]
+#[ext(event(indexes = 3))]
 public struct TestEvent14 has copy, drop {
     a: u32,
     b: address,
@@ -139,7 +139,7 @@ public struct TestEvent14 has copy, drop {
 }
 
 #[allow(unused_field)]
-#[ext(event, indexes = 3)]
+#[ext(event(indexes = 3))]
 public struct TestEvent15 has copy, drop {
     a: TestEnum,
     b: address,
@@ -212,13 +212,13 @@ entry fun emit_test_event15(a: TestEnum, b: address, c: u128) {
 }
 
 #[allow(unused_field)]
-#[ext(event, anonymous, indexes = 1)]
+#[ext(event(anonymous, indexes = 1))]
 public struct TestEvent1Anon has copy, drop {
     n: u32
 }
 
 #[allow(unused_field)]
-#[ext(event, anonymous, indexes = 3)]
+#[ext(event(anonymous, indexes = 3))]
 public struct TestEvent2Anon has copy, drop {
     a: u32,
     b: address,
@@ -226,7 +226,7 @@ public struct TestEvent2Anon has copy, drop {
 }
 
 #[allow(unused_field)]
-#[ext(event, anonymous, indexes = 2)]
+#[ext(event(anonymous, indexes = 2))]
 public struct TestEvent3Anon has copy, drop {
     a: u32,
     b: address,
@@ -235,7 +235,7 @@ public struct TestEvent3Anon has copy, drop {
 }
 
 #[allow(unused_field)]
-#[ext(event, anonymous, indexes = 2)]
+#[ext(event(anonymous, indexes = 2))]
 public struct TestEvent4Anon has copy, drop {
     a: u32,
     b: address,
@@ -245,7 +245,7 @@ public struct TestEvent4Anon has copy, drop {
 }
 
 #[allow(unused_field)]
-#[ext(event, anonymous, indexes = 3)]
+#[ext(event(anonymous, indexes = 3))]
 public struct TestEvent5Anon has copy, drop {
     a: u32,
     b: address,
@@ -253,7 +253,7 @@ public struct TestEvent5Anon has copy, drop {
 }
 
 #[allow(unused_field)]
-#[ext(event, anonymous, indexes = 3)]
+#[ext(event(anonymous, indexes = 3))]
 public struct TestEvent6Anon has copy, drop {
     a: u32,
     b: address,
@@ -261,7 +261,7 @@ public struct TestEvent6Anon has copy, drop {
 }
 
 #[allow(unused_field)]
-#[ext(event, anonymous, indexes = 3)]
+#[ext(event(anonymous, indexes = 3))]
 public struct TestEvent7Anon has copy, drop {
     a: u32,
     b: vector<u8>,
@@ -269,21 +269,21 @@ public struct TestEvent7Anon has copy, drop {
 }
 
 #[allow(unused_field)]
-#[ext(event, anonymous, indexes = 1)]
+#[ext(event(anonymous, indexes = 1))]
 public struct TestEvent8Anon has copy, drop {
     a: u64,
     b: std::ascii::String,
 }
 
 #[allow(unused_field)]
-#[ext(event, anonymous, indexes = 2)]
+#[ext(event(anonymous, indexes = 2))]
 public struct TestEvent9Anon has copy, drop {
     a: u64,
     b: std::ascii::String,
 }
 
 #[allow(unused_field)]
-#[ext(event, anonymous, indexes = 3)]
+#[ext(event(anonymous, indexes = 3))]
 public struct TestEvent10Anon has copy, drop {
     a: u32,
     b: address,
@@ -291,7 +291,7 @@ public struct TestEvent10Anon has copy, drop {
 }
 
 #[allow(unused_field)]
-#[ext(event, anonymous, indexes = 3)]
+#[ext(event(anonymous, indexes = 3))]
 public struct TestEvent11Anon has copy, drop {
     a: u32,
     b: address,
@@ -299,21 +299,21 @@ public struct TestEvent11Anon has copy, drop {
 }
 
 #[allow(unused_field)]
-#[ext(event, anonymous, indexes = 2)]
+#[ext(event(anonymous, indexes = 2))]
 public struct TestEvent12Anon has copy, drop {
     a: u64,
     b: vector<std::ascii::String>,
 }
 
 #[allow(unused_field)]
-#[ext(event, anonymous, indexes = 2)]
+#[ext(event(anonymous, indexes = 2))]
 public struct TestEvent13Anon has copy, drop {
     a: u64,
     b: vector<TestEnum>,
 }
 
 #[allow(unused_field)]
-#[ext(event, anonymous, indexes = 3)]
+#[ext(event(anonymous, indexes = 3))]
 public struct TestEvent14Anon has copy, drop {
     a: u32,
     b: address,
@@ -321,7 +321,7 @@ public struct TestEvent14Anon has copy, drop {
 }
 
 #[allow(unused_field)]
-#[ext(event, anonymous, indexes = 3)]
+#[ext(event(anonymous, indexes = 3))]
 public struct TestEvent15Anon has copy, drop {
     a: TestEnum,
     b: address,
@@ -329,7 +329,7 @@ public struct TestEvent15Anon has copy, drop {
 }
 
 #[allow(unused_field)]
-#[ext(event, anonymous, indexes = 4)]
+#[ext(event(anonymous, indexes = 4))]
 public struct Anonymous has copy, drop {
     a: u32,
     b: u128,
@@ -338,7 +338,7 @@ public struct Anonymous has copy, drop {
 }
 
 #[allow(unused_field)]
-#[ext(event, anonymous, indexes = 4)]
+#[ext(event(anonymous, indexes = 4))]
 public struct Anonymous2 has copy, drop {
     a: u32,
     b: u128,

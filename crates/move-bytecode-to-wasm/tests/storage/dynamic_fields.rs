@@ -41,7 +41,7 @@ fn test_dynamic_fields(
     }
 
     // Read the object id emmited from the contract's events
-    let object_id = runtime.obtain_uid();
+    let object_id = runtime.obtain_uid().unwrap();
 
     let field_name_1 = "test_key_1".to_owned();
     let field_name_2 = "test_key_2".to_owned();

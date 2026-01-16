@@ -13,10 +13,10 @@ pub fn unpack_string_function(
     compilation_ctx: &CompilationContext,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     // Big-endian to Little-endian
-    let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
+    let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None, None)?;
     // Validate that the pointer fits in 32 bits
     let validate_pointer_fn =
-        RuntimeFunction::ValidatePointer32Bit.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::ValidatePointer32Bit.get(module, Some(compilation_ctx), None)?;
 
     let mut function = FunctionBuilder::new(
         &mut module.types,
@@ -58,7 +58,7 @@ pub fn unpack_string_function(
         .local_get(reader_pointer)
         .i32_const(32)
         .binop(BinaryOp::I32Add)
-        .global_set(compilation_ctx.calldata_reader_pointer);
+        .global_set(compilation_ctx.globals.calldata_reader_pointer);
 
     // Validate that the data reader pointer fits in 32 bits
     builder
@@ -95,7 +95,7 @@ pub fn unpack_string_function(
     // Allocate space for the vector
     // Each u8 element takes 1 byte
     let allocate_vector_with_header_function =
-        RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx), None)?;
     builder
         .local_get(length)
         .local_get(length)
