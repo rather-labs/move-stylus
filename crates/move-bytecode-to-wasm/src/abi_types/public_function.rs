@@ -248,7 +248,7 @@ mod tests {
 
     use crate::{
         compilation_context::globals::CompilationContextGlobals,
-        test_compilation_context, test_runtime_error_data,
+        test_compilation_context,
         test_tools::build_module,
         translation::{functions::prepare_function_return, intermediate_types::IntermediateType},
         utils::display_module,
@@ -393,7 +393,7 @@ mod tests {
         ctx_globals: CompilationContextGlobals,
     ) {
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
         // Build mock router
 
         let selector = module.locals.add(ValType::I32);

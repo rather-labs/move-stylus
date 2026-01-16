@@ -500,7 +500,7 @@ mod tests {
     use wasmtime::{Caller, Engine, Extern, Linker};
 
     use crate::{
-        test_compilation_context, test_runtime_error_data,
+        test_compilation_context,
         test_tools::{build_module, setup_wasmtime_module},
         utils::display_module,
     };
@@ -536,7 +536,7 @@ mod tests {
     fn test_build_pack_instructions() {
         let (mut raw_module, allocator_func, memory_id, ctx_globals) = build_module(None);
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let validator_func_type = raw_module.types.add(&[ValType::I32, ValType::I32], &[]);
         let (validator_func, _) = raw_module.add_import_func("", "validator", validator_func_type);
@@ -602,7 +602,7 @@ mod tests {
         // Memory offset starts at 100
         let (mut raw_module, allocator_func, memory_id, ctx_globals) = build_module(Some(100));
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let validator_func_type = raw_module.types.add(&[ValType::I32, ValType::I32], &[]);
         let (validator_func, _) = raw_module.add_import_func("", "validator", validator_func_type);
@@ -695,7 +695,7 @@ mod tests {
 
         let (mut raw_module, allocator_func, memory_id, ctx_globals) = build_module(Some(data_len));
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let validator_func_type = raw_module.types.add(&[ValType::I32, ValType::I32], &[]);
         let (validator_func, _) = raw_module.add_import_func("", "validator", validator_func_type);

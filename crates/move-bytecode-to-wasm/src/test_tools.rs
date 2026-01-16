@@ -161,13 +161,6 @@ macro_rules! test_compilation_context {
     };
 }
 
-#[macro_export]
-macro_rules! test_runtime_error_data {
-    () => {
-        $crate::data::RuntimeErrorData::new()
-    };
-}
-
 #[cfg(feature = "inject-host-debug-fns")]
 pub fn inject_debug_fns(module: &mut walrus::Module) {
     if cfg!(feature = "inject-host-debug-fns") {

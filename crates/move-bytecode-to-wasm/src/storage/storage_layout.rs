@@ -237,7 +237,6 @@ mod tests {
         compilation_context::{ModuleData, ModuleId},
         data::RuntimeErrorData,
         runtime::RuntimeFunction,
-        test_runtime_error_data,
         test_tools::build_module,
         translation::intermediate_types::{
             VmHandledStruct,
@@ -425,7 +424,7 @@ mod tests {
         .unwrap();
 
         let (ctx, mut module) = create_test_ctx(vec![], vec![enum_.clone()]);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
         let compilation_ctx = &ctx;
 
         let result = compute_enum_storage_size(&enum_, head_offset, compilation_ctx).unwrap();
@@ -548,7 +547,7 @@ mod tests {
 
         let (ctx, mut module) = create_test_ctx(vec![], vec![enum_.clone()]);
         let compilation_ctx = &ctx;
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
         let head_offset_plus_variant = (head_offset + 1) % SLOT_SIZE;
 
         // Test each variant size
@@ -692,7 +691,7 @@ mod tests {
             vec![nested_enum_1.clone(), nested_enum_2.clone(), enum_.clone()],
         );
         let compilation_ctx = &ctx;
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
         let head_offset_plus_variant = (head_offset + 1) % SLOT_SIZE;
 
         // Test each variant size
@@ -861,7 +860,7 @@ mod tests {
             vec![enum_.clone()],
         );
         let compilation_ctx = &ctx;
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
         let head_offset_plus_variant = (head_offset + 1) % SLOT_SIZE;
 
         // Test each variant size

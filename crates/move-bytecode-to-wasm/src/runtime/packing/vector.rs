@@ -198,10 +198,7 @@ pub fn pack_vector_function(
 
 #[cfg(test)]
 mod tests {
-    use std::cell::RefCell;
-    use std::panic::AssertUnwindSafe;
-    use std::rc::Rc;
-    use std::sync::Arc;
+    use std::{cell::RefCell, panic::AssertUnwindSafe, rc::Rc, sync::Arc};
 
     use alloy_primitives::{Address, U256, address};
     use alloy_sol_types::SolValue;
@@ -210,7 +207,8 @@ mod tests {
 
     use crate::{
         abi_types::packing::Packable,
-        test_compilation_context, test_runtime_error_data,
+        data::RuntimeErrorData,
+        test_compilation_context,
         test_tools::{build_module, setup_wasmtime_module},
         translation::intermediate_types::IntermediateType,
     };
@@ -394,7 +392,7 @@ mod tests {
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
 
         let compilation_ctx = test_compilation_context!(memory_id, alloc_function, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let local = raw_module.locals.add(ValType::I32);
         let writer_pointer = raw_module.locals.add(ValType::I32);
@@ -454,7 +452,7 @@ mod tests {
             FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[ValType::I32]);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let local = raw_module.locals.add(ValType::I32);
         let writer_pointer = raw_module.locals.add(ValType::I32);
@@ -553,7 +551,7 @@ mod tests {
             FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[ValType::I32]);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let local = raw_module.locals.add(ValType::I32);
         let writer_pointer = raw_module.locals.add(ValType::I32);
@@ -650,7 +648,7 @@ mod tests {
             FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[ValType::I32]);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let local = raw_module.locals.add(ValType::I32);
         let writer_pointer = raw_module.locals.add(ValType::I32);
@@ -747,7 +745,7 @@ mod tests {
             FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[ValType::I32]);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let local = raw_module.locals.add(ValType::I32);
         let writer_pointer = raw_module.locals.add(ValType::I32);
@@ -844,7 +842,7 @@ mod tests {
             FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[ValType::I32]);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let local = raw_module.locals.add(ValType::I32);
         let writer_pointer = raw_module.locals.add(ValType::I32);
@@ -948,7 +946,7 @@ mod tests {
             FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[ValType::I32]);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let local = raw_module.locals.add(ValType::I32);
         let writer_pointer = raw_module.locals.add(ValType::I32);
@@ -1057,7 +1055,7 @@ mod tests {
             FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[ValType::I32]);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let local = raw_module.locals.add(ValType::I32);
         let writer_pointer = raw_module.locals.add(ValType::I32);
@@ -1170,7 +1168,7 @@ mod tests {
             FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[ValType::I32]);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let local = raw_module.locals.add(ValType::I32);
         let writer_pointer = raw_module.locals.add(ValType::I32);
@@ -1281,7 +1279,7 @@ mod tests {
             FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[ValType::I32]);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let local = raw_module.locals.add(ValType::I32);
         let writer_pointer = raw_module.locals.add(ValType::I32);
