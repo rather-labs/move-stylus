@@ -1,9 +1,14 @@
 use walrus::{
     InstrSeqBuilder, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
 };
 
-use crate::{CompilationContext, data::RuntimeErrorData, runtime::RuntimeFunction};
+use crate::{
+    CompilationContext,
+    data::RuntimeErrorData,
+    error::{RuntimeError, add_handle_error_instructions},
+    runtime::RuntimeFunction,
+};
 
 use super::{IntermediateType, error::IntermediateTypeError};
 
@@ -157,6 +162,7 @@ impl IU128 {
         module: &mut walrus::Module,
         original_type: IntermediateType,
         compilation_ctx: &CompilationContext,
+        runtime_error_data: &mut RuntimeErrorData,
     ) -> Result<(), IntermediateTypeError> {
         match original_type {
             IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {
@@ -235,24 +241,30 @@ impl IU128 {
                     );
                 }
 
-                // Ensure the rest bytes are zero, otherwise it would have overflowed
+                // Ensure the remaining bytes are zero, otherwise it would have overflowed
                 for i in 0..2 {
                     builder.block(None, |inner_block| {
                         let inner_block_id = inner_block.id();
 
-                        inner_block.local_get(pointer);
-                        inner_block.load(
+                        inner_block
+                            .local_get(pointer)
+                            .load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I64 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 16 + i * 8,
+                                },
+                            )
+                            .unop(UnaryOp::I64Eqz)
+                            .br_if(inner_block_id);
+
+                        inner_block.i32_const(runtime_error_data.get(
+                            module,
                             compilation_ctx.memory_id,
-                            LoadKind::I64 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 16 + i * 8,
-                            },
-                        );
-                        inner_block.i64_const(0);
-                        inner_block.binop(BinaryOp::I64Eq);
-                        inner_block.br_if(inner_block_id);
-                        inner_block.unreachable();
+                            RuntimeError::Overflow,
+                        ));
+                        add_handle_error_instructions(module, inner_block, compilation_ctx, false);
                     });
                 }
                 builder.local_get(pointer);

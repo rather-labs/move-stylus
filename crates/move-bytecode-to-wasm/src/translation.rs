@@ -1894,7 +1894,13 @@ fn translate_instruction(
         }
         Bytecode::CastU128 => {
             let original_type = types_stack.pop()?;
-            IU128::cast_from(builder, module, original_type, compilation_ctx)?;
+            IU128::cast_from(
+                builder,
+                module,
+                original_type,
+                compilation_ctx,
+                runtime_error_data,
+            )?;
             types_stack.push(IntermediateType::IU128);
         }
         Bytecode::CastU256 => {
