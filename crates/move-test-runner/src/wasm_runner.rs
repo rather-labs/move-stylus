@@ -787,7 +787,7 @@ impl RuntimeSandbox {
     pub fn obtain_uid(&self) -> FixedBytes<32> {
         let (topic, data) = self.log_events.lock().unwrap().recv().unwrap();
         assert_eq!(2, topic);
-        assert_eq!(*keccak256(b"NewUID(address)").as_slice(), data[..32]);
+        assert_eq!(*keccak256(b"NewUID(bytes32)").as_slice(), data[..32]);
         FixedBytes::<32>::from_slice(&data[32..])
     }
 
