@@ -89,10 +89,6 @@ pub fn translate_package<'move_package>(
     }
 
     let mut modules = HashMap::new();
-
-    // Contains the module data for all the root package and its dependencies
-    // let mut modules_data: HashMap<ModuleId, ModuleData> = HashMap::new();
-
     let mut errors = Vec::new();
 
     for root_compiled_module in &root_compiled_units {

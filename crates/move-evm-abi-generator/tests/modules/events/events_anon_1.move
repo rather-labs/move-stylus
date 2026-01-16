@@ -8,19 +8,19 @@ public struct NestedStruct has copy, drop {
     c: u128,
 }
 
-#[ext(event, anonymous, indexes = 1)]
+#[ext(event(anonymous, indexes = 1))]
 public struct TestEvent1Anon has copy, drop {
     n: u32
 }
 
-#[ext(event, anonymous, indexes = 3)]
+#[ext(event(anonymous, indexes = 3))]
 public struct TestEvent2Anon has copy, drop {
     a: u32,
     b: address,
     c: u128,
 }
 
-#[ext(event, anonymous, indexes = 2)]
+#[ext(event(anonymous, indexes = 2))]
 public struct TestEvent3Anon has copy, drop {
     a: u32,
     b: address,
@@ -28,7 +28,7 @@ public struct TestEvent3Anon has copy, drop {
     d: vector<u8>,
 }
 
-#[ext(event, anonymous, indexes = 2)]
+#[ext(event(anonymous, indexes = 2))]
 public struct TestEvent4Anon has copy, drop {
     a: u32,
     b: address,
@@ -37,7 +37,7 @@ public struct TestEvent4Anon has copy, drop {
     e: NestedStruct,
 }
 
-#[ext(event, anonymous, indexes = 3)]
+#[ext(event(anonymous, indexes = 3))]
 public struct TestEvent5Anon has copy, drop {
     a: u32,
     b: address,

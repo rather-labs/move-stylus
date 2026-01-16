@@ -39,4 +39,7 @@ pub const SF_RESERVED_STRUCTS: &[&str] = &[
     "UID",
     "NamedId",
     "Table",
+    "FrozenStorageObject",
+    "OwnedStorageObject",
+    "SharedStorageObject",
 ];

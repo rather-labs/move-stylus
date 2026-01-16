@@ -33,18 +33,19 @@ use walrus::{
 /// * The value is the encoded structure.
 ///
 /// The lookup is done in the following order:
-/// * In the signer's owned objects (key is the signer's address).
 /// * In the shared objects key (1)
+/// * In the signer's owned objects (key is the signer's address).
 /// * In the frozen objects key (2)
 ///
 /// If no data is found an unrechable error is thrown. Otherwise the slot number to reconstruct the
 /// struct is written in DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET.
 ///
-/// When the data is found, the owner's ID is written in DATA_STORAGE_OBJECT_OWNER_OFFSET
-///
 /// # WASM Function Arguments
 /// * `uid_ptr` - (i32): pointer to the 32 bytes object id
 /// * `search_frozen` - (i32): if non-zero, search in frozen objects as well
+///
+/// # WASM Function Returns
+/// * (i32): pointer to the owner id
 pub fn locate_storage_data(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -185,6 +186,238 @@ pub fn locate_storage_data(
     });
 
     Ok(function.finish(vec![uid_ptr, search_frozen], &mut module.funcs))
+}
+
+/// Looks for an struct inside the object's owner namespace. The objects mappings follows the
+/// solidity notation:
+///
+/// mapping(bytes32 => mapping(bytes32 => T)) public moveObjects;
+///
+/// Where:
+/// * The outer mapping key is the id of the owner.
+/// * The inner mapping key is the object id itself.
+/// * The value is the encoded structure.
+///
+/// If no data is found an unrechable error is thrown. Otherwise the slot number to reconstruct the
+/// struct is written in DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET.
+///
+/// # WASM Function Arguments
+/// * `uid_ptr` - (i32): pointer to the 32 bytes object id
+///
+/// # WASM Function Returns
+/// * (i32): pointer to the owner id
+pub fn locate_storage_owned_data(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
+) -> Result<FunctionId, RuntimeFunctionError> {
+    // Runtime functions
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx), None)?;
+    let write_object_slot_fn =
+        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx), None)?;
+
+    // Host functions
+    let (tx_origin, _) = tx_origin(module);
+    let (storage_load, _) = storage_load_bytes32(module);
+
+    // Function declaration
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
+    let mut builder = function
+        .name(RuntimeFunction::LocateStorageOwnedData.name().to_owned())
+        .func_body();
+
+    // Arguments
+    let uid_ptr = module.locals.add(ValType::I32);
+
+    // Wipe the first 12 bytes, and then write the tx signer address
+    builder
+        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+        .i32_const(0)
+        .i32_const(12)
+        .memory_fill(compilation_ctx.memory_id);
+
+    // Write the tx signer (20 bytes) left padded
+    builder
+        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET + 12)
+        .call(tx_origin);
+
+    builder
+        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+        .local_get(uid_ptr)
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .call(write_object_slot_fn);
+
+    // Load data from slot
+    builder
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+        .call(storage_load);
+
+    // Check if it is empty (all zeroes)
+    builder
+        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+        .i32_const(32)
+        .call(is_zero_fn)
+        .negate()
+        .return_()
+        .drop();
+
+    // If we get here means the object was not found
+    builder.return_error(
+        module,
+        compilation_ctx,
+        runtime_error_data,
+        RuntimeError::StorageObjectNotFound,
+    );
+
+    Ok(function.finish(vec![uid_ptr], &mut module.funcs))
+}
+
+/// Looks for an struct inside the object's shared namespace. The objects mappings follows the
+/// solidity notation:
+///
+/// mapping(bytes32 => mapping(bytes32 => T)) public moveObjects;
+///
+/// Where:
+/// * The outer mapping key is the id of the owner (shared key, address 0x1).
+/// * The inner mapping key is the object id itself.
+/// * The value is the encoded structure.
+///
+/// If no data is found an unrechable error is thrown. Otherwise the slot number to reconstruct the
+/// struct is written in DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET.
+///
+/// # WASM Function Arguments
+/// * `uid_ptr` - (i32): pointer to the 32 bytes object id
+///
+/// # WASM Function Returns
+/// * (i32): pointer to the owner id
+pub fn locate_storage_shared_data(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
+) -> Result<FunctionId, RuntimeFunctionError> {
+    // Runtime functions
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx), None)?;
+    let write_object_slot_fn =
+        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx), None)?;
+
+    // Host functions
+    let (storage_load, _) = storage_load_bytes32(module);
+
+    // Function declaration
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
+    let mut builder = function
+        .name(RuntimeFunction::LocateStorageSharedData.name().to_owned())
+        .func_body();
+
+    // Arguments
+    let uid_ptr = module.locals.add(ValType::I32);
+
+    builder
+        .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
+        .local_get(uid_ptr)
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .call(write_object_slot_fn);
+
+    // Load data from slot
+    builder
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+        .call(storage_load);
+
+    // Check if it is empty (all zeroes)
+    builder
+        .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
+        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+        .i32_const(32)
+        .call(is_zero_fn)
+        .negate()
+        .return_()
+        .drop();
+
+    // If we get here means the object was not found
+    builder.return_error(
+        module,
+        compilation_ctx,
+        runtime_error_data,
+        RuntimeError::StorageObjectNotFound,
+    );
+
+    Ok(function.finish(vec![uid_ptr], &mut module.funcs))
+}
+
+/// Looks for an struct inside the object's frozen namespace. The objects mappings follows the
+/// solidity notation:
+///
+/// mapping(bytes32 => mapping(bytes32 => T)) public moveObjects;
+///
+/// Where:
+/// * The outer mapping key is the id of the owner (frozen key, address 0x2).
+/// * The inner mapping key is the object id itself.
+/// * The value is the encoded structure.
+///
+/// If no data is found an unrechable error is thrown. Otherwise the slot number to reconstruct the
+/// struct is written in DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET.
+///
+/// # WASM Function Arguments
+/// * `uid_ptr` - (i32): pointer to the 32 bytes object id
+///
+/// # WASM Function Returns
+/// * (i32): pointer to the owner id
+pub fn locate_storage_frozen_data(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
+) -> Result<FunctionId, RuntimeFunctionError> {
+    // Runtime functions
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx), None)?;
+    let write_object_slot_fn =
+        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx), None)?;
+
+    // Host functions
+    let (storage_load, _) = storage_load_bytes32(module);
+
+    // Function declaration
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
+    let mut builder = function
+        .name(RuntimeFunction::LocateStorageFrozenData.name().to_owned())
+        .func_body();
+
+    // Arguments
+    let uid_ptr = module.locals.add(ValType::I32);
+
+    builder
+        .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
+        .local_get(uid_ptr)
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .call(write_object_slot_fn);
+
+    // Load data from slot
+    builder
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+        .call(storage_load);
+
+    // Check if it is empty (all zeroes)
+    builder
+        .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
+        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+        .i32_const(32)
+        .call(is_zero_fn)
+        .negate()
+        .return_()
+        .drop();
+
+    // If we get here means the object was not found
+    builder.return_error(
+        module,
+        compilation_ctx,
+        runtime_error_data,
+        RuntimeError::StorageObjectNotFound,
+    );
+
+    Ok(function.finish(vec![uid_ptr], &mut module.funcs))
 }
 
 /// Computes the storage slot number where the struct should be persisted.

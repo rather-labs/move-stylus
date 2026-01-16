@@ -1,6 +1,6 @@
 use crate::{
     abi_error::AbiError,
-    error::{SpecialAttributeError, SpecialAttributeErrorKind},
+    error::{DIAGNOSTIC_CATEGORY, SpecialAttributeError, SpecialAttributeErrorKind},
     event::Event,
     reserved_modules::{SF_ADDRESS, SF_RESERVED_STRUCTS},
     types::Type,
@@ -41,7 +41,7 @@ pub enum StructValidationError {
 impl From<&StructValidationError> for DiagnosticInfo {
     fn from(value: &StructValidationError) -> Self {
         custom(
-            "Struct validation error",
+            DIAGNOSTIC_CATEGORY,
             Severity::BlockingError,
             3,
             3,
