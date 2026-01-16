@@ -2,16 +2,18 @@ use move_compiler::{
     diagnostics::codes::{DiagnosticInfo, Severity, custom},
     parser::ast::{Function, FunctionBody_},
 };
+use move_ir_types::location::Loc;
 use move_symbol_pool::Symbol;
 
 use crate::{
     AbiError, Event, Struct_,
-    error::{SpecialAttributeError, SpecialAttributeErrorKind},
+    error::{DIAGNOSTIC_CATEGORY, SpecialAttributeError, SpecialAttributeErrorKind},
+    function_modifiers::Signature,
     types::Type,
 };
 
 use crate::ModuleId;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 #[derive(thiserror::Error, Debug)]
 pub enum FunctionValidationError {
     #[error("Function with Event type parameter must be a native emit function")]
@@ -34,6 +36,15 @@ pub enum FunctionValidationError {
     )]
     InvalidNamedIdArgument,
 
+    #[error("Storage object '{0}' must be a struct with the key ability")]
+    StorageObjectNotKeyedStruct(Symbol),
+
+    #[error("Storage object struct '{0}' not found")]
+    StorageObjectStructNotFound(Symbol),
+
+    #[error("Parameter '{0}' not found in function signature")]
+    ParameterNotFound(Symbol),
+
     #[error("Struct not found in local or imported modules")]
     StructNotFound,
 }
@@ -41,7 +52,7 @@ pub enum FunctionValidationError {
 impl From<&FunctionValidationError> for DiagnosticInfo {
     fn from(value: &FunctionValidationError) -> Self {
         custom(
-            "Function validation error",
+            DIAGNOSTIC_CATEGORY,
             Severity::BlockingError,
             3,
             3,
@@ -288,4 +299,80 @@ pub fn validate_function(
     }
 
     Ok(())
+}
+
+pub fn check_storage_object_param(
+    signature: &Signature,
+    identifier: Symbol,
+    identifier_loc: Loc,
+    module_structs: &[Struct_],
+) -> Result<(), SpecialAttributeError> {
+    if let Some(param_type_name) = signature.parameters.iter().find_map(|p| {
+        if p.name == identifier {
+            match &p.type_ {
+                Type::UserDataType(name, _) => Some(name),
+                Type::Ref(inner) => {
+                    if let Type::UserDataType(name, _) = &**inner {
+                        Some(name)
+                    } else {
+                        None
+                    }
+                }
+                Type::MutRef(inner) => {
+                    if let Type::UserDataType(name, _) = &**inner {
+                        Some(name)
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }) {
+        if let Some(struct_) = module_structs.iter().find(|s| s.name == *param_type_name) {
+            if !struct_.has_key {
+                return Err(SpecialAttributeError {
+                    kind: SpecialAttributeErrorKind::FunctionValidation(
+                        FunctionValidationError::StorageObjectNotKeyedStruct(identifier),
+                    ),
+                    line_of_code: identifier_loc,
+                });
+            }
+        } else {
+            return Err(SpecialAttributeError {
+                kind: SpecialAttributeErrorKind::FunctionValidation(
+                    FunctionValidationError::StorageObjectStructNotFound(identifier),
+                ),
+                line_of_code: identifier_loc,
+            });
+        }
+    } else {
+        return Err(SpecialAttributeError {
+            kind: SpecialAttributeErrorKind::FunctionValidation(
+                FunctionValidationError::ParameterNotFound(identifier),
+            ),
+            line_of_code: identifier_loc,
+        });
+    }
+
+    Ok(())
+}
+
+pub fn check_repeated_storage_object_param(
+    processed_storage_objects: &mut HashSet<Symbol>,
+    identifier: Symbol,
+    identifier_loc: Loc,
+) -> Result<(), SpecialAttributeError> {
+    if processed_storage_objects.contains(&identifier) {
+        Err(SpecialAttributeError {
+            kind: SpecialAttributeErrorKind::RepeatedStorageObject(identifier),
+            line_of_code: identifier_loc,
+        })
+    } else {
+        // Add to processed storage objects
+        processed_storage_objects.insert(identifier);
+        Ok(())
+    }
 }

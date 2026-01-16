@@ -1,4 +1,4 @@
-use move_parse_special_attributes::function_modifiers::FunctionModifier;
+use move_parse_special_attributes::function_modifiers::SolidityFunctionModifier;
 use walrus::{
     FunctionBuilder, FunctionId, LocalId, Module, ValType,
     ir::{BinaryOp, ExtendedLoad, LoadKind, MemArg, StoreKind},
@@ -42,7 +42,7 @@ pub fn add_external_contract_call_fn(
     compilation_ctx: &CompilationContext,
     module_id: &ModuleId,
     function_information: &MappedFunction,
-    function_modifiers: &[FunctionModifier],
+    function_modifiers: &[SolidityFunctionModifier],
     arguments_types: &[IntermediateType],
     named_ids: &[IntermediateType],
 ) -> Result<FunctionId, NativeFunctionError> {
@@ -158,7 +158,7 @@ pub fn add_external_contract_call_fn(
         .local_set(gas);
 
     // Load value (if the function is payable) otherwise we load zeroes
-    if function_modifiers.contains(&FunctionModifier::Payable) {
+    if function_modifiers.contains(&SolidityFunctionModifier::Payable) {
         builder
             .local_get(*self_)
             .load(
@@ -291,8 +291,8 @@ pub fn add_external_contract_call_fn(
 
     // If the function is pure or view, we use static_call_contract since no state modification is
     // allowed
-    if function_modifiers.contains(&FunctionModifier::Pure)
-        || function_modifiers.contains(&FunctionModifier::View)
+    if function_modifiers.contains(&SolidityFunctionModifier::Pure)
+        || function_modifiers.contains(&SolidityFunctionModifier::View)
     {
         builder
             .local_get(address_ptr)

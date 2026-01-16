@@ -7,7 +7,7 @@ use move_bytecode_to_wasm::compilation_context::{
         SF_MODULE_NAME_OBJECT, SF_MODULE_NAME_TX_CONTEXT, STYLUS_FRAMEWORK_ADDRESS,
     },
 };
-use move_parse_special_attributes::function_modifiers::{FunctionModifier, Parameter};
+use move_parse_special_attributes::function_modifiers::{Parameter, SolidityFunctionModifier};
 use move_symbol_pool::Symbol;
 
 use crate::{
@@ -41,7 +41,7 @@ pub struct Function {
     pub(crate) parameters: Vec<NamedType>,
     pub(crate) return_types: Type,
     pub(crate) visibility: Visibility,
-    pub(crate) modifiers: Vec<FunctionModifier>,
+    pub(crate) modifiers: Vec<SolidityFunctionModifier>,
     pub(crate) is_entry: bool,
 }
 

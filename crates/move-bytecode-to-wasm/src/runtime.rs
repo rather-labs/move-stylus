@@ -74,6 +74,9 @@ pub enum RuntimeFunction {
     DeriveDynArraySlot,
     WriteObjectSlot,
     LocateStorageData,
+    LocateStorageOwnedData,
+    LocateStorageSharedData,
+    LocateStorageFrozenData,
     LocateStructSlot,
     GetIdBytesPtr,
     EncodeAndSaveInStorage,
@@ -172,6 +175,9 @@ impl RuntimeFunction {
             Self::DeriveMappingSlot => "derive_mapping_slot",
             Self::DeriveDynArraySlot => "derive_dyn_array_slot",
             Self::LocateStorageData => "locate_storage_data",
+            Self::LocateStorageOwnedData => "locate_storage_owned_data",
+            Self::LocateStorageSharedData => "locate_storage_shared_data",
+            Self::LocateStorageFrozenData => "locate_storage_frozen_data",
             Self::WriteObjectSlot => "write_object_slot",
             Self::LocateStructSlot => "locate_struct_slot",
             Self::GetIdBytesPtr => "get_id_bytes_ptr",
@@ -324,6 +330,15 @@ impl RuntimeFunction {
                 }
                 (Self::WriteObjectSlot, Some(ctx)) => storage::write_object_slot(module, ctx)?,
                 (Self::LocateStorageData, Some(ctx)) => storage::locate_storage_data(module, ctx)?,
+                (Self::LocateStorageOwnedData, Some(ctx)) => {
+                    storage::locate_storage_owned_data(module, ctx)?
+                }
+                (Self::LocateStorageSharedData, Some(ctx)) => {
+                    storage::locate_storage_shared_data(module, ctx)?
+                }
+                (Self::LocateStorageFrozenData, Some(ctx)) => {
+                    storage::locate_storage_frozen_data(module, ctx)?
+                }
                 (Self::LocateStructSlot, Some(ctx)) => storage::locate_struct_slot(module, ctx)?,
                 (Self::GetIdBytesPtr, Some(ctx)) => storage::get_id_bytes_ptr(module, ctx),
                 (Self::GetStructOwner, None) => storage::get_struct_owner_fn(module),

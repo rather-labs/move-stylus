@@ -11,7 +11,7 @@ public struct ErrorWithVectors has copy, drop {
     c: vector<vector<u64>>,
 }
 
-#[ext(pure)]
+#[ext(abi(pure))]
 entry fun revert_error_with_vectors(a: vector<u32>, b: vector<u128>, c: vector<vector<u64>>) {
     revert(ErrorWithVectors { a, b, c });
 }
@@ -29,7 +29,7 @@ public struct ErrorWithNestedStructs has copy, drop {
     b: NestedStruct2,
 }
 
-#[ext(pure)]
+#[ext(abi(pure))]
 entry fun revert_error_with_nested_structs(a: String, b: String, c: u64) {
     let ns = NestedStruct(a);
     let ns2 = NestedStruct2 { a: b, b: c };

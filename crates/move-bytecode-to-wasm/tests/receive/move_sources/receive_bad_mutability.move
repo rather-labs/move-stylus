@@ -1,6 +1,6 @@
 module test::receive_bad_mutability;
 
-#[ext(pure)]
+#[ext(abi(pure))]
 entry fun receive() {
   // Do nothing
 }
