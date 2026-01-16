@@ -1,4 +1,7 @@
-pub use crate::translation::intermediate_types::{IntermediateType, structs::IStruct};
+pub use crate::translation::intermediate_types::{
+    IntermediateType,
+    structs::{IStruct, IStructType},
+};
 use move_binary_format::{
     file_format::{
         FieldHandleIndex, FieldInstantiationIndex, StructDefInstantiationIndex,

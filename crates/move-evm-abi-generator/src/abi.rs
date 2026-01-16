@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use move_bytecode_to_wasm::compilation_context::{
     ModuleData, ModuleId,
-    module_data::struct_data::{IStruct, IntermediateType},
+    module_data::struct_data::{IStruct, IStructType, IntermediateType},
     reserved_modules::{
         SF_MODULE_NAME_OBJECT, SF_MODULE_NAME_TX_CONTEXT, STYLUS_FRAMEWORK_ADDRESS,
     },
@@ -128,21 +128,12 @@ impl Abi {
         let mut result = Vec::new();
 
         // First we filter the functions we are going to process
-        let mut functions: Vec<_> = processing_module
+        let functions: Vec<_> = processing_module
             .functions
             .information
             .iter()
             .filter(|f| f.is_entry)
             .collect();
-
-        // Add the init function to the functions list, which is not entry
-        if let Some(init) = processing_module.functions.init.as_ref() {
-            let init_information = processing_module
-                .functions
-                .get_information_by_identifier(&init.identifier)
-                .unwrap();
-            functions.push(init_information);
-        }
 
         'functions_loop: for function in functions {
             let parsed_function = processing_module
@@ -156,7 +147,7 @@ impl Abi {
             let function_type = if processing_module.functions.init.as_ref()
                 == Some(&function.function_id)
             {
-                FunctionType::Constructor
+                continue;
             } else if processing_module.functions.receive.as_ref() == Some(&function.function_id) {
                 FunctionType::Receive
             } else if processing_module.functions.fallback.as_ref() == Some(&function.function_id) {
@@ -193,6 +184,11 @@ impl Abi {
                     } => {
                         let struct_module = modules_data.get(module_id).unwrap();
                         let struct_ = struct_module.structs.get_by_index(*index).unwrap();
+
+                        // Skip one-time witness structs
+                        if struct_.type_ == IStructType::OneTimeWitness {
+                            continue;
+                        }
 
                         match (
                             struct_.identifier.as_str(),
@@ -655,6 +651,7 @@ impl Abi {
                     && !is_uid(&struct_.identifier, module_id)
                     && !is_id(&struct_.identifier, module_id)
                     && !is_string(&struct_.identifier, module_id)
+                    && struct_.type_ != IStructType::OneTimeWitness
             }
             _ => false,
         }

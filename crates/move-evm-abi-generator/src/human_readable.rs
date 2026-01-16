@@ -51,7 +51,9 @@ pub fn process_functions(contract_abi: &mut String, abi: &Abi) {
             continue;
         }
 
-        if function.function_type == FunctionType::Function {
+        if function.function_type == FunctionType::Function
+            || function.function_type == FunctionType::Constructor
+        {
             contract_abi.push_str("    function ");
             contract_abi.push_str(&function.identifier);
         } else {
@@ -89,7 +91,7 @@ pub fn process_functions(contract_abi: &mut String, abi: &Abi) {
 
         // Return
         if function.return_types != Type::None {
-            contract_abi.push(' ');
+            contract_abi.push_str(" returns ");
 
             if let Type::Tuple(_) = function.return_types {
                 contract_abi.push_str(&function.return_types.name());

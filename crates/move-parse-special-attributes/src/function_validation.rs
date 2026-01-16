@@ -47,6 +47,9 @@ pub enum FunctionValidationError {
 
     #[error("Struct not found in local or imported modules")]
     StructNotFound,
+
+    #[error("init function cannot be entry")]
+    InitFunctionCannotBeEntry,
 }
 
 impl From<&FunctionValidationError> for DiagnosticInfo {
