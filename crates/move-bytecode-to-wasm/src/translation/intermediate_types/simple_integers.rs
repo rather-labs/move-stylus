@@ -49,7 +49,11 @@ impl IU8 {
         builder
             .binop(BinaryOp::I32Add)
             .i32_const(Self::MAX_VALUE)
-            .call(check_overflow_f);
+            .call_runtime_function(
+                compilation_ctx,
+                check_overflow_f,
+                &RuntimeFunction::CheckOverflowU8U16,
+            );
 
         Ok(())
     }
@@ -65,7 +69,7 @@ impl IU8 {
     ) -> Result<(), IntermediateTypeError> {
         let sub_u32_f =
             RuntimeFunction::SubU32.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
-        builder.call(sub_u32_f);
+        builder.call_runtime_function(compilation_ctx, sub_u32_f, &RuntimeFunction::SubU32);
         Ok(())
     }
 
@@ -102,7 +106,11 @@ impl IU8 {
         builder
             .binop(BinaryOp::I32Mul)
             .i32_const(Self::MAX_VALUE)
-            .call(check_overflow_f);
+            .call_runtime_function(
+                compilation_ctx,
+                check_overflow_f,
+                &RuntimeFunction::CheckOverflowU8U16,
+            );
 
         Ok(())
     }
@@ -230,7 +238,11 @@ impl IU16 {
         builder
             .binop(BinaryOp::I32Add)
             .i32_const(Self::MAX_VALUE)
-            .call(check_overflow_f);
+            .call_runtime_function(
+                compilation_ctx,
+                check_overflow_f,
+                &RuntimeFunction::CheckOverflowU8U16,
+            );
 
         Ok(())
     }
@@ -246,7 +258,7 @@ impl IU16 {
     ) -> Result<(), IntermediateTypeError> {
         let sub_u32_f =
             RuntimeFunction::SubU32.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
-        builder.call(sub_u32_f);
+        builder.call_runtime_function(compilation_ctx, sub_u32_f, &RuntimeFunction::SubU32);
 
         Ok(())
     }
@@ -284,7 +296,11 @@ impl IU16 {
         builder
             .binop(BinaryOp::I32Mul)
             .i32_const(Self::MAX_VALUE)
-            .call(check_overflow_f);
+            .call_runtime_function(
+                compilation_ctx,
+                check_overflow_f,
+                &RuntimeFunction::CheckOverflowU8U16,
+            );
 
         Ok(())
     }
@@ -403,7 +419,7 @@ impl IU32 {
     ) -> Result<(), IntermediateTypeError> {
         let add_function_id =
             RuntimeFunction::AddU32.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
-        builder.call(add_function_id);
+        builder.call_runtime_function(compilation_ctx, add_function_id, &RuntimeFunction::AddU32);
         Ok(())
     }
 
@@ -418,7 +434,7 @@ impl IU32 {
     ) -> Result<(), IntermediateTypeError> {
         let sub_u32_f =
             RuntimeFunction::SubU32.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
-        builder.call(sub_u32_f);
+        builder.call_runtime_function(compilation_ctx, sub_u32_f, &RuntimeFunction::SubU32);
         Ok(())
     }
 
@@ -449,7 +465,7 @@ impl IU32 {
     ) -> Result<(), IntermediateTypeError> {
         let mul_f =
             RuntimeFunction::MulU32.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
-        builder.call(mul_f);
+        builder.call_runtime_function(compilation_ctx, mul_f, &RuntimeFunction::MulU32);
         Ok(())
     }
 
@@ -572,7 +588,7 @@ impl IU64 {
     ) -> Result<(), IntermediateTypeError> {
         let sub_u64_f =
             RuntimeFunction::SubU64.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
-        builder.call(sub_u64_f);
+        builder.call_runtime_function(compilation_ctx, sub_u64_f, &RuntimeFunction::SubU64);
         Ok(())
     }
 
@@ -603,7 +619,7 @@ impl IU64 {
     ) -> Result<(), IntermediateTypeError> {
         let mul_f =
             RuntimeFunction::MulU64.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
-        builder.call(mul_f);
+        builder.call_runtime_function(compilation_ctx, mul_f, &RuntimeFunction::MulU64);
         Ok(())
     }
 
