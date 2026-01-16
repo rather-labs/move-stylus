@@ -23,7 +23,7 @@ pub fn pack_u32_function(
     compilation_ctx: &CompilationContext,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     // Little-endian to Big-endian
-    let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
+    let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None, None)?;
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
     let mut builder = function
@@ -72,7 +72,7 @@ pub fn pack_u64_function(
     compilation_ctx: &CompilationContext,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     // Little-endian to Big-endian
-    let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None)?;
+    let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None, None)?;
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I64, ValType::I32], &[]);
 
     let mut builder = function
@@ -116,6 +116,7 @@ mod tests {
 
     use crate::{
         abi_types::packing::Packable,
+        data::RuntimeErrorData,
         test_compilation_context,
         test_tools::{build_module, setup_wasmtime_module},
         translation::intermediate_types::IntermediateType,
@@ -153,6 +154,7 @@ mod tests {
 
         let compilation_ctx =
             test_compilation_context!(memory_id, alloc_function, calldata_reader_pointer_global);
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
@@ -185,6 +187,7 @@ mod tests {
                 writer_pointer,
                 writer_pointer, // unused for this type
                 &compilation_ctx,
+                Some(&mut runtime_error_data),
             )
             .unwrap();
 
@@ -214,6 +217,7 @@ mod tests {
 
         let compilation_ctx =
             test_compilation_context!(memory_id, alloc_function, calldata_reader_pointer_global);
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[ValType::I32]);
@@ -240,6 +244,7 @@ mod tests {
                 writer_pointer,
                 writer_pointer,
                 &compilation_ctx,
+                Some(&mut runtime_error_data),
             )
             .unwrap();
 
@@ -296,6 +301,7 @@ mod tests {
 
         let compilation_ctx =
             test_compilation_context!(memory_id, alloc_function, calldata_reader_pointer_global);
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[ValType::I64], &[ValType::I32]);
@@ -322,6 +328,7 @@ mod tests {
                 writer_pointer,
                 writer_pointer,
                 &compilation_ctx,
+                Some(&mut runtime_error_data),
             )
             .unwrap();
 

@@ -5,7 +5,7 @@ use crate::{
         ModuleId,
         reserved_modules::{SF_MODULE_NAME_DYNAMIC_FIELD, STYLUS_FRAMEWORK_ADDRESS},
     },
-    data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET},
+    data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET, RuntimeErrorData},
     hostio::host_functions::{native_keccak256, storage_load_bytes32},
     runtime::RuntimeFunction,
     translation::intermediate_types::error::IntermediateTypeError,
@@ -30,6 +30,7 @@ use walrus::{
 pub fn add_child_object_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     itype: &IntermediateType,
     module_id: &ModuleId,
 ) -> Result<FunctionId, NativeFunctionError> {
@@ -43,11 +44,16 @@ pub fn add_child_object_fn(
         return Ok(function);
     };
 
-    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx))?;
+    let get_id_bytes_ptr_fn =
+        RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx), None)?;
     let write_object_slot_fn =
-        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
-    let save_struct_into_storage_fn =
-        RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype])?;
+        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx), None)?;
+    let save_struct_into_storage_fn = RuntimeFunction::EncodeAndSaveInStorage.get_generic(
+        module,
+        compilation_ctx,
+        Some(runtime_error_data),
+        &[itype],
+    )?;
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
 
@@ -97,6 +103,7 @@ pub fn add_child_object_fn(
 pub fn add_borrow_object_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     itype: &IntermediateType,
     module_id: &ModuleId,
 ) -> Result<FunctionId, NativeFunctionError> {
@@ -110,9 +117,13 @@ pub fn add_borrow_object_fn(
         return Ok(function);
     };
     let write_object_slot_fn =
-        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
-    let read_and_decode_from_storage_fn =
-        RuntimeFunction::ReadAndDecodeFromStorage.get_generic(module, compilation_ctx, &[itype])?;
+        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx), None)?;
+    let read_and_decode_from_storage_fn = RuntimeFunction::ReadAndDecodeFromStorage.get_generic(
+        module,
+        compilation_ctx,
+        Some(runtime_error_data),
+        &[itype],
+    )?;
 
     let mut function = FunctionBuilder::new(
         &mut module.types,
@@ -189,6 +200,7 @@ pub fn add_borrow_object_fn(
 pub fn add_remove_child_object_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     itype: &IntermediateType,
     module_id: &ModuleId,
 ) -> Result<FunctionId, NativeFunctionError> {
@@ -213,6 +225,7 @@ pub fn add_remove_child_object_fn(
         NativeFunction::NATIVE_BORROW_CHILD_OBJECT,
         module,
         compilation_ctx,
+        Some(runtime_error_data),
         &ModuleId::new(STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_DYNAMIC_FIELD),
         &[itype.clone()],
     )?;
@@ -268,8 +281,8 @@ pub fn add_has_child_object_fn(
 
     let (storage_load, _) = storage_load_bytes32(module);
     let write_object_slot_fn =
-        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
-    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx), None)?;
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx), None)?;
 
     // Arguments
     let parent_uid = module.locals.add(ValType::I32);

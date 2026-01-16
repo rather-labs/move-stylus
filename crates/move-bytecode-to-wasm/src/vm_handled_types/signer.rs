@@ -12,7 +12,8 @@ impl VmHandledType for Signer {
         module: &mut Module,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), VmHandledTypeError> {
-        let inject_signer_fn = RuntimeFunction::InjectSigner.get(module, Some(compilation_ctx))?;
+        let inject_signer_fn =
+            RuntimeFunction::InjectSigner.get(module, Some(compilation_ctx), None)?;
 
         block.call(inject_signer_fn);
         Ok(())

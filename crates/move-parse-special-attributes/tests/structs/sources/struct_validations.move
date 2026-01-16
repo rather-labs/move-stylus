@@ -37,7 +37,7 @@ public struct StructWithoutKeyHasUidField {
     value: u64
 }
 
-#[ext(event, indexes = 1)]
+#[ext(event(indexes = 1))]
 public struct NestedEvent {
     data: vector<u8>,
 }

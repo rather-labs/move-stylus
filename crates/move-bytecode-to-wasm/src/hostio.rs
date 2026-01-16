@@ -3,6 +3,7 @@ pub use entrypoint_router::add_entrypoint;
 use walrus::{FunctionId, MemoryId, Module, ModuleConfig};
 
 use crate::{
+    compilation_context::globals::CompilationContextGlobals,
     data::{TOTAL_RESERVED_MEMORY, setup_data_segment},
     memory::setup_module_memory,
 };
@@ -14,11 +15,11 @@ pub mod host_test_functions;
 
 /// Create a new module with stylus memory management functions and adds the `pay_for_memory_grow` function
 /// as required by stylus
-pub fn new_module_with_host() -> (Module, FunctionId, MemoryId) {
+pub fn new_module_with_host() -> (Module, FunctionId, MemoryId, CompilationContextGlobals) {
     let config = ModuleConfig::new();
     let mut module = Module::with_config(config);
 
-    let (allocator_function_id, memory_id) =
+    let (allocator_function_id, memory_id, compilation_context_globals) =
         setup_module_memory(&mut module, Some(TOTAL_RESERVED_MEMORY));
     let (memory_grow_id, _) = host_functions::add_pay_for_memory_grow(&mut module);
 
@@ -28,5 +29,10 @@ pub fn new_module_with_host() -> (Module, FunctionId, MemoryId) {
     // Fill data segment
     setup_data_segment(&mut module, memory_id);
 
-    (module, allocator_function_id, memory_id)
+    (
+        module,
+        allocator_function_id,
+        memory_id,
+        compilation_context_globals,
+    )
 }

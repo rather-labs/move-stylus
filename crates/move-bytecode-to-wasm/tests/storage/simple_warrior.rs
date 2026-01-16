@@ -75,7 +75,7 @@ fn test_equip_warrior(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let warrior_id = runtime.obtain_uid();
+    let warrior_id = runtime.obtain_uid().unwrap();
 
     // Inspect warrior and assert it has no sword or shield
     let call_data = inspectWarriorCall::new((warrior_id,)).abi_encode();
@@ -97,7 +97,7 @@ fn test_equip_warrior(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let sword_id = runtime.obtain_uid();
+    let sword_id = runtime.obtain_uid().unwrap();
     let sword_slot = derive_object_slot(&SIGNER_ADDRESS, &sword_id.0);
 
     // Equip sword
@@ -134,7 +134,7 @@ fn test_equip_warrior(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let new_sword_id = runtime.obtain_uid();
+    let new_sword_id = runtime.obtain_uid().unwrap();
     let new_sword_slot = derive_object_slot(&SIGNER_ADDRESS, &new_sword_id.0);
 
     // Equip new sword
@@ -189,7 +189,7 @@ fn test_equip_warrior(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let shield_id = runtime.obtain_uid();
+    let shield_id = runtime.obtain_uid().unwrap();
     let shield_slot = derive_object_slot(&SIGNER_ADDRESS, &shield_id.0);
 
     let call_data = equipShieldCall::new((warrior_id, shield_id)).abi_encode();

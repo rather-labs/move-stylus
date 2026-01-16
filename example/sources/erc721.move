@@ -53,7 +53,7 @@ public struct OperatorApprovals has key {
 }
 
 // Emitted when `owner` enables `approved` to manage the `token_id` token.
-#[ext(event, indexes = 3)]
+#[ext(event(indexes = 3))]
 public struct Approval has copy, drop {
     owner: address,
     approved: address,
@@ -61,7 +61,7 @@ public struct Approval has copy, drop {
 }
 
 // Emitted when `owner` enables or disables (`approved`) `operator` to manage all of its assets.
-#[ext(event, indexes = 2)]
+#[ext(event(indexes = 2))]
 public struct ApprovalForAll has copy, drop {
     owner: address,
     operator: address,
@@ -69,7 +69,7 @@ public struct ApprovalForAll has copy, drop {
 }
 
 // Emitted when `token_id` token is transferred from `from` to `to`.
-#[ext(event, indexes = 3)]
+#[ext(event(indexes = 3))]
 public struct Transfer has copy, drop {
     from: address,
     to: address,

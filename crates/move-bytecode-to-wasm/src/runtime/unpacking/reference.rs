@@ -2,6 +2,7 @@ use crate::{
     CompilationContext,
     abi_types::error::{AbiError, AbiOperationError},
     abi_types::unpacking::Unpackable,
+    data::RuntimeErrorData,
     runtime::{RuntimeFunction, RuntimeFunctionError},
     translation::intermediate_types::IntermediateType,
 };
@@ -10,6 +11,7 @@ use walrus::{FunctionBuilder, FunctionId, Module, ValType, ir::MemArg};
 pub fn unpack_reference_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     itype: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let name =
@@ -48,9 +50,11 @@ pub fn unpack_reference_function(
                 None,
                 &mut builder,
                 module,
+                None,
                 reader_pointer,
                 calldata_reader_pointer,
                 compilation_ctx,
+                Some(runtime_error_data),
             )?;
 
             builder.store(
@@ -100,24 +104,24 @@ pub fn unpack_reference_function(
 
 #[cfg(test)]
 mod tests {
+    use crate::{
+        abi_types::unpacking::Unpackable,
+        data::RuntimeErrorData,
+        test_compilation_context,
+        test_tools::{build_module, setup_wasmtime_module},
+        translation::intermediate_types::IntermediateType,
+    };
     use alloy_primitives::{U256, address};
     use alloy_sol_types::{SolType, sol};
     use std::sync::Arc;
     use walrus::{FunctionBuilder, ValType};
 
-    use crate::{
-        abi_types::unpacking::Unpackable,
-        test_compilation_context,
-        test_tools::{build_module, setup_wasmtime_module},
-        translation::intermediate_types::IntermediateType,
-    };
-
     /// Test helper for unpacking reference types
     fn unpack_ref(data: &[u8], ref_type: IntermediateType, expected_memory_bytes: &[u8]) {
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+        let (mut raw_module, allocator, memory_id, ctx_globals) =
             build_module(Some(data.len() as i32));
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
@@ -135,9 +139,11 @@ mod tests {
                 Some(&ref_type),
                 &mut func_body,
                 &mut raw_module,
+                None,
                 args_pointer,
                 calldata_reader_pointer,
                 &compilation_ctx,
+                Some(&mut runtime_error_data),
             )
             .unwrap();
 

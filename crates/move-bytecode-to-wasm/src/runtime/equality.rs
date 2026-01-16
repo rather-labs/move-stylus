@@ -133,7 +133,8 @@ pub fn vec_equality_heap_type(
         .name(RuntimeFunction::VecEqualityHeapType.name().to_owned())
         .func_body();
 
-    let equality_f_id = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx))?;
+    let equality_f_id =
+        RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx), None)?;
 
     // Function arguments
     let v1_ptr = module.locals.add(ValType::I32);

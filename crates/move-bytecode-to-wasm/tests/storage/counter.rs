@@ -23,7 +23,7 @@ fn test_storage_counter(
     assert_eq!(0, result);
 
     // Read the object id emmited from the contract's events
-    let object_id = runtime.obtain_uid();
+    let object_id = runtime.obtain_uid().unwrap();
 
     // Read initial value (should be 25)
     let call_data = readCall::new((object_id,)).abi_encode();
