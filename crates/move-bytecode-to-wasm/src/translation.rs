@@ -14,6 +14,7 @@ pub mod table;
 
 use std::{
     collections::{HashMap, HashSet},
+    hash::{Hash, Hasher},
     rc::Rc,
     sync::Arc,
 };
@@ -36,8 +37,8 @@ use crate::{
     abi_types::error_encoding::build_abort_error_message,
     compilation_context::{ModuleData, ModuleId},
     data::{DATA_ABORT_MESSAGE_PTR_OFFSET, RuntimeErrorData},
-    error::add_propagate_error_instructions,
     generics::{replace_type_parameters, type_contains_generics},
+    hasher::get_hasher,
     hostio::host_functions::storage_flush_cache,
     native_functions::NativeFunction,
     runtime::RuntimeFunction,
@@ -203,7 +204,15 @@ pub fn translate_function(
     let mut function = FunctionBuilder::new(&mut module.types, &params, &results);
 
     #[cfg(debug_assertions)]
-    function.name(function_information.function_id.identifier.to_string());
+    {
+        let mut hasher = get_hasher();
+        function_information.function_id.hash(&mut hasher);
+        function.name(format!(
+            "{}_{:x}",
+            function_information.function_id.identifier,
+            hasher.finish()
+        ));
+    }
 
     let mut builder = function.func_body();
 
@@ -2974,7 +2983,7 @@ fn call_indirect(
         .i32_const(function_entry.index)
         .call_indirect(function_entry.type_id, wasm_table_id);
 
-    add_propagate_error_instructions(builder, compilation_ctx);
+    builder.add_propagate_error_instructions(compilation_ctx);
 
     add_unpack_function_return_values_instructions(
         builder,

@@ -5,8 +5,8 @@ use crate::{
     abi_types::error_encoding::build_custom_error_message,
     compilation_context::ModuleId,
     data::RuntimeErrorData,
-    error::add_handle_error_instructions,
     translation::intermediate_types::{IntermediateType, structs::IStructType},
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 
 use super::{NativeFunction, error::NativeFunctionError};
@@ -55,8 +55,9 @@ pub fn add_revert_fn(
         error_struct_ptr,
     )?;
 
-    builder.local_get(encoded_error_ptr);
-    add_handle_error_instructions(module, &mut builder, compilation_ctx, false);
+    builder
+        .local_get(encoded_error_ptr)
+        .add_handle_error_instructions(module, compilation_ctx);
 
     Ok(function.finish(vec![error_struct_ptr], &mut module.funcs))
 }

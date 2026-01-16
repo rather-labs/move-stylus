@@ -64,7 +64,6 @@ pub fn translate_package<'move_package>(
     modules_data: &mut HashMap<ModuleId, ModuleData<'move_package>>,
     verbose: bool,
 ) -> Result<HashMap<String, Module>, CompilationError> {
-    println!("module data: {:?}", modules_data.keys());
     // HashMap of package name to address
     // This includes all the dependencies of the root package
     let address_alias_instantiation: HashMap<Symbol, [u8; 32]> = package
@@ -90,10 +89,6 @@ pub fn translate_package<'move_package>(
     }
 
     let mut modules = HashMap::new();
-
-    // Contains the module data for all the root package and its dependencies
-    // let mut modules_data: HashMap<ModuleId, ModuleData> = HashMap::new();
-
     let mut errors = Vec::new();
 
     for root_compiled_module in &root_compiled_units {

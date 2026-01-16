@@ -46,12 +46,16 @@ pub const DATA_ENUM_STORAGE_SIZE_OFFSET: i32 = 260;
 /// 8 bytes: [data_length][data_pointer]
 pub const DATA_CALLDATA_OFFSET: i32 = 396;
 
+/// Used to derive storage mapping slots for data structures. Here we save the data that will be
+/// hashed with keccak256 to derive the storage slot.
+pub const DATA_DERIVED_MAPPING_SLOT: i32 = 404;
+
 /// Amount of memory reserved starting from offset 0.
 ///
 /// # WARNING
 /// This value must be kept in sync to correctly initialize the memory allocator
 /// at the proper offset.
-pub const TOTAL_RESERVED_MEMORY: i32 = 404;
+pub const TOTAL_RESERVED_MEMORY: i32 = 468;
 
 /// Initializes the module's data segment.
 pub fn setup_data_segment(module: &mut Module, memory_id: MemoryId) {
@@ -118,7 +122,7 @@ impl RuntimeErrorData {
         let encoded_error = Self::abi_encode_error_message(error);
         let offset = self.next_offset;
         let data_size = encoded_error.len() as i32;
-        if data_size > 256 {
+        if data_size > 255 {
             panic!("Error message is too long");
         }
 

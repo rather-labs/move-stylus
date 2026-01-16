@@ -270,7 +270,8 @@ mod tests {
     use std::sync::Arc;
 
     use crate::{
-        test_compilation_context, test_runtime_error_data,
+        data::RuntimeErrorData,
+        test_compilation_context,
         test_tools::{build_module, setup_wasmtime_module},
     };
     use alloy_primitives::U256;
@@ -321,7 +322,7 @@ mod tests {
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
 
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
@@ -426,7 +427,7 @@ mod tests {
         let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
@@ -496,7 +497,7 @@ mod tests {
         let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
@@ -613,7 +614,7 @@ mod tests {
         let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);

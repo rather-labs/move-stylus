@@ -1,6 +1,6 @@
 module test::receive_bad_visibility;
 
-#[ext(payable)]
+#[ext(abi(payable))]
 public fun receive() {
   // Do nothing
 }

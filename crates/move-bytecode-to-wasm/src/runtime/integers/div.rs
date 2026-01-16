@@ -496,7 +496,6 @@ mod tests {
     use std::rc::Rc;
 
     use crate::test_compilation_context;
-    use crate::test_runtime_error_data;
     use crate::test_tools::{
         build_module, get_linker_with_host_debug_functions, setup_wasmtime_module,
     };
@@ -679,7 +678,7 @@ mod tests {
             build_module(Some(TYPE_HEAP_SIZE * 2));
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -737,7 +736,7 @@ mod tests {
             build_module(Some(TYPE_HEAP_SIZE * 2));
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
             &[ValType::I32, ValType::I32],
@@ -835,7 +834,7 @@ mod tests {
             build_module(Some(TYPE_HEAP_SIZE * 2));
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -896,7 +895,7 @@ mod tests {
             build_module(Some(TYPE_HEAP_SIZE * 2));
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -1010,7 +1009,7 @@ mod tests {
         let (mut raw_module, allocator_func, memory_id, ctx_globals) =
             build_module(Some(TYPE_HEAP_SIZE * 2));
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -1065,7 +1064,7 @@ mod tests {
             build_module(Some(TYPE_HEAP_SIZE * 2));
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
             &[ValType::I32, ValType::I32],
@@ -1191,7 +1190,7 @@ mod tests {
             build_module(Some(TYPE_HEAP_SIZE * 2));
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -1247,7 +1246,7 @@ mod tests {
             build_module(Some(TYPE_HEAP_SIZE * 2));
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
             &[ValType::I32, ValType::I32],

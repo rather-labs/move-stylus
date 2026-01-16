@@ -87,6 +87,11 @@ pub enum AbiError {
 
     #[error("invalid selector size")]
     InvalidSelectorSize,
+
+    #[error(
+        "storage object (FrozenStorageObject, OwnedStorageObject, SharedStorageObject) has invalid type paramter"
+    )]
+    StorageObjectHasInvalidType,
 }
 
 impl From<AbiError> for CompilationError {

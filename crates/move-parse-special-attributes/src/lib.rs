@@ -17,15 +17,16 @@ use error::SpecialAttributeErrorKind;
 pub use event::Event;
 use event::EventParseError;
 pub use external_call::error::{ExternalCallFunctionError, ExternalCallStructError};
+use external_call::external_struct::ExternalStructError;
 pub use function_validation::FunctionValidationError;
+use function_validation::check_repeated_storage_object_param;
+use function_validation::check_storage_object_param;
 use move_symbol_pool::Symbol;
 pub use reserved_modules::{SF_ADDRESS, SF_RESERVED_STRUCTS};
 pub use struct_validation::StructValidationError;
-// TODO: Create error struct with LOC and error info
 
 use external_call::{
-    external_struct::{ExternalStruct, ExternalStructError},
-    validate_external_call_function, validate_external_call_struct,
+    external_struct::ExternalStruct, validate_external_call_function, validate_external_call_struct,
 };
 use function_modifiers::{Function, FunctionModifier, Visibility};
 use function_validation::validate_function;
@@ -36,7 +37,7 @@ use move_compiler::{
 };
 use move_ir_types::location::Loc;
 use std::{
-    collections::{BTreeMap, HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, HashMap, HashSet},
     path::Path,
 };
 use struct_modifiers::StructModifier;
@@ -55,7 +56,6 @@ pub struct Struct_ {
 #[derive(Debug)]
 pub struct TestFunction {
     pub name: Symbol,
-    pub skip: bool,
     pub expect_failure: bool,
 }
 
@@ -160,105 +160,100 @@ pub fn process_special_attributes(
                             has_key: s.abilities.iter().any(|a| a.value == Ability_::Key),
                         });
 
-                        let mut found_modifier: bool = false;
-                        'loop_att: for attributes in &s.attributes {
-                            if let Some(att) = attributes.value.first() {
-                                let modifier = StructModifier::parse_struct_modifier(&att.value);
-                                if let Some(modifier) = modifier {
-                                    if found_modifier {
-                                        // Found a second match
+                        for attributes in &s.attributes {
+                            let mut modifiers: Vec<StructModifier> = Vec::new();
+                            for attr in &attributes.value {
+                                match StructModifier::parse_struct_modifier(&attr.value) {
+                                    Ok(Some(modifier)) => modifiers.push(modifier),
+                                    Ok(None) => {}
+                                    Err(e) => {
                                         found_error = true;
-                                        module_errors.push(SpecialAttributeError {
-                                            kind: SpecialAttributeErrorKind::TooManyAttributes,
-                                            line_of_code: s.loc,
-                                        });
-                                        break 'loop_att;
+                                        module_errors.push(e);
                                     }
+                                }
+                            }
 
-                                    match modifier {
-                                        StructModifier::ExternalCall => {
-                                            match validate_external_call_struct(s) {
-                                                Ok(_)
-                                                    if !result
-                                                        .external_call_structs
-                                                        .contains(&struct_name) =>
-                                                {
-                                                    result.external_call_structs.insert(struct_name);
-                                                    found_modifier = true;
-                                                }
-                                                Ok(_) => {
-                                                    found_modifier = true;
-                                                }
-                                                Err(e) => {
-                                                    found_error = true;
-                                                    module_errors.extend(e);
-                                                    break 'loop_att;
-                                                }
+                            // println!("Struct {} has modifiers: {:?}", struct_name, modifiers);
+                            for modifier in modifiers {
+                                match modifier {
+                                    StructModifier::ExternalStruct => {
+                                        match ExternalStruct::try_from(s) {
+                                            Ok(external_struct) => {
+                                                result
+                                                    .external_struct
+                                                    .insert(struct_name, external_struct);
                                             }
-                                        }
-                                        StructModifier::ExternalStruct => {
-                                            match ExternalStruct::try_from(s) {
-                                                Ok(external_struct) => {
-                                                    result
-                                                        .external_struct
-                                                        .insert(struct_name, external_struct);
-                                                    found_modifier = true;
-                                                }
-                                                Err(SpecialAttributeError {
-                                                    kind:
-                                                        SpecialAttributeErrorKind::ExternalStruct(
-                                                            ExternalStructError::NotAnExternalStruct,
-                                                        ),
-                                                    ..
-                                                }) => {}
-                                                Err(e) => {
-                                                    found_error = true;
-                                                    module_errors.push(e);
-                                                    break 'loop_att;
-                                                }
-                                            }
-                                        }
-                                        StructModifier::Event => {
-                                            match Event::try_from(s) {
-                                                Ok(event) => {
-                                                    result.events.insert(struct_name, event);
-                                                    found_modifier = true;
-                                                }
-                                                Err(SpecialAttributeError {
-                                                    kind:
-                                                        SpecialAttributeErrorKind::Event(
-                                                            EventParseError::NotAnEvent,
-                                                        ),
-                                                    ..
-                                                }) => {}
-                                                Err(e) => {
-                                                    found_error = true;
-                                                    module_errors.push(e);
-                                                    break 'loop_att;
-                                                }
-                                            }
-                                        }
-                                        StructModifier::AbiError => {
-                                            match AbiError::try_from(s) {
-                                                Ok(abi_error) => {
-                                                    result.abi_errors.insert(struct_name, abi_error);
-                                                    found_modifier = true;
-                                                }
-                                                Err(SpecialAttributeError {
-                                                    kind:
-                                                        SpecialAttributeErrorKind::AbiError(
-                                                            AbiErrorParseError::NotAnAbiError,
-                                                        ),
-                                                    ..
-                                                }) => {}
-                                                Err(e) => {
-                                                    found_error = true;
-                                                    module_errors.push(e);
-                                                    break 'loop_att;
-                                                }
+                                            Err(SpecialAttributeError {
+                                                kind:
+                                                    SpecialAttributeErrorKind::ExternalStruct(
+                                                        ExternalStructError::NotAnExternalStruct,
+                                                    ),
+                                                ..
+                                            }) => {}
+                                            Err(e) => {
+                                                found_error = true;
+                                                module_errors.push(e);
+                                                continue;
                                             }
                                         }
                                     }
+                                    StructModifier::ExternalCall => {
+                                        match validate_external_call_struct(s) {
+                                            Ok(_)
+                                                if !result
+                                                    .external_call_structs
+                                                    .contains(&struct_name) =>
+                                            {
+                                                result.external_call_structs.insert(struct_name);
+                                            }
+                                            Ok(_) => {}
+                                            Err(e) => {
+                                                found_error = true;
+                                                module_errors.extend(e);
+                                            }
+                                        }
+                                    }
+                                    StructModifier::Event {
+                                        is_anonymous,
+                                        indexes,
+                                    } => {
+                                        // Check if the event has the key ability
+                                        if s.abilities.iter().any(|a| a.value == Ability_::Key) {
+                                            module_errors.push(SpecialAttributeError {
+                                                kind: SpecialAttributeErrorKind::Event(
+                                                    EventParseError::EventWithKey,
+                                                ),
+                                                line_of_code: s.loc,
+                                            });
+                                            found_error = true;
+                                            continue;
+                                        }
+
+                                        result.events.insert(
+                                            struct_name,
+                                            Event {
+                                                name: struct_name,
+                                                is_anonymous,
+                                                indexes,
+                                            },
+                                        );
+                                    }
+                                    StructModifier::AbiError => match AbiError::try_from(s) {
+                                        Ok(abi_error) => {
+                                            result.abi_errors.insert(struct_name, abi_error);
+                                        }
+                                        Err(SpecialAttributeError {
+                                            kind:
+                                                SpecialAttributeErrorKind::AbiError(
+                                                    AbiErrorParseError::NotAnAbiError,
+                                                ),
+                                            ..
+                                        }) => {}
+                                        Err(e) => {
+                                            found_error = true;
+                                            module_errors.push(e);
+                                        }
+                                    },
                                 }
                             }
                         }
@@ -374,8 +369,15 @@ pub fn process_special_attributes(
             for module_member in module.members {
                 match module_member {
                     ModuleMember::Function(ref f) => {
+                        // This hashset is used to detect repeated storage object identifiers when declaring
+                        // owned/shared/frozen objects
+                        let mut processed_storage_objects: HashSet<Symbol> = HashSet::new();
+
                         let visibility: Visibility = (&f.visibility).into();
                         let signature = Function::parse_signature(&f.signature);
+
+                        let mut function =
+                            Function::new(f.name.0.value, signature.clone(), visibility);
 
                         // Function validation checks:
                         // - Entry functions must not be generic.
@@ -396,96 +398,177 @@ pub fn process_special_attributes(
                             module_errors.push(error);
                         }
 
-                        if let Some(attributes) = f.attributes.first() {
-                            let mut modifiers = attributes
+                        for attributes in &f.attributes {
+                            let modifiers = attributes
                                 .value
                                 .iter()
-                                .flat_map(|s| FunctionModifier::parse_modifiers(&s.value))
-                                .collect::<VecDeque<FunctionModifier>>();
+                                .map(|s| FunctionModifier::parse_modifiers(&s.value))
+                                .collect::<Result<Vec<Vec<FunctionModifier>>, SpecialAttributeError>>();
 
-                            let first_modifier = modifiers.pop_front();
-                            match first_modifier {
-                                // TODO: Process this only if test mode is enabled
-                                Some(FunctionModifier::Test) => {
-                                    let modifiers =
-                                        modifiers.into_iter().collect::<Vec<FunctionModifier>>();
-
-                                    result.test_functions.push(TestFunction {
-                                        name: f.name.0.value,
-                                        skip: modifiers.contains(&FunctionModifier::Skip),
-                                        expect_failure: modifiers
-                                            .contains(&FunctionModifier::ExpectedFailure),
-                                    });
-
-                                    result.functions.push(Function {
-                                        name: f.name.0.value,
-                                        modifiers: vec![],
-                                        signature,
-                                        visibility,
-                                    });
+                            let modifiers = match modifiers {
+                                Ok(modifiers) => modifiers.concat(),
+                                Err(e) => {
+                                    found_error = true;
+                                    module_errors.push(e);
+                                    continue;
                                 }
-                                Some(FunctionModifier::ExternalCall) => {
-                                    let modifiers =
-                                        modifiers.into_iter().collect::<Vec<FunctionModifier>>();
+                            };
 
-                                    let errors = validate_external_call_function(
-                                        f,
-                                        &modifiers,
-                                        &result.external_call_structs,
-                                    );
+                            for modifier in modifiers {
+                                match modifier {
+                                    FunctionModifier::OwnedObjects(owned_objects) => {
+                                        // TODO: Check declared attributes exist
 
-                                    if let Err(errors) = errors {
-                                        found_error = true;
-                                        module_errors.extend(errors);
-                                    } else if !found_error {
-                                        result.external_calls.insert(
-                                            f.name.0.value,
-                                            Function {
-                                                name: f.name.0.value,
-                                                modifiers,
-                                                signature,
-                                                visibility,
-                                            },
-                                        );
-                                    }
-                                }
-                                Some(FunctionModifier::Abi) => {
-                                    let modifiers =
-                                        modifiers.into_iter().collect::<Vec<FunctionModifier>>();
+                                        for (owned_object_identifier, loc) in &owned_objects {
+                                            if let Err(e) = check_repeated_storage_object_param(
+                                                &mut processed_storage_objects,
+                                                *owned_object_identifier,
+                                                *loc,
+                                            ) {
+                                                found_error = true;
+                                                module_errors.push(e);
+                                            }
 
-                                    if !found_error {
-                                        result.functions.push(Function {
-                                            name: f.name.0.value,
-                                            modifiers,
-                                            signature,
-                                            visibility,
-                                        });
-                                    }
-                                }
-                                _ => {
-                                    if !found_error {
-                                        if let Some(modifier) = first_modifier {
-                                            modifiers.push_front(modifier);
+                                            if let Err(e) = check_storage_object_param(
+                                                &signature,
+                                                *owned_object_identifier,
+                                                *loc,
+                                                &result.structs,
+                                            ) {
+                                                found_error = true;
+                                                module_errors.push(e);
+                                                continue;
+                                            }
                                         }
-                                        let modifiers = modifiers
-                                            .into_iter()
-                                            .collect::<Vec<FunctionModifier>>();
-                                        result.functions.push(Function {
+
+                                        if found_error {
+                                            continue;
+                                        }
+
+                                        function
+                                            .owned_objects
+                                            .extend(owned_objects.iter().map(|(id, _)| *id));
+                                    }
+                                    FunctionModifier::SharedObjects(shared_objects) => {
+                                        for (shared_object_identifier, loc) in &shared_objects {
+                                            if let Err(e) = check_repeated_storage_object_param(
+                                                &mut processed_storage_objects,
+                                                *shared_object_identifier,
+                                                *loc,
+                                            ) {
+                                                found_error = true;
+                                                module_errors.push(e);
+                                            }
+
+                                            if let Err(e) = check_storage_object_param(
+                                                &signature,
+                                                *shared_object_identifier,
+                                                *loc,
+                                                &result.structs,
+                                            ) {
+                                                found_error = true;
+                                                module_errors.push(e);
+                                                continue;
+                                            }
+                                        }
+
+                                        if found_error {
+                                            continue;
+                                        }
+
+                                        function
+                                            .shared_objects
+                                            .extend(shared_objects.iter().map(|(id, _)| *id));
+                                    }
+                                    FunctionModifier::FrozenObjects(frozen_objects) => {
+                                        for (frozen_object_identifier, loc) in &frozen_objects {
+                                            if let Err(e) = check_repeated_storage_object_param(
+                                                &mut processed_storage_objects,
+                                                *frozen_object_identifier,
+                                                *loc,
+                                            ) {
+                                                found_error = true;
+                                                module_errors.push(e);
+                                            }
+
+                                            if let Err(e) = check_storage_object_param(
+                                                &signature,
+                                                *frozen_object_identifier,
+                                                *loc,
+                                                &result.structs,
+                                            ) {
+                                                found_error = true;
+                                                module_errors.push(e);
+                                                continue;
+                                            }
+                                        }
+
+                                        if found_error {
+                                            continue;
+                                        }
+
+                                        function
+                                            .frozen_objects
+                                            .extend(frozen_objects.iter().map(|(id, _)| *id));
+                                    }
+                                    // TODO: Process this only if test mode is enabled
+                                    FunctionModifier::Test => {
+                                        result.test_functions.push(TestFunction {
                                             name: f.name.0.value,
-                                            modifiers,
-                                            signature,
-                                            visibility,
+                                            expect_failure: false,
                                         });
                                     }
+                                    FunctionModifier::ExpectedFailure => {
+                                        if let Some(test_function) = result
+                                            .test_functions
+                                            .iter_mut()
+                                            .find(|tf| tf.name == f.name.0.value)
+                                        {
+                                            test_function.expect_failure = true;
+                                        } else {
+                                            found_error = true;
+                                            module_errors.push(SpecialAttributeError {
+                                                kind: SpecialAttributeErrorKind::ExpectedFailureWithoutTest,
+                                                line_of_code: f.loc,
+                                            });
+                                        }
+                                    }
+                                    FunctionModifier::ExternalCall(solidity_modifiers) => {
+                                        let errors = validate_external_call_function(
+                                            f,
+                                            &solidity_modifiers,
+                                            &result.external_call_structs,
+                                        );
+
+                                        if let Err(errors) = errors {
+                                            found_error = true;
+                                            module_errors.extend(errors);
+                                        } else if !found_error {
+                                            result.external_calls.insert(
+                                                f.name.0.value,
+                                                Function {
+                                                    name: f.name.0.value,
+                                                    modifiers: solidity_modifiers,
+                                                    owned_objects: vec![],
+                                                    shared_objects: vec![],
+                                                    frozen_objects: vec![],
+                                                    signature: signature.clone(),
+                                                    visibility,
+                                                },
+                                            );
+                                        }
+                                    }
+                                    FunctionModifier::Abi(solidity_modifiers) => {
+                                        if !found_error {
+                                            function.modifiers.extend(solidity_modifiers);
+                                        }
+                                    }
+                                    _ => {}
                                 }
                             }
-                        } else if !found_error {
-                            result.functions.push(Function {
-                                name: f.name.0.value,
-                                modifiers: Vec::new(),
-                                signature,
-                                visibility,
-                            });
+                        }
+                        if !found_error {
+                            result.functions.push(function);
                         }
                     }
                     _ => continue,

@@ -12,7 +12,7 @@ public struct ErrorOk(String) has drop;
 #[ext(abi_error)]
 public struct Error(String) has drop;
 
-#[ext(event, indexes = 1)]
+#[ext(event(indexes = 1))]
 public struct EventOk has copy, drop {
     a: u64,
     b: u128,

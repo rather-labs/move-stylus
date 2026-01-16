@@ -104,24 +104,24 @@ pub fn unpack_reference_function(
 
 #[cfg(test)]
 mod tests {
+    use crate::{
+        abi_types::unpacking::Unpackable,
+        data::RuntimeErrorData,
+        test_compilation_context,
+        test_tools::{build_module, setup_wasmtime_module},
+        translation::intermediate_types::IntermediateType,
+    };
     use alloy_primitives::{U256, address};
     use alloy_sol_types::{SolType, sol};
     use std::sync::Arc;
     use walrus::{FunctionBuilder, ValType};
-
-    use crate::{
-        abi_types::unpacking::Unpackable,
-        test_compilation_context, test_runtime_error_data,
-        test_tools::{build_module, setup_wasmtime_module},
-        translation::intermediate_types::IntermediateType,
-    };
 
     /// Test helper for unpacking reference types
     fn unpack_ref(data: &[u8], ref_type: IntermediateType, expected_memory_bytes: &[u8]) {
         let (mut raw_module, allocator, memory_id, ctx_globals) =
             build_module(Some(data.len() as i32));
         let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);

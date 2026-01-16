@@ -249,21 +249,18 @@ pub fn pack_struct_function(
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, sync::Arc};
+    use std::{cell::RefCell, collections::HashMap, panic::AssertUnwindSafe, rc::Rc, sync::Arc};
 
-    use crate::compilation_context::ModuleData;
     use alloy_primitives::{U256, address};
     use alloy_sol_types::{SolValue, sol};
     use rstest::rstest;
-    use std::cell::RefCell;
-    use std::panic::AssertUnwindSafe;
-    use std::rc::Rc;
     use walrus::{FunctionBuilder, ValType};
 
     use crate::{
         abi_types::packing::Packable,
-        compilation_context::ModuleId,
-        test_compilation_context, test_runtime_error_data,
+        compilation_context::{ModuleData, ModuleId},
+        data::RuntimeErrorData,
+        test_compilation_context,
         test_tools::{build_module, setup_wasmtime_module},
         translation::intermediate_types::{
             IntermediateType, VmHandledStruct,
@@ -633,7 +630,7 @@ mod tests {
         let (mut raw_module, alloc_function, memory_id, ctx_globals) = build_module(None);
 
         let mut compilation_ctx = test_compilation_context!(memory_id, alloc_function, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let struct_type = IntermediateType::IStruct {
             module_id: ModuleId::default(),
@@ -737,7 +734,7 @@ mod tests {
         let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
         let mut compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let struct_type = IntermediateType::IStruct {
             module_id: ModuleId::default(),
@@ -884,7 +881,7 @@ mod tests {
         let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
         let mut compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let struct_type = IntermediateType::IStruct {
             module_id: ModuleId::default(),
@@ -1065,7 +1062,7 @@ mod tests {
         let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
         let mut compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let struct_type = IntermediateType::IStruct {
             module_id: ModuleId::default(),
@@ -1236,7 +1233,7 @@ mod tests {
         let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
         let mut compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let struct_type = IntermediateType::IStruct {
             module_id: ModuleId::default(),

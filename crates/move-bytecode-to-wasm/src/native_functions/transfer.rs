@@ -1,13 +1,11 @@
 use crate::{
     CompilationContext,
     compilation_context::ModuleId,
-    data::{
-        DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
-        DATA_SHARED_OBJECTS_KEY_OFFSET, RuntimeErrorData,
-    },
-    error::{RuntimeError, add_handle_error_instructions},
+    data::{DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_SHARED_OBJECTS_KEY_OFFSET, RuntimeErrorData},
+    error::RuntimeError,
     runtime::RuntimeFunction,
     translation::intermediate_types::IntermediateType,
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
@@ -89,13 +87,12 @@ pub fn add_transfer_object_fn(
             .unop(UnaryOp::I32Eqz)
             .br_if(block_id);
 
-        block.i32_const(runtime_error_data.get(
+        block.return_error(
             module,
-            compilation_ctx.memory_id,
+            compilation_ctx,
+            runtime_error_data,
             RuntimeError::SharedObjectsCannotBeTransferred,
-        ));
-
-        add_handle_error_instructions(module, block, compilation_ctx, false);
+        );
     });
 
     // Check that the object is not frozen
@@ -109,12 +106,12 @@ pub fn add_transfer_object_fn(
             .call(equality_fn)
             .br_if(block_id);
 
-        block.i32_const(runtime_error_data.get(
+        block.return_error(
             module,
-            compilation_ctx.memory_id,
+            compilation_ctx,
+            runtime_error_data,
             RuntimeError::FrozenObjectsCannotBeTransferred,
-        ));
-        add_handle_error_instructions(module, block, compilation_ctx, false);
+        );
     });
 
     // Delete the object from the owner mapping on the storage
@@ -149,21 +146,17 @@ pub fn add_transfer_object_fn(
         .call(get_id_bytes_ptr_fn)
         .local_set(id_bytes_ptr);
 
+    builder
+        .i32_const(32)
+        .call(compilation_ctx.allocator)
+        .local_set(slot_ptr);
+
     // Calculate the slot number corresponding to the (recipient, struct_id) tuple
     builder
         .local_get(recipient_ptr)
         .local_get(id_bytes_ptr)
+        .local_get(slot_ptr)
         .call(write_object_slot_fn);
-
-    // Allocate 32 bytes for the slot pointer and copy the DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET to it
-    // This is needed because DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET might be overwritten later on
-    builder
-        .i32_const(32)
-        .call(compilation_ctx.allocator)
-        .local_tee(slot_ptr)
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .i32_const(32)
-        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
     // Store the struct in the slot associated with the new owner's mapping
     builder
@@ -249,12 +242,12 @@ pub fn add_share_object_fn(
                 None,
                 |then| {
                     // Build the error message and handle the error
-                    then.i32_const(runtime_error_data.get(
+                    then.return_error(
                         module,
-                        compilation_ctx.memory_id,
+                        compilation_ctx,
+                        runtime_error_data,
                         RuntimeError::FrozenObjectsCannotBeShared,
-                    ));
-                    add_handle_error_instructions(module, then, compilation_ctx, false);
+                    );
                 },
                 |else_| {
                     // Delete the object from owner mapping on the storage
@@ -282,22 +275,18 @@ pub fn add_share_object_fn(
                         .i32_const(32)
                         .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
+                    else_
+                        .i32_const(32)
+                        .call(compilation_ctx.allocator)
+                        .local_set(slot_ptr);
+
                     // Calculate the slot number in the shared objects mapping
                     else_
                         .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
                         .local_get(struct_ptr)
                         .call(get_id_bytes_ptr_fn)
+                        .local_get(slot_ptr)
                         .call(write_object_slot_fn);
-
-                    // Allocate 32 bytes for the slot pointer and copy the DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET to it
-                    // This is needed because DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET might be overwritten later on
-                    else_
-                        .i32_const(32)
-                        .call(compilation_ctx.allocator)
-                        .local_tee(slot_ptr)
-                        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                        .i32_const(32)
-                        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
                     // Save the struct in the shared objects mapping
                     else_
@@ -393,12 +382,12 @@ pub fn add_freeze_object_fn(
                 None,
                 |then| {
                     // Shared objects cannot be frozen
-                    then.i32_const(runtime_error_data.get(
+                    then.return_error(
                         module,
-                        compilation_ctx.memory_id,
+                        compilation_ctx,
+                        runtime_error_data,
                         RuntimeError::SharedObjectsCannotBeFrozen,
-                    ));
-                    add_handle_error_instructions(module, then, compilation_ctx, false);
+                    );
                 },
                 |else_| {
                     // Delete the object from the owner mapping on the storage
@@ -426,21 +415,18 @@ pub fn add_freeze_object_fn(
                         .i32_const(32)
                         .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
+                    else_
+                        .i32_const(32)
+                        .call(compilation_ctx.allocator)
+                        .local_set(slot_ptr);
+
                     // Calculate the struct slot in the frozen objects mapping
                     else_
                         .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
                         .local_get(struct_ptr)
                         .call(get_id_bytes_ptr_fn)
+                        .local_get(slot_ptr)
                         .call(write_object_slot_fn);
-
-                    // Allocate 32 bytes for the slot pointer and copy the DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET to it
-                    else_
-                        .i32_const(32)
-                        .call(compilation_ctx.allocator)
-                        .local_tee(slot_ptr)
-                        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                        .i32_const(32)
-                        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
                     // Save the struct into the frozen objects mapping
                     else_

@@ -528,7 +528,6 @@ mod tests {
     use crate::data::DATA_ABORT_MESSAGE_PTR_OFFSET;
     use crate::error::RuntimeError;
     use crate::test_compilation_context;
-    use crate::test_runtime_error_data;
     use crate::test_tools::{build_module, setup_wasmtime_module};
     use alloy_primitives::U256;
     use alloy_primitives::keccak256;
@@ -566,7 +565,7 @@ mod tests {
         func_body.i32_const(TYPE_HEAP_SIZE);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
         let shift_left_f =
             heap_int_shift_left(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
                 .unwrap();
@@ -613,7 +612,7 @@ mod tests {
         let mut func_body = function_builder.func_body();
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
         let shift_left_f =
             heap_int_shift_left(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
                 .unwrap();
@@ -709,7 +708,7 @@ mod tests {
             .i32_const(TYPE_HEAP_SIZE);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
         let shift_left_f =
             heap_int_shift_left(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
                 .unwrap();
@@ -791,7 +790,7 @@ mod tests {
         func_body.i32_const(TYPE_HEAP_SIZE);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
         let shift_left_f =
             heap_int_shift_left(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
                 .unwrap();
@@ -837,7 +836,7 @@ mod tests {
         let mut func_body = function_builder.func_body();
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
         let shift_left_f =
             heap_int_shift_left(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
                 .unwrap();
@@ -934,7 +933,7 @@ mod tests {
 
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
         let shift_left_f =
             heap_int_shift_left(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
                 .unwrap();
@@ -1015,7 +1014,7 @@ mod tests {
         func_body.i32_const(TYPE_HEAP_SIZE);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
         let shift_right_f =
             heap_int_shift_right(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
                 .unwrap();
@@ -1060,7 +1059,7 @@ mod tests {
         let mut func_body = function_builder.func_body();
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
         let shift_right_f =
             heap_int_shift_right(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
                 .unwrap();
@@ -1156,7 +1155,7 @@ mod tests {
             .i32_const(TYPE_HEAP_SIZE);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
         let shift_left_f =
             heap_int_shift_right(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
                 .unwrap();
@@ -1238,7 +1237,7 @@ mod tests {
         func_body.i32_const(TYPE_HEAP_SIZE);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
         let shift_right_f =
             heap_int_shift_right(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
                 .unwrap();
@@ -1284,7 +1283,7 @@ mod tests {
         let mut func_body = function_builder.func_body();
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
         let shift_right_f =
             heap_int_shift_right(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
                 .unwrap();
@@ -1380,7 +1379,7 @@ mod tests {
             .i32_const(TYPE_HEAP_SIZE);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
         let shift_left_f =
             heap_int_shift_right(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
                 .unwrap();

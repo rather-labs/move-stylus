@@ -10,7 +10,7 @@ public struct NestedStruct<T,U> has copy, drop {
     d: vector<U>,
 }
 
-#[ext(event, indexes = 2)]
+#[ext(event(indexes = 2))]
 public struct TestEvent1<T,U,V> has copy, drop {
     a: T,
     b: NestedStruct<U,V>,
