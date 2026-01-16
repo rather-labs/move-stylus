@@ -323,6 +323,37 @@ fn encode_for_json_abi(type_: Type, abi: &Abi) -> JsonAbiData {
         | Type::Uint128
         | Type::Uint256
         | Type::Unit
+        | Type::Bytes1
+        | Type::Bytes2
+        | Type::Bytes3
+        | Type::Bytes4
+        | Type::Bytes5
+        | Type::Bytes6
+        | Type::Bytes7
+        | Type::Bytes8
+        | Type::Bytes9
+        | Type::Bytes10
+        | Type::Bytes11
+        | Type::Bytes12
+        | Type::Bytes13
+        | Type::Bytes14
+        | Type::Bytes15
+        | Type::Bytes16
+        | Type::Bytes17
+        | Type::Bytes18
+        | Type::Bytes19
+        | Type::Bytes20
+        | Type::Bytes21
+        | Type::Bytes22
+        | Type::Bytes23
+        | Type::Bytes24
+        | Type::Bytes25
+        | Type::Bytes26
+        | Type::Bytes27
+        | Type::Bytes28
+        | Type::Bytes29
+        | Type::Bytes30
+        | Type::Bytes31
         | Type::Bytes32
         | Type::String => JsonAbiData {
             abi_type: type_.name(),

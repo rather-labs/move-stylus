@@ -1,4 +1,4 @@
-use alloy::primitives::address;
+use alloy::primitives::{Bytes, address, keccak256};
 use alloy::primitives::{FixedBytes, U256};
 use alloy::providers::Provider;
 use alloy::rpc::types::TransactionRequest;
@@ -14,31 +14,33 @@ sol!(
     #[allow(missing_docs)]
     contract Erc721 {
         #[derive(Debug)]
-        event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId);
+        event Approval(address indexed owner, address indexed approved, uint256 indexed token_id);
 
         #[derive(Debug)]
         event ApprovalForAll(address indexed owner, address indexed operator, bool approved);
 
         #[derive(Debug)]
-        event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
+        event NewUID(bytes32 indexed uid);
 
-        function constructor() public view;
-        function mint(address to, uint256 tokenId) external view;
-        function burn(uint256 tokenId) external view;
-        function balanceOf(address owner) public view returns (uint256);
-        function ownerOf(uint256 tokenId) public view returns (address);
-        function totalSupply() external view returns (uint256);
-        function transfer(address from, address to, uint256 tokenId) external;
-        function approve(address to, uint256 tokenId) external;
-        function getApproved(uint256 tokenId) external view returns (address);
+        #[derive(Debug)]
+        event Transfer(address indexed from, address indexed to, uint256 indexed token_id);
+
+        function approve(address to, uint256 token_id) external;
+        function balanceOf(address owner) external returns (uint256);
+        function burn(uint256 token_id) external;
+        function getApproved(uint256 token_id) external returns (address);
+        function isApprovedForAll(address owner, address operator) external returns (bool);
+        function mint(address to, uint256 token_id) external;
+        function name() external returns (string);
+        function ownerOf(uint256 token_id) external returns (address);
+        function safeTransferFrom(address from, address to, uint256 token_id, uint8[] data) external;
         function setApprovalForAll(address operator, bool approved) external;
-        function isApprovedForAll(address owner, address operator) external view returns (bool);
-        function transferFrom(address from, address to, uint256 tokenId) external;
-        function safeTransferFrom(address from, address to, uint256 tokenId, uint8[] data);
-        function name() external view returns (string);
-        function symbol() external view returns (string);
-        function tokenURI(uint256 tokenId) external view returns (string);
-        function supportsInterface(bytes4 interfaceId) external view returns (bool);
+        function supportsInterface(bytes4 interface_id) external returns (bool);
+        function symbol() external returns (string);
+        function tokenURI(uint256 token_id) external returns (string);
+        function totalSupply() external returns (uint256);
+        function transfer(address from, address to, uint256 token_id) external;
+        function transferFrom(address from, address to, uint256 token_id) external;
     }
 );
 
@@ -106,7 +108,13 @@ async fn main() -> eyre::Result<()> {
     println!("║         Creating ERC721 Token        ║");
     println!("╚══════════════════════════════════════╝");
 
-    let _pending_tx_ = example.constructor().send().await?;
+    // Compute the constructor selector: keccak256("constructor()")[0..4]
+    let constructor_selector = &keccak256("constructor()")[0..4];
+    let tx = TransactionRequest::default()
+        .from(sender)
+        .to(address)
+        .input(Bytes::copy_from_slice(constructor_selector).into());
+    let _pending_tx_ = provider.send_transaction(tx).await?;
     println!("✓ Contract initialized");
 
     // ==================== Contract Info ====================

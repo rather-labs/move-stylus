@@ -1,5 +1,5 @@
-use alloy::primitives::U256;
 use alloy::primitives::address;
+use alloy::primitives::{Bytes, U256, keccak256};
 use alloy::providers::Provider;
 use alloy::rpc::types::TransactionRequest;
 use alloy::signers::local::PrivateKeySigner;
@@ -13,6 +13,7 @@ sol!(
     #[sol(rpc)]
     #[allow(missing_docs)]
     contract Example {
+
         #[derive(Debug)]
         event Approval(address indexed owner, address indexed spender, uint256 value);
 
@@ -22,18 +23,17 @@ sol!(
         #[derive(Debug)]
         event Transfer(address indexed from, address indexed to, uint256 value);
 
-        function constructor() public view;
-        function mint(address to, uint256 amount) external view;
-        function burn(address from, uint256 amount) external view;
-        function balanceOf(address account) public view returns (uint256);
-        function totalSupply() external view returns (uint256);
-        function transfer(address recipient, uint256 amount) external returns (bool);
-        function allowance(address owner, address spender) external view returns (uint256);
+        function allowance(address owner, address spender) external returns (uint256);
         function approve(address spender, uint256 amount) external returns (bool);
+        function balanceOf(address account) external returns (uint256);
+        function burn(address from, uint256 amount) external;
+        function decimals() external returns (uint8);
+        function mint(address to, uint256 amount) external;
+        function name() external returns (string);
+        function symbol() external returns (string);
+        function totalSupply() external returns (uint256);
+        function transfer(address recipient, uint256 amount) external returns (bool);
         function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
-        function name() external view returns (string);
-        function symbol() external view returns (string);
-        function decimals() external view returns (uint8);
     }
 );
 
@@ -97,7 +97,13 @@ async fn main() -> eyre::Result<()> {
     println!("║         Creating ERC20 Token         ║");
     println!("╚══════════════════════════════════════╝");
 
-    let _pending_tx_ = example.constructor().send().await?;
+    // Compute the constructor selector: keccak256("constructor()")[0..4]
+    let constructor_selector = &keccak256("constructor()")[0..4];
+    let tx = TransactionRequest::default()
+        .from(sender)
+        .to(address)
+        .input(Bytes::copy_from_slice(constructor_selector).into());
+    let _pending_tx_ = provider.send_transaction(tx).await?;
     println!("✓ Contract initialized");
 
     // ==================== Contract Info ====================

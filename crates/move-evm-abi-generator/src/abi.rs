@@ -13,7 +13,7 @@ use move_symbol_pool::Symbol;
 use crate::{
     ErrorStruct, EventStruct,
     common::snake_to_camel,
-    special_types::{is_id, is_named_id, is_string, is_uid},
+    special_types::{is_bytes_n, is_id, is_named_id, is_string, is_uid},
     types::Type,
 };
 
@@ -210,17 +210,12 @@ impl Abi {
                                         structs_to_process,
                                     );
                                 } else {
-                                    {
-                                        function_parameters.push(NamedType {
-                                            identifier: param.name,
-                                            type_: Type::from_intermediate_type(
-                                                itype,
-                                                modules_data,
-                                            ),
-                                        });
-                                        if Self::should_process_struct(itype, modules_data) {
-                                            structs_to_process.insert(itype.clone());
-                                        }
+                                    function_parameters.push(NamedType {
+                                        identifier: param.name,
+                                        type_: Type::from_intermediate_type(itype, modules_data),
+                                    });
+                                    if Self::should_process_struct(itype, modules_data) {
+                                        structs_to_process.insert(itype.clone());
                                     }
                                 }
                             }
@@ -651,6 +646,7 @@ impl Abi {
                     && !is_uid(&struct_.identifier, module_id)
                     && !is_id(&struct_.identifier, module_id)
                     && !is_string(&struct_.identifier, module_id)
+                    && !is_bytes_n(&struct_.identifier, module_id)
                     && struct_.type_ != IStructType::OneTimeWitness
             }
             _ => false,

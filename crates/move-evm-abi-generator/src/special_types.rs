@@ -1,8 +1,8 @@
 use move_bytecode_to_wasm::compilation_context::{
     ModuleId,
     reserved_modules::{
-        SF_MODULE_NAME_OBJECT, STANDARD_LIB_ADDRESS, STDLIB_MODULE_NAME_ASCII,
-        STDLIB_MODULE_NAME_STRING, STYLUS_FRAMEWORK_ADDRESS,
+        SF_MODULE_NAME_OBJECT, SF_MODULE_NAME_SOL_TYPES, STANDARD_LIB_ADDRESS,
+        STDLIB_MODULE_NAME_ASCII, STDLIB_MODULE_NAME_STRING, STYLUS_FRAMEWORK_ADDRESS,
     },
 };
 
@@ -29,4 +29,10 @@ pub fn is_string(identifier: &str, module_id: &ModuleId) -> bool {
         && module_id.address == STANDARD_LIB_ADDRESS
         && (module_id.module_name.as_str() == STDLIB_MODULE_NAME_ASCII
             || module_id.module_name.as_str() == STDLIB_MODULE_NAME_STRING)
+}
+
+pub fn is_bytes_n(identifier: &str, module_id: &ModuleId) -> bool {
+    identifier.starts_with("Bytes")
+        && module_id.address == STYLUS_FRAMEWORK_ADDRESS
+        && module_id.module_name.as_str() == SF_MODULE_NAME_SOL_TYPES
 }
