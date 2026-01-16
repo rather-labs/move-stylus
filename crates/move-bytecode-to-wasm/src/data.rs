@@ -122,7 +122,7 @@ impl RuntimeErrorData {
         let encoded_error = Self::abi_encode_error_message(error);
         let offset = self.next_offset;
         let data_size = encoded_error.len() as i32;
-        if data_size > 256 {
+        if data_size > 255 {
             panic!("Error message is too long");
         }
 
