@@ -328,8 +328,10 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
                 },
             );
 
-        // Return 1 to indicate an error occurred
-        self.i32_const(1).return_();
+        // Return 0xD15EA5E to indicate an error occurred
+        // This value serves only to maintain stack balance.
+        // It will be ignored if the caller returns nothing.
+        self.i32_const(0xD15EA5E).return_();
 
         self
     }
