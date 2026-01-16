@@ -8,6 +8,7 @@ use crate::{
     data::RuntimeErrorData,
     error::{RuntimeError, add_handle_error_instructions},
     runtime::RuntimeFunction,
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 
 use super::{IntermediateType, error::IntermediateTypeError};
@@ -290,7 +291,11 @@ impl IU128 {
         builder
             .i32_const(Self::HEAP_SIZE)
             .call(compilation_ctx.allocator);
-        builder.i32_const(Self::HEAP_SIZE).call(add_function_id);
+        builder.i32_const(Self::HEAP_SIZE).call_runtime_function(
+            compilation_ctx,
+            add_function_id,
+            &RuntimeFunction::HeapIntSum,
+        );
 
         Ok(())
     }
@@ -306,9 +311,11 @@ impl IU128 {
             Some(compilation_ctx),
             Some(runtime_error_data),
         )?;
-        builder
-            .i32_const(Self::HEAP_SIZE)
-            .call(shift_left_function_id);
+        builder.i32_const(Self::HEAP_SIZE).call_runtime_function(
+            compilation_ctx,
+            shift_left_function_id,
+            &RuntimeFunction::HeapIntShiftLeft,
+        );
 
         Ok(())
     }
@@ -324,9 +331,11 @@ impl IU128 {
             Some(compilation_ctx),
             Some(runtime_error_data),
         )?;
-        builder
-            .i32_const(Self::HEAP_SIZE)
-            .call(shift_right_function_id);
+        builder.i32_const(Self::HEAP_SIZE).call_runtime_function(
+            compilation_ctx,
+            shift_right_function_id,
+            &RuntimeFunction::HeapIntShiftRight,
+        );
 
         Ok(())
     }
@@ -346,7 +355,11 @@ impl IU128 {
         builder
             .i32_const(Self::HEAP_SIZE)
             .call(compilation_ctx.allocator);
-        builder.i32_const(Self::HEAP_SIZE).call(sub_function_id);
+        builder.i32_const(Self::HEAP_SIZE).call_runtime_function(
+            compilation_ctx,
+            sub_function_id,
+            &RuntimeFunction::HeapIntSub,
+        );
 
         Ok(())
     }
@@ -363,7 +376,11 @@ impl IU128 {
             Some(runtime_error_data),
         )?;
 
-        builder.i32_const(Self::HEAP_SIZE).call(mul_function_id);
+        builder.i32_const(Self::HEAP_SIZE).call_runtime_function(
+            compilation_ctx,
+            mul_function_id,
+            &RuntimeFunction::HeapIntMul,
+        );
 
         Ok(())
     }
@@ -380,10 +397,11 @@ impl IU128 {
             Some(runtime_error_data),
         )?;
 
-        builder
-            .i32_const(128)
-            .i32_const(1)
-            .call(div_mod_function_id);
+        builder.i32_const(128).i32_const(1).call_runtime_function(
+            compilation_ctx,
+            div_mod_function_id,
+            &RuntimeFunction::HeapIntDivMod,
+        );
 
         Ok(())
     }
@@ -400,10 +418,11 @@ impl IU128 {
             Some(runtime_error_data),
         )?;
 
-        builder
-            .i32_const(128)
-            .i32_const(0)
-            .call(div_mod_function_id);
+        builder.i32_const(128).i32_const(0).call_runtime_function(
+            compilation_ctx,
+            div_mod_function_id,
+            &RuntimeFunction::HeapIntDivMod,
+        );
 
         Ok(())
     }
@@ -615,7 +634,11 @@ impl IU256 {
         builder
             .i32_const(Self::HEAP_SIZE)
             .call(compilation_ctx.allocator);
-        builder.i32_const(Self::HEAP_SIZE).call(add_function_id);
+        builder.i32_const(Self::HEAP_SIZE).call_runtime_function(
+            compilation_ctx,
+            add_function_id,
+            &RuntimeFunction::HeapIntSum,
+        );
 
         Ok(())
     }
@@ -631,9 +654,11 @@ impl IU256 {
             Some(compilation_ctx),
             Some(runtime_error_data),
         )?;
-        builder
-            .i32_const(Self::HEAP_SIZE)
-            .call(shift_left_function_id);
+        builder.i32_const(Self::HEAP_SIZE).call_runtime_function(
+            compilation_ctx,
+            shift_left_function_id,
+            &RuntimeFunction::HeapIntShiftLeft,
+        );
 
         Ok(())
     }
@@ -649,9 +674,11 @@ impl IU256 {
             Some(compilation_ctx),
             Some(runtime_error_data),
         )?;
-        builder
-            .i32_const(Self::HEAP_SIZE)
-            .call(shift_right_function_id);
+        builder.i32_const(Self::HEAP_SIZE).call_runtime_function(
+            compilation_ctx,
+            shift_right_function_id,
+            &RuntimeFunction::HeapIntShiftRight,
+        );
 
         Ok(())
     }
@@ -670,7 +697,12 @@ impl IU256 {
         builder
             .i32_const(Self::HEAP_SIZE)
             .call(compilation_ctx.allocator);
-        builder.i32_const(Self::HEAP_SIZE).call(sub_function_id);
+
+        builder.i32_const(Self::HEAP_SIZE).call_runtime_function(
+            compilation_ctx,
+            sub_function_id,
+            &RuntimeFunction::HeapIntSub,
+        );
 
         Ok(())
     }
@@ -686,7 +718,11 @@ impl IU256 {
             Some(compilation_ctx),
             Some(runtime_error_data),
         )?;
-        builder.i32_const(Self::HEAP_SIZE).call(mul_function_id);
+        builder.i32_const(Self::HEAP_SIZE).call_runtime_function(
+            compilation_ctx,
+            mul_function_id,
+            &RuntimeFunction::HeapIntMul,
+        );
         Ok(())
     }
 
