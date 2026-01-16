@@ -169,8 +169,7 @@ pub fn heap_int_shift_left(
             let block_id = block.id();
             block
                 .local_get(bit_shift)
-                .i32_const(0)
-                .binop(BinaryOp::I32Eq)
+                .unop(UnaryOp::I32Eqz)
                 .local_get(j)
                 .i32_const(1)
                 .binop(BinaryOp::I32Add)
@@ -419,8 +418,7 @@ pub fn heap_int_shift_right(
             let block_id = block.id();
             block
                 .local_get(bit_shift)
-                .i32_const(0)
-                .binop(BinaryOp::I32Eq)
+                .unop(UnaryOp::I32Eqz)
                 .local_get(j)
                 .i32_const(1)
                 .binop(BinaryOp::I32Add)

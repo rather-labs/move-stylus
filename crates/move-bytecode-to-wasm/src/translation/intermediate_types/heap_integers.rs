@@ -1,6 +1,6 @@
 use walrus::{
     InstrSeqBuilder, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
 };
 
 use crate::{CompilationContext, runtime::RuntimeFunction};
@@ -249,8 +249,7 @@ impl IU128 {
                                 offset: 16 + i * 8,
                             },
                         );
-                        inner_block.i64_const(0);
-                        inner_block.binop(BinaryOp::I64Eq);
+                        inner_block.unop(UnaryOp::I64Eqz);
                         inner_block.br_if(inner_block_id);
                         inner_block.unreachable();
                     });

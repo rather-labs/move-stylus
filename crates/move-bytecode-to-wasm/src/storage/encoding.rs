@@ -5,7 +5,7 @@
 //! https://docs.soliditylang.org/en/latest/internals/layout_in_storage.html
 use walrus::{
     InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
 };
 
 use crate::{
@@ -567,8 +567,7 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
         // Check if length == 0
         outer_block
             .local_get(len)
-            .i32_const(0)
-            .binop(BinaryOp::I32Eq)
+            .unop(UnaryOp::I32Eqz)
             .br_if(outer_block_id);
 
         // First slot = keccak(header_slot)
