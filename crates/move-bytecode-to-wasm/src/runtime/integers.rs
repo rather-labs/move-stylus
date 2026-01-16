@@ -425,7 +425,7 @@ mod tests {
     #[case(42, u128::MAX, 1)]
     fn test_a_less_than_b_u128(#[case] n1: u128, #[case] n2: u128, #[case] expected: i32) {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
             build_module(Some(TYPE_HEAP_SIZE * 2));
 
         let mut function_builder = FunctionBuilder::new(
@@ -445,8 +445,7 @@ mod tests {
             .i32_const(TYPE_HEAP_SIZE)
             .i32_const(TYPE_HEAP_SIZE);
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
         let heap_integers_add_f = check_if_a_less_than_b(&mut raw_module, &compilation_ctx);
         func_body.call(heap_integers_add_f);
 
@@ -546,7 +545,7 @@ mod tests {
     #[case(U256::from(42), U256::MAX, 1)]
     fn test_a_less_than_b_u256(#[case] n1: U256, #[case] n2: U256, #[case] expected: i32) {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
             build_module(Some(TYPE_HEAP_SIZE * 2));
 
         let mut function_builder = FunctionBuilder::new(
@@ -566,8 +565,7 @@ mod tests {
             .i32_const(TYPE_HEAP_SIZE)
             .i32_const(TYPE_HEAP_SIZE);
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
         let heap_integers_add_f = check_if_a_less_than_b(&mut raw_module, &compilation_ctx);
         func_body.call(heap_integers_add_f);
 

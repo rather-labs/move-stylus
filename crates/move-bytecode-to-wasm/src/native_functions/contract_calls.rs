@@ -10,7 +10,7 @@ use crate::{
         function_encoding::move_signature_to_abi_selector, packing::Packable, unpacking::Unpackable,
     },
     compilation_context::ModuleId,
-    data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
+    data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, RuntimeErrorData},
     hostio::host_functions::{
         call_contract, delegate_call_contract, read_return_data, static_call_contract,
     },
@@ -37,9 +37,11 @@ use super::error::NativeFunctionError;
 /// the `value` argument as the first argument. Additionally, if the function is declared with the
 /// `gas` argument, it will be passed to the `call_contract` functions, otherwise, the maximum gas
 /// (u64::MAX) will be used.
+#[allow(clippy::too_many_arguments)]
 pub fn add_external_contract_call_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     module_id: &ModuleId,
     function_information: &MappedFunction,
     function_modifiers: &[SolidityFunctionModifier],
@@ -61,8 +63,8 @@ pub fn add_external_contract_call_fn(
     let (call_contract, _) = call_contract(module);
     let (delegate_call_contract, _) = delegate_call_contract(module);
     let (static_call_contract, _) = static_call_contract(module);
-    let swap_i32 = RuntimeFunction::SwapI32Bytes.get(module, None)?;
-    let swap = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx))?;
+    let swap_i32 = RuntimeFunction::SwapI32Bytes.get(module, None, None)?;
+    let swap = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx), None)?;
 
     let mut arguments = function_information.signature.get_argument_wasm_types()?;
 
@@ -248,6 +250,7 @@ pub fn add_external_contract_call_fn(
                     writer_pointer,
                     calldata_reference_pointer,
                     compilation_ctx,
+                    Some(runtime_error_data),
                 )?;
 
                 builder
@@ -263,6 +266,7 @@ pub fn add_external_contract_call_fn(
                     writer_pointer,
                     calldata_reference_pointer,
                     compilation_ctx,
+                    Some(runtime_error_data),
                 )?;
 
                 builder
@@ -463,9 +467,11 @@ pub fn add_external_contract_call_fn(
                             None,
                             block,
                             module,
+                            None,
                             return_data_abi_encoded_ptr,
                             calldata_reader_pointer,
                             compilation_ctx,
+                            Some(runtime_error_data),
                         )?;
 
                         let abi_decoded_call_result = if result_type == &IntermediateType::IU64 {
@@ -644,8 +650,11 @@ pub fn add_external_contract_call_fn(
     storage_objects.extend(named_ids_storage_objects);
 
     if !storage_objects.is_empty() {
-        let locate_storage_data_fn =
-            RuntimeFunction::LocateStorageData.get(module, Some(compilation_ctx))?;
+        let locate_storage_data_fn = RuntimeFunction::LocateStorageData.get(
+            module,
+            Some(compilation_ctx),
+            Some(runtime_error_data),
+        )?;
 
         let mut inner_result = Ok(());
         builder.block(None, |block| {
@@ -703,7 +712,12 @@ pub fn add_external_contract_call_fn(
 
                 // The slot for this struct written in DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET
                 let read_and_decode_from_storage_fn = RuntimeFunction::ReadAndDecodeFromStorage
-                    .get_generic(module, compilation_ctx, &[&storage_obj_itype]);
+                    .get_generic(
+                        module,
+                        compilation_ctx,
+                        Some(runtime_error_data),
+                        &[&storage_obj_itype],
+                    );
 
                 match read_and_decode_from_storage_fn {
                     Err(e) => {

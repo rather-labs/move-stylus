@@ -1,14 +1,16 @@
 mod error;
+pub mod globals;
 pub mod module_data;
 pub mod reserved_modules;
 
+use crate::compilation_context::globals::CompilationContextGlobals;
 use crate::translation::intermediate_types::{
     ISignature, IntermediateType, enums::IEnum, structs::IStruct,
 };
 pub use error::CompilationContextError;
 pub use module_data::{ModuleData, ModuleId, UserDefinedType};
 use std::{borrow::Cow, collections::HashMap};
-use walrus::{FunctionId, GlobalId, MemoryId};
+use walrus::{FunctionId, MemoryId};
 
 type Result<T> = std::result::Result<T, CompilationContextError>;
 
@@ -32,7 +34,7 @@ pub struct CompilationContext<'a> {
 
     /// Globals
     /// - Calldata reader pointer
-    pub calldata_reader_pointer: GlobalId,
+    pub globals: CompilationContextGlobals,
 }
 
 impl CompilationContext<'_> {
@@ -42,14 +44,14 @@ impl CompilationContext<'_> {
         deps_data: &'a HashMap<ModuleId, ModuleData>,
         memory_id: MemoryId,
         allocator: FunctionId,
-        calldata_reader_pointer: GlobalId,
+        compilation_context_globals: CompilationContextGlobals,
     ) -> CompilationContext<'a> {
         CompilationContext::<'a> {
             root_module_data,
             deps_data,
             memory_id,
             allocator,
-            calldata_reader_pointer,
+            globals: compilation_context_globals,
             empty_signature: ISignature {
                 arguments: Vec::new(),
                 returns: Vec::new(),

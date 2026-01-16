@@ -784,11 +784,32 @@ impl RuntimeSandbox {
         })
     }
 
-    pub fn obtain_uid(&self) -> FixedBytes<32> {
-        let (topic, data) = self.log_events.lock().unwrap().recv().unwrap();
-        assert_eq!(2, topic);
-        assert_eq!(*keccak256(b"NewUID(address)").as_slice(), data[..32]);
-        FixedBytes::<32>::from_slice(&data[32..])
+    pub fn obtain_uid(&self) -> Result<FixedBytes<32>, anyhow::Error> {
+        use std::sync::mpsc::TryRecvError;
+
+        let rx = self.log_events.lock().unwrap();
+        match rx.try_recv() {
+            Ok((topic, data)) => {
+                if topic != 2 {
+                    return Err(anyhow::anyhow!(
+                        "Unexpected event topic: expected 2, got {}",
+                        topic
+                    ));
+                }
+                if *keccak256(b"NewUID(address)").as_slice() != data[..32] {
+                    return Err(anyhow::anyhow!(
+                        "Unexpected event: first 32 bytes do not match NewUID(address) event signature"
+                    ));
+                }
+                Ok(FixedBytes::<32>::from_slice(&data[32..]))
+            }
+            Err(TryRecvError::Empty) => Err(anyhow::anyhow!(
+                "No NewUID(address) event currently available"
+            )),
+            Err(TryRecvError::Disconnected) => {
+                Err(anyhow::anyhow!("Log event channel is disconnected"))
+            }
+        }
     }
 
     pub fn read_memory_from(

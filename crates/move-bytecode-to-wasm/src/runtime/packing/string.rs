@@ -30,7 +30,7 @@ pub fn pack_string_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
 ) -> Result<FunctionId, RuntimeFunctionError> {
-    let pack_u32_function = RuntimeFunction::PackU32.get(module, Some(compilation_ctx))?;
+    let pack_u32_function = RuntimeFunction::PackU32.get(module, Some(compilation_ctx), None)?;
 
     let mut function = FunctionBuilder::new(
         &mut module.types,
@@ -255,7 +255,7 @@ mod tests {
 
         // 4. Call pack_string_function directly
         let pack_string_func = RuntimeFunction::PackString
-            .get(&mut raw_module, Some(&compilation_ctx))
+            .get(&mut raw_module, Some(&compilation_ctx), None)
             .unwrap();
         func_body
             .local_get(string_pointer)
@@ -339,7 +339,7 @@ mod tests {
 
         // Call pack_string_function
         let pack_string_func = RuntimeFunction::PackString
-            .get(&mut raw_module, Some(&compilation_ctx))
+            .get(&mut raw_module, Some(&compilation_ctx), None)
             .unwrap();
         func_body
             .local_get(string_pointer)

@@ -2,6 +2,7 @@ use crate::{
     CompilationContext,
     abi_types::error::{AbiError, AbiOperationError},
     abi_types::packing::Packable,
+    data::RuntimeErrorData,
     runtime::{RuntimeFunction, RuntimeFunctionError},
     translation::intermediate_types::IntermediateType,
 };
@@ -30,6 +31,7 @@ use walrus::{
 pub fn pack_reference_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     inner: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let name =
@@ -81,6 +83,7 @@ pub fn pack_reference_function(
                 writer_pointer,
                 calldata_reference_pointer,
                 compilation_ctx,
+                Some(runtime_error_data),
             )?;
         }
         IntermediateType::IBool
@@ -120,6 +123,7 @@ pub fn pack_reference_function(
                 writer_pointer,
                 calldata_reference_pointer,
                 compilation_ctx,
+                Some(runtime_error_data),
             )?;
         }
         IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -147,18 +151,15 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
-    use crate::test_compilation_context;
-    use crate::test_tools::build_module;
-    use crate::test_tools::setup_wasmtime_module;
-    use crate::translation::intermediate_types::IntermediateType;
-    use alloy_primitives::Address;
-    use alloy_primitives::U256;
-    use alloy_primitives::address;
+    use crate::{
+        test_compilation_context,
+        test_tools::{build_module, setup_wasmtime_module},
+        translation::intermediate_types::IntermediateType,
+    };
+    use alloy_primitives::{Address, U256, address};
     use alloy_sol_types::SolValue;
     use rstest::rstest;
-    use std::cell::RefCell;
-    use std::panic::AssertUnwindSafe;
-    use std::rc::Rc;
+    use std::{cell::RefCell, panic::AssertUnwindSafe, rc::Rc};
     use walrus::{FunctionBuilder, ValType};
 
     // NOTE: The first value of data is always the pointer to the data
@@ -326,14 +327,13 @@ mod tests {
         #[case] data: &[u8],
         #[case] expected_calldata_bytes: &[u8],
     ) {
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let local = raw_module.locals.add(ValType::I32);
         let writer_pointer = raw_module.locals.add(ValType::I32);
@@ -361,6 +361,7 @@ mod tests {
                     writer_pointer,
                     calldata_reference_pointer,
                     &compilation_ctx,
+                    Some(&mut runtime_error_data),
                 )
                 .unwrap();
         } else {
@@ -372,6 +373,7 @@ mod tests {
                     writer_pointer,
                     calldata_reference_pointer,
                     &compilation_ctx,
+                    Some(&mut runtime_error_data),
                 )
                 .unwrap();
         };
@@ -403,14 +405,13 @@ mod tests {
     fn test_pack_ref_u8_fuzz() {
         let ref_type = IntermediateType::IRef(Arc::new(IntermediateType::IU8));
 
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let local = raw_module.locals.add(ValType::I32);
         let writer_pointer = raw_module.locals.add(ValType::I32);
@@ -435,6 +436,7 @@ mod tests {
                 writer_pointer,
                 calldata_reference_pointer,
                 &compilation_ctx,
+                Some(&mut runtime_error_data),
             )
             .unwrap();
 
@@ -492,14 +494,13 @@ mod tests {
     fn test_pack_ref_u32_fuzz() {
         let ref_type = IntermediateType::IRef(Arc::new(IntermediateType::IU32));
 
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let local = raw_module.locals.add(ValType::I32);
         let writer_pointer = raw_module.locals.add(ValType::I32);
@@ -524,6 +525,7 @@ mod tests {
                 writer_pointer,
                 calldata_reference_pointer,
                 &compilation_ctx,
+                Some(&mut runtime_error_data),
             )
             .unwrap();
 
@@ -581,14 +583,13 @@ mod tests {
     fn test_pack_ref_u64_fuzz() {
         let ref_type = IntermediateType::IRef(Arc::new(IntermediateType::IU64));
 
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let local = raw_module.locals.add(ValType::I32);
         let writer_pointer = raw_module.locals.add(ValType::I32);
@@ -613,6 +614,7 @@ mod tests {
                 writer_pointer,
                 calldata_reference_pointer,
                 &compilation_ctx,
+                Some(&mut runtime_error_data),
             )
             .unwrap();
 
@@ -670,14 +672,13 @@ mod tests {
     fn test_pack_ref_u128_fuzz() {
         let ref_type = IntermediateType::IRef(Arc::new(IntermediateType::IU128));
 
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let local = raw_module.locals.add(ValType::I32);
         let writer_pointer = raw_module.locals.add(ValType::I32);
@@ -702,6 +703,7 @@ mod tests {
                 writer_pointer,
                 calldata_reference_pointer,
                 &compilation_ctx,
+                Some(&mut runtime_error_data),
             )
             .unwrap();
 
@@ -759,14 +761,13 @@ mod tests {
     fn test_pack_ref_u256_fuzz() {
         let ref_type = IntermediateType::IRef(Arc::new(IntermediateType::IU256));
 
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let local = raw_module.locals.add(ValType::I32);
         let writer_pointer = raw_module.locals.add(ValType::I32);
@@ -791,6 +792,7 @@ mod tests {
                 writer_pointer,
                 calldata_reference_pointer,
                 &compilation_ctx,
+                Some(&mut runtime_error_data),
             )
             .unwrap();
 
@@ -845,14 +847,13 @@ mod tests {
     fn test_pack_ref_address_fuzz() {
         let ref_type = IntermediateType::IRef(Arc::new(IntermediateType::IAddress));
 
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let local = raw_module.locals.add(ValType::I32);
         let writer_pointer = raw_module.locals.add(ValType::I32);
@@ -877,6 +878,7 @@ mod tests {
                 writer_pointer,
                 calldata_reference_pointer,
                 &compilation_ctx,
+                Some(&mut runtime_error_data),
             )
             .unwrap();
 
@@ -932,14 +934,13 @@ mod tests {
     fn test_pack_ref_u16_fuzz() {
         let ref_type = IntermediateType::IRef(Arc::new(IntermediateType::IU16));
 
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let local = raw_module.locals.add(ValType::I32);
         let writer_pointer = raw_module.locals.add(ValType::I32);
@@ -964,6 +965,7 @@ mod tests {
                 writer_pointer,
                 calldata_reference_pointer,
                 &compilation_ctx,
+                Some(&mut runtime_error_data),
             )
             .unwrap();
 
@@ -1023,8 +1025,7 @@ mod tests {
             IntermediateType::IU8,
         ))));
 
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -1032,8 +1033,8 @@ mod tests {
             &[ValType::I32],
         );
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let local = raw_module.locals.add(ValType::I32);
         let writer_pointer = raw_module.locals.add(ValType::I32);
@@ -1061,6 +1062,7 @@ mod tests {
                 writer_pointer,
                 calldata_reference_pointer,
                 &compilation_ctx,
+                Some(&mut runtime_error_data),
             )
             .unwrap();
 
@@ -1144,8 +1146,7 @@ mod tests {
             IntermediateType::IU16,
         ))));
 
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -1153,8 +1154,8 @@ mod tests {
             &[ValType::I32],
         );
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let local = raw_module.locals.add(ValType::I32);
         let writer_pointer = raw_module.locals.add(ValType::I32);
@@ -1182,6 +1183,7 @@ mod tests {
                 writer_pointer,
                 calldata_reference_pointer,
                 &compilation_ctx,
+                Some(&mut runtime_error_data),
             )
             .unwrap();
 
@@ -1263,8 +1265,7 @@ mod tests {
             IntermediateType::IU64,
         ))));
 
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -1272,8 +1273,8 @@ mod tests {
             &[ValType::I32],
         );
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let local = raw_module.locals.add(ValType::I32);
         let writer_pointer = raw_module.locals.add(ValType::I32);
@@ -1301,6 +1302,7 @@ mod tests {
                 writer_pointer,
                 calldata_reference_pointer,
                 &compilation_ctx,
+                Some(&mut runtime_error_data),
             )
             .unwrap();
 
@@ -1382,8 +1384,7 @@ mod tests {
             IntermediateType::IU128,
         ))));
 
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -1391,8 +1392,8 @@ mod tests {
             &[ValType::I32],
         );
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let local = raw_module.locals.add(ValType::I32);
         let writer_pointer = raw_module.locals.add(ValType::I32);
@@ -1420,6 +1421,7 @@ mod tests {
                 writer_pointer,
                 calldata_reference_pointer,
                 &compilation_ctx,
+                Some(&mut runtime_error_data),
             )
             .unwrap();
 
@@ -1510,8 +1512,7 @@ mod tests {
             IntermediateType::IVector(Arc::new(IntermediateType::IU32)),
         ))));
 
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -1519,8 +1520,8 @@ mod tests {
             &[ValType::I32],
         );
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let local = raw_module.locals.add(ValType::I32);
         let writer_pointer = raw_module.locals.add(ValType::I32);
@@ -1548,6 +1549,7 @@ mod tests {
                 writer_pointer,
                 calldata_reference_pointer,
                 &compilation_ctx,
+                Some(&mut runtime_error_data),
             )
             .unwrap();
 
@@ -1657,8 +1659,7 @@ mod tests {
             IntermediateType::IVector(Arc::new(IntermediateType::IU128)),
         ))));
 
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -1666,8 +1667,8 @@ mod tests {
             &[ValType::I32],
         );
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let local = raw_module.locals.add(ValType::I32);
         let writer_pointer = raw_module.locals.add(ValType::I32);
@@ -1695,6 +1696,7 @@ mod tests {
                 writer_pointer,
                 calldata_reference_pointer,
                 &compilation_ctx,
+                Some(&mut runtime_error_data),
             )
             .unwrap();
 
