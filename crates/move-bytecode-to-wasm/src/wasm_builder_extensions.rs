@@ -1,9 +1,16 @@
 use walrus::{
-    InstrSeqBuilder, LocalId,
-    ir::{BinaryOp, UnaryOp},
+    FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
+    ir::{BinaryOp, InstrSeqId, LoadKind, MemArg, StoreKind, UnaryOp},
 };
 
-use crate::{CompilationContext, data::DATA_SLOT_DATA_PTR_OFFSET};
+use crate::{
+    CompilationContext,
+    compilation_context::ModuleId,
+    data::{DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_SLOT_DATA_PTR_OFFSET, RuntimeErrorData},
+    error::RuntimeError,
+    native_functions::NativeFunction,
+    runtime::RuntimeFunction,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum WasmBuilderExtensionError {
@@ -60,7 +67,7 @@ pub trait WasmBuilderExtension {
     fn skip_vec_header(&mut self, ptr: LocalId) -> &mut Self;
 
     /// Adds the instructions to compute: DATA_SLOT_DATA_PTR_OFFSET + (32 - used_bytes_in_slot).
-    fn add_slot_data_ptr_plus_offset(&mut self, used_bytes_in_slot: LocalId) -> &mut Self;
+    fn slot_data_ptr_plus_offset(&mut self, used_bytes_in_slot: LocalId) -> &mut Self;
 
     /// Loads a i32 constant from a byte slice.
     ///
@@ -82,6 +89,52 @@ pub trait WasmBuilderExtension {
 
     /// Leaves in the stack the current position of the linear memory.
     fn get_memory_curret_position(&mut self, compilation_ctx: &CompilationContext) -> &mut Self;
+
+    /// Calls a function and handles the error.
+    fn call_native_function(
+        &mut self,
+        compilation_ctx: &CompilationContext,
+        function_name: &str,
+        module_id: &ModuleId,
+        function_id: FunctionId,
+    ) -> &mut Self;
+
+    fn call_runtime_function(
+        &mut self,
+        compilation_ctx: &CompilationContext,
+        function_id: FunctionId,
+        runtime_fn: &RuntimeFunction,
+    ) -> &mut Self;
+
+    fn call_unpack_function(
+        &mut self,
+        compilation_ctx: &CompilationContext,
+        function_id: FunctionId,
+        runtime_fn: &RuntimeFunction,
+        return_block_id: InstrSeqId,
+    ) -> &mut Self;
+
+    /// Adds the instructions to store the error message pointer at DATA_ABORT_MESSAGE_PTR_OFFSET and return 1 to indicate an error occurred.
+    fn add_handle_error_instructions(
+        &mut self,
+        module: &mut Module,
+        compilation_ctx: &CompilationContext,
+    ) -> &mut Self;
+
+    /// Adds the instructions to propagate the error by returning if the error message pointer at DATA_ABORT_MESSAGE_PTR_OFFSET is not null.
+    fn add_propagate_error_instructions(
+        &mut self,
+        compilation_ctx: &CompilationContext,
+    ) -> &mut Self;
+
+    /// Adds the instructions to handle a specific runtime error.
+    fn return_error(
+        &mut self,
+        module: &mut Module,
+        compilation_ctx: &CompilationContext,
+        runtime_error_data: &mut RuntimeErrorData,
+        runtime_error: RuntimeError,
+    ) -> &mut Self;
 }
 
 impl WasmBuilderExtension for InstrSeqBuilder<'_> {
@@ -120,7 +173,7 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
         self.local_get(ptr).i32_const(8).binop(BinaryOp::I32Add)
     }
 
-    fn add_slot_data_ptr_plus_offset(&mut self, slot_offset: LocalId) -> &mut Self {
+    fn slot_data_ptr_plus_offset(&mut self, slot_offset: LocalId) -> &mut Self {
         // Check if 0 < offset <= 32
         self.local_get(slot_offset).unop(UnaryOp::I32Eqz).if_else(
             None,
@@ -185,5 +238,140 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
 
     fn get_memory_curret_position(&mut self, compilation_ctx: &CompilationContext) -> &mut Self {
         self.i32_const(0).call(compilation_ctx.allocator)
+    }
+
+    fn call_native_function(
+        &mut self,
+        compilation_ctx: &CompilationContext,
+        function_name: &str,
+        module_id: &ModuleId,
+        function_id: FunctionId,
+    ) -> &mut Self {
+        // Call the function
+        self.call(function_id);
+
+        // If the function may result in a runtime error, we need to handle it
+        if NativeFunction::can_abort(function_name, module_id) {
+            self.add_propagate_error_instructions(compilation_ctx);
+        }
+
+        self
+    }
+
+    fn call_runtime_function(
+        &mut self,
+        compilation_ctx: &CompilationContext,
+        function_id: FunctionId,
+        runtime_fn: &RuntimeFunction,
+    ) -> &mut Self {
+        self.call(function_id);
+
+        // If the function may result in a runtime error, we need to handle it
+        if runtime_fn.can_abort() {
+            self.add_propagate_error_instructions(compilation_ctx);
+        }
+
+        self
+    }
+
+    fn call_unpack_function(
+        &mut self,
+        compilation_ctx: &CompilationContext,
+        function_id: FunctionId,
+        runtime_fn: &RuntimeFunction,
+        return_block_id: InstrSeqId,
+    ) -> &mut Self {
+        self.call(function_id);
+
+        // If the function may result in a runtime error, we need to handle it
+        if runtime_fn.can_abort() {
+            // If the function aborts, propagate the error
+            self.block(None, |b| {
+                let block_id = b.id();
+                b.i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .i32_const(0)
+                    .binop(BinaryOp::I32Eq)
+                    .br_if(block_id)
+                    .i32_const(1)
+                    .br(return_block_id);
+            });
+        }
+
+        self
+    }
+
+    fn add_handle_error_instructions(
+        &mut self,
+        module: &mut Module,
+        compilation_ctx: &CompilationContext,
+    ) -> &mut Self {
+        let encoded_error_ptr = module.locals.add(ValType::I32);
+        self.local_set(encoded_error_ptr);
+
+        // Store the ptr at DATA_ABORT_MESSAGE_PTR_OFFSET
+        self.i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)
+            .local_get(encoded_error_ptr)
+            .store(
+                compilation_ctx.memory_id,
+                StoreKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+
+        // Return 0xBADF00D to indicate an error occurred
+        // This value serves only to maintain stack balance.
+        // It will be ignored if the caller returns nothing.
+        self.i32_const(0xBADF00D).return_();
+
+        self
+    }
+
+    fn add_propagate_error_instructions(
+        &mut self,
+        compilation_ctx: &CompilationContext,
+    ) -> &mut Self {
+        // If the function aborts, propagate the error
+        self.block(None, |b| {
+            let block_id = b.id();
+            b.i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
+                .i32_const(0)
+                .binop(BinaryOp::I32Eq)
+                .br_if(block_id);
+
+            b.i32_const(1).return_();
+        });
+
+        self
+    }
+
+    fn return_error(
+        &mut self,
+        module: &mut Module,
+        compilation_ctx: &CompilationContext,
+        runtime_error_data: &mut RuntimeErrorData,
+        runtime_error: RuntimeError,
+    ) -> &mut Self {
+        self.i32_const(runtime_error_data.get(module, compilation_ctx.memory_id, runtime_error));
+
+        self.add_handle_error_instructions(module, compilation_ctx);
+        self
     }
 }

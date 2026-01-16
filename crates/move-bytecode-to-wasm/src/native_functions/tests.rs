@@ -3,8 +3,8 @@
 
 use super::{NativeFunction, error::NativeFunctionError};
 use crate::{
-    CompilationContext, compilation_context::ModuleId, runtime::RuntimeFunction,
-    translation::intermediate_types::IntermediateType,
+    CompilationContext, compilation_context::ModuleId, data::RuntimeErrorData,
+    runtime::RuntimeFunction, translation::intermediate_types::IntermediateType,
 };
 use walrus::{FunctionBuilder, FunctionId, Module, ValType};
 
@@ -34,6 +34,7 @@ pub fn add_get_last_memory_position_fn(
 pub fn add_read_slot_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     itype: &IntermediateType,
     module_id: &ModuleId,
 ) -> Result<FunctionId, NativeFunctionError> {
@@ -58,8 +59,12 @@ pub fn add_read_slot_fn(
     let slot_ptr = module.locals.add(ValType::I32);
     let uid_ptr = module.locals.add(ValType::I32);
 
-    let read_and_decode_fn =
-        RuntimeFunction::ReadAndDecodeFromStorage.get_generic(module, compilation_ctx, &[itype])?;
+    let read_and_decode_fn = RuntimeFunction::ReadAndDecodeFromStorage.get_generic(
+        module,
+        compilation_ctx,
+        Some(runtime_error_data),
+        &[itype],
+    )?;
 
     // The owner pointer does not matter in this functions, since it is testing
     builder

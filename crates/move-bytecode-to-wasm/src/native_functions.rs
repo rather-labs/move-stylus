@@ -35,6 +35,7 @@ use crate::{
             STDLIB_MODULE_NAME_STRING, STDLIB_MODULE_UNIT_TEST, STYLUS_FRAMEWORK_ADDRESS,
         },
     },
+    data::RuntimeErrorData,
     hasher::get_hasher,
     hostio::{self, host_functions::HOST_MODULE_NAME, host_test_functions::TEST_HOST_MODULE_NAME},
     runtime::RuntimeFunction,
@@ -365,6 +366,7 @@ impl NativeFunction {
         name: &str,
         module: &mut Module,
         compilation_ctx: &CompilationContext,
+        runtime_error_data: &mut RuntimeErrorData,
         module_id: &ModuleId,
         arguments_types: &[IntermediateType],
         named_ids: &[IntermediateType],
@@ -386,6 +388,7 @@ impl NativeFunction {
                 contract_calls::add_external_contract_call_fn(
                     module,
                     compilation_ctx,
+                    runtime_error_data,
                     module_id,
                     function_information,
                     &special_attributes.modifiers,
@@ -410,6 +413,7 @@ impl NativeFunction {
         name: &str,
         module: &mut Module,
         compilation_ctx: &CompilationContext,
+        runtime_error_data: Option<&mut RuntimeErrorData>,
         module_id: &ModuleId,
         generics: &[IntermediateType],
     ) -> Result<FunctionId, NativeFunctionError> {
@@ -418,7 +422,7 @@ impl NativeFunction {
             module_name,
         } = module_id;
 
-        let function_id = match (name, *address, module_name.as_str()) {
+        let function_id = match (name, *address, module_name.as_str(), runtime_error_data) {
             //
             // Tests
             //
@@ -426,53 +430,125 @@ impl NativeFunction {
                 Self::NATIVE_DROP_STORAGE_OBJECT,
                 STYLUS_FRAMEWORK_ADDRESS,
                 SF_MODULE_TEST_SCENARIO,
+                _,
             ) => unit_test::add_drop_storage_object_fn(module, module_id),
             //
             // Transfer
             //
-            (Self::NATIVE_SHARE_OBJECT, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TRANSFER) => {
+            (
+                Self::NATIVE_SHARE_OBJECT,
+                STYLUS_FRAMEWORK_ADDRESS,
+                SF_MODULE_NAME_TRANSFER,
+                Some(runtime_error_data),
+            ) => {
                 Self::assert_generics_length(generics.len(), 1, name, module_id)?;
-                transfer::add_share_object_fn(module, compilation_ctx, &generics[0], module_id)?
+                transfer::add_share_object_fn(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    &generics[0],
+                    module_id,
+                )?
             }
-            (Self::NATIVE_TRANSFER_OBJECT, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TRANSFER) => {
+            (
+                Self::NATIVE_TRANSFER_OBJECT,
+                STYLUS_FRAMEWORK_ADDRESS,
+                SF_MODULE_NAME_TRANSFER,
+                Some(runtime_error_data),
+            ) => {
                 Self::assert_generics_length(generics.len(), 1, name, module_id)?;
-                transfer::add_transfer_object_fn(module, compilation_ctx, &generics[0], module_id)?
+                transfer::add_transfer_object_fn(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    &generics[0],
+                    module_id,
+                )?
             }
-            (Self::NATIVE_FREEZE_OBJECT, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TRANSFER) => {
+            (
+                Self::NATIVE_FREEZE_OBJECT,
+                STYLUS_FRAMEWORK_ADDRESS,
+                SF_MODULE_NAME_TRANSFER,
+                Some(runtime_error_data),
+            ) => {
                 Self::assert_generics_length(generics.len(), 1, name, module_id)?;
-                transfer::add_freeze_object_fn(module, compilation_ctx, &generics[0], module_id)?
+                transfer::add_freeze_object_fn(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    &generics[0],
+                    module_id,
+                )?
             }
-            (Self::NATIVE_DELETE_OBJECT, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TRANSFER)
-            | (Self::NATIVE_REMOVE_OBJECT, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TRANSFER) => {
+            (
+                Self::NATIVE_DELETE_OBJECT,
+                STYLUS_FRAMEWORK_ADDRESS,
+                SF_MODULE_NAME_TRANSFER,
+                Some(runtime_error_data),
+            )
+            | (
+                Self::NATIVE_REMOVE_OBJECT,
+                STYLUS_FRAMEWORK_ADDRESS,
+                SF_MODULE_NAME_TRANSFER,
+                Some(runtime_error_data),
+            ) => {
                 Self::assert_generics_length(generics.len(), 1, name, module_id)?;
                 // In this case the native function implementation is the same as the runtime one.
                 // So we reuse the runtime function.
                 RuntimeFunction::DeleteFromStorage.get_generic(
                     module,
                     compilation_ctx,
+                    Some(runtime_error_data),
                     &[&generics[0]],
                 )?
             }
             //
             // Event
             //
-            (Self::NATIVE_EMIT, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_EVENT) => {
+            (
+                Self::NATIVE_EMIT,
+                STYLUS_FRAMEWORK_ADDRESS,
+                SF_MODULE_NAME_EVENT,
+                Some(runtime_error_data),
+            ) => {
                 Self::assert_generics_length(generics.len(), 1, name, module_id)?;
-                event::add_emit_log_fn(module, compilation_ctx, &generics[0], module_id)?
+                event::add_emit_log_fn(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    &generics[0],
+                    module_id,
+                )?
             }
 
             //
             // Error
             //
-            (Self::NATIVE_REVERT, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_ERROR) => {
+            (
+                Self::NATIVE_REVERT,
+                STYLUS_FRAMEWORK_ADDRESS,
+                SF_MODULE_NAME_ERROR,
+                Some(runtime_error_data),
+            ) => {
                 Self::assert_generics_length(generics.len(), 1, name, module_id)?;
-                abi_error::add_revert_fn(module, compilation_ctx, &generics[0], module_id)?
+                abi_error::add_revert_fn(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    &generics[0],
+                    module_id,
+                )?
             }
 
             //
             // Types
             //
-            (Self::NATIVE_IS_ONE_TIME_WITNESS, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TYPES) => {
+            (
+                Self::NATIVE_IS_ONE_TIME_WITNESS,
+                STYLUS_FRAMEWORK_ADDRESS,
+                SF_MODULE_NAME_TYPES,
+                _,
+            ) => {
                 Self::assert_generics_length(generics.len(), 1, name, module_id)?;
                 types::add_is_one_time_witness_fn(module, compilation_ctx, &generics[0], module_id)?
             }
@@ -480,12 +556,12 @@ impl NativeFunction {
             //
             // Object
             //
-            (Self::NATIVE_COMPUTE_NAMED_ID, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => {
+            (Self::NATIVE_COMPUTE_NAMED_ID, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT, _) => {
                 Self::assert_generics_length(generics.len(), 1, name, module_id)?;
                 object::add_compute_named_id_fn(module, compilation_ctx, &generics[0], module_id)?
             }
-            (Self::NATIVE_AS_UID, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT)
-            | (Self::NATIVE_AS_UID_MUT, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => {
+            (Self::NATIVE_AS_UID, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT, _)
+            | (Self::NATIVE_AS_UID_MUT, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT, _) => {
                 // Generics are not used in this function because it just converts &NamedId to &UID,
                 // which, under the hood they have the same structure. Generic type is not used in
                 // the function, just to detect that the function was called correctly
@@ -500,6 +576,7 @@ impl NativeFunction {
                 Self::NATIVE_HASH_TYPE_AND_KEY,
                 STYLUS_FRAMEWORK_ADDRESS,
                 SF_MODULE_NAME_DYNAMIC_FIELD,
+                _,
             ) => {
                 Self::assert_generics_length(generics.len(), 1, name, module_id)?;
                 dynamic_field::add_hash_type_and_key_fn(
@@ -513,11 +590,13 @@ impl NativeFunction {
                 Self::NATIVE_ADD_CHILD_OBJECT,
                 STYLUS_FRAMEWORK_ADDRESS,
                 SF_MODULE_NAME_DYNAMIC_FIELD,
+                Some(runtime_error_data),
             ) => {
                 Self::assert_generics_length(generics.len(), 1, name, module_id)?;
                 dynamic_field::add_child_object_fn(
                     module,
                     compilation_ctx,
+                    runtime_error_data,
                     &generics[0],
                     module_id,
                 )?
@@ -526,16 +605,19 @@ impl NativeFunction {
                 Self::NATIVE_BORROW_CHILD_OBJECT,
                 STYLUS_FRAMEWORK_ADDRESS,
                 SF_MODULE_NAME_DYNAMIC_FIELD,
+                Some(runtime_error_data),
             )
             | (
                 Self::NATIVE_BORROW_CHILD_OBJECT_MUT,
                 STYLUS_FRAMEWORK_ADDRESS,
                 SF_MODULE_NAME_DYNAMIC_FIELD,
+                Some(runtime_error_data),
             ) => {
                 Self::assert_generics_length(generics.len(), 1, name, module_id)?;
                 dynamic_field::add_borrow_object_fn(
                     module,
                     compilation_ctx,
+                    runtime_error_data,
                     &generics[0],
                     module_id,
                 )?
@@ -544,11 +626,13 @@ impl NativeFunction {
                 Self::NATIVE_REMOVE_CHILD_OBJECT,
                 STYLUS_FRAMEWORK_ADDRESS,
                 SF_MODULE_NAME_DYNAMIC_FIELD,
+                Some(runtime_error_data),
             ) => {
                 Self::assert_generics_length(generics.len(), 1, name, module_id)?;
                 dynamic_field::add_remove_child_object_fn(
                     module,
                     compilation_ctx,
+                    runtime_error_data,
                     &generics[0],
                     module_id,
                 )?
@@ -557,33 +641,43 @@ impl NativeFunction {
             //
             // Bytes
             //
-            (Self::NATIVE_AS_VEC_BYTES_N, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_SOL_TYPES) => {
-                RuntimeFunction::BytesToVec.get(module, Some(compilation_ctx))?
-            }
+            (
+                Self::NATIVE_AS_VEC_BYTES_N,
+                STYLUS_FRAMEWORK_ADDRESS,
+                SF_MODULE_NAME_SOL_TYPES,
+                _,
+            ) => RuntimeFunction::BytesToVec.get(module, Some(compilation_ctx), None)?,
 
             // This native function is only available in debug mode to help with testing. It should
             // not be compiled in release mode.
             #[cfg(debug_assertions)]
-            (Self::SAVE_IN_SLOT, _, _) => {
+            (Self::SAVE_IN_SLOT, _, _, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, name, module_id)?;
                 // In this case the native function implementation is the same as the runtime one.
                 // So we reuse the runtime function.
                 RuntimeFunction::EncodeAndSaveInStorage.get_generic(
                     module,
                     compilation_ctx,
+                    Some(runtime_error_data),
                     &[&generics[0]],
                 )?
             }
             // This native function is only available in debug mode to help with testing. It should
             // not be compiled in release mode.
             #[cfg(debug_assertions)]
-            (Self::READ_SLOT, _, _) => {
+            (Self::READ_SLOT, _, _, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, name, module_id)?;
 
-                tests::add_read_slot_fn(module, compilation_ctx, &generics[0], module_id)?
+                tests::add_read_slot_fn(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    &generics[0],
+                    module_id,
+                )?
             }
             #[cfg(debug_assertions)]
-            (Self::NATIVE_HASH_TYPE_AND_KEY, _, _) => {
+            (Self::NATIVE_HASH_TYPE_AND_KEY, _, _, _) => {
                 Self::assert_generics_length(generics.len(), 1, name, module_id)?;
                 dynamic_field::add_hash_type_and_key_fn(
                     module,
@@ -592,9 +686,20 @@ impl NativeFunction {
                     module_id,
                 )?
             }
-            (Self::NATIVE_PEEP, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_PEEP) => {
+            (
+                Self::NATIVE_PEEP,
+                STYLUS_FRAMEWORK_ADDRESS,
+                SF_MODULE_NAME_PEEP,
+                Some(runtime_error_data),
+            ) => {
                 Self::assert_generics_length(generics.len(), 1, name, module_id)?;
-                peep::add_peep_fn(module, compilation_ctx, &generics[0], module_id)?
+                peep::add_peep_fn(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    &generics[0],
+                    module_id,
+                )?
             }
 
             _ => {
@@ -676,5 +781,33 @@ impl NativeFunction {
         let hash = format!("{:x}", hasher.finish());
 
         Ok(format!("___{name}_{hash}_{:x}", module_id.hash()))
+    }
+
+    pub fn can_abort(name: &str, module_id: &ModuleId) -> bool {
+        let ModuleId {
+            address,
+            module_name,
+        } = module_id;
+
+        matches!(
+            (name, *address, module_name.as_str()),
+            (
+                Self::NATIVE_PEEP,
+                STYLUS_FRAMEWORK_ADDRESS,
+                SF_MODULE_NAME_PEEP
+            ) | (
+                Self::NATIVE_SHARE_OBJECT,
+                STYLUS_FRAMEWORK_ADDRESS,
+                SF_MODULE_NAME_TRANSFER
+            ) | (
+                Self::NATIVE_FREEZE_OBJECT,
+                STYLUS_FRAMEWORK_ADDRESS,
+                SF_MODULE_NAME_TRANSFER
+            ) | (
+                Self::NATIVE_TRANSFER_OBJECT,
+                STYLUS_FRAMEWORK_ADDRESS,
+                SF_MODULE_NAME_TRANSFER
+            )
+        )
     }
 }

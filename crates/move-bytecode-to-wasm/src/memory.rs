@@ -1,9 +1,10 @@
+use crate::compilation_context::globals::CompilationContextGlobals;
 use walrus::{
     ConstExpr, FunctionBuilder, FunctionId, MemoryId, Module, ValType,
     ir::{BinaryOp, Value},
 };
 
-const MEMORY_PAGE_SIZE: i32 = 65536;
+pub const MEMORY_PAGE_SIZE: i32 = 65536;
 
 /// Setup the module memory
 /// This function adds the following components to the module:
@@ -22,7 +23,7 @@ const MEMORY_PAGE_SIZE: i32 = 65536;
 pub fn setup_module_memory(
     module: &mut Module,
     initial_offset: Option<i32>,
-) -> (FunctionId, MemoryId) {
+) -> (FunctionId, MemoryId, CompilationContextGlobals) {
     let memory_id = module.memories.add_local(false, false, 1, None, None);
     module.exports.add("memory", memory_id);
 
@@ -158,7 +159,18 @@ pub fn setup_module_memory(
         );
     }
 
-    (func, memory_id)
+    let calldata_reader_pointer =
+        module
+            .globals
+            .add_local(ValType::I32, true, false, ConstExpr::Value(Value::I32(0)));
+
+    let compilation_context_globals = CompilationContextGlobals::new(
+        calldata_reader_pointer,
+        global_next_free_memory_pointer,
+        global_available_memory,
+    );
+
+    (func, memory_id, compilation_context_globals)
 }
 
 #[cfg(test)]

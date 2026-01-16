@@ -7,6 +7,7 @@ use crate::{
     CompilationContext,
     abi_types::abi_encoding::{self, AbiFunctionSelector},
     abi_types::packing::build_pack_instructions,
+    data::RuntimeErrorData,
     runtime::RuntimeFunction,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
     utils::snake_to_upper_camel,
@@ -52,6 +53,7 @@ pub fn build_custom_error_message(
     builder: &mut InstrSeqBuilder,
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     error_struct: &IStruct,
     error_struct_ptr: LocalId,
 ) -> Result<LocalId, AbiError> {
@@ -109,8 +111,22 @@ pub fn build_custom_error_message(
     }
 
     // Combine all the error struct fields into one ABI-encoded error data buffer.
-    let (_error_data_ptr, error_data_len) =
-        build_pack_instructions(builder, &error_struct.fields, module, compilation_ctx)?;
+    // Here, we only allocate 8 bytes up front: 4 for the error message length and 4 for the selector.
+    // The actual ABI-encoded error data (the packed error fields) is handled entirely by build_pack_instructions,
+    // which is responsible for allocating the memory and packing the fields immediately after these 8 bytes.
+    // This is correct: the memory layout becomes [length | selector | packed fields] in contiguous memory.
+    // However, this depends on build_pack_instructions allocating memory for the packed fields *immediately* after
+    // those initial 8 bytes. If, in the future, build_pack_instructions is changed to allocate other memory before
+    // allocating for the packed fields, this invariant would break and the error message buffer would become corrupted.
+    // So, this code assumes that build_pack_instructions does not insert any unrelated allocations between the header/selector
+    // and the packed error fields when laying out the memory.
+    let (_error_data_ptr, error_data_len) = build_pack_instructions(
+        builder,
+        &error_struct.fields,
+        module,
+        compilation_ctx,
+        runtime_error_data,
+    )?;
 
     // Store the total length of the error message: length(4) + selector(4) + error_data_len
     builder
@@ -159,10 +175,9 @@ pub fn build_abort_error_message(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
 ) -> Result<LocalId, AbiError> {
-    let ptr = module.locals.add(ValType::I32);
-
     // Convert error code to decimal string
-    let u64_to_dec_ascii = RuntimeFunction::U64ToAsciiBase10.get(module, Some(compilation_ctx))?;
+    let u64_to_dec_ascii =
+        RuntimeFunction::U64ToAsciiBase10.get(module, Some(compilation_ctx), None)?;
     let error_ptr = module.locals.add(ValType::I32);
     let error_len = module.locals.add(ValType::I32);
 
@@ -189,6 +204,9 @@ pub fn build_abort_error_message(
         .i32_const(1)
         .binop(BinaryOp::I32Add)
         .local_set(error_ptr);
+
+    // Build the ABI-encoded error message (inlined from build_error_string_abi_encoding)
+    let ptr = module.locals.add(ValType::I32);
 
     // Step 1: Calculate memory requirements
     let total_len = module.locals.add(ValType::I32);
@@ -230,7 +248,6 @@ pub fn build_abort_error_message(
         );
 
     // Write ABI header
-
     for (i, b) in ERROR_SELECTOR.iter().enumerate() {
         builder.local_get(ptr).i32_const(*b as i32).store(
             compilation_ctx.memory_id,
@@ -257,7 +274,7 @@ pub fn build_abort_error_message(
 
     // Write message length in big-endian format
     const LENGTH_WORD_END: i32 = 64; // last 4 bytes of the 32 bytes length word (offset 68 = 4 + 64)
-    let swap_i32 = RuntimeFunction::SwapI32Bytes.get(module, None)?;
+    let swap_i32 = RuntimeFunction::SwapI32Bytes.get(module, None, None)?;
     builder
         .local_get(ptr)
         .local_get(error_len)
@@ -271,7 +288,7 @@ pub fn build_abort_error_message(
             },
         );
 
-    // Step 4: Write error message data
+    // Write error message data
     builder
         .local_get(ptr)
         .i32_const(LENGTH_HEADER_SIZE + ABI_HEADER_SIZE)
@@ -304,10 +321,8 @@ mod tests {
     #[case(9876543210u64, "9876543210")]
     #[case(u64::MAX, "18446744073709551615")]
     fn test_build_abort_error_message(#[case] error_code: u64, #[case] expected: &str) {
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(None);
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+        let (mut raw_module, allocator_func, memory_id, ctx_globals) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
 
         // Create a test function that calls build_abort_error_message
         let mut function_builder =

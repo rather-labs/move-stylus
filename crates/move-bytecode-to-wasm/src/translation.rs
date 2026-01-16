@@ -36,7 +36,7 @@ use crate::{
     CompilationContext,
     abi_types::error_encoding::build_abort_error_message,
     compilation_context::{ModuleData, ModuleId},
-    data::DATA_ABORT_MESSAGE_PTR_OFFSET,
+    data::{DATA_ABORT_MESSAGE_PTR_OFFSET, RuntimeErrorData},
     generics::{replace_type_parameters, type_contains_generics},
     hasher::get_hasher,
     hostio::host_functions::storage_flush_cache,
@@ -169,6 +169,7 @@ struct StorageIdParentInformation {
 /// This is used to pass around the context of the translation process. Also clippy complains about too many arguments in translate_instruction.
 struct TranslateFlowContext<'a> {
     compilation_ctx: &'a CompilationContext<'a>,
+    runtime_error_data: &'a mut RuntimeErrorData,
     module_data: &'a ModuleData<'a>,
     types_stack: &'a mut TypesStack,
     function_information: &'a MappedFunction,
@@ -187,9 +188,11 @@ struct TranslateFlowContext<'a> {
 /// The return values are:
 /// 1. The translated WASM FunctionId
 /// 2. A list of function ids from other modules to be translated and linked.
+#[allow(clippy::too_many_arguments)]
 pub fn translate_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     module_data: &ModuleData,
     function_table: &mut FunctionTable,
     function_information: &MappedFunction,
@@ -247,6 +250,7 @@ pub fn translate_function(
         // Create the context for the translation of the flow
         let mut ctx = TranslateFlowContext {
             compilation_ctx,
+            runtime_error_data,
             module_data,
             function_table,
             function_information,
@@ -526,6 +530,7 @@ fn translate_instruction(
     let mut functions_calls_to_link = Vec::new();
 
     let compilation_ctx = &translate_flow_ctx.compilation_ctx;
+    let runtime_error_data = &mut translate_flow_ctx.runtime_error_data;
     let module_data = &translate_flow_ctx.module_data;
     let mapped_function = &translate_flow_ctx.function_information;
     let function_table = &mut translate_flow_ctx.function_table;
@@ -646,6 +651,7 @@ fn translate_instruction(
                 let delete_fn = RuntimeFunction::DeleteFromStorage.get_generic(
                     module,
                     compilation_ctx,
+                    Some(runtime_error_data),
                     &[&parent_struct],
                 )?;
 
@@ -768,11 +774,17 @@ fn translate_instruction(
                         &function_id.identifier,
                         module,
                         compilation_ctx,
+                        Some(runtime_error_data),
                         &function_id.module_id,
                         type_instantiations,
                     )?;
 
-                    builder.call(native_function_id);
+                    builder.call_native_function(
+                        compilation_ctx,
+                        &function_id.identifier,
+                        &function_id.module_id,
+                        native_function_id,
+                    );
                 } else {
                     let table_id = function_table.get_table_id();
 
@@ -819,8 +831,11 @@ fn translate_instruction(
                     // After the call, check if any argument is a mutable reference to a vector
                     // and update it if needed.
                     if !mut_ref_vec_locals.is_empty() {
-                        let update_mut_ref_fn =
-                            RuntimeFunction::VecUpdateMutRef.get(module, Some(compilation_ctx))?;
+                        let update_mut_ref_fn = RuntimeFunction::VecUpdateMutRef.get(
+                            module,
+                            Some(compilation_ctx),
+                            None,
+                        )?;
                         for &local in mut_ref_vec_locals.iter() {
                             builder.local_get(local).call(update_mut_ref_fn);
                         }
@@ -889,6 +904,7 @@ fn translate_instruction(
                 let delete_fn = RuntimeFunction::DeleteFromStorage.get_generic(
                     module,
                     compilation_ctx,
+                    Some(runtime_error_data),
                     &[&parent_struct],
                 )?;
 
@@ -947,6 +963,7 @@ fn translate_instruction(
                                 module,
                                 builder,
                                 compilation_ctx,
+                                runtime_error_data,
                                 &mapped_function.signature.arguments,
                                 function_locals,
                             )?;
@@ -957,6 +974,7 @@ fn translate_instruction(
                                 &function_id.identifier,
                                 module,
                                 compilation_ctx,
+                                runtime_error_data,
                                 &function_information.function_id.module_id,
                                 &argument_types,
                                 &named_ids_types,
@@ -997,7 +1015,12 @@ fn translate_instruction(
                             )?
                         };
 
-                    builder.call(native_function_id);
+                    builder.call_native_function(
+                        compilation_ctx,
+                        &function_information.function_id.identifier,
+                        &function_information.function_id.module_id,
+                        native_function_id,
+                    );
                 } else {
                     let table_id = function_table.get_table_id();
 
@@ -1025,8 +1048,11 @@ fn translate_instruction(
                 // After the call, check if any argument is a mutable reference to a vector
                 // and update it if needed.
                 if !mut_ref_vec_locals.is_empty() {
-                    let update_mut_ref_fn =
-                        RuntimeFunction::VecUpdateMutRef.get(module, Some(compilation_ctx))?;
+                    let update_mut_ref_fn = RuntimeFunction::VecUpdateMutRef.get(
+                        module,
+                        Some(compilation_ctx),
+                        None,
+                    )?;
                     for &local in mut_ref_vec_locals.iter() {
                         builder.local_get(local).call(update_mut_ref_fn);
                     }
@@ -1183,7 +1209,13 @@ fn translate_instruction(
         Bytecode::CopyLoc(local_id) => {
             let local = function_locals[*local_id as usize];
             let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
-            local_type.copy_local_instructions(module, builder, compilation_ctx, local)?;
+            local_type.copy_local_instructions(
+                module,
+                builder,
+                compilation_ctx,
+                runtime_error_data,
+                local,
+            )?;
             types_stack.push(local_type);
         }
         Bytecode::ImmBorrowLoc(local_id) => {
@@ -1594,6 +1626,7 @@ fn translate_instruction(
                     let pop_back_f = RuntimeFunction::VecPopBack.get_generic(
                         module,
                         compilation_ctx,
+                        Some(runtime_error_data),
                         &[&*vec_inner],
                     )?;
                     builder.call(pop_back_f);
@@ -1645,8 +1678,12 @@ fn translate_instruction(
                 });
             }
 
-            let push_back_f =
-                RuntimeFunction::VecPushBack.get_generic(module, compilation_ctx, &[&elem_ty])?;
+            let push_back_f = RuntimeFunction::VecPushBack.get_generic(
+                module,
+                compilation_ctx,
+                Some(runtime_error_data),
+                &[&elem_ty],
+            )?;
             builder.call(push_back_f);
         }
         Bytecode::VecSwap(signature_index) => {
@@ -1679,8 +1716,12 @@ fn translate_instruction(
                 });
             }
 
-            let swap_f =
-                RuntimeFunction::VecSwap.get_generic(module, compilation_ctx, &[&*vec_inner])?;
+            let swap_f = RuntimeFunction::VecSwap.get_generic(
+                module,
+                compilation_ctx,
+                Some(runtime_error_data),
+                &[&*vec_inner],
+            )?;
             builder.call(swap_f);
         }
         Bytecode::VecLen(signature_index) => {
@@ -1733,7 +1774,12 @@ fn translate_instruction(
                 ref_type
             ));
 
-            inner.add_read_ref_instructions(builder, module, compilation_ctx)?;
+            inner.add_read_ref_instructions(
+                builder,
+                module,
+                compilation_ctx,
+                runtime_error_data,
+            )?;
             types_stack.push((*inner).clone());
         }
         Bytecode::WriteRef => {
@@ -1776,6 +1822,7 @@ fn translate_instruction(
                     module,
                     builder,
                     compilation_ctx,
+                    runtime_error_data,
                     &mapped_function.signature.arguments,
                     function_locals,
                 )?;
@@ -1947,13 +1994,13 @@ fn translate_instruction(
                 }
                 IntermediateType::IU128 => {
                     let less_than_f =
-                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None)?;
 
                     builder.i32_const(IU128::HEAP_SIZE).call(less_than_f);
                 }
                 IntermediateType::IU256 => {
                     let less_than_f =
-                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None)?;
 
                     builder.i32_const(IU256::HEAP_SIZE).call(less_than_f);
                 }
@@ -1986,7 +2033,7 @@ fn translate_instruction(
                 // we can reuse the LessThan function
                 IntermediateType::IU128 => {
                     let less_than_f =
-                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None)?;
 
                     // Temp variables to perform the swap
                     let a = module.locals.add(ValType::I32);
@@ -2000,7 +2047,7 @@ fn translate_instruction(
                 }
                 IntermediateType::IU256 => {
                     let less_than_f =
-                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None)?;
 
                     // Temp variables to perform the swap
                     let a = module.locals.add(ValType::I32);
@@ -2041,7 +2088,7 @@ fn translate_instruction(
                 // LessThan function
                 IntermediateType::IU128 => {
                     let less_than_f =
-                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None)?;
 
                     let a = module.locals.add(ValType::I32);
                     let b = module.locals.add(ValType::I32);
@@ -2053,7 +2100,7 @@ fn translate_instruction(
                 }
                 IntermediateType::IU256 => {
                     let less_than_f =
-                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None)?;
 
                     let a = module.locals.add(ValType::I32);
                     let b = module.locals.add(ValType::I32);
@@ -2092,7 +2139,7 @@ fn translate_instruction(
                 // LessThan function
                 IntermediateType::IU128 => {
                     let less_than_f =
-                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None)?;
 
                     // Compare
                     builder
@@ -2102,7 +2149,7 @@ fn translate_instruction(
                 }
                 IntermediateType::IU256 => {
                     let less_than_f =
-                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None)?;
 
                     builder
                         .i32_const(IU256::HEAP_SIZE)
@@ -2152,7 +2199,7 @@ fn translate_instruction(
                 });
             }
 
-            t1.load_equality_instructions(module, builder, compilation_ctx)?;
+            t1.load_equality_instructions(module, builder, compilation_ctx, runtime_error_data)?;
 
             types_stack.push(IntermediateType::IBool);
         }
@@ -2166,7 +2213,12 @@ fn translate_instruction(
                 });
             }
 
-            t1.load_not_equality_instructions(module, builder, compilation_ctx)?;
+            t1.load_not_equality_instructions(
+                module,
+                builder,
+                compilation_ctx,
+                runtime_error_data,
+            )?;
 
             types_stack.push(IntermediateType::IBool);
         }
@@ -2825,6 +2877,8 @@ fn call_indirect(
         .i32_const(function_entry.index)
         .call_indirect(function_entry.type_id, wasm_table_id);
 
+    builder.add_propagate_error_instructions(compilation_ctx);
+
     add_unpack_function_return_values_instructions(
         builder,
         module,
@@ -2926,6 +2980,7 @@ fn add_cache_storage_object_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     function_argumets: &[IntermediateType],
     function_locals: &[LocalId],
 ) -> Result<(), TranslationError> {
@@ -2954,7 +3009,7 @@ fn add_cache_storage_object_instructions(
 
     for (itype, wasm_local_var) in object_to_cache {
         let cache_storage_object_changes_fn = RuntimeFunction::CacheStorageObjectChanges
-            .get_generic(module, compilation_ctx, &[itype])?;
+            .get_generic(module, compilation_ctx, Some(runtime_error_data), &[itype])?;
 
         builder
             .local_get(wasm_local_var)
@@ -3127,6 +3182,7 @@ pub(crate) fn translate_and_link_functions(
     modules_data: &HashMap<ModuleId, ModuleData>,
     module: &mut walrus::Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     dynamic_fields_global_variables: &mut Vec<(GlobalId, IntermediateType)>,
 ) -> Result<(), TranslationError> {
     // Obtain the function information and module's data
@@ -3190,6 +3246,7 @@ pub(crate) fn translate_and_link_functions(
         let (wasm_function_id, functions_to_link) = translate_function(
             module,
             compilation_ctx,
+            runtime_error_data,
             module_data,
             function_table,
             function_information,
@@ -3207,6 +3264,7 @@ pub(crate) fn translate_and_link_functions(
                 modules_data,
                 module,
                 compilation_ctx,
+                runtime_error_data,
                 dynamic_fields_global_variables,
             )?;
         }

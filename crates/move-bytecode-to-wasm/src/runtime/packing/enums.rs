@@ -22,7 +22,7 @@ pub fn pack_enum_function(
     let value = module.locals.add(ValType::I32);
 
     // Little-endian to Big-endian
-    let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
+    let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None, None)?;
 
     builder.local_get(writer_pointer);
 

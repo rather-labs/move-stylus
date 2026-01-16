@@ -10,7 +10,7 @@ use walrus::{
 
 use crate::{
     CompilationContext,
-    data::{DATA_SLOT_DATA_PTR_OFFSET, DATA_ZERO_OFFSET},
+    data::{DATA_SLOT_DATA_PTR_OFFSET, DATA_ZERO_OFFSET, RuntimeErrorData},
     hostio::host_functions::{native_keccak256, storage_cache_bytes32, storage_load_bytes32},
     runtime::RuntimeFunction,
     storage::storage_layout::field_size,
@@ -41,6 +41,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     struct_ptr: LocalId,
     slot_ptr: LocalId,
     slot_offset: LocalId,
@@ -51,9 +52,10 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
     let (storage_cache, _) = storage_cache_bytes32(module);
 
     // Runtime functions
-    let get_struct_id_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx))?;
+    let get_struct_id_fn =
+        RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx), None)?;
     let accumulate_or_advance_slot_write_fn =
-        RuntimeFunction::AccumulateOrAdvanceSlotWrite.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::AccumulateOrAdvanceSlotWrite.get(module, Some(compilation_ctx), None)?;
 
     // Get the IStruct representation
     let struct_ = compilation_ctx.get_struct_by_intermediate_type(itype)?;
@@ -126,6 +128,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
             module,
             builder,
             compilation_ctx,
+            runtime_error_data,
             slot_ptr,
             slot_offset,
             field_owner_ptr,
@@ -160,6 +163,7 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     enum_ptr: LocalId,
     slot_ptr: LocalId,
     slot_offset: LocalId,
@@ -171,11 +175,11 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
 
     // Runtime functions
     let accumulate_or_advance_slot_write_fn =
-        RuntimeFunction::AccumulateOrAdvanceSlotWrite.get(module, Some(compilation_ctx))?;
-    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx))?;
-    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::AccumulateOrAdvanceSlotWrite.get(module, Some(compilation_ctx), None)?;
+    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx), None)?;
+    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx), None)?;
     let compute_enum_storage_tail_position_fn = RuntimeFunction::ComputeEnumStorageTailPosition
-        .get_generic(module, compilation_ctx, &[itype])?;
+        .get_generic(module, compilation_ctx, Some(runtime_error_data), &[itype])?;
 
     // Get the IEnum representation
     let enum_ = compilation_ctx.get_enum_by_intermediate_type(itype)?;
@@ -216,7 +220,7 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
 
         // Write the variant index in the slot data.
         block
-            .add_slot_data_ptr_plus_offset(slot_offset)
+            .slot_data_ptr_plus_offset(slot_offset)
             .local_get(variant_index)
             .store(
                 compilation_ctx.memory_id,
@@ -261,6 +265,7 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
                 module,
                 block,
                 compilation_ctx,
+                runtime_error_data,
                 slot_ptr,
                 slot_offset,
                 owner_ptr,
@@ -385,10 +390,12 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
 /// * `slot_ptr` - Local pointing to the vector header slot in storage.
 /// * `owner_ptr` - Local to the owner struct UID (for nested keyed objects).
 /// * `inner` - Intermediate type of the vector elements.
+#[allow(clippy::too_many_arguments)]
 pub fn add_encode_and_save_into_storage_vector_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     vector_ptr: LocalId,
     slot_ptr: LocalId,
     owner_ptr: LocalId,
@@ -400,11 +407,11 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
     let (native_keccak, _) = native_keccak256(module);
 
     // Runtime functions
-    let swap_fn = RuntimeFunction::SwapI32Bytes.get(module, None)?;
+    let swap_fn = RuntimeFunction::SwapI32Bytes.get(module, None, None)?;
     let derive_dyn_array_slot_fn =
-        RuntimeFunction::DeriveDynArraySlot.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::DeriveDynArraySlot.get(module, Some(compilation_ctx), None)?;
     let accumulate_or_advance_slot_write_fn =
-        RuntimeFunction::AccumulateOrAdvanceSlotWrite.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::AccumulateOrAdvanceSlotWrite.get(module, Some(compilation_ctx), None)?;
 
     // Locals
     let elem_slot_ptr = module.locals.add(ValType::I32);
@@ -509,6 +516,7 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                     module,
                     loop_,
                     compilation_ctx,
+                    runtime_error_data,
                     elem_slot_ptr,
                     elem_slot_offset,
                     inner,
@@ -600,6 +608,7 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                     module,
                     loop_,
                     compilation_ctx,
+                    runtime_error_data,
                     elem_slot_ptr,
                     elem_slot_offset,
                     owner_ptr,
@@ -680,6 +689,7 @@ pub fn add_encode_intermediate_type_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     slot_ptr: LocalId,
     slot_offset: LocalId,
     owner_ptr: LocalId,
@@ -694,9 +704,10 @@ pub fn add_encode_intermediate_type_instructions(
     let data_size = itype.wasm_memory_data_size()?;
 
     // Runtime functions
-    let get_struct_id_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx))?;
+    let get_struct_id_fn =
+        RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx), None)?;
     let write_object_slot_fn =
-        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx), None)?;
 
     match itype {
         IntermediateType::IBool
@@ -705,9 +716,9 @@ pub fn add_encode_intermediate_type_instructions(
         | IntermediateType::IU32
         | IntermediateType::IU64 => {
             let swap_fn = if data_size == 8 {
-                RuntimeFunction::SwapI64Bytes.get(module, None)?
+                RuntimeFunction::SwapI64Bytes.get(module, None, None)?
             } else {
-                RuntimeFunction::SwapI32Bytes.get(module, None)?
+                RuntimeFunction::SwapI32Bytes.get(module, None, None)?
             };
             let load_kind = itype.load_kind()?;
             let val = match ValType::try_from(itype)? {
@@ -749,7 +760,7 @@ pub fn add_encode_intermediate_type_instructions(
 
             // Save the value in slot data
             builder
-                .add_slot_data_ptr_plus_offset(slot_offset)
+                .slot_data_ptr_plus_offset(slot_offset)
                 .local_get(val)
                 .store(
                     compilation_ctx.memory_id,
@@ -761,20 +772,22 @@ pub fn add_encode_intermediate_type_instructions(
                 );
         }
         IntermediateType::IU128 => {
-            let swap_fn = RuntimeFunction::SwapI128Bytes.get(module, Some(compilation_ctx))?;
+            let swap_fn =
+                RuntimeFunction::SwapI128Bytes.get(module, Some(compilation_ctx), None)?;
 
             // Slot data plus offset as dest ptr
-            builder.add_slot_data_ptr_plus_offset(slot_offset);
+            builder.slot_data_ptr_plus_offset(slot_offset);
 
             // Transform to BE
             builder.call(swap_fn);
         }
         IntermediateType::IU256 => {
-            let swap_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx))?;
+            let swap_fn =
+                RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx), None)?;
 
             // Slot data plus offset as dest ptr (offset should be zero because data is already
             // 32 bytes in size)
-            builder.add_slot_data_ptr_plus_offset(slot_offset);
+            builder.slot_data_ptr_plus_offset(slot_offset);
 
             // Transform to BE
             builder.call(swap_fn);
@@ -785,7 +798,7 @@ pub fn add_encode_intermediate_type_instructions(
             builder.local_set(val_32);
 
             // Slot data plus offset as dest ptr
-            builder.add_slot_data_ptr_plus_offset(slot_offset);
+            builder.slot_data_ptr_plus_offset(slot_offset);
 
             // Grab the last 20 bytes of the address
             builder
@@ -850,6 +863,7 @@ pub fn add_encode_intermediate_type_instructions(
                     module,
                     builder,
                     compilation_ctx,
+                    runtime_error_data,
                     child_struct_ptr,
                     child_struct_slot_ptr,
                     slot_offset,
@@ -884,6 +898,7 @@ pub fn add_encode_intermediate_type_instructions(
                     module,
                     builder,
                     compilation_ctx,
+                    runtime_error_data,
                     child_struct_ptr,
                     slot_ptr,
                     slot_offset,
@@ -899,6 +914,7 @@ pub fn add_encode_intermediate_type_instructions(
                 module,
                 builder,
                 compilation_ctx,
+                runtime_error_data,
                 val_32,
                 slot_ptr,
                 slot_offset,
@@ -913,6 +929,7 @@ pub fn add_encode_intermediate_type_instructions(
                 module,
                 builder,
                 compilation_ctx,
+                runtime_error_data,
                 val_32,
                 slot_ptr,
                 owner_ptr,

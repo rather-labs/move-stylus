@@ -14,7 +14,10 @@
 //!
 //! For stack types the data is saved in-place, for heap-types we just save the pointer to the
 //! data.
-use crate::{CompilationContext, generics::replace_type_parameters, storage::error::StorageError};
+use crate::{
+    CompilationContext, data::RuntimeErrorData, generics::replace_type_parameters,
+    storage::error::StorageError,
+};
 
 use super::{
     error::IntermediateTypeError,
@@ -122,6 +125,7 @@ impl IEnum {
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
         compilation_ctx: &CompilationContext,
+        runtime_error_data: &mut RuntimeErrorData,
     ) -> Result<(), IntermediateTypeError> {
         let e1_ptr = module.locals.add(ValType::I32);
         let e2_ptr = module.locals.add(ValType::I32);
@@ -183,6 +187,7 @@ impl IEnum {
                         arm,
                         module,
                         compilation_ctx,
+                        runtime_error_data,
                         e1_ptr,
                         e2_ptr,
                     );
@@ -211,6 +216,7 @@ impl IEnum {
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
+        runtime_error_data: &mut RuntimeErrorData,
     ) -> Result<(), IntermediateTypeError> {
         let src_ptr = module.locals.add(ValType::I32);
         let ptr = module.locals.add(ValType::I32);
@@ -259,6 +265,7 @@ impl IEnum {
                 arm,
                 module,
                 compilation_ctx,
+                runtime_error_data,
                 src_ptr,
                 ptr,
                 4,

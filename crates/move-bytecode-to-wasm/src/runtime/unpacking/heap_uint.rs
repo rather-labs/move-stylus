@@ -12,7 +12,7 @@ pub fn unpack_u128_function(
 ) -> Result<FunctionId, RuntimeFunctionError> {
     // Big-endian to Little-endian
     let swap_i128_bytes_function =
-        RuntimeFunction::SwapI128Bytes.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::SwapI128Bytes.get(module, Some(compilation_ctx), None)?;
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
     let mut builder = function
         .name(RuntimeFunction::UnpackU128.name().to_owned())
@@ -39,7 +39,7 @@ pub fn unpack_u128_function(
         .local_get(reader_pointer)
         .i32_const(encoded_size)
         .binop(BinaryOp::I32Add)
-        .global_set(compilation_ctx.calldata_reader_pointer);
+        .global_set(compilation_ctx.globals.calldata_reader_pointer);
 
     builder.local_get(unpacked_pointer);
 
@@ -52,7 +52,7 @@ pub fn unpack_u256_function(
 ) -> Result<FunctionId, RuntimeFunctionError> {
     // Big-endian to Little-endian
     let swap_i256_bytes_function =
-        RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx), None)?;
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
     let mut builder = function
         .name(RuntimeFunction::UnpackU256.name().to_owned())
@@ -75,7 +75,7 @@ pub fn unpack_u256_function(
         .local_get(reader_pointer)
         .i32_const(encoded_size)
         .binop(BinaryOp::I32Add)
-        .global_set(compilation_ctx.calldata_reader_pointer);
+        .global_set(compilation_ctx.globals.calldata_reader_pointer);
 
     builder.local_get(unpacked_pointer);
 
@@ -112,7 +112,7 @@ pub fn unpack_address_function(
         .local_get(reader_pointer)
         .i32_const(encoded_size)
         .binop(BinaryOp::I32Add)
-        .global_set(compilation_ctx.calldata_reader_pointer);
+        .global_set(compilation_ctx.globals.calldata_reader_pointer);
 
     builder.local_get(unpacked_pointer);
 
@@ -127,6 +127,7 @@ mod tests {
 
     use crate::{
         abi_types::unpacking::Unpackable,
+        data::RuntimeErrorData,
         test_compilation_context,
         test_tools::{build_module, setup_wasmtime_module},
         translation::intermediate_types::IntermediateType,
@@ -134,10 +135,10 @@ mod tests {
 
     /// Test helper for unpacking heap-allocated types (u128, u256, address)
     fn unpack_heap_uint(data: &[u8], int_type: IntermediateType, expected_result_bytes: &[u8]) {
-        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+        let (mut raw_module, allocator, memory_id, ctx_globals) =
             build_module(Some(data.len() as i32));
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
@@ -153,9 +154,11 @@ mod tests {
                 None,
                 &mut func_body,
                 &mut raw_module,
+                None,
                 args_pointer,
                 args_pointer,
                 &compilation_ctx,
+                Some(&mut runtime_error_data),
             )
             .unwrap();
 

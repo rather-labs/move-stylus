@@ -4,11 +4,14 @@ use walrus::{
 };
 
 use super::{RuntimeFunction, error::RuntimeFunctionError};
-use crate::CompilationContext;
-use crate::translation::intermediate_types::{
-    IntermediateType, error::IntermediateTypeError, heap_integers::IU128,
+use crate::{
+    CompilationContext,
+    data::RuntimeErrorData,
+    translation::intermediate_types::{
+        IntermediateType, error::IntermediateTypeError, heap_integers::IU128,
+    },
+    wasm_builder_extensions::WasmBuilderExtension,
 };
-use crate::wasm_builder_extensions::WasmBuilderExtension;
 
 /// Increments vector length by 1
 ///
@@ -157,7 +160,7 @@ pub fn vec_swap_function(
     let idx1 = module.locals.add(ValType::I32);
     let len = module.locals.add(ValType::I32);
 
-    let downcast_f = RuntimeFunction::DowncastU64ToU32.get(module, None)?;
+    let downcast_f = RuntimeFunction::DowncastU64ToU32.get(module, None, None)?;
 
     builder.local_get(idx1_i64).call(downcast_f).local_set(idx1);
     builder.local_get(idx2_i64).call(downcast_f).local_set(idx2);
@@ -301,7 +304,7 @@ pub fn vec_pop_back_function(
     }
 
     let decrement_vec_len_function =
-        RuntimeFunction::VecDecrementLen.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::VecDecrementLen.get(module, Some(compilation_ctx), None)?;
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[return_type]);
     let mut builder = function.name(name).func_body();
@@ -374,6 +377,7 @@ pub fn vec_pop_back_function(
 pub fn vec_push_back_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     inner: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let name = RuntimeFunction::VecPushBack.get_generic_function_name(compilation_ctx, &[inner])?;
@@ -432,8 +436,12 @@ pub fn vec_push_back_function(
     );
 
     // Check if len == capacity. If true, we copy the original vector but doubling its capacity.
-    let copy_local_function =
-        RuntimeFunction::VecCopyLocal.get_generic(module, compilation_ctx, &[inner])?;
+    let copy_local_function = RuntimeFunction::VecCopyLocal.get_generic(
+        module,
+        compilation_ctx,
+        Some(runtime_error_data),
+        &[inner],
+    )?;
     builder.binop(BinaryOp::I32Eq).if_else(
         None,
         |then| {
@@ -503,7 +511,7 @@ pub fn vec_push_back_function(
 
     // length++
     let vec_increment_len_fn =
-        RuntimeFunction::VecIncrementLen.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::VecIncrementLen.get(module, Some(compilation_ctx), None)?;
     builder.local_get(vec_ptr).call(vec_increment_len_fn);
 
     Ok(function.finish(vec![vec_ref, elem], &mut module.funcs))
@@ -800,6 +808,7 @@ pub fn allocate_vector_with_header_function(
 pub fn copy_local_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     inner: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let name =
@@ -860,7 +869,7 @@ pub fn copy_local_function(
 
     // Allocate memory and write length and capacity at the beginning
     let allocate_vector_with_header_function =
-        RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx), None)?;
     builder
         .local_get(len)
         .local_get(capacity)
@@ -877,7 +886,12 @@ pub fn copy_local_function(
 
     // Get nested vector copy function if needed (before entering closure)
     let nested_copy_function = if let IntermediateType::IVector(inner_) = inner {
-        Some(copy_local_function(module, compilation_ctx, inner_)?)
+        Some(copy_local_function(
+            module,
+            compilation_ctx,
+            runtime_error_data,
+            inner_,
+        )?)
     } else {
         None
     };
@@ -1006,7 +1020,12 @@ pub fn copy_local_function(
 
                         let struct_ = compilation_ctx.get_struct_by_index(module_id, *index)?;
 
-                        struct_.copy_local_instructions(module, loop_block, compilation_ctx)?;
+                        struct_.copy_local_instructions(
+                            module,
+                            loop_block,
+                            compilation_ctx,
+                            runtime_error_data,
+                        )?;
                     }
 
                     IntermediateType::IGenericStructInstance {
@@ -1027,7 +1046,12 @@ pub fn copy_local_function(
                         let struct_ = compilation_ctx.get_struct_by_index(module_id, *index)?;
                         let struct_ = struct_.instantiate(types);
 
-                        struct_.copy_local_instructions(module, loop_block, compilation_ctx)?;
+                        struct_.copy_local_instructions(
+                            module,
+                            loop_block,
+                            compilation_ctx,
+                            runtime_error_data,
+                        )?;
                     }
                     IntermediateType::IEnum { .. } => {
                         loop_block.load(
@@ -1039,8 +1063,12 @@ pub fn copy_local_function(
                             },
                         );
                         let enum_ = compilation_ctx.get_enum_by_intermediate_type(inner)?;
-                        inner_result =
-                            enum_.copy_local_instructions(module, loop_block, compilation_ctx);
+                        inner_result = enum_.copy_local_instructions(
+                            module,
+                            loop_block,
+                            compilation_ctx,
+                            runtime_error_data,
+                        )
                     }
 
                     t => return Err(IntermediateTypeError::VectorUnnsuportedType(t.clone())),
@@ -1093,6 +1121,7 @@ pub fn copy_local_function(
 pub fn equality_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     inner: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let name = RuntimeFunction::VecEquality.get_generic_function_name(compilation_ctx, &[inner])?;
@@ -1155,8 +1184,11 @@ pub fn equality_function(
                     | IntermediateType::IU32
                     | IntermediateType::IU64 => {
                         // Call the generic equality function
-                        let equality_f =
-                            RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx))?;
+                        let equality_f = RuntimeFunction::HeapTypeEquality.get(
+                            module,
+                            Some(compilation_ctx),
+                            None,
+                        )?;
                         then.skip_vec_header(v1_ptr)
                             .skip_vec_header(v2_ptr)
                             .local_get(len)
@@ -1195,7 +1227,12 @@ pub fn equality_function(
                                     },
                                 );
 
-                                inner.load_equality_instructions(module, loop_, compilation_ctx)?;
+                                inner.load_equality_instructions(
+                                    module,
+                                    loop_,
+                                    compilation_ctx,
+                                    runtime_error_data,
+                                )?;
 
                                 // If they are not equal we set result to false and break the loop
                                 loop_.if_else(
@@ -1275,7 +1312,7 @@ pub fn bytes_to_vec_function(
     let vector_ptr = module.locals.add(ValType::I32);
 
     let allocate_vector_with_header_function =
-        RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx))?;
+        RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx), None)?;
     builder
         .local_get(n)
         .local_get(n)

@@ -65,7 +65,8 @@ impl IAddress {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), IntermediateTypeError> {
-        let equality_f_id = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx))?;
+        let equality_f_id =
+            RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx), None)?;
         builder.i32_const(Self::HEAP_SIZE).call(equality_f_id);
 
         Ok(())

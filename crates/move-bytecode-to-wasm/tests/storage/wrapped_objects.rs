@@ -118,14 +118,14 @@ fn test_creating_and_deleting_beta(
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let alpha_id = runtime.obtain_uid();
+        let alpha_id = runtime.obtain_uid().unwrap();
 
         // Create beta, passing alpha as argument to be wrapped in it
         let call_data = createBetaTtoCall::new((alpha_id,)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let beta_id = runtime.obtain_uid();
+        let beta_id = runtime.obtain_uid().unwrap();
 
         (alpha_id, beta_id)
     } else {
@@ -135,8 +135,8 @@ fn test_creating_and_deleting_beta(
         assert_eq!(0, result);
 
         // Get the object ids
-        let alpha_id = runtime.obtain_uid();
-        let beta_id = runtime.obtain_uid();
+        let alpha_id = runtime.obtain_uid().unwrap();
+        let beta_id = runtime.obtain_uid().unwrap();
 
         (alpha_id, beta_id)
     };
@@ -187,15 +187,15 @@ fn test_creating_and_deleting_gamma(
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let alpha_id = runtime.obtain_uid();
-        let beta_id = runtime.obtain_uid();
+        let alpha_id = runtime.obtain_uid().unwrap();
+        let beta_id = runtime.obtain_uid().unwrap();
 
         // Create gamma, passing beta as argument to be wrapped in it
         let call_data = createGammaTtoCall::new((beta_id,)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let gamma_id = runtime.obtain_uid();
+        let gamma_id = runtime.obtain_uid().unwrap();
 
         (alpha_id, beta_id, gamma_id)
     } else {
@@ -205,9 +205,9 @@ fn test_creating_and_deleting_gamma(
         assert_eq!(0, result);
 
         // Get the object ids
-        let alpha_id = runtime.obtain_uid();
-        let beta_id = runtime.obtain_uid();
-        let gamma_id = runtime.obtain_uid();
+        let alpha_id = runtime.obtain_uid().unwrap();
+        let beta_id = runtime.obtain_uid().unwrap();
+        let gamma_id = runtime.obtain_uid().unwrap();
 
         (alpha_id, beta_id, gamma_id)
     };
@@ -262,20 +262,20 @@ fn test_creating_and_deleting_delta(
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let alpha_1_id = runtime.obtain_uid();
+        let alpha_1_id = runtime.obtain_uid().unwrap();
 
         let call_data = createAlphaCall::new((102,)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let alpha_2_id = runtime.obtain_uid();
+        let alpha_2_id = runtime.obtain_uid().unwrap();
 
         // Create delta using TTO method
         let call_data = createDeltaTtoCall::new((alpha_1_id, alpha_2_id)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let delta_id = runtime.obtain_uid();
+        let delta_id = runtime.obtain_uid().unwrap();
 
         (alpha_1_id, alpha_2_id, delta_id)
     } else {
@@ -284,9 +284,9 @@ fn test_creating_and_deleting_delta(
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let alpha_1_id = runtime.obtain_uid();
-        let alpha_2_id = runtime.obtain_uid();
-        let delta_id = runtime.obtain_uid();
+        let alpha_1_id = runtime.obtain_uid().unwrap();
+        let alpha_2_id = runtime.obtain_uid().unwrap();
+        let delta_id = runtime.obtain_uid().unwrap();
 
         (alpha_1_id, alpha_2_id, delta_id)
     };
@@ -344,45 +344,45 @@ fn test_creating_and_deleting_epsilon(
             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
             assert_eq!(0, result);
 
-            let alpha_1_id = runtime.obtain_uid();
+            let alpha_1_id = runtime.obtain_uid().unwrap();
 
             let call_data = createAlphaCall::new((102,)).abi_encode();
             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
             assert_eq!(0, result);
 
-            let alpha_2_id = runtime.obtain_uid();
+            let alpha_2_id = runtime.obtain_uid().unwrap();
 
             // Create deltas first for TTO method
             let call_data = createDeltaTtoCall::new((alpha_1_id, alpha_2_id)).abi_encode();
             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
             assert_eq!(0, result);
 
-            let delta_1_id = runtime.obtain_uid();
+            let delta_1_id = runtime.obtain_uid().unwrap();
 
             let call_data = createAlphaCall::new((103,)).abi_encode();
             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
             assert_eq!(0, result);
 
-            let alpha_3_id = runtime.obtain_uid();
+            let alpha_3_id = runtime.obtain_uid().unwrap();
 
             let call_data = createAlphaCall::new((104,)).abi_encode();
             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
             assert_eq!(0, result);
 
-            let alpha_4_id = runtime.obtain_uid();
+            let alpha_4_id = runtime.obtain_uid().unwrap();
 
             let call_data = createDeltaTtoCall::new((alpha_3_id, alpha_4_id)).abi_encode();
             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
             assert_eq!(0, result);
 
-            let delta_2_id = runtime.obtain_uid();
+            let delta_2_id = runtime.obtain_uid().unwrap();
 
             // Create epsilon using TTO method
             let call_data = createEpsilonTtoCall::new((delta_1_id, delta_2_id)).abi_encode();
             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
             assert_eq!(0, result);
 
-            let epsilon_id = runtime.obtain_uid();
+            let epsilon_id = runtime.obtain_uid().unwrap();
 
             (
                 alpha_1_id, alpha_2_id, alpha_3_id, alpha_4_id, delta_1_id, delta_2_id, epsilon_id,
@@ -393,13 +393,13 @@ fn test_creating_and_deleting_epsilon(
             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
             assert_eq!(0, result);
 
-            let delta_1_id = runtime.obtain_uid();
-            let alpha_1_id = runtime.obtain_uid();
-            let alpha_2_id = runtime.obtain_uid();
-            let delta_2_id = runtime.obtain_uid();
-            let alpha_3_id = runtime.obtain_uid();
-            let alpha_4_id = runtime.obtain_uid();
-            let epsilon_id = runtime.obtain_uid();
+            let delta_1_id = runtime.obtain_uid().unwrap();
+            let alpha_1_id = runtime.obtain_uid().unwrap();
+            let alpha_2_id = runtime.obtain_uid().unwrap();
+            let delta_2_id = runtime.obtain_uid().unwrap();
+            let alpha_3_id = runtime.obtain_uid().unwrap();
+            let alpha_4_id = runtime.obtain_uid().unwrap();
+            let epsilon_id = runtime.obtain_uid().unwrap();
 
             (
                 alpha_1_id, alpha_2_id, alpha_3_id, alpha_4_id, delta_1_id, delta_2_id, epsilon_id,
@@ -482,8 +482,8 @@ fn test_transferring_beta(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let alpha_id = runtime.obtain_uid();
-    let beta_id = runtime.obtain_uid();
+    let alpha_id = runtime.obtain_uid().unwrap();
+    let beta_id = runtime.obtain_uid().unwrap();
 
     let beta_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &beta_id.0);
 
@@ -537,9 +537,9 @@ fn test_transferring_gamma(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let alpha_id = runtime.obtain_uid();
-    let beta_id = runtime.obtain_uid();
-    let gamma_id = runtime.obtain_uid();
+    let alpha_id = runtime.obtain_uid().unwrap();
+    let beta_id = runtime.obtain_uid().unwrap();
+    let gamma_id = runtime.obtain_uid().unwrap();
 
     let gamma_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &gamma_id.0);
 
@@ -596,9 +596,9 @@ fn test_transferring_delta(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let alpha_1_id = runtime.obtain_uid();
-    let alpha_2_id = runtime.obtain_uid();
-    let delta_id = runtime.obtain_uid();
+    let alpha_1_id = runtime.obtain_uid().unwrap();
+    let alpha_2_id = runtime.obtain_uid().unwrap();
+    let delta_id = runtime.obtain_uid().unwrap();
 
     let delta_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &delta_id.0);
 
@@ -656,9 +656,9 @@ fn test_rebuilding_gamma(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let alpha_id = runtime.obtain_uid();
-    let beta_id = runtime.obtain_uid();
-    let gamma_id = runtime.obtain_uid();
+    let alpha_id = runtime.obtain_uid().unwrap();
+    let beta_id = runtime.obtain_uid().unwrap();
+    let gamma_id = runtime.obtain_uid().unwrap();
 
     let gamma_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &gamma_id.0);
 
@@ -667,7 +667,7 @@ fn test_rebuilding_gamma(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let new_gamma_id = runtime.obtain_uid();
+    let new_gamma_id = runtime.obtain_uid().unwrap();
 
     // Read gamma from the recipient namespace in storage
     runtime.set_tx_origin(RECIPIENT_ADDRESS);
@@ -719,9 +719,9 @@ fn test_destruct_delta_to_beta(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let alpha_1_id = runtime.obtain_uid();
-    let alpha_2_id = runtime.obtain_uid();
-    let delta_id = runtime.obtain_uid();
+    let alpha_1_id = runtime.obtain_uid().unwrap();
+    let alpha_2_id = runtime.obtain_uid().unwrap();
+    let delta_id = runtime.obtain_uid().unwrap();
 
     let storage_before_destruct = runtime.get_storage();
 
@@ -734,8 +734,8 @@ fn test_destruct_delta_to_beta(
     // Delta is deleted and each alpha is wrapped in a new beta, hence all the original slots should be empty
     assert_empty_storage(&storage_before_destruct, &storage_after_destruct);
 
-    let beta_1_id = runtime.obtain_uid();
-    let beta_2_id = runtime.obtain_uid();
+    let beta_1_id = runtime.obtain_uid().unwrap();
+    let beta_2_id = runtime.obtain_uid().unwrap();
 
     // Read the betas and assert the returned data is correct
     let call_data = readBetaCall::new((beta_1_id,)).abi_encode();
@@ -785,14 +785,14 @@ fn test_pushing_alpha_into_delta(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let delta_id = runtime.obtain_uid();
+    let delta_id = runtime.obtain_uid().unwrap();
 
     // Create alpha
     let call_data = createAlphaCall::new((101,)).abi_encode();
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let alpha_1_id = runtime.obtain_uid();
+    let alpha_1_id = runtime.obtain_uid().unwrap();
     let alpha_1_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &alpha_1_id.0);
 
     // Push alpha to delta
@@ -830,7 +830,7 @@ fn test_pushing_alpha_into_delta(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let alpha_2_id = runtime.obtain_uid();
+    let alpha_2_id = runtime.obtain_uid().unwrap();
     let alpha_2_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &alpha_2_id.0);
 
     // Push second alpha to delta
@@ -953,7 +953,7 @@ fn test_pushing_alpha_into_delta(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let alpha_3_id = runtime.obtain_uid();
+    let alpha_3_id = runtime.obtain_uid().unwrap();
 
     // Push one more alpha to delta
     let call_data = pushAlphaToDeltaCall::new((delta_id, alpha_3_id)).abi_encode();
@@ -993,13 +993,13 @@ fn test_destruct_epsilon(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let delta_1_id = runtime.obtain_uid();
-    let alpha_1_id = runtime.obtain_uid();
-    let alpha_2_id = runtime.obtain_uid();
-    let delta_2_id = runtime.obtain_uid();
-    let alpha_3_id = runtime.obtain_uid();
-    let alpha_4_id = runtime.obtain_uid();
-    let epsilon_id = runtime.obtain_uid();
+    let delta_1_id = runtime.obtain_uid().unwrap();
+    let alpha_1_id = runtime.obtain_uid().unwrap();
+    let alpha_2_id = runtime.obtain_uid().unwrap();
+    let delta_2_id = runtime.obtain_uid().unwrap();
+    let alpha_3_id = runtime.obtain_uid().unwrap();
+    let alpha_4_id = runtime.obtain_uid().unwrap();
+    let epsilon_id = runtime.obtain_uid().unwrap();
 
     let epsilon_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &epsilon_id.0);
 
@@ -1007,7 +1007,7 @@ fn test_destruct_epsilon(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let alpha_5_id = runtime.obtain_uid();
+    let alpha_5_id = runtime.obtain_uid().unwrap();
     let alpha_5_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &alpha_5_id.0);
 
     let call_data = destructEpsilonCall::new((epsilon_id, alpha_5_id)).abi_encode();
@@ -1060,7 +1060,7 @@ fn test_destruct_epsilon(
     assert_eq!(Delta::abi_encode(&return_data), delta_expected);
     assert_eq!(0, result);
 
-    let new_epsilon_id = runtime.obtain_uid();
+    let new_epsilon_id = runtime.obtain_uid().unwrap();
 
     // Read epsilon and assert the returned data
     let call_data = readEpsilonCall::new((new_epsilon_id,)).abi_encode();
@@ -1107,7 +1107,7 @@ fn test_pushing_and_popping_alpha_from_zeta(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let zeta_id = runtime.obtain_uid();
+    let zeta_id = runtime.obtain_uid().unwrap();
 
     let call_data = readZetaCall::new((zeta_id,)).abi_encode();
     let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -1126,14 +1126,14 @@ fn test_pushing_and_popping_alpha_from_zeta(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let alpha_1_id = runtime.obtain_uid();
+    let alpha_1_id = runtime.obtain_uid().unwrap();
     let alpha_1_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &alpha_1_id.0);
 
     let call_data = createAlphaCall::new((102,)).abi_encode();
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let alpha_2_id = runtime.obtain_uid();
+    let alpha_2_id = runtime.obtain_uid().unwrap();
     let alpha_2_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &alpha_2_id.0);
 
     // Pushback alpha 1 and alpha 2 to zeta
@@ -1245,7 +1245,7 @@ fn test_popping_from_empty_zeta(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let zeta_id = runtime.obtain_uid();
+    let zeta_id = runtime.obtain_uid().unwrap();
 
     let call_data = readZetaCall::new((zeta_id,)).abi_encode();
     let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -1264,7 +1264,7 @@ fn test_popping_from_empty_zeta(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let alpha_1_id = runtime.obtain_uid();
+    let alpha_1_id = runtime.obtain_uid().unwrap();
     let alpha_1_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &alpha_1_id.0);
 
     let call_data = createAlphaCall::new((102,)).abi_encode();
@@ -1346,7 +1346,7 @@ fn test_pushing_and_popping_from_bora(
     let (result, _) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
 
-    let eta_id = runtime.obtain_uid();
+    let eta_id = runtime.obtain_uid().unwrap();
 
     let call_data = readEtaCall::new((eta_id,)).abi_encode();
     let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();

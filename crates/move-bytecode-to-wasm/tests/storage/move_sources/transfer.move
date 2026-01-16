@@ -141,6 +141,10 @@ entry fun freeze_obj(foo: Foo) {
     transfer::freeze_object(foo);
 }
 
+entry fun call_indirect_freeze_obj(foo: Foo) {
+    freeze_obj(foo);
+}
+
 entry fun share_obj(foo: Foo) {
     transfer::share_object(foo);
 }
