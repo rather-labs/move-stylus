@@ -4,9 +4,8 @@ use walrus::{
 };
 
 use crate::{
-    CompilationContext,
-    data::RuntimeErrorData,
-    error::{RuntimeError, add_handle_error_instructions},
+    CompilationContext, data::RuntimeErrorData, error::RuntimeError,
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 
 use super::RuntimeFunction;
@@ -167,16 +166,12 @@ pub fn heap_integers_mul(
                                             .if_else(
                                                 None,
                                                 |then| {
-                                                    then.i32_const(runtime_error_data.get(
+                                                    then.return_error(
                                                         module,
-                                                        compilation_ctx.memory_id,
-                                                        RuntimeError::Overflow,
-                                                    ));
-                                                    add_handle_error_instructions(
-                                                        module,
-                                                        then,
                                                         compilation_ctx,
-                                                        false,
+                                                        Some(ValType::I32),
+                                                        runtime_error_data,
+                                                        RuntimeError::Overflow,
                                                     );
                                                 },
                                                 |else_| {
@@ -361,12 +356,13 @@ pub fn mul_u32(
                     .if_else(
                         Some(ValType::I32),
                         |then| {
-                            then.i32_const(runtime_error_data.get(
+                            then.return_error(
                                 module,
-                                compilation_ctx.memory_id,
+                                compilation_ctx,
+                                Some(ValType::I32),
+                                runtime_error_data,
                                 RuntimeError::Overflow,
-                            ));
-                            add_handle_error_instructions(module, then, compilation_ctx, false);
+                            );
                         },
                         |else_| {
                             else_.local_get(n1).local_get(n2).binop(BinaryOp::I32Mul);
@@ -431,12 +427,13 @@ pub fn mul_u64(
                     .if_else(
                         Some(ValType::I64),
                         |then| {
-                            then.i32_const(runtime_error_data.get(
+                            then.return_error(
                                 module,
-                                compilation_ctx.memory_id,
+                                compilation_ctx,
+                                Some(ValType::I64),
+                                runtime_error_data,
                                 RuntimeError::Overflow,
-                            ));
-                            add_handle_error_instructions(module, then, compilation_ctx, true);
+                            );
                         },
                         |else_| {
                             else_.local_get(n1).local_get(n2).binop(BinaryOp::I64Mul);
@@ -554,7 +551,7 @@ mod tests {
                                 .unwrap();
                             assert_eq!(result_memory_data, expected.to_le_bytes().to_vec());
                         } else {
-                            assert_eq!(1, pointer);
+                            assert_eq!(0xBADF00D, pointer);
                         }
                     }
                     Err(_) => {
@@ -694,7 +691,7 @@ mod tests {
 
                             assert_eq!(result_memory_data, expected.to_le_bytes::<32>().to_vec());
                         } else {
-                            assert_eq!(1, pointer);
+                            assert_eq!(0xBADF00D, pointer);
                         }
                     }
                     Err(_) => {
@@ -756,7 +753,7 @@ mod tests {
                     Ok(res) => {
                         if a.checked_mul(b).is_none() {
                             // Overflow case: function should return 1
-                            assert_eq!(1, res);
+                            assert_eq!(0xBADF00D, res);
                         } else {
                             // Normal case: function should return the expected result
                             assert_eq!(expected, res);
@@ -820,7 +817,7 @@ mod tests {
                     Ok(res) => {
                         if a.checked_mul(b).is_none() {
                             // Overflow case: function should return 1
-                            assert_eq!(1, res);
+                            assert_eq!(0xBADF00D, res);
                         } else {
                             // Normal case: function should return the expected result
                             assert_eq!(expected, res);

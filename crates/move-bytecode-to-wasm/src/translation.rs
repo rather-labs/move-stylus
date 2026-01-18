@@ -667,7 +667,11 @@ fn translate_instruction(
                     },
                 );
 
-                builder.call(delete_fn);
+                builder.call_runtime_function(
+                    compilation_ctx,
+                    delete_fn,
+                    &RuntimeFunction::DeleteFromStorage,
+                );
             } else {
                 let type_instantiations = function_id
                     .type_instantiations
@@ -837,7 +841,11 @@ fn translate_instruction(
                             None,
                         )?;
                         for &local in mut_ref_vec_locals.iter() {
-                            builder.local_get(local).call(update_mut_ref_fn);
+                            builder.local_get(local).call_runtime_function(
+                                compilation_ctx,
+                                update_mut_ref_fn,
+                                &RuntimeFunction::VecUpdateMutRef,
+                            );
                         }
                     }
                 };
@@ -920,7 +928,11 @@ fn translate_instruction(
                     },
                 );
 
-                builder.call(delete_fn);
+                builder.call_runtime_function(
+                    compilation_ctx,
+                    delete_fn,
+                    &RuntimeFunction::DeleteFromStorage,
+                );
             } else {
                 let (argument_types, mut_ref_vec_locals) = prepare_function_arguments(
                     module,
@@ -1054,7 +1066,11 @@ fn translate_instruction(
                         None,
                     )?;
                     for &local in mut_ref_vec_locals.iter() {
-                        builder.local_get(local).call(update_mut_ref_fn);
+                        builder.local_get(local).call_runtime_function(
+                            compilation_ctx,
+                            update_mut_ref_fn,
+                            &RuntimeFunction::VecUpdateMutRef,
+                        );
                     }
                 }
             }
@@ -1641,7 +1657,11 @@ fn translate_instruction(
                         Some(runtime_error_data),
                         &[&*vec_inner],
                     )?;
-                    builder.call(pop_back_f);
+                    builder.call_runtime_function(
+                        compilation_ctx,
+                        pop_back_f,
+                        &RuntimeFunction::VecPopBack,
+                    );
                 }
                 IntermediateType::ITypeParameter(_)
                 | IntermediateType::IRef(_)
@@ -1696,7 +1716,11 @@ fn translate_instruction(
                 Some(runtime_error_data),
                 &[&elem_ty],
             )?;
-            builder.call(push_back_f);
+            builder.call_runtime_function(
+                compilation_ctx,
+                push_back_f,
+                &RuntimeFunction::VecPushBack,
+            );
         }
         Bytecode::VecSwap(signature_index) => {
             let [id2_ty, id1_ty, ref_ty] = types_stack.pop_n_from_stack()?;
@@ -1734,7 +1758,7 @@ fn translate_instruction(
                 Some(runtime_error_data),
                 &[&*vec_inner],
             )?;
-            builder.call(swap_f);
+            builder.call_runtime_function(compilation_ctx, swap_f, &RuntimeFunction::VecSwap);
         }
         Bytecode::VecLen(signature_index) => {
             let elem_ir_type =
@@ -2078,13 +2102,21 @@ fn translate_instruction(
                     let less_than_f =
                         RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None)?;
 
-                    builder.i32_const(IU128::HEAP_SIZE).call(less_than_f);
+                    builder.i32_const(IU128::HEAP_SIZE).call_runtime_function(
+                        compilation_ctx,
+                        less_than_f,
+                        &RuntimeFunction::LessThan,
+                    );
                 }
                 IntermediateType::IU256 => {
                     let less_than_f =
                         RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None)?;
 
-                    builder.i32_const(IU256::HEAP_SIZE).call(less_than_f);
+                    builder.i32_const(IU256::HEAP_SIZE).call_runtime_function(
+                        compilation_ctx,
+                        less_than_f,
+                        &RuntimeFunction::LessThan,
+                    );
                 }
                 _ => Err(TranslationError::InvalidBinaryOperation {
                     operation: Bytecode::Lt,
@@ -2124,7 +2156,11 @@ fn translate_instruction(
                     builder
                         .swap(a, b)
                         .i32_const(IU128::HEAP_SIZE)
-                        .call(less_than_f)
+                        .call_runtime_function(
+                            compilation_ctx,
+                            less_than_f,
+                            &RuntimeFunction::LessThan,
+                        )
                         .negate();
                 }
                 IntermediateType::IU256 => {
@@ -2138,7 +2174,11 @@ fn translate_instruction(
                     builder
                         .swap(a, b)
                         .i32_const(IU256::HEAP_SIZE)
-                        .call(less_than_f)
+                        .call_runtime_function(
+                            compilation_ctx,
+                            less_than_f,
+                            &RuntimeFunction::LessThan,
+                        )
                         .negate();
                 }
                 _ => Err(TranslationError::InvalidBinaryOperation {
@@ -2178,7 +2218,11 @@ fn translate_instruction(
                     builder
                         .swap(a, b)
                         .i32_const(IU128::HEAP_SIZE)
-                        .call(less_than_f);
+                        .call_runtime_function(
+                            compilation_ctx,
+                            less_than_f,
+                            &RuntimeFunction::LessThan,
+                        );
                 }
                 IntermediateType::IU256 => {
                     let less_than_f =
@@ -2190,7 +2234,11 @@ fn translate_instruction(
                     builder
                         .swap(a, b)
                         .i32_const(IU256::HEAP_SIZE)
-                        .call(less_than_f);
+                        .call_runtime_function(
+                            compilation_ctx,
+                            less_than_f,
+                            &RuntimeFunction::LessThan,
+                        );
                 }
                 _ => Err(TranslationError::InvalidBinaryOperation {
                     operation: Bytecode::Gt,
@@ -2226,7 +2274,11 @@ fn translate_instruction(
                     // Compare
                     builder
                         .i32_const(IU128::HEAP_SIZE)
-                        .call(less_than_f)
+                        .call_runtime_function(
+                            compilation_ctx,
+                            less_than_f,
+                            &RuntimeFunction::LessThan,
+                        )
                         .negate();
                 }
                 IntermediateType::IU256 => {
@@ -2235,7 +2287,11 @@ fn translate_instruction(
 
                     builder
                         .i32_const(IU256::HEAP_SIZE)
-                        .call(less_than_f)
+                        .call_runtime_function(
+                            compilation_ctx,
+                            less_than_f,
+                            &RuntimeFunction::LessThan,
+                        )
                         .negate();
                 }
                 _ => Err(TranslationError::InvalidBinaryOperation {
@@ -2983,7 +3039,7 @@ fn call_indirect(
         .i32_const(function_entry.index)
         .call_indirect(function_entry.type_id, wasm_table_id);
 
-    builder.add_propagate_error_instructions(compilation_ctx);
+    builder.add_propagate_error_with_return_instructions(compilation_ctx);
 
     add_unpack_function_return_values_instructions(
         builder,
@@ -3117,9 +3173,11 @@ fn add_cache_storage_object_instructions(
         let cache_storage_object_changes_fn = RuntimeFunction::CacheStorageObjectChanges
             .get_generic(module, compilation_ctx, Some(runtime_error_data), &[itype])?;
 
-        builder
-            .local_get(wasm_local_var)
-            .call(cache_storage_object_changes_fn);
+        builder.local_get(wasm_local_var).call_runtime_function(
+            compilation_ctx,
+            cache_storage_object_changes_fn,
+            &RuntimeFunction::CacheStorageObjectChanges,
+        );
     }
 
     Ok(())

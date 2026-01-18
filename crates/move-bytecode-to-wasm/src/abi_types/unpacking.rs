@@ -152,8 +152,15 @@ impl Unpackable for IntermediateType {
 
                 builder
                     .local_get(reader_pointer)
-                    .local_get(calldata_base_pointer)
-                    .call(unpack_vector_fn);
+                    .local_get(calldata_base_pointer);
+
+                call_unpack_or_runtime_function(
+                    builder,
+                    compilation_ctx,
+                    unpack_vector_fn,
+                    &RuntimeFunction::UnpackVector,
+                    return_block_id,
+                );
             }
             // The signer must not be unpacked here, since it can't be part of the calldata. It is
             // injected directly by the VM into the stack
@@ -288,7 +295,11 @@ impl Unpackable for IntermediateType {
                     runtime_error_data,
                     &[self],
                 )?;
-                builder.local_get(reader_pointer).call(unpack_enum_function);
+                builder.local_get(reader_pointer).call_runtime_function(
+                    compilation_ctx,
+                    unpack_enum_function,
+                    &RuntimeFunction::UnpackEnum,
+                );
             }
             IntermediateType::ITypeParameter(_) => {
                 return Err(AbiError::Unpack(
@@ -348,7 +359,12 @@ fn load_struct_storage_id(
             )
             .map_err(AbiError::NativeFunction)?;
 
-            function_builder.call(compute_named_id_fn);
+            function_builder.call_native_function(
+                compilation_ctx,
+                NativeFunction::NATIVE_COMPUTE_NAMED_ID,
+                &ModuleId::new(STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT),
+                compute_named_id_fn,
+            );
         }
         _ => {
             Err(AbiError::Unpack(AbiOperationError::StorageObjectHasNoId(

@@ -81,7 +81,11 @@ pub fn add_child_object_fn(
     builder
         .local_get(child_ptr)
         .local_get(slot_ptr)
-        .call(save_struct_into_storage_fn);
+        .call_runtime_function(
+            compilation_ctx,
+            save_struct_into_storage_fn,
+            &RuntimeFunction::EncodeAndSaveInStorage,
+        );
 
     Ok(function.finish(vec![parent_address, child_ptr], &mut module.funcs))
 }
@@ -174,7 +178,11 @@ pub fn add_borrow_object_fn(
         .local_get(slot_ptr)
         .local_get(child_id)
         .local_get(parent_uid)
-        .call(read_and_decode_from_storage_fn)
+        .call_runtime_function(
+            compilation_ctx,
+            read_and_decode_from_storage_fn,
+            &RuntimeFunction::ReadAndDecodeFromStorage,
+        )
         .local_set(result_struct);
 
     let result = module.locals.add(ValType::I32);

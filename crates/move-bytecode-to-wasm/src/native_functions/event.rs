@@ -320,6 +320,7 @@ pub fn add_emit_log_fn(
                     calldata_reference_pointer,
                     compilation_ctx,
                     Some(runtime_error_data),
+                    None,
                 )?;
             }
             IntermediateType::IVector(_)
@@ -532,6 +533,7 @@ fn add_encode_indexed_vector_instructions(
                         writer_pointer,
                         compilation_ctx,
                         Some(runtime_error_data),
+                        None,
                     )?;
 
                     loop_
@@ -698,6 +700,7 @@ fn add_encode_indexed_vector_instructions(
                         writer_pointer,
                         compilation_ctx,
                         None,
+                        None,
                     )?;
 
                     loop_
@@ -793,6 +796,7 @@ fn add_encode_indexed_struct_instructions(
                     writer_pointer,
                     writer_pointer,
                     compilation_ctx,
+                    None,
                     None,
                 )?;
             }
@@ -938,6 +942,7 @@ fn add_encode_indexed_struct_instructions(
                     writer_pointer,
                     writer_pointer,
                     compilation_ctx,
+                    None,
                     None,
                 )?;
             }

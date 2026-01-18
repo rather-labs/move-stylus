@@ -122,6 +122,7 @@ pub fn build_custom_error_message(
     // and the packed error fields when laying out the memory.
     let (_error_data_ptr, error_data_len) = build_pack_instructions(
         builder,
+        None,
         &error_struct.fields,
         module,
         compilation_ctx,

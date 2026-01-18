@@ -180,6 +180,7 @@ pub fn locate_storage_data(
         block.return_error(
             module,
             compilation_ctx,
+            Some(ValType::I32),
             runtime_error_data,
             RuntimeError::StorageObjectNotFound,
         );
@@ -267,6 +268,7 @@ pub fn locate_storage_owned_data(
     builder.return_error(
         module,
         compilation_ctx,
+        Some(ValType::I32),
         runtime_error_data,
         RuntimeError::StorageObjectNotFound,
     );
@@ -340,6 +342,7 @@ pub fn locate_storage_shared_data(
     builder.return_error(
         module,
         compilation_ctx,
+        Some(ValType::I32),
         runtime_error_data,
         RuntimeError::StorageObjectNotFound,
     );
@@ -413,6 +416,7 @@ pub fn locate_storage_frozen_data(
     builder.return_error(
         module,
         compilation_ctx,
+        Some(ValType::I32),
         runtime_error_data,
         RuntimeError::StorageObjectNotFound,
     );

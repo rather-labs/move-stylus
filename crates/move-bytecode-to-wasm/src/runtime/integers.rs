@@ -11,10 +11,9 @@ use walrus::{
 };
 
 use crate::{
-    CompilationContext,
-    data::RuntimeErrorData,
-    error::{RuntimeError, add_handle_error_instructions},
+    CompilationContext, data::RuntimeErrorData, error::RuntimeError,
     translation::intermediate_types::simple_integers::IU32,
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 
 use super::RuntimeFunction;
@@ -53,13 +52,13 @@ pub fn check_overflow_u8_u16(
         .if_else(
             Some(ValType::I32),
             |then| {
-                then.i32_const(runtime_error_data.get(
+                then.return_error(
                     module,
-                    compilation_ctx.memory_id,
+                    compilation_ctx,
+                    Some(ValType::I32),
+                    runtime_error_data,
                     RuntimeError::Overflow,
-                ));
-
-                add_handle_error_instructions(module, then, compilation_ctx, false);
+                );
             },
             |else_| {
                 else_.local_get(n);
@@ -97,13 +96,13 @@ pub fn downcast_u64_to_u32(
         .if_else(
             Some(ValType::I32),
             |then| {
-                then.i32_const(runtime_error_data.get(
+                then.return_error(
                     module,
-                    compilation_ctx.memory_id,
+                    compilation_ctx,
+                    Some(ValType::I32),
+                    runtime_error_data,
                     RuntimeError::OutOfBounds,
-                ));
-
-                add_handle_error_instructions(module, then, compilation_ctx, false);
+                );
             },
             |else_| {
                 else_.local_get(n).unop(UnaryOp::I32WrapI64);
@@ -193,13 +192,13 @@ pub fn downcast_u128_u256_to_u32(
                             .br(loop_id);
                     },
                     |else_| {
-                        else_.i32_const(runtime_error_data.get(
+                        else_.return_error(
                             module,
-                            compilation_ctx.memory_id,
+                            compilation_ctx,
+                            Some(ValType::I32),
+                            runtime_error_data,
                             RuntimeError::OutOfBounds,
-                        ));
-
-                        add_handle_error_instructions(module, else_, compilation_ctx, false);
+                        );
                     },
                 );
         });
@@ -288,13 +287,13 @@ pub fn downcast_u128_u256_to_u64(
                             .br(loop_id);
                     },
                     |else_| {
-                        else_.i32_const(runtime_error_data.get(
+                        else_.return_error(
                             module,
-                            compilation_ctx.memory_id,
+                            compilation_ctx,
+                            Some(ValType::I64),
+                            runtime_error_data,
                             RuntimeError::OutOfBounds,
-                        ));
-
-                        add_handle_error_instructions(module, else_, compilation_ctx, true);
+                        );
                     },
                 );
         });

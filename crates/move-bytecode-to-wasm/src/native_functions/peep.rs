@@ -110,6 +110,7 @@ pub fn add_peep_fn(
         block.return_error(
             module,
             compilation_ctx,
+            Some(ValType::I32),
             runtime_error_data,
             RuntimeError::StorageObjectNotFound,
         );

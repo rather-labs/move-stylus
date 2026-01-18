@@ -4,10 +4,7 @@ use walrus::{
 };
 
 use crate::{
-    CompilationContext,
-    data::RuntimeErrorData,
-    error::{RuntimeError, add_handle_error_instructions},
-    runtime::RuntimeFunction,
+    CompilationContext, data::RuntimeErrorData, error::RuntimeError, runtime::RuntimeFunction,
     wasm_builder_extensions::WasmBuilderExtension,
 };
 
@@ -260,12 +257,13 @@ impl IU128 {
                             .unop(UnaryOp::I64Eqz)
                             .br_if(inner_block_id);
 
-                        inner_block.i32_const(runtime_error_data.get(
+                        inner_block.return_error(
                             module,
-                            compilation_ctx.memory_id,
+                            compilation_ctx,
+                            Some(ValType::I32),
+                            runtime_error_data,
                             RuntimeError::Overflow,
-                        ));
-                        add_handle_error_instructions(module, inner_block, compilation_ctx, false);
+                        );
                     });
                 }
                 builder.local_get(pointer);

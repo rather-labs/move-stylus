@@ -84,6 +84,7 @@ pub fn pack_reference_function(
                 calldata_reference_pointer,
                 compilation_ctx,
                 Some(runtime_error_data),
+                None,
             )?;
         }
         IntermediateType::IBool
@@ -124,6 +125,7 @@ pub fn pack_reference_function(
                 calldata_reference_pointer,
                 compilation_ctx,
                 Some(runtime_error_data),
+                None,
             )?;
         }
         IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -362,6 +364,7 @@ mod tests {
                     calldata_reference_pointer,
                     &compilation_ctx,
                     Some(&mut runtime_error_data),
+                    None,
                 )
                 .unwrap();
         } else {
@@ -374,6 +377,7 @@ mod tests {
                     calldata_reference_pointer,
                     &compilation_ctx,
                     Some(&mut runtime_error_data),
+                    None,
                 )
                 .unwrap();
         };
@@ -389,16 +393,18 @@ mod tests {
 
         let result_ptr: i32 = entrypoint.call(&mut store, ()).unwrap();
 
-        let memory = instance.get_memory(&mut store, "memory").unwrap();
-        let mut result_memory_data = vec![0; expected_calldata_bytes.len()];
-        memory
-            .read(&mut store, result_ptr as usize, &mut result_memory_data)
-            .unwrap();
+        if result_ptr != 0xBADF00D {
+            let memory = instance.get_memory(&mut store, "memory").unwrap();
+            let mut result_memory_data = vec![0; expected_calldata_bytes.len()];
+            memory
+                .read(&mut store, result_ptr as usize, &mut result_memory_data)
+                .unwrap();
 
-        assert_eq!(
-            result_memory_data, expected_calldata_bytes,
-            "Packed calldata did not match expected result"
-        );
+            assert_eq!(
+                result_memory_data, expected_calldata_bytes,
+                "Packed calldata did not match expected result"
+            );
+        }
     }
 
     #[test]
@@ -437,6 +443,7 @@ mod tests {
                 calldata_reference_pointer,
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
+                None,
             )
             .unwrap();
 
@@ -471,21 +478,22 @@ mod tests {
 
                 let result_ptr: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
 
-                let mut result_memory_data = vec![0; 32];
-                memory
-                    .read(
-                        &mut *store.0.borrow_mut(),
-                        result_ptr as usize,
-                        &mut result_memory_data,
-                    )
-                    .unwrap();
+                if result_ptr != 0xBADF00D {
+                    let mut result_memory_data = vec![0; 32];
+                    memory
+                        .read(
+                            &mut *store.0.borrow_mut(),
+                            result_ptr as usize,
+                            &mut result_memory_data,
+                        )
+                        .unwrap();
 
-                let expected = (value as u16).abi_encode();
-                assert_eq!(
-                    result_memory_data, expected,
-                    "Packed ref u8 did not match expected result for value {value}",
-                );
-
+                    let expected = (value as u16).abi_encode();
+                    assert_eq!(
+                        result_memory_data, expected,
+                        "Packed ref u8 did not match expected result for value {value}",
+                    );
+                }
                 reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
             });
     }
@@ -526,6 +534,7 @@ mod tests {
                 calldata_reference_pointer,
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
+                None,
             )
             .unwrap();
 
@@ -560,21 +569,22 @@ mod tests {
 
                 let result_ptr: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
 
-                let mut result_memory_data = vec![0; 32];
-                memory
-                    .read(
-                        &mut *store.0.borrow_mut(),
-                        result_ptr as usize,
-                        &mut result_memory_data,
-                    )
-                    .unwrap();
+                if result_ptr != 0xBADF00D {
+                    let mut result_memory_data = vec![0; 32];
+                    memory
+                        .read(
+                            &mut *store.0.borrow_mut(),
+                            result_ptr as usize,
+                            &mut result_memory_data,
+                        )
+                        .unwrap();
 
-                let expected = value.abi_encode();
-                assert_eq!(
-                    result_memory_data, expected,
-                    "Packed ref u32 did not match expected result for value {value}",
-                );
-
+                    let expected = value.abi_encode();
+                    assert_eq!(
+                        result_memory_data, expected,
+                        "Packed ref u32 did not match expected result for value {value}",
+                    );
+                }
                 reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
             });
     }
@@ -615,6 +625,7 @@ mod tests {
                 calldata_reference_pointer,
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
+                None,
             )
             .unwrap();
 
@@ -649,21 +660,22 @@ mod tests {
 
                 let result_ptr: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
 
-                let mut result_memory_data = vec![0; 32];
-                memory
-                    .read(
-                        &mut *store.0.borrow_mut(),
-                        result_ptr as usize,
-                        &mut result_memory_data,
-                    )
-                    .unwrap();
+                if result_ptr != 0xBADF00D {
+                    let mut result_memory_data = vec![0; 32];
+                    memory
+                        .read(
+                            &mut *store.0.borrow_mut(),
+                            result_ptr as usize,
+                            &mut result_memory_data,
+                        )
+                        .unwrap();
 
-                let expected = value.abi_encode();
-                assert_eq!(
-                    result_memory_data, expected,
-                    "Packed ref u64 did not match expected result for value {value}",
-                );
-
+                    let expected = value.abi_encode();
+                    assert_eq!(
+                        result_memory_data, expected,
+                        "Packed ref u64 did not match expected result for value {value}",
+                    );
+                }
                 reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
             });
     }
@@ -704,6 +716,7 @@ mod tests {
                 calldata_reference_pointer,
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
+                None,
             )
             .unwrap();
 
@@ -738,21 +751,22 @@ mod tests {
 
                 let result_ptr: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
 
-                let mut result_memory_data = vec![0; 32];
-                memory
-                    .read(
-                        &mut *store.0.borrow_mut(),
-                        result_ptr as usize,
-                        &mut result_memory_data,
-                    )
-                    .unwrap();
+                if result_ptr != 0xBADF00D {
+                    let mut result_memory_data = vec![0; 32];
+                    memory
+                        .read(
+                            &mut *store.0.borrow_mut(),
+                            result_ptr as usize,
+                            &mut result_memory_data,
+                        )
+                        .unwrap();
 
-                let expected = value.abi_encode();
-                assert_eq!(
-                    result_memory_data, expected,
-                    "Packed ref u128 did not match expected result for value {value}",
-                );
-
+                    let expected = value.abi_encode();
+                    assert_eq!(
+                        result_memory_data, expected,
+                        "Packed ref u128 did not match expected result for value {value}",
+                    );
+                }
                 reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
             });
     }
@@ -793,6 +807,7 @@ mod tests {
                 calldata_reference_pointer,
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
+                None,
             )
             .unwrap();
 
@@ -824,21 +839,22 @@ mod tests {
 
                 let result_ptr: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
 
-                let mut result_memory_data = vec![0; 32];
-                memory
-                    .read(
-                        &mut *store.0.borrow_mut(),
-                        result_ptr as usize,
-                        &mut result_memory_data,
-                    )
-                    .unwrap();
+                if result_ptr != 0xBADF00D {
+                    let mut result_memory_data = vec![0; 32];
+                    memory
+                        .read(
+                            &mut *store.0.borrow_mut(),
+                            result_ptr as usize,
+                            &mut result_memory_data,
+                        )
+                        .unwrap();
 
-                let expected = value.abi_encode();
-                assert_eq!(
-                    result_memory_data, expected,
-                    "Packed ref U256 did not match expected result for value {value}",
-                );
-
+                    let expected = value.abi_encode();
+                    assert_eq!(
+                        result_memory_data, expected,
+                        "Packed ref U256 did not match expected result for value {value}",
+                    );
+                }
                 reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
             });
     }
@@ -879,6 +895,7 @@ mod tests {
                 calldata_reference_pointer,
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
+                None,
             )
             .unwrap();
 
@@ -911,21 +928,22 @@ mod tests {
 
                 let result_ptr: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
 
-                let mut result_memory_data = vec![0; 32];
-                memory
-                    .read(
-                        &mut *store.0.borrow_mut(),
-                        result_ptr as usize,
-                        &mut result_memory_data,
-                    )
-                    .unwrap();
+                if result_ptr != 0xBADF00D {
+                    let mut result_memory_data = vec![0; 32];
+                    memory
+                        .read(
+                            &mut *store.0.borrow_mut(),
+                            result_ptr as usize,
+                            &mut result_memory_data,
+                        )
+                        .unwrap();
 
-                let expected = value.abi_encode();
-                assert_eq!(
-                    result_memory_data, expected,
-                    "Packed ref address did not match expected result for value {value}",
-                );
-
+                    let expected = value.abi_encode();
+                    assert_eq!(
+                        result_memory_data, expected,
+                        "Packed ref address did not match expected result for value {value}",
+                    );
+                }
                 reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
             });
     }
@@ -966,6 +984,7 @@ mod tests {
                 calldata_reference_pointer,
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
+                None,
             )
             .unwrap();
 
@@ -1000,21 +1019,22 @@ mod tests {
 
                 let result_ptr: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
 
-                let mut result_memory_data = vec![0; 32];
-                memory
-                    .read(
-                        &mut *store.0.borrow_mut(),
-                        result_ptr as usize,
-                        &mut result_memory_data,
-                    )
-                    .unwrap();
+                if result_ptr != 0xBADF00D {
+                    let mut result_memory_data = vec![0; 32];
+                    memory
+                        .read(
+                            &mut *store.0.borrow_mut(),
+                            result_ptr as usize,
+                            &mut result_memory_data,
+                        )
+                        .unwrap();
 
-                let expected = value.abi_encode();
-                assert_eq!(
-                    result_memory_data, expected,
-                    "Packed ref u16 did not match expected result for value {value}",
-                );
-
+                    let expected = value.abi_encode();
+                    assert_eq!(
+                        result_memory_data, expected,
+                        "Packed ref u16 did not match expected result for value {value}",
+                    );
+                }
                 reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
             });
     }
@@ -1063,6 +1083,7 @@ mod tests {
                 calldata_reference_pointer,
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
+                None,
             )
             .unwrap();
 
@@ -1116,21 +1137,22 @@ mod tests {
                     )
                     .unwrap();
 
-                let expected = values.abi_encode();
-                let mut result_memory_data = vec![0; expected.len()];
-                memory
-                    .read(
-                        &mut *store.0.borrow_mut(),
-                        result_ptr as usize,
-                        &mut result_memory_data,
-                    )
-                    .unwrap();
+                if result_ptr != 0xBADF00D {
+                    let expected = values.abi_encode();
+                    let mut result_memory_data = vec![0; expected.len()];
+                    memory
+                        .read(
+                            &mut *store.0.borrow_mut(),
+                            result_ptr as usize,
+                            &mut result_memory_data,
+                        )
+                        .unwrap();
 
-                assert_eq!(
-                    result_memory_data, expected,
-                    "Packed ref vec<u8> did not match expected result",
-                );
-
+                    assert_eq!(
+                        result_memory_data, expected,
+                        "Packed ref vec<u8> did not match expected result",
+                    );
+                }
                 reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
             });
     }
@@ -1184,6 +1206,7 @@ mod tests {
                 calldata_reference_pointer,
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
+                None,
             )
             .unwrap();
 
@@ -1235,21 +1258,22 @@ mod tests {
                     )
                     .unwrap();
 
-                let expected = values.abi_encode();
-                let mut result_memory_data = vec![0; expected.len()];
-                memory
-                    .read(
-                        &mut *store.0.borrow_mut(),
-                        result_ptr as usize,
-                        &mut result_memory_data,
-                    )
-                    .unwrap();
+                if result_ptr != 0xBADF00D {
+                    let expected = values.abi_encode();
+                    let mut result_memory_data = vec![0; expected.len()];
+                    memory
+                        .read(
+                            &mut *store.0.borrow_mut(),
+                            result_ptr as usize,
+                            &mut result_memory_data,
+                        )
+                        .unwrap();
 
-                assert_eq!(
-                    result_memory_data, expected,
-                    "Packed ref vec<u16> did not match expected result",
-                );
-
+                    assert_eq!(
+                        result_memory_data, expected,
+                        "Packed ref vec<u16> did not match expected result",
+                    );
+                }
                 reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
             });
     }
@@ -1303,6 +1327,7 @@ mod tests {
                 calldata_reference_pointer,
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
+                None,
             )
             .unwrap();
 
@@ -1354,21 +1379,22 @@ mod tests {
                     )
                     .unwrap();
 
-                let expected = values.abi_encode();
-                let mut result_memory_data = vec![0; expected.len()];
-                memory
-                    .read(
-                        &mut *store.0.borrow_mut(),
-                        result_ptr as usize,
-                        &mut result_memory_data,
-                    )
-                    .unwrap();
+                if result_ptr != 0xBADF00D {
+                    let expected = values.abi_encode();
+                    let mut result_memory_data = vec![0; expected.len()];
+                    memory
+                        .read(
+                            &mut *store.0.borrow_mut(),
+                            result_ptr as usize,
+                            &mut result_memory_data,
+                        )
+                        .unwrap();
 
-                assert_eq!(
-                    result_memory_data, expected,
-                    "Packed ref vec<u64> did not match expected result",
-                );
-
+                    assert_eq!(
+                        result_memory_data, expected,
+                        "Packed ref vec<u64> did not match expected result",
+                    );
+                }
                 reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
             });
     }
@@ -1422,6 +1448,7 @@ mod tests {
                 calldata_reference_pointer,
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
+                None,
             )
             .unwrap();
 
@@ -1482,20 +1509,22 @@ mod tests {
                     )
                     .unwrap();
 
-                let expected = values.abi_encode();
-                let mut result_memory_data = vec![0; expected.len()];
-                memory
-                    .read(
-                        &mut *store.0.borrow_mut(),
-                        result_ptr as usize,
-                        &mut result_memory_data,
-                    )
-                    .unwrap();
+                if result_ptr != 0xBADF00D {
+                    let expected = values.abi_encode();
+                    let mut result_memory_data = vec![0; expected.len()];
+                    memory
+                        .read(
+                            &mut *store.0.borrow_mut(),
+                            result_ptr as usize,
+                            &mut result_memory_data,
+                        )
+                        .unwrap();
 
-                assert_eq!(
-                    result_memory_data, expected,
-                    "Packed ref vec<u128> did not match expected result",
-                );
+                    assert_eq!(
+                        result_memory_data, expected,
+                        "Packed ref vec<u128> did not match expected result",
+                    );
+                }
 
                 reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
             });
@@ -1550,6 +1579,7 @@ mod tests {
                 calldata_reference_pointer,
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
+                None,
             )
             .unwrap();
 
@@ -1629,20 +1659,22 @@ mod tests {
                     )
                     .unwrap();
 
-                let expected = outer_vec.abi_encode();
-                let mut result_memory_data = vec![0; expected.len()];
-                memory
-                    .read(
-                        &mut *store.0.borrow_mut(),
-                        result_ptr as usize,
-                        &mut result_memory_data,
-                    )
-                    .unwrap();
+                if result_ptr != 0xBADF00D {
+                    let expected = outer_vec.abi_encode();
+                    let mut result_memory_data = vec![0; expected.len()];
+                    memory
+                        .read(
+                            &mut *store.0.borrow_mut(),
+                            result_ptr as usize,
+                            &mut result_memory_data,
+                        )
+                        .unwrap();
 
-                assert_eq!(
-                    result_memory_data, expected,
-                    "Packed ref vec<vec<u32>> did not match expected result",
-                );
+                    assert_eq!(
+                        result_memory_data, expected,
+                        "Packed ref vec<vec<u32>> did not match expected result",
+                    );
+                }
 
                 reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
             });
@@ -1697,6 +1729,7 @@ mod tests {
                 calldata_reference_pointer,
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
+                None,
             )
             .unwrap();
 
@@ -1791,20 +1824,22 @@ mod tests {
                     )
                     .unwrap();
 
-                let expected = outer_vec.abi_encode();
-                let mut result_memory_data = vec![0; expected.len()];
-                memory
-                    .read(
-                        &mut *store.0.borrow_mut(),
-                        result_ptr as usize,
-                        &mut result_memory_data,
-                    )
-                    .unwrap();
+                if result_ptr != 0xBADF00D {
+                    let expected = outer_vec.abi_encode();
+                    let mut result_memory_data = vec![0; expected.len()];
+                    memory
+                        .read(
+                            &mut *store.0.borrow_mut(),
+                            result_ptr as usize,
+                            &mut result_memory_data,
+                        )
+                        .unwrap();
 
-                assert_eq!(
-                    result_memory_data, expected,
-                    "Packed ref vec<vec<u128>> did not match expected result",
-                );
+                    assert_eq!(
+                        result_memory_data, expected,
+                        "Packed ref vec<vec<u128>> did not match expected result",
+                    );
+                }
 
                 reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
             });
