@@ -277,6 +277,7 @@ mod tests {
                 writer_pointer, // unused for this type
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
+                None,
             )
             .unwrap();
 
@@ -333,6 +334,7 @@ mod tests {
                 writer_pointer,
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
+                None,
             )
             .unwrap();
 
@@ -417,6 +419,7 @@ mod tests {
                 writer_pointer,
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
+                None,
             )
             .unwrap();
 
@@ -506,6 +509,7 @@ mod tests {
                 writer_pointer,
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
+                None,
             )
             .unwrap();
 

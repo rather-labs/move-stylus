@@ -4,9 +4,8 @@ use walrus::{
 };
 
 use crate::{
-    CompilationContext,
-    data::RuntimeErrorData,
-    error::{RuntimeError, add_handle_error_instructions},
+    CompilationContext, data::RuntimeErrorData, error::RuntimeError,
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 
 use super::RuntimeFunction;
@@ -52,12 +51,13 @@ pub fn validate_pointer_32_bit(
                 .unop(UnaryOp::I32Eqz)
                 .br_if(block_id);
 
-            block.i32_const(runtime_error_data.get(
+            block.return_error(
                 module,
-                compilation_ctx.memory_id,
+                compilation_ctx,
+                None,
+                runtime_error_data,
                 RuntimeError::Overflow,
-            ));
-            add_handle_error_instructions(module, block, compilation_ctx, false);
+            );
         });
     }
 

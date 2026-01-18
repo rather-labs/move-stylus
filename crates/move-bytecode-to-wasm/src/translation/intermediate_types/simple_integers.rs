@@ -135,9 +135,11 @@ impl IU8 {
                     Some(compilation_ctx),
                     Some(runtime_error_data),
                 )?;
-                builder
-                    .i32_const(IU128::HEAP_SIZE)
-                    .call(downcast_u128_u256_to_u32_f);
+                builder.i32_const(IU128::HEAP_SIZE).call_runtime_function(
+                    compilation_ctx,
+                    downcast_u128_u256_to_u32_f,
+                    &RuntimeFunction::DowncastU128U256ToU32,
+                );
             }
             IntermediateType::IU256 => {
                 let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32.get(
@@ -145,9 +147,11 @@ impl IU8 {
                     Some(compilation_ctx),
                     Some(runtime_error_data),
                 )?;
-                builder
-                    .i32_const(IU256::HEAP_SIZE)
-                    .call(downcast_u128_u256_to_u32_f);
+                builder.i32_const(IU256::HEAP_SIZE).call_runtime_function(
+                    compilation_ctx,
+                    downcast_u128_u256_to_u32_f,
+                    &RuntimeFunction::DowncastU128U256ToU32,
+                );
             }
             t => return Err(IntermediateTypeError::InvalidCast(t.clone())),
         }
@@ -157,7 +161,11 @@ impl IU8 {
             Some(compilation_ctx),
             Some(runtime_error_data),
         )?;
-        builder.i32_const(Self::MAX_VALUE).call(check_overflow_f);
+        builder.i32_const(Self::MAX_VALUE).call_runtime_function(
+            compilation_ctx,
+            check_overflow_f,
+            &RuntimeFunction::CheckOverflowU8U16,
+        );
 
         Ok(())
     }
@@ -174,7 +182,11 @@ impl IU8 {
             Some(compilation_ctx),
             Some(runtime_error_data),
         )?;
-        builder.i32_const(7).call(check_overflow_f);
+        builder.i32_const(7).call_runtime_function(
+            compilation_ctx,
+            check_overflow_f,
+            &RuntimeFunction::CheckOverflowU8U16,
+        );
 
         builder.binop(BinaryOp::I32Shl);
         // Mask the bytes outside the u8 range
@@ -195,7 +207,11 @@ impl IU8 {
             Some(compilation_ctx),
             Some(runtime_error_data),
         )?;
-        builder.i32_const(7).call(check_overflow_f);
+        builder.i32_const(7).call_runtime_function(
+            compilation_ctx,
+            check_overflow_f,
+            &RuntimeFunction::CheckOverflowU8U16,
+        );
 
         builder.binop(BinaryOp::I32ShrU);
 
@@ -327,9 +343,11 @@ impl IU16 {
                     Some(compilation_ctx),
                     Some(runtime_error_data),
                 )?;
-                builder
-                    .i32_const(IU128::HEAP_SIZE)
-                    .call(downcast_u128_u256_to_u32_f);
+                builder.i32_const(IU128::HEAP_SIZE).call_runtime_function(
+                    compilation_ctx,
+                    downcast_u128_u256_to_u32_f,
+                    &RuntimeFunction::DowncastU128U256ToU32,
+                );
             }
             IntermediateType::IU256 => {
                 let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32.get(
@@ -337,9 +355,11 @@ impl IU16 {
                     Some(compilation_ctx),
                     Some(runtime_error_data),
                 )?;
-                builder
-                    .i32_const(IU256::HEAP_SIZE)
-                    .call(downcast_u128_u256_to_u32_f);
+                builder.i32_const(IU256::HEAP_SIZE).call_runtime_function(
+                    compilation_ctx,
+                    downcast_u128_u256_to_u32_f,
+                    &RuntimeFunction::DowncastU128U256ToU32,
+                );
             }
             t => return Err(IntermediateTypeError::InvalidCast(t.clone())),
         }
@@ -349,7 +369,11 @@ impl IU16 {
             Some(compilation_ctx),
             Some(runtime_error_data),
         )?;
-        builder.i32_const(Self::MAX_VALUE).call(check_overflow_f);
+        builder.i32_const(Self::MAX_VALUE).call_runtime_function(
+            compilation_ctx,
+            check_overflow_f,
+            &RuntimeFunction::CheckOverflowU8U16,
+        );
 
         Ok(())
     }
@@ -366,7 +390,11 @@ impl IU16 {
             Some(compilation_ctx),
             Some(runtime_error_data),
         )?;
-        builder.i32_const(15).call(check_overflow_f);
+        builder.i32_const(15).call_runtime_function(
+            compilation_ctx,
+            check_overflow_f,
+            &RuntimeFunction::CheckOverflowU8U16,
+        );
 
         builder.binop(BinaryOp::I32Shl);
         // Mask the bytes outside the u16 range
@@ -387,7 +415,11 @@ impl IU16 {
             Some(compilation_ctx),
             Some(runtime_error_data),
         )?;
-        builder.i32_const(15).call(check_overflow_f);
+        builder.i32_const(15).call_runtime_function(
+            compilation_ctx,
+            check_overflow_f,
+            &RuntimeFunction::CheckOverflowU8U16,
+        );
 
         builder.binop(BinaryOp::I32ShrU);
 
@@ -484,7 +516,11 @@ impl IU32 {
                     Some(compilation_ctx),
                     Some(runtime_error_data),
                 )?;
-                builder.call(downcast_u64_to_u32_f);
+                builder.call_runtime_function(
+                    compilation_ctx,
+                    downcast_u64_to_u32_f,
+                    &RuntimeFunction::DowncastU64ToU32,
+                );
             }
             IntermediateType::IU128 => {
                 let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32.get(
@@ -492,9 +528,11 @@ impl IU32 {
                     Some(compilation_ctx),
                     Some(runtime_error_data),
                 )?;
-                builder
-                    .i32_const(IU128::HEAP_SIZE)
-                    .call(downcast_u128_u256_to_u32_f);
+                builder.i32_const(IU128::HEAP_SIZE).call_runtime_function(
+                    compilation_ctx,
+                    downcast_u128_u256_to_u32_f,
+                    &RuntimeFunction::DowncastU128U256ToU32,
+                );
             }
             IntermediateType::IU256 => {
                 let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32.get(
@@ -502,9 +540,11 @@ impl IU32 {
                     Some(compilation_ctx),
                     Some(runtime_error_data),
                 )?;
-                builder
-                    .i32_const(IU256::HEAP_SIZE)
-                    .call(downcast_u128_u256_to_u32_f);
+                builder.i32_const(IU256::HEAP_SIZE).call_runtime_function(
+                    compilation_ctx,
+                    downcast_u128_u256_to_u32_f,
+                    &RuntimeFunction::DowncastU128U256ToU32,
+                );
             }
             t => return Err(IntermediateTypeError::InvalidCast(t.clone())),
         }
@@ -524,7 +564,11 @@ impl IU32 {
             Some(compilation_ctx),
             Some(runtime_error_data),
         )?;
-        builder.i32_const(31).call(check_overflow_f);
+        builder.i32_const(31).call_runtime_function(
+            compilation_ctx,
+            check_overflow_f,
+            &RuntimeFunction::CheckOverflowU8U16,
+        );
 
         builder.binop(BinaryOp::I32Shl);
 
@@ -543,7 +587,11 @@ impl IU32 {
             Some(compilation_ctx),
             Some(runtime_error_data),
         )?;
-        builder.i32_const(31).call(check_overflow_f);
+        builder.i32_const(31).call_runtime_function(
+            compilation_ctx,
+            check_overflow_f,
+            &RuntimeFunction::CheckOverflowU8U16,
+        );
 
         builder.binop(BinaryOp::I32ShrU);
 
@@ -573,7 +621,7 @@ impl IU64 {
     ) -> Result<(), IntermediateTypeError> {
         let add_function_id =
             RuntimeFunction::AddU64.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
-        builder.call(add_function_id);
+        builder.call_runtime_function(compilation_ctx, add_function_id, &RuntimeFunction::AddU64);
         Ok(())
     }
 
@@ -641,9 +689,11 @@ impl IU64 {
                     Some(compilation_ctx),
                     Some(runtime_error_data),
                 )?;
-                builder
-                    .i32_const(IU128::HEAP_SIZE)
-                    .call(downcast_u128_u256_to_u64_f);
+                builder.i32_const(IU128::HEAP_SIZE).call_runtime_function(
+                    compilation_ctx,
+                    downcast_u128_u256_to_u64_f,
+                    &RuntimeFunction::DowncastU128U256ToU64,
+                );
             }
             IntermediateType::IU256 => {
                 let downcast_u128_u256_to_u64_f = RuntimeFunction::DowncastU128U256ToU64.get(
@@ -651,9 +701,11 @@ impl IU64 {
                     Some(compilation_ctx),
                     Some(runtime_error_data),
                 )?;
-                builder
-                    .i32_const(IU256::HEAP_SIZE)
-                    .call(downcast_u128_u256_to_u64_f);
+                builder.i32_const(IU256::HEAP_SIZE).call_runtime_function(
+                    compilation_ctx,
+                    downcast_u128_u256_to_u64_f,
+                    &RuntimeFunction::DowncastU128U256ToU64,
+                );
             }
             t => return Err(IntermediateTypeError::InvalidCast(t.clone())),
         }
@@ -672,7 +724,11 @@ impl IU64 {
             Some(compilation_ctx),
             Some(runtime_error_data),
         )?;
-        builder.i32_const(63).call(check_overflow_f);
+        builder.i32_const(63).call_runtime_function(
+            compilation_ctx,
+            check_overflow_f,
+            &RuntimeFunction::CheckOverflowU8U16,
+        );
 
         builder.unop(UnaryOp::I64ExtendUI32);
         builder.binop(BinaryOp::I64Shl);
@@ -691,7 +747,11 @@ impl IU64 {
             Some(compilation_ctx),
             Some(runtime_error_data),
         )?;
-        builder.i32_const(63).call(check_overflow_f);
+        builder.i32_const(63).call_runtime_function(
+            compilation_ctx,
+            check_overflow_f,
+            &RuntimeFunction::CheckOverflowU8U16,
+        );
 
         builder.unop(UnaryOp::I64ExtendUI32);
         builder.binop(BinaryOp::I64ShrU);

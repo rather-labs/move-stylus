@@ -2,6 +2,7 @@ use alloy_sol_types::{SolType, sol_data};
 
 use walrus::{
     InstrSeqBuilder, LocalId, Module, ValType,
+    ir::InstrSeqId,
     ir::{BinaryOp, LoadKind, MemArg},
 };
 
@@ -12,6 +13,7 @@ use crate::{
     runtime::RuntimeFunction,
     translation::intermediate_types::IntermediateType,
     vm_handled_types::{VmHandledType, string::String_},
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 
 pub trait Packable {
@@ -32,6 +34,7 @@ pub trait Packable {
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
         runtime_error_data: Option<&mut RuntimeErrorData>,
+        return_block_id: Option<InstrSeqId>,
     ) -> Result<(), AbiError>;
 
     /// Adds the instructions to pack the value into memory according to Solidity's ABI encoding.
@@ -61,6 +64,7 @@ pub trait Packable {
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
         runtime_error_data: Option<&mut RuntimeErrorData>,
+        return_block_id: Option<InstrSeqId>,
     ) -> Result<(), AbiError>;
 
     /// Adds the instructions to load the value into a local variable.
@@ -101,6 +105,7 @@ pub trait Packable {
 /// Returns a pointer to the memory holding the return data and the length of the encoded data.
 pub fn build_pack_instructions<T: Packable>(
     builder: &mut InstrSeqBuilder,
+    return_block_id: Option<InstrSeqId>,
     function_return_signature: &[T],
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -159,6 +164,7 @@ pub fn build_pack_instructions<T: Packable>(
                 calldata_reference_pointer,
                 compilation_ctx,
                 Some(runtime_error_data),
+                return_block_id,
             )?;
 
             // A dynamic value will only save the offset to where the values are located, so, we
@@ -177,6 +183,7 @@ pub fn build_pack_instructions<T: Packable>(
                 calldata_reference_pointer,
                 compilation_ctx,
                 Some(runtime_error_data),
+                return_block_id,
             )?;
 
             builder
@@ -219,6 +226,7 @@ impl Packable for IntermediateType {
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
         runtime_error_data: Option<&mut RuntimeErrorData>,
+        return_block_id: Option<InstrSeqId>,
     ) -> Result<(), AbiError> {
         match self {
             IntermediateType::IBool
@@ -275,7 +283,11 @@ impl Packable for IntermediateType {
                     .local_get(local)
                     .local_get(writer_pointer)
                     .local_get(calldata_reference_pointer)
-                    .call(pack_vector_function);
+                    .call_runtime_function(
+                        compilation_ctx,
+                        pack_vector_function,
+                        &RuntimeFunction::PackVector,
+                    );
             }
             IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
                 let pack_reference_function = RuntimeFunction::PackReference.get_generic(
@@ -287,8 +299,15 @@ impl Packable for IntermediateType {
                 builder
                     .local_get(local)
                     .local_get(writer_pointer)
-                    .local_get(calldata_reference_pointer)
-                    .call(pack_reference_function);
+                    .local_get(calldata_reference_pointer);
+
+                call_pack_or_runtime_function(
+                    builder,
+                    compilation_ctx,
+                    pack_reference_function,
+                    &RuntimeFunction::PackReference,
+                    return_block_id,
+                );
             }
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
                 let pack_struct_function = RuntimeFunction::PackStruct.get_generic(
@@ -302,8 +321,15 @@ impl Packable for IntermediateType {
                     .local_get(local)
                     .local_get(writer_pointer)
                     .local_get(calldata_reference_pointer)
-                    .i32_const(0) // is_nested = false
-                    .call(pack_struct_function);
+                    .i32_const(0); // is_nested = false
+
+                call_pack_or_runtime_function(
+                    builder,
+                    compilation_ctx,
+                    pack_struct_function,
+                    &RuntimeFunction::PackStruct,
+                    return_block_id,
+                );
             }
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
                 let enum_ = compilation_ctx.get_enum_by_intermediate_type(self)?;
@@ -314,10 +340,15 @@ impl Packable for IntermediateType {
                 }
                 let pack_enum_function =
                     RuntimeFunction::PackEnum.get(module, Some(compilation_ctx), None)?;
-                builder
-                    .local_get(local)
-                    .local_get(writer_pointer)
-                    .call(pack_enum_function);
+                builder.local_get(local).local_get(writer_pointer);
+
+                call_pack_or_runtime_function(
+                    builder,
+                    compilation_ctx,
+                    pack_enum_function,
+                    &RuntimeFunction::PackEnum,
+                    return_block_id,
+                );
             }
             IntermediateType::ISigner => {
                 return Err(AbiError::Pack(AbiOperationError::FoundSignerType))?;
@@ -341,6 +372,7 @@ impl Packable for IntermediateType {
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
         runtime_error_data: Option<&mut RuntimeErrorData>,
+        return_block_id: Option<InstrSeqId>,
     ) -> Result<(), AbiError> {
         match self {
             IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
@@ -366,6 +398,7 @@ impl Packable for IntermediateType {
                     calldata_reference_pointer,
                     compilation_ctx,
                     runtime_error_data,
+                    return_block_id,
                 )?;
             }
             IntermediateType::IStruct {
@@ -391,8 +424,15 @@ impl Packable for IntermediateType {
                     .local_get(local)
                     .local_get(writer_pointer)
                     .local_get(calldata_reference_pointer)
-                    .i32_const(1) // is_nested = true
-                    .call(pack_struct_function);
+                    .i32_const(1); // is_nested = true
+
+                call_pack_or_runtime_function(
+                    builder,
+                    compilation_ctx,
+                    pack_struct_function,
+                    &RuntimeFunction::PackStruct,
+                    return_block_id,
+                );
             }
             _ => self.add_pack_instructions(
                 builder,
@@ -402,6 +442,7 @@ impl Packable for IntermediateType {
                 calldata_reference_pointer,
                 compilation_ctx,
                 runtime_error_data,
+                return_block_id,
             )?,
         }
         Ok(())
@@ -490,6 +531,21 @@ impl Packable for IntermediateType {
     }
 }
 
+/// Helper function to conditionally call either `call_pack_function` or `call_runtime_function`
+/// based on whether a return block ID is provided.
+fn call_pack_or_runtime_function(
+    builder: &mut InstrSeqBuilder,
+    compilation_ctx: &CompilationContext,
+    function_id: walrus::FunctionId,
+    runtime_fn: &RuntimeFunction,
+    return_block_id: Option<InstrSeqId>,
+) {
+    if let Some(return_block_id) = return_block_id {
+        builder.call_pack_function(compilation_ctx, function_id, runtime_fn, return_block_id);
+    } else {
+        builder.call_runtime_function(compilation_ctx, function_id, runtime_fn);
+    }
+}
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -556,6 +612,7 @@ mod tests {
 
         let (data_start, data_end) = build_pack_instructions(
             &mut func_body,
+            None,
             &[
                 IntermediateType::IBool,
                 IntermediateType::IU16,
@@ -622,6 +679,7 @@ mod tests {
 
         let (data_start, data_end) = build_pack_instructions(
             &mut func_body,
+            None,
             &[
                 IntermediateType::IBool,
                 IntermediateType::IU16,
@@ -715,6 +773,7 @@ mod tests {
 
         let (data_start, data_end) = build_pack_instructions(
             &mut func_body,
+            None,
             &[
                 IntermediateType::IU16,
                 IntermediateType::IVector(Arc::new(IntermediateType::IVector(Arc::new(
