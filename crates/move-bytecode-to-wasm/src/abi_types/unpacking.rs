@@ -154,8 +154,7 @@ impl Unpackable for IntermediateType {
                     .local_get(reader_pointer)
                     .local_get(calldata_base_pointer);
 
-                call_unpack_or_runtime_function(
-                    builder,
+                builder.call_runtime_function_conditional_return(
                     compilation_ctx,
                     unpack_vector_fn,
                     &RuntimeFunction::UnpackVector,
@@ -198,8 +197,7 @@ impl Unpackable for IntermediateType {
                             .local_get(reader_pointer)
                             .local_get(calldata_base_pointer);
 
-                        call_unpack_or_runtime_function(
-                            builder,
+                        builder.call_runtime_function_conditional_return(
                             compilation_ctx,
                             unpack_reference_function,
                             &RuntimeFunction::UnpackReference,
@@ -260,8 +258,7 @@ impl Unpackable for IntermediateType {
                         .get_generic(module, compilation_ctx, runtime_error_data, &[self])?;
 
                     // Unpack the storage struct
-                    call_unpack_or_runtime_function(
-                        builder,
+                    builder.call_runtime_function_conditional_return(
                         compilation_ctx,
                         unpack_storage_struct_function,
                         &RuntimeFunction::UnpackStorageStruct,
@@ -279,8 +276,7 @@ impl Unpackable for IntermediateType {
                         .local_get(reader_pointer)
                         .local_get(calldata_base_pointer);
 
-                    call_unpack_or_runtime_function(
-                        builder,
+                    builder.call_runtime_function_conditional_return(
                         compilation_ctx,
                         unpack_struct_function,
                         &RuntimeFunction::UnpackStruct,
@@ -375,21 +371,6 @@ fn load_struct_storage_id(
     Ok(())
 }
 
-/// Helper function to conditionally call either `call_unpack_function` or `call_runtime_function`
-/// based on whether a return block ID is provided.
-fn call_unpack_or_runtime_function(
-    builder: &mut InstrSeqBuilder,
-    compilation_ctx: &CompilationContext,
-    function_id: walrus::FunctionId,
-    runtime_fn: &RuntimeFunction,
-    return_block_id: Option<InstrSeqId>,
-) {
-    if let Some(return_block_id) = return_block_id {
-        builder.call_unpack_function(compilation_ctx, function_id, runtime_fn, return_block_id);
-    } else {
-        builder.call_runtime_function(compilation_ctx, function_id, runtime_fn);
-    }
-}
 #[cfg(test)]
 mod tests {
     use alloy_sol_types::{SolType, sol};

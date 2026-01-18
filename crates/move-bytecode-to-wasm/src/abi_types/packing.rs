@@ -301,8 +301,7 @@ impl Packable for IntermediateType {
                     .local_get(writer_pointer)
                     .local_get(calldata_reference_pointer);
 
-                call_pack_or_runtime_function(
-                    builder,
+                builder.call_runtime_function_conditional_return(
                     compilation_ctx,
                     pack_reference_function,
                     &RuntimeFunction::PackReference,
@@ -323,8 +322,7 @@ impl Packable for IntermediateType {
                     .local_get(calldata_reference_pointer)
                     .i32_const(0); // is_nested = false
 
-                call_pack_or_runtime_function(
-                    builder,
+                builder.call_runtime_function_conditional_return(
                     compilation_ctx,
                     pack_struct_function,
                     &RuntimeFunction::PackStruct,
@@ -342,8 +340,7 @@ impl Packable for IntermediateType {
                     RuntimeFunction::PackEnum.get(module, Some(compilation_ctx), None)?;
                 builder.local_get(local).local_get(writer_pointer);
 
-                call_pack_or_runtime_function(
-                    builder,
+                builder.call_runtime_function_conditional_return(
                     compilation_ctx,
                     pack_enum_function,
                     &RuntimeFunction::PackEnum,
@@ -426,8 +423,7 @@ impl Packable for IntermediateType {
                     .local_get(calldata_reference_pointer)
                     .i32_const(1); // is_nested = true
 
-                call_pack_or_runtime_function(
-                    builder,
+                builder.call_runtime_function_conditional_return(
                     compilation_ctx,
                     pack_struct_function,
                     &RuntimeFunction::PackStruct,
@@ -531,21 +527,6 @@ impl Packable for IntermediateType {
     }
 }
 
-/// Helper function to conditionally call either `call_pack_function` or `call_runtime_function`
-/// based on whether a return block ID is provided.
-fn call_pack_or_runtime_function(
-    builder: &mut InstrSeqBuilder,
-    compilation_ctx: &CompilationContext,
-    function_id: walrus::FunctionId,
-    runtime_fn: &RuntimeFunction,
-    return_block_id: Option<InstrSeqId>,
-) {
-    if let Some(return_block_id) = return_block_id {
-        builder.call_pack_function(compilation_ctx, function_id, runtime_fn, return_block_id);
-    } else {
-        builder.call_runtime_function(compilation_ctx, function_id, runtime_fn);
-    }
-}
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;

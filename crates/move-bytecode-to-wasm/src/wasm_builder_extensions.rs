@@ -90,7 +90,7 @@ pub trait WasmBuilderExtension {
     /// Leaves in the stack the current position of the linear memory.
     fn get_memory_curret_position(&mut self, compilation_ctx: &CompilationContext) -> &mut Self;
 
-    /// Calls a function and handles the error.
+    /// Calls a function and propagates the error in case the function aborts.
     fn call_native_function(
         &mut self,
         compilation_ctx: &CompilationContext,
@@ -99,6 +99,7 @@ pub trait WasmBuilderExtension {
         function_id: FunctionId,
     ) -> &mut Self;
 
+    // Calls a runtime function and propagates the error in case the function aborts.
     fn call_runtime_function(
         &mut self,
         compilation_ctx: &CompilationContext,
@@ -106,20 +107,13 @@ pub trait WasmBuilderExtension {
         runtime_fn: &RuntimeFunction,
     ) -> &mut Self;
 
-    fn call_unpack_function(
+    // Call a runtime function conditionally returning or branching to `return_block_id`
+    fn call_runtime_function_conditional_return(
         &mut self,
         compilation_ctx: &CompilationContext,
         function_id: FunctionId,
         runtime_fn: &RuntimeFunction,
-        return_block_id: InstrSeqId,
-    ) -> &mut Self;
-
-    fn call_pack_function(
-        &mut self,
-        compilation_ctx: &CompilationContext,
-        function_id: FunctionId,
-        runtime_fn: &RuntimeFunction,
-        return_block_id: InstrSeqId,
+        return_block_id: Option<InstrSeqId>,
     ) -> &mut Self;
 
     /// Adds the instructions to store the error message pointer at DATA_ABORT_MESSAGE_PTR_OFFSET and return 1 to indicate an error occurred.
@@ -136,15 +130,10 @@ pub trait WasmBuilderExtension {
     ) -> &mut Self;
 
     /// Adds the instructions to propagate the error by returning if the error message pointer at DATA_ABORT_MESSAGE_PTR_OFFSET is not null.
-    fn add_propagate_error_with_return_instructions(
+    fn add_propagate_error_instructions(
         &mut self,
         compilation_ctx: &CompilationContext,
-    ) -> &mut Self;
-
-    fn add_propagate_error_with_branch_instructions(
-        &mut self,
-        compilation_ctx: &CompilationContext,
-        return_block: InstrSeqId,
+        return_block_id: Option<InstrSeqId>,
     ) -> &mut Self;
 
     /// Adds the instructions to handle a specific runtime error.
@@ -280,7 +269,7 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
 
         // If the function may result in a runtime error, we need to handle it
         if NativeFunction::can_abort(function_name, module_id) {
-            self.add_propagate_error_with_return_instructions(compilation_ctx);
+            self.add_propagate_error_instructions(compilation_ctx, None);
         }
 
         self
@@ -296,51 +285,34 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
 
         // If the function may result in a runtime error, we need to handle it
         if runtime_fn.can_abort() {
-            self.add_propagate_error_with_return_instructions(compilation_ctx);
+            self.add_propagate_error_instructions(compilation_ctx, None);
         }
 
         self
     }
 
-    fn call_unpack_function(
+    fn call_runtime_function_conditional_return(
         &mut self,
         compilation_ctx: &CompilationContext,
         function_id: FunctionId,
         runtime_fn: &RuntimeFunction,
-        return_block_id: InstrSeqId,
+        return_block_id: Option<InstrSeqId>,
     ) -> &mut Self {
         self.call(function_id);
 
         // If the function may result in a runtime error, we need to handle it
         if runtime_fn.can_abort() {
             // If the function aborts, propagate the error
-            self.add_propagate_error_with_branch_instructions(compilation_ctx, return_block_id);
+            self.add_propagate_error_instructions(compilation_ctx, return_block_id);
         }
 
         self
     }
 
-    fn call_pack_function(
+    fn add_propagate_error_instructions(
         &mut self,
         compilation_ctx: &CompilationContext,
-        function_id: FunctionId,
-        runtime_fn: &RuntimeFunction,
-        return_block_id: InstrSeqId,
-    ) -> &mut Self {
-        self.call(function_id);
-
-        // If the function may result in a runtime error, we need to handle it
-        if runtime_fn.can_abort() {
-            // If the function aborts, propagate the error
-            self.add_propagate_error_with_branch_instructions(compilation_ctx, return_block_id);
-        }
-
-        self
-    }
-
-    fn add_propagate_error_with_return_instructions(
-        &mut self,
-        compilation_ctx: &CompilationContext,
+        return_block_id: Option<InstrSeqId>,
     ) -> &mut Self {
         // If the function aborts, propagate the error
         self.block(None, |b| {
@@ -357,36 +329,15 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
                 .i32_const(0)
                 .binop(BinaryOp::I32Eq)
                 .br_if(block_id);
+
+            b.i32_const(0xBADF00D);
 
             // TODO: if calling from a runtime fn, this could be an u64
-            b.i32_const(0xBADF00D).return_();
-        });
-
-        self
-    }
-
-    fn add_propagate_error_with_branch_instructions(
-        &mut self,
-        compilation_ctx: &CompilationContext,
-        return_block: InstrSeqId,
-    ) -> &mut Self {
-        // If the function aborts, propagate the error
-        self.block(None, |b| {
-            let block_id = b.id();
-            b.i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)
-                .load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                )
-                .i32_const(0)
-                .binop(BinaryOp::I32Eq)
-                .br_if(block_id);
-
-            b.i32_const(0xBADF00D).br(return_block);
+            if let Some(return_block_id) = return_block_id {
+                b.br(return_block_id);
+            } else {
+                b.return_();
+            }
         });
 
         self

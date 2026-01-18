@@ -3039,7 +3039,7 @@ fn call_indirect(
         .i32_const(function_entry.index)
         .call_indirect(function_entry.type_id, wasm_table_id);
 
-    builder.add_propagate_error_with_return_instructions(compilation_ctx);
+    builder.add_propagate_error_instructions(compilation_ctx, None);
 
     add_unpack_function_return_values_instructions(
         builder,
