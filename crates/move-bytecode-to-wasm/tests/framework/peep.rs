@@ -138,6 +138,6 @@ fn test_peep(#[with("peep", "tests/framework/move_sources/peep.move")] runtime: 
     let err = runtime.obtain_uid().unwrap_err();
     assert_eq!(
         err.to_string(),
-        "No NewUID(address) event currently available"
+        "No NewUID(bytes32) event currently available"
     );
 }
