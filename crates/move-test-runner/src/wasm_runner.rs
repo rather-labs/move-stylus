@@ -796,15 +796,15 @@ impl RuntimeSandbox {
                         topic
                     ));
                 }
-                if *keccak256(b"NewUID(address)").as_slice() != data[..32] {
+                if *keccak256(b"NewUID(bytes32)").as_slice() != data[..32] {
                     return Err(anyhow::anyhow!(
-                        "Unexpected event: first 32 bytes do not match NewUID(address) event signature"
+                        "Unexpected event: first 32 bytes do not match NewUID(bytes32) event signature"
                     ));
                 }
                 Ok(FixedBytes::<32>::from_slice(&data[32..]))
             }
             Err(TryRecvError::Empty) => Err(anyhow::anyhow!(
-                "No NewUID(address) event currently available"
+                "No NewUID(bytes32) event currently available"
             )),
             Err(TryRecvError::Disconnected) => {
                 Err(anyhow::anyhow!("Log event channel is disconnected"))

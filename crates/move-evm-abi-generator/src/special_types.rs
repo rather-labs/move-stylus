@@ -12,6 +12,12 @@ pub fn is_named_id(identifier: &str, module_id: &ModuleId) -> bool {
         && module_id.address == STYLUS_FRAMEWORK_ADDRESS
 }
 
+pub fn is_id(identifier: &str, module_id: &ModuleId) -> bool {
+    "ID" == identifier
+        && module_id.module_name.as_str() == SF_MODULE_NAME_OBJECT
+        && module_id.address == STYLUS_FRAMEWORK_ADDRESS
+}
+
 pub fn is_uid(identifier: &str, module_id: &ModuleId) -> bool {
     "UID" == identifier
         && module_id.module_name.as_str() == SF_MODULE_NAME_OBJECT
