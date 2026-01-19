@@ -17,7 +17,7 @@ use crate::{
         IntermediateType,
         structs::{IStruct, IStructType},
     },
-    vm_handled_types::{VmHandledType, string::String_},
+    vm_handled_types::{VmHandledType, id::Id, string::String_},
     wasm_builder_extensions::WasmBuilderExtension,
 };
 
@@ -76,7 +76,7 @@ pub fn add_emit_log_fn(
     let local_64 = module.locals.add(ValType::I64);
     let abi_encoded_data_length = module.locals.add(ValType::I32);
 
-    // Before encoding the event, abi encode complex fields such as structs, vectors and strings,
+    // Before encoding the event, encode complex fields such as structs, vectors and strings,
     // then, if those fields are dynamic, we just put the keccak256 in the corresponding topic,
     // otherwise, we copy the whole encoding
     let mut event_fields_encoded_data = Vec::new();
@@ -313,6 +313,39 @@ pub fn add_emit_log_fn(
                     .local_set(calldata_reference_pointer);
 
                 field.add_pack_instructions(
+                    &mut builder,
+                    module,
+                    local,
+                    writer_pointer,
+                    calldata_reference_pointer,
+                    compilation_ctx,
+                    Some(runtime_error_data),
+                )?;
+            }
+
+            IntermediateType::IStruct {
+                module_id, index, ..
+            } if Id::is_vm_type(module_id, *index, compilation_ctx)? => {
+                builder
+                    .i32_const(32)
+                    .call(compilation_ctx.allocator)
+                    .local_tee(writer_pointer)
+                    .local_set(calldata_reference_pointer);
+
+                // Load the pointer to the address
+                builder
+                    .local_get(local)
+                    .load(
+                        compilation_ctx.memory_id,
+                        field.load_kind()?,
+                        MemArg {
+                            offset: 0,
+                            align: 0,
+                        },
+                    )
+                    .local_set(local);
+
+                IntermediateType::IAddress.add_pack_instructions(
                     &mut builder,
                     module,
                     local,

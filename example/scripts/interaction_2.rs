@@ -18,17 +18,7 @@ sol!(
     #[allow(missing_docs)]
     contract Example {
         #[derive(Debug)]
-        struct ID {
-           bytes32 bytes;
-        }
-
-        #[derive(Debug)]
-        struct UID {
-           ID id;
-        }
-
-        #[derive(Debug)]
-        event NewUID(address indexed uid);
+        event NewUID(bytes32 indexed uid);
 
         #[derive(Debug, PartialEq)]
         event TestEvent1 (
@@ -88,8 +78,8 @@ sol!(
         function echoWithGenericFunctionVec32(uint32[] x) external view returns (uint32[]);
         function echoWithGenericFunctionU16Vec32(uint16 x, uint32[] y) external view returns (uint16, uint32[]);
         function echoWithGenericFunctionAddressVec128(address x, uint128[] y) external view returns (address, uint128[]);
-        function getUniqueIds() external view returns (UID, UID, UID);
-        function getUniqueId() external view returns (UID);
+        function getUniqueIds() external view returns (bytes32, bytes32, bytes32);
+        function getUniqueId() external view returns (bytes32);
         function getFreshObjectAddress() external view returns (address);
         function testStack1() external view returns (Stack, uint64);
         function testStack2() external view returns (Stack, uint64);
