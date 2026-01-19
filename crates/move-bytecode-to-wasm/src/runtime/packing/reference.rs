@@ -155,7 +155,7 @@ mod tests {
     use super::*;
     use crate::{
         test_compilation_context,
-        test_tools::{build_module, setup_wasmtime_module},
+        test_tools::{INITIAL_MEMORY_OFFSET, build_module, setup_wasmtime_module},
         translation::intermediate_types::IntermediateType,
     };
     use alloy_primitives::{Address, U256, address};
@@ -171,32 +171,32 @@ mod tests {
     // test_pack_ref_u8
     #[case::u8(
         IntermediateType::IRef(Arc::new(IntermediateType::IU8)),
-        &[4u32.to_le_bytes().as_slice(), 88u8.to_le_bytes().as_slice()].concat(),
+        &[((INITIAL_MEMORY_OFFSET + 4) as u32).to_le_bytes().as_slice(), 88u8.to_le_bytes().as_slice()].concat(),
         &88_i8.abi_encode()
     )]
     // test_pack_ref_u32
     #[case::u32(
         IntermediateType::IRef(Arc::new(IntermediateType::IU32)),
-        &[4u32.to_le_bytes().as_slice(), 88u32.to_le_bytes().as_slice()].concat(),
+        &[((INITIAL_MEMORY_OFFSET + 4) as u32).to_le_bytes().as_slice(), 88u32.to_le_bytes().as_slice()].concat(),
         &88_u32.abi_encode()
     )]
     // test_pack_ref_u64
     #[case::u64(
         IntermediateType::IRef(Arc::new(IntermediateType::IU64)),
-        &[4u32.to_le_bytes().as_slice(), 88u64.to_le_bytes().as_slice()].concat(),
+        &[((INITIAL_MEMORY_OFFSET + 4) as u32).to_le_bytes().as_slice(), 88u64.to_le_bytes().as_slice()].concat(),
         &88_u64.abi_encode()
     )]
     // test_pack_ref_u128
     #[case::u128(
         IntermediateType::IRef(Arc::new(IntermediateType::IU128)),
-        &[4u32.to_le_bytes().as_slice(), 88u128.to_le_bytes().as_slice()].concat(),
+        &[((INITIAL_MEMORY_OFFSET + 4) as u32).to_le_bytes().as_slice(), 88u128.to_le_bytes().as_slice()].concat(),
         &88_u128.abi_encode()
     )]
     // test_pack_ref_address
     #[case::address(
         IntermediateType::IRef(Arc::new(IntermediateType::IAddress)),
         &[
-            4u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 4) as u32).to_le_bytes().as_slice(),
             (address!("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF").abi_encode()).as_slice()
         ].concat(),
         &(address!("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"),).abi_encode()
@@ -205,7 +205,7 @@ mod tests {
     #[case::signer(
         IntermediateType::IRef(Arc::new(IntermediateType::ISigner)),
         &[
-            4u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 4) as u32).to_le_bytes().as_slice(),
             (address!("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF").abi_encode()).as_slice()
         ].concat(),
         &(address!("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"),).abi_encode()
@@ -214,7 +214,7 @@ mod tests {
     #[case::vec_u8(
         IntermediateType::IRef(Arc::new(IntermediateType::IVector(Arc::new(IntermediateType::IU8)))),
         &[
-            4u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 4) as u32).to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
             1u8.to_le_bytes().as_slice(),
@@ -227,7 +227,7 @@ mod tests {
     #[case::vec_u16(
         IntermediateType::IRef(Arc::new(IntermediateType::IVector(Arc::new(IntermediateType::IU16)))),
         &[
-            4u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 4) as u32).to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
             1u16.to_le_bytes().as_slice(),
@@ -240,7 +240,7 @@ mod tests {
     #[case::vec_u32(
         IntermediateType::IRef(Arc::new(IntermediateType::IVector(Arc::new(IntermediateType::IU32)))),
         &[
-            4u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 4) as u32).to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
             1u32.to_le_bytes().as_slice(),
@@ -253,12 +253,12 @@ mod tests {
     #[case::vec_128(
         IntermediateType::IRef(Arc::new(IntermediateType::IVector(Arc::new(IntermediateType::IU128)))),
         &[
-            4u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 4) as u32).to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
-            28u32.to_le_bytes().as_slice(),
-            44u32.to_le_bytes().as_slice(),
-            60u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 28) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 44) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 60) as u32).to_le_bytes().as_slice(),
             0u32.to_le_bytes().as_slice(),
             1u128.to_le_bytes().as_slice(),
             2u128.to_le_bytes().as_slice(),
@@ -270,11 +270,11 @@ mod tests {
     #[case::vec_vec_u32(
         IntermediateType::IRef(Arc::new(IntermediateType::IVector(Arc::new(IntermediateType::IVector(Arc::new(IntermediateType::IU32)))))),
         &[
-            4u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 4) as u32).to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
-            28u32.to_le_bytes().as_slice(),
-            60u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 28) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 60) as u32).to_le_bytes().as_slice(),
             0u32.to_le_bytes().as_slice(),
             0u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
@@ -300,24 +300,24 @@ mod tests {
     #[case::vec_vec_u128(
         IntermediateType::IRef(Arc::new(IntermediateType::IVector(Arc::new(IntermediateType::IVector(Arc::new(IntermediateType::IU128)))))),
         &[
-            4u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 4) as u32).to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
-            20u32.to_le_bytes().as_slice(),
-            88u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 20) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 88) as u32).to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
-            40u32.to_le_bytes().as_slice(),
-            56u32.to_le_bytes().as_slice(),
-            72u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 40) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 56) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 72) as u32).to_le_bytes().as_slice(),
             1u128.to_le_bytes().as_slice(),
             2u128.to_le_bytes().as_slice(),
             3u128.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
-            108u32.to_le_bytes().as_slice(),
-            124u32.to_le_bytes().as_slice(),
-            140u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 108) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 124) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 140) as u32).to_le_bytes().as_slice(),
             4u128.to_le_bytes().as_slice(),
             5u128.to_le_bytes().as_slice(),
             6u128.to_le_bytes().as_slice(),
@@ -470,11 +470,19 @@ mod tests {
             .cloned()
             .for_each(|value: u8| {
                 let data = [
-                    4u32.to_le_bytes().as_slice(),
+                    ((INITIAL_MEMORY_OFFSET + 4) as u32)
+                        .to_le_bytes()
+                        .as_slice(),
                     value.to_le_bytes().as_slice(),
                 ]
                 .concat();
-                memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+                memory
+                    .write(
+                        &mut *store.0.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &data,
+                    )
+                    .unwrap();
 
                 let result_ptr: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
 
@@ -561,11 +569,19 @@ mod tests {
             .cloned()
             .for_each(|value: u32| {
                 let data = [
-                    4u32.to_le_bytes().as_slice(),
+                    ((INITIAL_MEMORY_OFFSET + 4) as u32)
+                        .to_le_bytes()
+                        .as_slice(),
                     value.to_le_bytes().as_slice(),
                 ]
                 .concat();
-                memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+                memory
+                    .write(
+                        &mut *store.0.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &data,
+                    )
+                    .unwrap();
 
                 let result_ptr: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
 
@@ -652,11 +668,19 @@ mod tests {
             .cloned()
             .for_each(|value: u64| {
                 let data = [
-                    4u32.to_le_bytes().as_slice(),
+                    ((INITIAL_MEMORY_OFFSET + 4) as u32)
+                        .to_le_bytes()
+                        .as_slice(),
                     value.to_le_bytes().as_slice(),
                 ]
                 .concat();
-                memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+                memory
+                    .write(
+                        &mut *store.0.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &data,
+                    )
+                    .unwrap();
 
                 let result_ptr: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
 
@@ -743,11 +767,19 @@ mod tests {
             .cloned()
             .for_each(|value: u128| {
                 let data = [
-                    4u32.to_le_bytes().as_slice(),
+                    ((INITIAL_MEMORY_OFFSET + 4) as u32)
+                        .to_le_bytes()
+                        .as_slice(),
                     value.to_le_bytes().as_slice(),
                 ]
                 .concat();
-                memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+                memory
+                    .write(
+                        &mut *store.0.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &data,
+                    )
+                    .unwrap();
 
                 let result_ptr: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
 
@@ -834,8 +866,20 @@ mod tests {
             .cloned()
             .for_each(|bytes: [u8; 32]| {
                 let value = U256::from_le_bytes(bytes);
-                let data = [4u32.to_le_bytes().as_slice(), bytes.as_slice()].concat();
-                memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+                let data = [
+                    ((INITIAL_MEMORY_OFFSET + 4) as u32)
+                        .to_le_bytes()
+                        .as_slice(),
+                    bytes.as_slice(),
+                ]
+                .concat();
+                memory
+                    .write(
+                        &mut *store.0.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &data,
+                    )
+                    .unwrap();
 
                 let result_ptr: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
 
@@ -923,8 +967,20 @@ mod tests {
             .for_each(|bytes: [u8; 20]| {
                 let value = Address::from_slice(&bytes);
                 let addr_data = value.abi_encode();
-                let data = [4u32.to_le_bytes().as_slice(), addr_data.as_slice()].concat();
-                memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+                let data = [
+                    ((INITIAL_MEMORY_OFFSET + 4) as u32)
+                        .to_le_bytes()
+                        .as_slice(),
+                    addr_data.as_slice(),
+                ]
+                .concat();
+                memory
+                    .write(
+                        &mut *store.0.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &data,
+                    )
+                    .unwrap();
 
                 let result_ptr: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
 
@@ -1011,11 +1067,19 @@ mod tests {
             .cloned()
             .for_each(|value: u16| {
                 let data = [
-                    4u32.to_le_bytes().as_slice(),
+                    ((INITIAL_MEMORY_OFFSET + 4) as u32)
+                        .to_le_bytes()
+                        .as_slice(),
                     value.to_le_bytes().as_slice(),
                 ]
                 .concat();
-                memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+                memory
+                    .write(
+                        &mut *store.0.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &data,
+                    )
+                    .unwrap();
 
                 let result_ptr: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
 
@@ -1117,14 +1181,20 @@ mod tests {
 
                 let len = values.len() as u32;
                 let mut data = vec![];
-                data.extend(&4u32.to_le_bytes()); // Pointer to vector
+                data.extend(&((INITIAL_MEMORY_OFFSET + 4) as u32).to_le_bytes()); // Pointer to vector
                 data.extend(&len.to_le_bytes()); // Length
                 data.extend(&len.to_le_bytes()); // Capacity
                 for value in &values {
                     data.push(value.to_le_bytes()[0]);
                 }
 
-                memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+                memory
+                    .write(
+                        &mut *store.0.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &data,
+                    )
+                    .unwrap();
 
                 let result_ptr: i32 = entrypoint
                     .0
@@ -1238,14 +1308,20 @@ mod tests {
             .for_each(|values: &Vec<u16>| {
                 let len = values.len() as u32;
                 let mut data = vec![];
-                data.extend(&4u32.to_le_bytes());
+                data.extend(&((INITIAL_MEMORY_OFFSET + 4) as u32).to_le_bytes());
                 data.extend(&len.to_le_bytes());
                 data.extend(&len.to_le_bytes());
                 for value in values {
                     data.extend(&value.to_le_bytes());
                 }
 
-                memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+                memory
+                    .write(
+                        &mut *store.0.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &data,
+                    )
+                    .unwrap();
 
                 let result_ptr: i32 = entrypoint
                     .0
@@ -1359,14 +1435,20 @@ mod tests {
             .for_each(|values: &Vec<u64>| {
                 let len = values.len() as u32;
                 let mut data = vec![];
-                data.extend(&4u32.to_le_bytes());
+                data.extend(&((INITIAL_MEMORY_OFFSET + 4) as u32).to_le_bytes());
                 data.extend(&len.to_le_bytes());
                 data.extend(&len.to_le_bytes());
                 for value in values {
                     data.extend(&value.to_le_bytes());
                 }
 
-                memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+                memory
+                    .write(
+                        &mut *store.0.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &data,
+                    )
+                    .unwrap();
 
                 let result_ptr: i32 = entrypoint
                     .0
@@ -1480,12 +1562,12 @@ mod tests {
             .for_each(|values: &Vec<u128>| {
                 let len = values.len() as u32;
                 let mut data = vec![];
-                data.extend(&4u32.to_le_bytes()); // Pointer to vector
+                data.extend(&((INITIAL_MEMORY_OFFSET + 4) as u32).to_le_bytes()); // Pointer to vector
                 data.extend(&len.to_le_bytes()); // Length
                 data.extend(&len.to_le_bytes()); // Capacity
 
                 // For u128, we need pointers to heap-allocated values
-                let base_ptr = 12u32 + values.len() as u32 * 4;
+                let base_ptr = (INITIAL_MEMORY_OFFSET + 12) as u32 + values.len() as u32 * 4;
                 for (i, _) in values.iter().enumerate() {
                     let ptr = base_ptr + (i as u32 * 16);
                     data.extend(&ptr.to_le_bytes());
@@ -1496,7 +1578,13 @@ mod tests {
                     data.extend(&value.to_le_bytes());
                 }
 
-                memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+                memory
+                    .write(
+                        &mut *store.0.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &data,
+                    )
+                    .unwrap();
 
                 let result_ptr: i32 = entrypoint
                     .0
@@ -1616,13 +1704,13 @@ mod tests {
                 }
 
                 let mut data = vec![];
-                data.extend(&4u32.to_le_bytes()); // Pointer to outer vector
+                data.extend(&((INITIAL_MEMORY_OFFSET + 4) as u32).to_le_bytes()); // Pointer to outer vector
                 data.extend(&outer_len.to_le_bytes()); // Outer length
                 data.extend(&outer_len.to_le_bytes()); // Outer capacity
 
                 let mut inner_vec_ptrs = vec![];
 
-                let base_ptr = 12u32 + (outer_len * 4);
+                let base_ptr = (INITIAL_MEMORY_OFFSET + 12) as u32 + (outer_len * 4);
                 let mut current_ptr = base_ptr; // After outer vector header and pointers
 
                 // First pass: calculate pointers and add them
@@ -1646,7 +1734,13 @@ mod tests {
                     }
                 }
 
-                memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+                memory
+                    .write(
+                        &mut *store.0.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &data,
+                    )
+                    .unwrap();
 
                 let result_ptr: i32 = entrypoint
                     .0
@@ -1766,13 +1860,13 @@ mod tests {
                 }
 
                 let mut data = vec![];
-                data.extend(&4u32.to_le_bytes()); // Pointer to outer vector
+                data.extend(&((INITIAL_MEMORY_OFFSET + 4) as u32).to_le_bytes()); // Pointer to outer vector
                 data.extend(&outer_len.to_le_bytes()); // Outer length
                 data.extend(&outer_len.to_le_bytes()); // Outer capacity
 
                 let mut inner_vec_ptrs = vec![];
 
-                let base_ptr = 12u32 + (outer_len * 4);
+                let base_ptr = (INITIAL_MEMORY_OFFSET + 12) as u32 + (outer_len * 4);
                 let mut current_ptr = base_ptr; // After outer vector header and pointers
 
                 // First pass: calculate pointers to inner vectors
@@ -1811,7 +1905,13 @@ mod tests {
                     }
                 }
 
-                memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+                memory
+                    .write(
+                        &mut *store.0.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &data,
+                    )
+                    .unwrap();
 
                 let result_ptr: i32 = entrypoint
                     .0

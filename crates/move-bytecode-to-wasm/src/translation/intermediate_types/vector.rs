@@ -272,6 +272,7 @@ mod tests {
     use crate::{
         data::RuntimeErrorData,
         test_compilation_context,
+        test_tools::INITIAL_MEMORY_OFFSET,
         test_tools::{build_module, setup_wasmtime_module},
     };
     use alloy_primitives::U256;
@@ -307,7 +308,6 @@ mod tests {
             setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
 
         let result: i32 = entrypoint.call(&mut store, ()).unwrap();
-        assert_eq!(result, 0);
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let mut result_memory_data = vec![0; expected_result_bytes.len()];
@@ -484,7 +484,13 @@ mod tests {
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let mut result_memory_data = vec![0; expected_result_bytes.len()];
-        memory.read(&mut store, 4, &mut result_memory_data).unwrap();
+        memory
+            .read(
+                &mut store,
+                INITIAL_MEMORY_OFFSET as usize + 4,
+                &mut result_memory_data,
+            )
+            .unwrap();
         assert_eq!(result_memory_data, expected_result_bytes);
     }
 
@@ -670,7 +676,13 @@ mod tests {
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let mut result_memory_data = vec![0; expected_result_bytes.len()];
-        memory.read(&mut store, 4, &mut result_memory_data).unwrap();
+        memory
+            .read(
+                &mut store,
+                INITIAL_MEMORY_OFFSET as usize + 4,
+                &mut result_memory_data,
+            )
+            .unwrap();
         assert_eq!(result_memory_data, expected_result_bytes);
     }
 
@@ -1002,10 +1014,18 @@ mod tests {
             4u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
             // Pointers to memory
-            24u32.to_le_bytes().as_slice(),
-            40u32.to_le_bytes().as_slice(),
-            56u32.to_le_bytes().as_slice(),
-            72u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 24) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 40) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 56) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 72) as u32)
+                .to_le_bytes()
+                .as_slice(),
             // Referenced values
             1u128.to_le_bytes().as_slice(),
             2u128.to_le_bytes().as_slice(),
@@ -1017,10 +1037,18 @@ mod tests {
         let expected_copy_vector = [
             4u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
-            112u32.to_le_bytes().as_slice(),
-            128u32.to_le_bytes().as_slice(),
-            144u32.to_le_bytes().as_slice(),
-            160u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 112) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 128) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 144) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 160) as u32)
+                .to_le_bytes()
+                .as_slice(),
             1u128.to_le_bytes().as_slice(),
             2u128.to_le_bytes().as_slice(),
             3u128.to_le_bytes().as_slice(),
@@ -1031,10 +1059,18 @@ mod tests {
         let expected_pop_bytes = [
             3u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
-            28u32.to_le_bytes().as_slice(),
-            44u32.to_le_bytes().as_slice(),
-            60u32.to_le_bytes().as_slice(),
-            76u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 28) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 44) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 60) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 76) as u32)
+                .to_le_bytes()
+                .as_slice(),
             1u128.to_le_bytes().as_slice(),
             2u128.to_le_bytes().as_slice(),
             3u128.to_le_bytes().as_slice(),
@@ -1046,12 +1082,24 @@ mod tests {
             99u128.to_le_bytes().as_slice(),
             6u32.to_le_bytes().as_slice(),
             8u32.to_le_bytes().as_slice(),
-            148u32.to_le_bytes().as_slice(),
-            164u32.to_le_bytes().as_slice(),
-            180u32.to_le_bytes().as_slice(),
-            196u32.to_le_bytes().as_slice(),
-            92u32.to_le_bytes().as_slice(),
-            92u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 148) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 164) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 180) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 196) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 92) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 92) as u32)
+                .to_le_bytes()
+                .as_slice(),
             0u32.to_le_bytes().as_slice(),
             0u32.to_le_bytes().as_slice(),
             1u128.to_le_bytes().as_slice(),
@@ -1065,10 +1113,18 @@ mod tests {
         let expected_swap_bytes = [
             4u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
-            28u32.to_le_bytes().as_slice(),
-            44u32.to_le_bytes().as_slice(),
-            76u32.to_le_bytes().as_slice(),
-            60u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 28) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 44) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 76) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 60) as u32)
+                .to_le_bytes()
+                .as_slice(),
             1u128.to_le_bytes().as_slice(),
             2u128.to_le_bytes().as_slice(),
             3u128.to_le_bytes().as_slice(),
@@ -1077,7 +1133,12 @@ mod tests {
         .concat();
         test_vector(&data, IntermediateType::IU128, &expected_bytes);
         test_vector_copy(&data, IntermediateType::IU128, &expected_copy_vector);
-        test_vector_pop_back(&data, IntermediateType::IU128, &expected_pop_bytes, 76);
+        test_vector_pop_back(
+            &data,
+            IntermediateType::IU128,
+            &expected_pop_bytes,
+            INITIAL_MEMORY_OFFSET + 76,
+        );
         test_vector_swap(&data, IntermediateType::IU128, &expected_swap_bytes, 2, 3);
         test_vector_push_back(
             &data,
@@ -1100,8 +1161,12 @@ mod tests {
             2u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
             // Pointers to memory
-            16u32.to_le_bytes().as_slice(),
-            48u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 16) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 48) as u32)
+                .to_le_bytes()
+                .as_slice(),
             // Referenced values
             U256::from(1u128).to_le_bytes::<32>().as_slice(),
             U256::from(2u128).to_le_bytes::<32>().as_slice(),
@@ -1112,8 +1177,12 @@ mod tests {
             2u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
             // Pointers to memory
-            96u32.to_le_bytes().as_slice(),
-            128u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 96) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 128) as u32)
+                .to_le_bytes()
+                .as_slice(),
             // Referenced values
             U256::from(1u128).to_le_bytes::<32>().as_slice(),
             U256::from(2u128).to_le_bytes::<32>().as_slice(),
@@ -1123,8 +1192,12 @@ mod tests {
         let expected_pop_bytes = [
             1u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
-            20u32.to_le_bytes().as_slice(),
-            52u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 20) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 52) as u32)
+                .to_le_bytes()
+                .as_slice(),
             U256::from(1u128).to_le_bytes::<32>().as_slice(),
             U256::from(2u128).to_le_bytes::<32>().as_slice(),
         ]
@@ -1134,10 +1207,18 @@ mod tests {
             U256::from(99u128).to_le_bytes::<32>().as_slice(),
             4u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
-            140u32.to_le_bytes().as_slice(),
-            172u32.to_le_bytes().as_slice(),
-            84u32.to_le_bytes().as_slice(),
-            84u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 140) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 172) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 84) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 84) as u32)
+                .to_le_bytes()
+                .as_slice(),
             U256::from(1u128).to_le_bytes::<32>().as_slice(),
             U256::from(2u128).to_le_bytes::<32>().as_slice(),
         ]
@@ -1147,8 +1228,12 @@ mod tests {
         let expected_swap_bytes = [
             2u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
-            52u32.to_le_bytes().as_slice(),
-            20u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 52) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 20) as u32)
+                .to_le_bytes()
+                .as_slice(),
             U256::from(1u128).to_le_bytes::<32>().as_slice(),
             U256::from(2u128).to_le_bytes::<32>().as_slice(),
         ]
@@ -1156,7 +1241,12 @@ mod tests {
 
         test_vector(&data, IntermediateType::IU256, &expected_bytes);
         test_vector_copy(&data, IntermediateType::IU256, &expected_copy_bytes);
-        test_vector_pop_back(&data, IntermediateType::IU256, &expected_pop_bytes, 52);
+        test_vector_pop_back(
+            &data,
+            IntermediateType::IU256,
+            &expected_pop_bytes,
+            INITIAL_MEMORY_OFFSET + 52,
+        );
         test_vector_swap(&data, IntermediateType::IU256, &expected_swap_bytes, 0, 1);
         test_vector_push_back(
             &data,
@@ -1181,10 +1271,18 @@ mod tests {
             4u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
             // Pointers to memory
-            24u32.to_le_bytes().as_slice(),
-            56u32.to_le_bytes().as_slice(),
-            88u32.to_le_bytes().as_slice(),
-            120u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 24) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 56) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 88) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 120) as u32)
+                .to_le_bytes()
+                .as_slice(),
             // Referenced values
             U256::from(0x1111).to_be_bytes::<32>().as_slice(),
             U256::from(0x2222).to_be_bytes::<32>().as_slice(),
@@ -1197,10 +1295,18 @@ mod tests {
             4u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
             // Pointers to memory
-            176u32.to_le_bytes().as_slice(),
-            208u32.to_le_bytes().as_slice(),
-            240u32.to_le_bytes().as_slice(),
-            272u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 176) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 208) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 240) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 272) as u32)
+                .to_le_bytes()
+                .as_slice(),
             U256::from(0x1111).to_be_bytes::<32>().as_slice(),
             U256::from(0x2222).to_be_bytes::<32>().as_slice(),
             U256::from(0x3333).to_be_bytes::<32>().as_slice(),
@@ -1211,10 +1317,18 @@ mod tests {
             3u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
             // Pointers to memory
-            28u32.to_le_bytes().as_slice(),
-            60u32.to_le_bytes().as_slice(),
-            92u32.to_le_bytes().as_slice(),
-            124u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 28) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 60) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 92) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 124) as u32)
+                .to_le_bytes()
+                .as_slice(),
             // Referenced values
             U256::from(0x1111).to_be_bytes::<32>().as_slice(),
             U256::from(0x2222).to_be_bytes::<32>().as_slice(),
@@ -1228,12 +1342,24 @@ mod tests {
             6u32.to_le_bytes().as_slice(),
             8u32.to_le_bytes().as_slice(),
             // Pointers to memory
-            228u32.to_le_bytes().as_slice(),
-            260u32.to_le_bytes().as_slice(),
-            292u32.to_le_bytes().as_slice(),
-            324u32.to_le_bytes().as_slice(),
-            156u32.to_le_bytes().as_slice(),
-            156u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 228) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 260) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 292) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 324) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 156) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 156) as u32)
+                .to_le_bytes()
+                .as_slice(),
             0u32.to_le_bytes().as_slice(),
             0u32.to_le_bytes().as_slice(),
             U256::from(0x1111).to_be_bytes::<32>().as_slice(),
@@ -1249,10 +1375,18 @@ mod tests {
             4u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
             // Pointers to memory
-            124u32.to_le_bytes().as_slice(),
-            60u32.to_le_bytes().as_slice(),
-            92u32.to_le_bytes().as_slice(),
-            28u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 124) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 60) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 92) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 28) as u32)
+                .to_le_bytes()
+                .as_slice(),
             // Referenced values
             U256::from(0x1111).to_be_bytes::<32>().as_slice(),
             U256::from(0x2222).to_be_bytes::<32>().as_slice(),
@@ -1263,7 +1397,12 @@ mod tests {
 
         test_vector(&data, IntermediateType::IAddress, &expected_load_bytes);
         test_vector_copy(&data, IntermediateType::IAddress, &expected_copy_bytes);
-        test_vector_pop_back(&data, IntermediateType::IAddress, &expected_pop_bytes, 124);
+        test_vector_pop_back(
+            &data,
+            IntermediateType::IAddress,
+            &expected_pop_bytes,
+            INITIAL_MEMORY_OFFSET + 124,
+        );
         test_vector_swap(
             &data,
             IntermediateType::IAddress,
@@ -1307,8 +1446,12 @@ mod tests {
         let expected_load_bytes = [
             2u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
-            16u32.to_le_bytes().as_slice(), // pointer to first vector
-            40u32.to_le_bytes().as_slice(), // pointer to second vector
+            ((INITIAL_MEMORY_OFFSET + 16) as u32)
+                .to_le_bytes()
+                .as_slice(), // pointer to first vector
+            ((INITIAL_MEMORY_OFFSET + 40) as u32)
+                .to_le_bytes()
+                .as_slice(), // pointer to second vector
             [
                 4u32.to_le_bytes().as_slice(),
                 4u32.to_le_bytes().as_slice(),
@@ -1335,8 +1478,12 @@ mod tests {
         let expected_copy_bytes = [
             2u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
-            80u32.to_le_bytes().as_slice(),
-            104u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 80) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 104) as u32)
+                .to_le_bytes()
+                .as_slice(),
             [
                 4u32.to_le_bytes().as_slice(),
                 4u32.to_le_bytes().as_slice(),
@@ -1363,8 +1510,12 @@ mod tests {
         let expected_pop_bytes = [
             1u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
-            20u32.to_le_bytes().as_slice(),
-            44u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 20) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 44) as u32)
+                .to_le_bytes()
+                .as_slice(),
             [
                 4u32.to_le_bytes().as_slice(),
                 4u32.to_le_bytes().as_slice(),
@@ -1401,10 +1552,18 @@ mod tests {
             .as_slice(), // push back element is loaded before the new vector!
             4u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
-            116u32.to_le_bytes().as_slice(),
-            140u32.to_le_bytes().as_slice(),
-            68u32.to_le_bytes().as_slice(),
-            68u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 116) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 140) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 68) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 68) as u32)
+                .to_le_bytes()
+                .as_slice(),
             [
                 4u32.to_le_bytes().as_slice(),
                 4u32.to_le_bytes().as_slice(),
@@ -1440,8 +1599,12 @@ mod tests {
         let expected_swap_bytes = [
             2u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
-            44u32.to_le_bytes().as_slice(),
-            20u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 44) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 20) as u32)
+                .to_le_bytes()
+                .as_slice(),
             [
                 4u32.to_le_bytes().as_slice(),
                 4u32.to_le_bytes().as_slice(),
@@ -1479,7 +1642,7 @@ mod tests {
             &data,
             IntermediateType::IVector(Arc::new(IntermediateType::IU32)),
             &expected_pop_bytes,
-            44,
+            INITIAL_MEMORY_OFFSET + 44,
         );
         test_vector_push_back(
             &data,
@@ -1520,14 +1683,22 @@ mod tests {
         let expected_load_bytes = [
             2u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
-            16u32.to_le_bytes().as_slice(), // pointer to first vector
-            96u32.to_le_bytes().as_slice(), // pointer to second vector
+            ((INITIAL_MEMORY_OFFSET + 16) as u32)
+                .to_le_bytes()
+                .as_slice(), // pointer to first vector
+            ((INITIAL_MEMORY_OFFSET + 96) as u32)
+                .to_le_bytes()
+                .as_slice(), // pointer to second vector
             [
                 2u32.to_le_bytes().as_slice(),
                 2u32.to_le_bytes().as_slice(),
                 // Pointers to memory
-                32u32.to_le_bytes().as_slice(),
-                64u32.to_le_bytes().as_slice(),
+                ((INITIAL_MEMORY_OFFSET + 32) as u32)
+                    .to_le_bytes()
+                    .as_slice(),
+                ((INITIAL_MEMORY_OFFSET + 64) as u32)
+                    .to_le_bytes()
+                    .as_slice(),
                 // Referenced values
                 U256::from(1u128).to_le_bytes::<32>().as_slice(),
                 U256::from(2u128).to_le_bytes::<32>().as_slice(),
@@ -1538,8 +1709,12 @@ mod tests {
                 2u32.to_le_bytes().as_slice(),
                 2u32.to_le_bytes().as_slice(),
                 // Pointers to memory
-                112u32.to_le_bytes().as_slice(),
-                144u32.to_le_bytes().as_slice(),
+                ((INITIAL_MEMORY_OFFSET + 112) as u32)
+                    .to_le_bytes()
+                    .as_slice(),
+                ((INITIAL_MEMORY_OFFSET + 144) as u32)
+                    .to_le_bytes()
+                    .as_slice(),
                 // Referenced values
                 U256::from(3u128).to_le_bytes::<32>().as_slice(),
                 U256::from(4u128).to_le_bytes::<32>().as_slice(),
@@ -1552,14 +1727,22 @@ mod tests {
         let expected_copy_bytes = [
             2u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
-            192u32.to_le_bytes().as_slice(),
-            272u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 192) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 272) as u32)
+                .to_le_bytes()
+                .as_slice(),
             [
                 2u32.to_le_bytes().as_slice(),
                 2u32.to_le_bytes().as_slice(),
                 // Pointers to memory
-                208u32.to_le_bytes().as_slice(),
-                240u32.to_le_bytes().as_slice(),
+                ((INITIAL_MEMORY_OFFSET + 208) as u32)
+                    .to_le_bytes()
+                    .as_slice(),
+                ((INITIAL_MEMORY_OFFSET + 240) as u32)
+                    .to_le_bytes()
+                    .as_slice(),
                 // Referenced values
                 U256::from(1u128).to_le_bytes::<32>().as_slice(),
                 U256::from(2u128).to_le_bytes::<32>().as_slice(),
@@ -1570,8 +1753,12 @@ mod tests {
                 2u32.to_le_bytes().as_slice(),
                 2u32.to_le_bytes().as_slice(),
                 // Pointers to memory
-                288u32.to_le_bytes().as_slice(),
-                320u32.to_le_bytes().as_slice(),
+                ((INITIAL_MEMORY_OFFSET + 288) as u32)
+                    .to_le_bytes()
+                    .as_slice(),
+                ((INITIAL_MEMORY_OFFSET + 320) as u32)
+                    .to_le_bytes()
+                    .as_slice(),
                 //Referenced values
                 U256::from(3u128).to_le_bytes::<32>().as_slice(),
                 U256::from(4u128).to_le_bytes::<32>().as_slice(),
@@ -1584,13 +1771,21 @@ mod tests {
         let expected_pop_bytes = [
             1u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
-            20u32.to_le_bytes().as_slice(),
-            100u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 20) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 100) as u32)
+                .to_le_bytes()
+                .as_slice(),
             [
                 2u32.to_le_bytes().as_slice(),
                 2u32.to_le_bytes().as_slice(),
-                36u32.to_le_bytes().as_slice(),
-                68u32.to_le_bytes().as_slice(),
+                ((INITIAL_MEMORY_OFFSET + 36) as u32)
+                    .to_le_bytes()
+                    .as_slice(),
+                ((INITIAL_MEMORY_OFFSET + 68) as u32)
+                    .to_le_bytes()
+                    .as_slice(),
                 U256::from(1u128).to_le_bytes::<32>().as_slice(),
                 U256::from(2u128).to_le_bytes::<32>().as_slice(),
             ]
@@ -1599,8 +1794,12 @@ mod tests {
             [
                 2u32.to_le_bytes().as_slice(),
                 2u32.to_le_bytes().as_slice(),
-                116u32.to_le_bytes().as_slice(),
-                148u32.to_le_bytes().as_slice(),
+                ((INITIAL_MEMORY_OFFSET + 116) as u32)
+                    .to_le_bytes()
+                    .as_slice(),
+                ((INITIAL_MEMORY_OFFSET + 148) as u32)
+                    .to_le_bytes()
+                    .as_slice(),
                 U256::from(3u128).to_le_bytes::<32>().as_slice(),
                 U256::from(4u128).to_le_bytes::<32>().as_slice(),
             ]
@@ -1614,8 +1813,12 @@ mod tests {
                 2u32.to_le_bytes().as_slice(),
                 2u32.to_le_bytes().as_slice(),
                 // Pointers to memory
-                196u32.to_le_bytes().as_slice(),
-                228u32.to_le_bytes().as_slice(),
+                ((INITIAL_MEMORY_OFFSET + 196) as u32)
+                    .to_le_bytes()
+                    .as_slice(),
+                ((INITIAL_MEMORY_OFFSET + 228) as u32)
+                    .to_le_bytes()
+                    .as_slice(),
                 //Referenced values
                 U256::from(5u128).to_le_bytes::<32>().as_slice(),
                 U256::from(6u128).to_le_bytes::<32>().as_slice(),
@@ -1624,16 +1827,28 @@ mod tests {
             .as_slice(),
             4u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
-            284u32.to_le_bytes().as_slice(),
-            364u32.to_le_bytes().as_slice(),
-            180u32.to_le_bytes().as_slice(),
-            180u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 284) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 364) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 180) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 180) as u32)
+                .to_le_bytes()
+                .as_slice(),
             [
                 2u32.to_le_bytes().as_slice(),
                 2u32.to_le_bytes().as_slice(),
                 // Pointers to memory
-                300u32.to_le_bytes().as_slice(),
-                332u32.to_le_bytes().as_slice(),
+                ((INITIAL_MEMORY_OFFSET + 300) as u32)
+                    .to_le_bytes()
+                    .as_slice(),
+                ((INITIAL_MEMORY_OFFSET + 332) as u32)
+                    .to_le_bytes()
+                    .as_slice(),
                 // Referenced values
                 U256::from(1u128).to_le_bytes::<32>().as_slice(),
                 U256::from(2u128).to_le_bytes::<32>().as_slice(),
@@ -1644,8 +1859,12 @@ mod tests {
                 2u32.to_le_bytes().as_slice(),
                 2u32.to_le_bytes().as_slice(),
                 // Pointers to memory
-                380u32.to_le_bytes().as_slice(),
-                412u32.to_le_bytes().as_slice(),
+                ((INITIAL_MEMORY_OFFSET + 380) as u32)
+                    .to_le_bytes()
+                    .as_slice(),
+                ((INITIAL_MEMORY_OFFSET + 412) as u32)
+                    .to_le_bytes()
+                    .as_slice(),
                 //Referenced values
                 U256::from(3u128).to_le_bytes::<32>().as_slice(),
                 U256::from(4u128).to_le_bytes::<32>().as_slice(),
@@ -1664,13 +1883,21 @@ mod tests {
         let expected_swap_bytes = [
             2u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
-            100u32.to_le_bytes().as_slice(),
-            20u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 100) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 20) as u32)
+                .to_le_bytes()
+                .as_slice(),
             [
                 2u32.to_le_bytes().as_slice(),
                 2u32.to_le_bytes().as_slice(),
-                36u32.to_le_bytes().as_slice(),
-                68u32.to_le_bytes().as_slice(),
+                ((INITIAL_MEMORY_OFFSET + 36) as u32)
+                    .to_le_bytes()
+                    .as_slice(),
+                ((INITIAL_MEMORY_OFFSET + 68) as u32)
+                    .to_le_bytes()
+                    .as_slice(),
                 U256::from(1u128).to_le_bytes::<32>().as_slice(),
                 U256::from(2u128).to_le_bytes::<32>().as_slice(),
             ]
@@ -1679,8 +1906,12 @@ mod tests {
             [
                 2u32.to_le_bytes().as_slice(),
                 2u32.to_le_bytes().as_slice(),
-                116u32.to_le_bytes().as_slice(),
-                148u32.to_le_bytes().as_slice(),
+                ((INITIAL_MEMORY_OFFSET + 116) as u32)
+                    .to_le_bytes()
+                    .as_slice(),
+                ((INITIAL_MEMORY_OFFSET + 148) as u32)
+                    .to_le_bytes()
+                    .as_slice(),
                 U256::from(3u128).to_le_bytes::<32>().as_slice(),
                 U256::from(4u128).to_le_bytes::<32>().as_slice(),
             ]
@@ -1703,7 +1934,7 @@ mod tests {
             &data,
             IntermediateType::IVector(Arc::new(IntermediateType::IU256)),
             &expected_pop_bytes,
-            100,
+            INITIAL_MEMORY_OFFSET + 100,
         );
         test_vector_push_back(
             &data,
@@ -1768,7 +1999,7 @@ mod tests {
             vec![2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         ];
 
-        let expected_result_bytes = vec![2, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0];
+        let expected_result_bytes = vec![2, 0, 0, 0, 2, 0, 0, 0, 208, 7, 0, 0, 224, 7, 0, 0];
 
         test_vector_pack(
             &element_bytes,
@@ -1794,8 +2025,9 @@ mod tests {
             ],
         ];
 
-        let expected_result_bytes =
-            vec![3, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 0, 64, 0, 0, 0];
+        let expected_result_bytes = vec![
+            3, 0, 0, 0, 3, 0, 0, 0, 208, 7, 0, 0, 240, 7, 0, 0, 16, 8, 0, 0,
+        ];
 
         test_vector_pack(
             &element_bytes,
@@ -1811,7 +2043,7 @@ mod tests {
             vec![2, 0, 0, 0, 30, 0, 0, 0, 40, 0, 0, 0],
         ];
 
-        let expected_result_bytes = vec![2, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0];
+        let expected_result_bytes = vec![2, 0, 0, 0, 2, 0, 0, 0, 208, 7, 0, 0, 224, 7, 0, 0];
 
         test_vector_pack(
             &element_bytes,
@@ -1848,7 +2080,7 @@ mod tests {
         ];
 
         let expected_result_bytes = vec![
-            3, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 80, 0, 0, 0, 160, 0, 0, 0,
+            3, 0, 0, 0, 3, 0, 0, 0, 208, 7, 0, 0, 32, 8, 0, 0, 112, 8, 0, 0,
         ];
 
         test_vector_pack(

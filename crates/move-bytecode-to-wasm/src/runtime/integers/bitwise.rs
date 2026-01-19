@@ -730,7 +730,9 @@ mod tests {
                 let mut store = store.borrow_mut();
 
                 let data = n.to_le_bytes();
-                memory.write(&mut *store, 0, &data).unwrap();
+                memory
+                    .write(&mut *store, INITIAL_MEMORY_OFFSET as usize, &data)
+                    .unwrap();
 
                 let result: Result<i32, _> =
                     entrypoint.call(&mut *store, (shift as i32, TYPE_HEAP_SIZE));
@@ -942,7 +944,9 @@ mod tests {
             |&(n, shift): &([u8; TYPE_HEAP_SIZE as usize], u16)| {
                 let mut store = store.borrow_mut();
 
-                memory.write(&mut *store, 0, &n).unwrap();
+                memory
+                    .write(&mut *store, INITIAL_MEMORY_OFFSET as usize, &n)
+                    .unwrap();
 
                 let n = U256::from_le_bytes::<32>(n);
 
@@ -1156,7 +1160,9 @@ mod tests {
                 let mut store = store.borrow_mut();
 
                 let data = n.to_le_bytes();
-                memory.write(&mut *store, 0, &data).unwrap();
+                memory
+                    .write(&mut *store, INITIAL_MEMORY_OFFSET as usize, &data)
+                    .unwrap();
 
                 let result: Result<i32, _> =
                     entrypoint.call(&mut *store, (shift as i32, TYPE_HEAP_SIZE));
@@ -1427,7 +1433,7 @@ mod tests {
 
         function_builder
             .func_body()
-            .i32_const(0)
+            .i32_const(INITIAL_MEMORY_OFFSET)
             .local_get(shift_amount)
             .i32_const(heap_size)
             .call(shift_f);

@@ -175,7 +175,7 @@ pub fn setup_module_memory(
 
 #[cfg(test)]
 mod tests {
-    use crate::test_tools::build_module;
+    use crate::test_tools::{INITIAL_MEMORY_OFFSET, build_module};
 
     use super::*;
 
@@ -198,7 +198,7 @@ mod tests {
         let available_memory = instance.get_global(&mut store, "available_memory").unwrap();
 
         let result = allocator.call(&mut store, 2).unwrap();
-        assert_eq!(result, 0);
+        assert_eq!(result, INITIAL_MEMORY_OFFSET);
         assert_eq!(memory_size.size(&mut store), 1);
         assert_eq!(
             available_memory.get(&mut store).i32().unwrap(),
@@ -206,7 +206,7 @@ mod tests {
         );
 
         let result = allocator.call(&mut store, 2).unwrap();
-        assert_eq!(result, 2);
+        assert_eq!(result, INITIAL_MEMORY_OFFSET + 2);
         assert_eq!(memory_size.size(&mut store), 1);
         assert_eq!(
             available_memory.get(&mut store).i32().unwrap(),
@@ -214,12 +214,12 @@ mod tests {
         );
 
         let result = allocator.call(&mut store, MEMORY_PAGE_SIZE - 4).unwrap();
-        assert_eq!(result, 4);
+        assert_eq!(result, INITIAL_MEMORY_OFFSET + 4);
         assert_eq!(memory_size.size(&mut store), 1);
         assert_eq!(available_memory.get(&mut store).i32().unwrap(), 0);
 
         let result = allocator.call(&mut store, 2).unwrap();
-        assert_eq!(result, 65536);
+        assert_eq!(result, INITIAL_MEMORY_OFFSET + 65536);
         assert_eq!(memory_size.size(&mut store), 2);
         assert_eq!(
             available_memory.get(&mut store).i32().unwrap(),

@@ -174,7 +174,7 @@ mod tests {
         abi_types::packing::Packable,
         data::RuntimeErrorData,
         test_compilation_context,
-        test_tools::{build_module, setup_wasmtime_module},
+        test_tools::{INITIAL_MEMORY_OFFSET, build_module, setup_wasmtime_module},
         translation::intermediate_types::IntermediateType,
     };
 
@@ -362,7 +362,13 @@ mod tests {
             .for_each(|value: u128| {
                 // Write value to memory (little-endian)
                 let data = value.to_le_bytes();
-                memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+                memory
+                    .write(
+                        &mut *store.0.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &data,
+                    )
+                    .unwrap();
 
                 let result_ptr: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
 
@@ -452,7 +458,13 @@ mod tests {
                 let value = U256::from_le_bytes(bytes);
 
                 // Write value to memory (little-endian)
-                memory.write(&mut *store.0.borrow_mut(), 0, &bytes).unwrap();
+                memory
+                    .write(
+                        &mut *store.0.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &bytes,
+                    )
+                    .unwrap();
 
                 let result_ptr: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
 
@@ -539,7 +551,13 @@ mod tests {
 
                 // Write value to memory (padded to 32 bytes)
                 let data = value.abi_encode();
-                memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+                memory
+                    .write(
+                        &mut *store.0.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &data,
+                    )
+                    .unwrap();
 
                 let result_ptr: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
 

@@ -19,6 +19,9 @@ pub fn new_module_with_host() -> (Module, FunctionId, MemoryId, CompilationConte
     let config = ModuleConfig::new();
     let mut module = Module::with_config(config);
 
+    #[cfg(feature = "inject-host-debug-fns")]
+    crate::test_tools::inject_debug_fns(&mut module);
+
     let (allocator_function_id, memory_id, compilation_context_globals) =
         setup_module_memory(&mut module, Some(TOTAL_RESERVED_MEMORY));
     let (memory_grow_id, _) = host_functions::add_pay_for_memory_grow(&mut module);
