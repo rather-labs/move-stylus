@@ -1,9 +1,12 @@
 use alloy_primitives::keccak256;
+use alloy_sol_types::{SolType, sol_data::FixedBytes};
 
 use crate::{
     CompilationContext,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
-    vm_handled_types::{VmHandledType, bytes::Bytes, string::String_, tx_context::TxContext},
+    vm_handled_types::{
+        VmHandledType, bytes::Bytes, id::Id, string::String_, tx_context::TxContext,
+    },
 };
 
 use super::error::AbiError;
@@ -70,6 +73,11 @@ fn solidity_name(
             module_id, index, ..
         } if Bytes::is_vm_type(module_id, *index, compilation_ctx)? => {
             argument.sol_name(compilation_ctx)?
+        }
+        IntermediateType::IStruct {
+            module_id, index, ..
+        } if Id::is_vm_type(module_id, *index, compilation_ctx)? => {
+            Some(FixedBytes::<32>::SOL_NAME.to_string())
         }
         IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
             let struct_ = compilation_ctx.get_struct_by_intermediate_type(argument)?;

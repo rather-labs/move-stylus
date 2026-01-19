@@ -41,6 +41,7 @@ pub fn translate_package_cli(
     emit_wat: bool,
     verbose: bool,
     optimize: bool,
+    test_mode: bool,
 ) -> Result<(), Box<CompilationError>> {
     let build_directory = get_build_directory(rerooted_path, package, &install_dir);
 
@@ -50,7 +51,7 @@ pub fn translate_package_cli(
 
     let mut modules_data = HashMap::new();
 
-    let mut modules = translate_package(package, None, &mut modules_data, verbose)?;
+    let mut modules = translate_package(package, None, &mut modules_data, verbose, test_mode)?;
 
     for (module_name, module) in modules.iter_mut() {
         let wasm_file_path = build_directory.join(format!("{module_name}.wasm"));
