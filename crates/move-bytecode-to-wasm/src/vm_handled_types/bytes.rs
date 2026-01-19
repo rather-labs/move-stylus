@@ -56,10 +56,4 @@ impl Bytes {
         }
         false
     }
-
-    pub fn get_bytes_number(identifier: &str) -> Option<u8> {
-        identifier
-            .strip_prefix("Bytes")
-            .and_then(|num_str| num_str.parse::<u8>().ok())
-    }
 }

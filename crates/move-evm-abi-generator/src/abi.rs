@@ -320,37 +320,12 @@ impl Abi {
             let return_type = if function.signature.returns.is_empty() {
                 Type::None
             } else if function.signature.returns.len() == 1 {
-                match &function.signature.returns[0] {
-                    IntermediateType::IEnum { module_id, index } => {
-                        let enum_module = modules_data.get(module_id).unwrap();
-                        let enum_ = enum_module.enums.get_by_index(*index).unwrap();
-                        if enum_.is_simple {
-                            enums_to_process.insert(function.signature.returns[0].clone());
-                        }
-                    }
-                    IntermediateType::IGenericEnumInstance {
-                        module_id,
-                        index,
-                        types,
-                    } => {
-                        let enum_module = modules_data.get(module_id).unwrap();
-                        let enum_ = enum_module.enums.get_by_index(*index).unwrap();
-                        let enum_ = enum_.instantiate(types);
-                        if enum_.is_simple {
-                            enums_to_process.insert(function.signature.returns[0].clone());
-                        }
-                    }
-                    IntermediateType::IStruct { .. }
-                    | IntermediateType::IGenericStructInstance { .. }
-                        if Self::should_process_struct(
-                            &function.signature.returns[0],
-                            modules_data,
-                        ) =>
-                    {
-                        structs_to_process.insert(function.signature.returns[0].clone());
-                    }
-                    _ => {}
-                }
+                Self::process_return_type(
+                    &function.signature.returns[0],
+                    modules_data,
+                    structs_to_process,
+                    enums_to_process,
+                );
 
                 Type::from_intermediate_type(&function.signature.returns[0], modules_data)
             } else {
@@ -358,33 +333,13 @@ impl Abi {
                     .signature
                     .returns
                     .iter()
-                    .inspect(|t| match *t {
-                        IntermediateType::IEnum { module_id, index } => {
-                            let enum_module = modules_data.get(module_id).unwrap();
-                            let enum_ = enum_module.enums.get_by_index(*index).unwrap();
-                            if enum_.is_simple {
-                                enums_to_process.insert((*t).clone());
-                            }
-                        }
-                        IntermediateType::IGenericEnumInstance {
-                            module_id,
-                            index,
-                            types,
-                        } => {
-                            let enum_module = modules_data.get(module_id).unwrap();
-                            let enum_ = enum_module.enums.get_by_index(*index).unwrap();
-                            let enum_ = enum_.instantiate(types);
-                            if enum_.is_simple {
-                                enums_to_process.insert(function.signature.returns[0].clone());
-                            }
-                        }
-                        IntermediateType::IStruct { .. }
-                        | IntermediateType::IGenericStructInstance { .. }
-                            if Self::should_process_struct(t, modules_data) =>
-                        {
-                            structs_to_process.insert((*t).clone());
-                        }
-                        _ => {}
+                    .inspect(|t| {
+                        Self::process_return_type(
+                            t,
+                            modules_data,
+                            structs_to_process,
+                            enums_to_process,
+                        )
                     })
                     .map(|t| Type::from_intermediate_type(t, modules_data))
                     .collect();
@@ -772,15 +727,47 @@ impl Abi {
             _ => false,
         }
     }
-}
-/*
-IntermediateType::IEnum { module_id, index }
-            | IntermediateType::IGenericEnumInstance {
-                module_id, index, ..
+
+    fn process_return_type(
+        itype: &IntermediateType,
+        modules_data: &HashMap<ModuleId, ModuleData>,
+        structs_to_process: &mut HashSet<IntermediateType>,
+        enums_to_process: &mut HashSet<IntermediateType>,
+    ) {
+        match itype {
+            IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
+                Self::process_return_type(
+                    inner.as_ref(),
+                    modules_data,
+                    structs_to_process,
+                    enums_to_process,
+                )
+            }
+            IntermediateType::IEnum { module_id, index } => {
+                let enum_module = modules_data.get(module_id).unwrap();
+                let enum_ = enum_module.enums.get_by_index(*index).unwrap();
+                if enum_.is_simple {
+                    enums_to_process.insert(itype.clone());
+                }
+            }
+            IntermediateType::IGenericEnumInstance {
+                module_id,
+                index,
+                types,
             } => {
                 let enum_module = modules_data.get(module_id).unwrap();
                 let enum_ = enum_module.enums.get_by_index(*index).unwrap();
-
-                enum_.is_simple
+                let enum_ = enum_.instantiate(types);
+                if enum_.is_simple {
+                    enums_to_process.insert(itype.clone());
+                }
             }
-*/
+            IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. }
+                if Self::should_process_struct(itype, modules_data) =>
+            {
+                structs_to_process.insert(itype.clone());
+            }
+            _ => {}
+        }
+    }
+}
