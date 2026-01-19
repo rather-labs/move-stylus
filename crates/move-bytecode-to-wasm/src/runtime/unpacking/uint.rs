@@ -99,7 +99,7 @@ mod tests {
     use crate::{
         abi_types::unpacking::Unpackable,
         test_compilation_context,
-        test_tools::{build_module, setup_wasmtime_module},
+        test_tools::{INITIAL_MEMORY_OFFSET, build_module, setup_wasmtime_module},
         translation::intermediate_types::IntermediateType,
     };
 
@@ -120,7 +120,7 @@ mod tests {
         let args_pointer = raw_module.locals.add(ValType::I32);
 
         let mut func_body = function_builder.func_body();
-        func_body.i32_const(0);
+        func_body.i32_const(INITIAL_MEMORY_OFFSET);
         func_body.local_set(args_pointer);
 
         int_type

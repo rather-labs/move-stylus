@@ -379,7 +379,7 @@ mod tests {
 
     use crate::{
         test_compilation_context,
-        test_tools::{build_module, setup_wasmtime_module},
+        test_tools::{INITIAL_MEMORY_OFFSET, build_module, setup_wasmtime_module},
         utils::display_module,
     };
 
@@ -452,7 +452,9 @@ mod tests {
             Some(linker),
         );
 
-        entrypoint.call(&mut store, (0, data_len)).unwrap();
+        entrypoint
+            .call(&mut store, (INITIAL_MEMORY_OFFSET, data_len))
+            .unwrap();
     }
 
     #[test]
@@ -521,7 +523,9 @@ mod tests {
             "test_function",
             Some(linker),
         );
-        entrypoint.call(&mut store, (0, data_len)).unwrap();
+        entrypoint
+            .call(&mut store, (INITIAL_MEMORY_OFFSET, data_len))
+            .unwrap();
     }
 
     #[test]
@@ -571,7 +575,6 @@ mod tests {
             <sol!((bool, uint16, uint64))>::abi_encode_params(&(true, 1234, 123456789012345));
         // Offset data by 10 bytes
         data = [vec![0; 10], data].concat();
-        println!("data: {data:?}");
         let data_len = data.len() as i32;
 
         // Define validator function
@@ -584,6 +587,8 @@ mod tests {
             "test_function",
             Some(linker),
         );
-        entrypoint.call(&mut store, (10, data_len - 10)).unwrap();
+        entrypoint
+            .call(&mut store, (INITIAL_MEMORY_OFFSET + 10, data_len - 10))
+            .unwrap();
     }
 }

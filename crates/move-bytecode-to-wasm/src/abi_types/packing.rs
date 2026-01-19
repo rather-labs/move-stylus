@@ -538,7 +538,7 @@ mod tests {
 
     use crate::{
         test_compilation_context,
-        test_tools::{build_module, setup_wasmtime_module},
+        test_tools::{INITIAL_MEMORY_OFFSET, build_module, setup_wasmtime_module},
         utils::display_module,
     };
 
@@ -622,7 +622,11 @@ mod tests {
         // Define validator function
         let mut linker = Linker::new(&Engine::default());
         linker
-            .func_wrap("", "validator", get_validator(0, data_len, data))
+            .func_wrap(
+                "",
+                "validator",
+                get_validator(INITIAL_MEMORY_OFFSET as u32, data_len, data),
+            )
             .unwrap();
 
         let (_, _, mut store, entrypoint) = setup_wasmtime_module::<(i32, i32), ()>(
@@ -632,7 +636,9 @@ mod tests {
             Some(linker),
         );
 
-        entrypoint.call(&mut store, (0, data_len)).unwrap();
+        entrypoint
+            .call(&mut store, (INITIAL_MEMORY_OFFSET, data_len))
+            .unwrap();
     }
 
     #[test]
@@ -683,13 +689,16 @@ mod tests {
         display_module(&mut raw_module);
 
         let data = <sol!((bool, uint16, uint64))>::abi_encode(&(true, 1234, 123456789012345));
-        println!("data: {data:?}");
         let data_len = data.len() as i32;
 
         // Define validator function
         let mut linker = Linker::new(&Engine::default());
         linker
-            .func_wrap("", "validator", get_validator(100, data_len, data))
+            .func_wrap(
+                "",
+                "validator",
+                get_validator(100 + INITIAL_MEMORY_OFFSET as u32, data_len, data),
+            )
             .unwrap();
 
         let (_, _, mut store, entrypoint) = setup_wasmtime_module::<(i32, i32), ()>(
@@ -699,7 +708,9 @@ mod tests {
             Some(linker),
         );
 
-        entrypoint.call(&mut store, (0, data_len)).unwrap();
+        entrypoint
+            .call(&mut store, (INITIAL_MEMORY_OFFSET, data_len))
+            .unwrap();
     }
 
     #[test]
@@ -707,21 +718,37 @@ mod tests {
         let data = [
             2u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
-            16u32.to_le_bytes().as_slice(),
-            84u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 16) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 84) as u32)
+                .to_le_bytes()
+                .as_slice(),
             3u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
-            36u32.to_le_bytes().as_slice(),
-            52u32.to_le_bytes().as_slice(),
-            68u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 36) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 52) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 68) as u32)
+                .to_le_bytes()
+                .as_slice(),
             1u128.to_le_bytes().as_slice(),
             2u128.to_le_bytes().as_slice(),
             3u128.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
-            104u32.to_le_bytes().as_slice(),
-            120u32.to_le_bytes().as_slice(),
-            136u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 104) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 120) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 136) as u32)
+                .to_le_bytes()
+                .as_slice(),
             4u128.to_le_bytes().as_slice(),
             5u128.to_le_bytes().as_slice(),
             6u128.to_le_bytes().as_slice(),
@@ -749,8 +776,8 @@ mod tests {
 
         // Load arguments to stack
         func_body.i32_const(1234);
-        func_body.i32_const(0); // vector pointer
-        func_body.i32_const(152); // u256 pointer
+        func_body.i32_const(INITIAL_MEMORY_OFFSET); // vector pointer
+        func_body.i32_const(INITIAL_MEMORY_OFFSET + 152); // u256 pointer
 
         let (data_start, data_end) = build_pack_instructions(
             &mut func_body,
@@ -792,7 +819,7 @@ mod tests {
                 "",
                 "validator",
                 get_validator(
-                    data_len as u32,
+                    INITIAL_MEMORY_OFFSET as u32 + data_len as u32,
                     expected_data.len() as i32,
                     expected_data.clone(),
                 ),
@@ -806,6 +833,8 @@ mod tests {
             Some(linker),
         );
 
-        entrypoint.call(&mut store, (0, data_len)).unwrap();
+        entrypoint
+            .call(&mut store, (INITIAL_MEMORY_OFFSET, data_len))
+            .unwrap();
     }
 }

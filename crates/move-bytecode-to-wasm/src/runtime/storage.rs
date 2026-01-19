@@ -1704,7 +1704,8 @@ pub fn cache_storage_object_changes(
 mod tests {
     use crate::test_compilation_context;
     use crate::test_tools::{
-        build_module, get_linker_with_native_keccak256, setup_wasmtime_module,
+        INITIAL_MEMORY_OFFSET, build_module, get_linker_with_native_keccak256,
+        setup_wasmtime_module,
     };
     use alloy_primitives::U256;
     use rstest::rstest;
@@ -1792,7 +1793,12 @@ mod tests {
         let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut module, data, "test_fn", Some(linker));
 
-        let pointer: i32 = entrypoint.call(&mut store, (0, 32)).unwrap();
+        let pointer: i32 = entrypoint
+            .call(
+                &mut store,
+                (INITIAL_MEMORY_OFFSET, INITIAL_MEMORY_OFFSET + 32),
+            )
+            .unwrap();
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let mut result_bytes = vec![0; 32];
         memory
@@ -1892,7 +1898,16 @@ mod tests {
         let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut module, data, "test_fn", Some(linker));
 
-        let pointer: i32 = entrypoint.call(&mut store, (0, 32, 64)).unwrap();
+        let pointer: i32 = entrypoint
+            .call(
+                &mut store,
+                (
+                    INITIAL_MEMORY_OFFSET,
+                    INITIAL_MEMORY_OFFSET + 32,
+                    INITIAL_MEMORY_OFFSET + 64,
+                ),
+            )
+            .unwrap();
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let mut result_bytes = vec![0; 32];
         memory
@@ -2022,8 +2037,16 @@ mod tests {
             setup_wasmtime_module(&mut module, data, "test_fn", Some(linker));
 
         let pointer: i32 = entrypoint
-            .call(&mut store, (0, element_index as i32, element_size as i32))
+            .call(
+                &mut store,
+                (
+                    INITIAL_MEMORY_OFFSET,
+                    element_index as i32,
+                    element_size as i32,
+                ),
+            )
             .unwrap();
+
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let mut result_bytes = vec![0; 32];
         memory
@@ -2128,7 +2151,7 @@ mod tests {
             .call(
                 &mut store,
                 (
-                    0,
+                    INITIAL_MEMORY_OFFSET,
                     element_outer_index as i32,
                     element_inner_index as i32,
                     element_size as i32,

@@ -497,7 +497,8 @@ mod tests {
 
     use crate::test_compilation_context;
     use crate::test_tools::{
-        build_module, get_linker_with_host_debug_functions, setup_wasmtime_module,
+        INITIAL_MEMORY_OFFSET, build_module, get_linker_with_host_debug_functions,
+        setup_wasmtime_module,
     };
     use alloy_primitives::U256;
     use rstest::rstest;
@@ -540,7 +541,10 @@ mod tests {
 
         let mut func_body = function_builder.func_body();
 
-        func_body.i32_const(0).i32_const(n).i32_const(128);
+        func_body
+            .i32_const(INITIAL_MEMORY_OFFSET)
+            .i32_const(n)
+            .i32_const(128);
 
         let shift_64bits_right_f = get_bit(&mut raw_module, &compilation_ctx);
         func_body.call(shift_64bits_right_f);
@@ -585,7 +589,7 @@ mod tests {
         let mut func_body = function_builder.func_body();
 
         // arguments for shift_64bits_right (a_ptr, size in heap)
-        func_body.i32_const(0).i32_const(16);
+        func_body.i32_const(INITIAL_MEMORY_OFFSET).i32_const(16);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
         let shift_64bits_right_f = shift_1bit_left(&mut raw_module, &compilation_ctx);
@@ -607,7 +611,8 @@ mod tests {
         entrypoint.call(&mut store, 0).unwrap();
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
-        let result = &memory.data(&mut store)[0..TYPE_HEAP_SIZE as usize];
+        let result = &memory.data(&mut store)
+            [INITIAL_MEMORY_OFFSET as usize..(INITIAL_MEMORY_OFFSET + TYPE_HEAP_SIZE) as usize];
 
         assert_eq!(result, expected.to_le_bytes());
     }
@@ -634,7 +639,7 @@ mod tests {
         let mut func_body = function_builder.func_body();
 
         // arguments for shift_64bits_right (a_ptr, size in heap)
-        func_body.i32_const(0).i32_const(32);
+        func_body.i32_const(INITIAL_MEMORY_OFFSET).i32_const(32);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
         let shift_64bits_right_f = shift_1bit_left(&mut raw_module, &compilation_ctx);
@@ -654,7 +659,8 @@ mod tests {
 
         entrypoint.call(&mut store, 0).unwrap();
         let memory = instance.get_memory(&mut store, "memory").unwrap();
-        let result = &memory.data(&mut store)[0..TYPE_HEAP_SIZE as usize];
+        let result = &memory.data(&mut store)
+            [INITIAL_MEMORY_OFFSET as usize..(INITIAL_MEMORY_OFFSET + TYPE_HEAP_SIZE) as usize];
 
         assert_eq!(result, expected.to_le_bytes::<32>());
     }
@@ -720,7 +726,9 @@ mod tests {
             .for_each(|&(n1, n2): &(u128, u128)| {
                 let mut store = store.borrow_mut();
                 let data = [n1.to_le_bytes(), n2.to_le_bytes()].concat();
-                memory.write(&mut *store, 0, &data).unwrap();
+                memory
+                    .write(&mut *store, INITIAL_MEMORY_OFFSET as usize, &data)
+                    .unwrap();
 
                 let expected_quotient = n1 / n2;
 
@@ -817,7 +825,9 @@ mod tests {
             .for_each(|&(n1, n2): &(u128, u128)| {
                 let mut store = store.borrow_mut();
                 let data = [n1.to_le_bytes(), n2.to_le_bytes()].concat();
-                memory.write(&mut *store, 0, &data).unwrap();
+                memory
+                    .write(&mut *store, INITIAL_MEMORY_OFFSET as usize, &data)
+                    .unwrap();
 
                 let expected_quotient = n1 % n2;
 
@@ -931,7 +941,9 @@ mod tests {
                 let mut store = store.borrow_mut();
                 let data = [n1, n2].concat();
 
-                memory.write(&mut *store, 0, &data).unwrap();
+                memory
+                    .write(&mut *store, INITIAL_MEMORY_OFFSET as usize, &data)
+                    .unwrap();
 
                 let n1 = U256::from_le_bytes(n1);
                 let n2 = U256::from_le_bytes(n2);
@@ -1055,7 +1067,9 @@ mod tests {
                 let mut store = store.borrow_mut();
                 let data = [n1, n2].concat();
 
-                memory.write(&mut *store, 0, &data).unwrap();
+                memory
+                    .write(&mut *store, INITIAL_MEMORY_OFFSET as usize, &data)
+                    .unwrap();
 
                 let n1 = U256::from_le_bytes(n1);
                 let n2 = U256::from_le_bytes(n2);
@@ -1121,7 +1135,9 @@ mod tests {
 
         let mut func_body = function_builder.func_body();
 
-        func_body.i32_const(0).i32_const(heap_size);
+        func_body
+            .i32_const(INITIAL_MEMORY_OFFSET)
+            .i32_const(INITIAL_MEMORY_OFFSET + heap_size);
 
         if heap_size == 16 {
             func_body.i32_const(128);

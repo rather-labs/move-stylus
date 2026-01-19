@@ -436,7 +436,7 @@ pub fn check_if_a_less_than_b(
 #[cfg(test)]
 mod tests {
     use crate::test_compilation_context;
-    use crate::test_tools::{build_module, setup_wasmtime_module};
+    use crate::test_tools::{INITIAL_MEMORY_OFFSET, build_module, setup_wasmtime_module};
     use alloy_primitives::U256;
     use rstest::rstest;
     use walrus::{FunctionBuilder, ValType};
@@ -479,8 +479,8 @@ mod tests {
 
         // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
         func_body
-            .i32_const(0)
-            .i32_const(TYPE_HEAP_SIZE)
+            .i32_const(INITIAL_MEMORY_OFFSET)
+            .i32_const(INITIAL_MEMORY_OFFSET + TYPE_HEAP_SIZE)
             .i32_const(TYPE_HEAP_SIZE);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
@@ -599,8 +599,8 @@ mod tests {
 
         // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
         func_body
-            .i32_const(0)
-            .i32_const(TYPE_HEAP_SIZE)
+            .i32_const(INITIAL_MEMORY_OFFSET)
+            .i32_const(INITIAL_MEMORY_OFFSET + TYPE_HEAP_SIZE)
             .i32_const(TYPE_HEAP_SIZE);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);

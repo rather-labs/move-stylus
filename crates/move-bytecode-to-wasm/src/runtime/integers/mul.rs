@@ -454,7 +454,7 @@ mod tests {
     use crate::{
         data::DATA_ABORT_MESSAGE_PTR_OFFSET,
         test_compilation_context,
-        test_tools::{build_module, setup_wasmtime_module},
+        test_tools::{INITIAL_MEMORY_OFFSET, build_module, setup_wasmtime_module},
     };
     use alloy_primitives::{U256, keccak256};
     use alloy_sol_types::{SolType, sol};
@@ -529,7 +529,13 @@ mod tests {
             .with_type()
             .for_each(|&(a, b): &(u128, u128)| {
                 let data = [a.to_le_bytes(), b.to_le_bytes()].concat();
-                memory.write(&mut *store.borrow_mut(), 0, &data).unwrap();
+                memory
+                    .write(
+                        &mut *store.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &data,
+                    )
+                    .unwrap();
 
                 let overflowing_mul = a.overflowing_mul(b);
                 let expected = overflowing_mul.0;
@@ -668,7 +674,13 @@ mod tests {
                 let data = [a, b].concat();
                 let a = U256::from_le_bytes::<32>(a);
                 let b = U256::from_le_bytes::<32>(b);
-                memory.write(&mut *store.borrow_mut(), 0, &data).unwrap();
+                memory
+                    .write(
+                        &mut *store.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &data,
+                    )
+                    .unwrap();
 
                 let overflowing_mul = a.overflowing_mul(b);
                 let expected = overflowing_mul.0;
@@ -859,9 +871,9 @@ mod tests {
 
         function_builder
             .func_body()
-            .i32_const(0) // result_ptr
-            .i32_const(heap_size) // left_ptr
-            .i32_const(heap_size) // right_ptr (offset by heap_size)
+            .i32_const(INITIAL_MEMORY_OFFSET)
+            .i32_const(INITIAL_MEMORY_OFFSET + heap_size)
+            .i32_const(heap_size)
             .call(mul_f);
 
         let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);

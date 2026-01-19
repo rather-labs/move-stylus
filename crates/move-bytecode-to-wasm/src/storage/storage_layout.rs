@@ -348,7 +348,13 @@ mod tests {
             );
 
         let (tail_slot_ptr, tail_slot_offset) = entrypoint
-            .call(&mut store, (0_i32, head_slot_offset_data as i32))
+            .call(
+                &mut store,
+                (
+                    crate::test_tools::INITIAL_MEMORY_OFFSET,
+                    head_slot_offset_data as i32,
+                ),
+            )
             .map_err(|e| format!("WASM execution error: {e:?}"))?;
 
         // Read end_slot from the returned pointer

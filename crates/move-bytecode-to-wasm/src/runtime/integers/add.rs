@@ -331,7 +331,7 @@ pub fn add_u64(
 mod tests {
     use crate::data::DATA_ABORT_MESSAGE_PTR_OFFSET;
     use crate::test_compilation_context;
-    use crate::test_tools::{build_module, setup_wasmtime_module};
+    use crate::test_tools::{INITIAL_MEMORY_OFFSET, build_module, setup_wasmtime_module};
     use alloy_primitives::U256;
     use alloy_primitives::keccak256;
     use alloy_sol_types::{SolType, sol};
@@ -399,7 +399,13 @@ mod tests {
             .for_each(|&(a, b): &(u128, u128)| {
                 let data = [a.to_le_bytes(), b.to_le_bytes()].concat();
 
-                memory.write(&mut *store.borrow_mut(), 0, &data).unwrap();
+                memory
+                    .write(
+                        &mut *store.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &data,
+                    )
+                    .unwrap();
 
                 let overflowing_add = a.overflowing_add(b);
                 let expected = overflowing_add.0;
@@ -523,7 +529,13 @@ mod tests {
 
                 let data = [a.to_le_bytes::<32>(), b.to_le_bytes::<32>()].concat();
 
-                memory.write(&mut *store.borrow_mut(), 0, &data).unwrap();
+                memory
+                    .write(
+                        &mut *store.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &data,
+                    )
+                    .unwrap();
 
                 let overflowing_add = a.overflowing_add(b);
                 let expected = overflowing_add.0;
@@ -736,8 +748,8 @@ mod tests {
             heap_integers_add(&mut raw_module, &compilation_ctx, &mut runtime_error_data);
 
         func_body
-            .i32_const(0)
-            .i32_const(heap_size)
+            .i32_const(INITIAL_MEMORY_OFFSET)
+            .i32_const(INITIAL_MEMORY_OFFSET + heap_size)
             .i32_const(0)
             .i32_const(heap_size)
             .call(heap_integers_add_f);

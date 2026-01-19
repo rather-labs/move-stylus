@@ -108,7 +108,7 @@ mod tests {
         abi_types::unpacking::Unpackable,
         data::RuntimeErrorData,
         test_compilation_context,
-        test_tools::{build_module, setup_wasmtime_module},
+        test_tools::{INITIAL_MEMORY_OFFSET, build_module, setup_wasmtime_module},
         translation::intermediate_types::IntermediateType,
     };
     use alloy_primitives::{U256, address};
@@ -130,7 +130,7 @@ mod tests {
         let args_pointer = raw_module.locals.add(ValType::I32);
         let calldata_reader_pointer = raw_module.locals.add(ValType::I32);
 
-        func_body.i32_const(0);
+        func_body.i32_const(INITIAL_MEMORY_OFFSET);
         func_body.local_tee(args_pointer);
         func_body.local_set(calldata_reader_pointer);
 
@@ -282,9 +282,9 @@ mod tests {
         expected.extend(&3u32.to_le_bytes()); // length
         expected.extend(&3u32.to_le_bytes()); // capacity
         // pointers to heap elements
-        expected.extend(&180u32.to_le_bytes());
-        expected.extend(&196u32.to_le_bytes());
-        expected.extend(&212u32.to_le_bytes());
+        expected.extend(&((INITIAL_MEMORY_OFFSET + 180) as u32).to_le_bytes());
+        expected.extend(&((INITIAL_MEMORY_OFFSET + 196) as u32).to_le_bytes());
+        expected.extend(&((INITIAL_MEMORY_OFFSET + 212) as u32).to_le_bytes());
         expected.extend(&1u128.to_le_bytes());
         expected.extend(&2u128.to_le_bytes());
         expected.extend(&3u128.to_le_bytes());

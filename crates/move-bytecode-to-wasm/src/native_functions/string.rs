@@ -330,6 +330,7 @@ pub fn add_internal_check_utf8(
 mod tests {
     use super::*;
     use crate::test_compilation_context;
+    use crate::test_tools::INITIAL_MEMORY_OFFSET;
     use crate::test_tools::{
         build_module, get_linker_with_host_debug_functions, setup_wasmtime_module,
     };
@@ -382,7 +383,7 @@ mod tests {
         let mut func_body = function_builder.func_body();
 
         // Pointer for the allocated string
-        func_body.i32_const(0);
+        func_body.i32_const(INITIAL_MEMORY_OFFSET);
 
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer);

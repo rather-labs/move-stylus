@@ -196,7 +196,7 @@ mod tests {
     use std::rc::Rc;
 
     use crate::test_compilation_context;
-    use crate::test_tools::{build_module, setup_wasmtime_module};
+    use crate::test_tools::{INITIAL_MEMORY_OFFSET, build_module, setup_wasmtime_module};
     use rstest::rstest;
     use walrus::{FunctionBuilder, ValType};
 
@@ -246,10 +246,11 @@ mod tests {
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let memory_data = memory.data(&mut store);
 
-        let len = memory_data[0] as u32;
+        let len = memory_data[INITIAL_MEMORY_OFFSET as usize] as u32;
 
         // Read the ASCII string
-        let ascii_data = &memory_data[1..1 + len as usize];
+        let ascii_data = &memory_data[(INITIAL_MEMORY_OFFSET as usize + 1)
+            ..(INITIAL_MEMORY_OFFSET as usize + 1 + len as usize)];
         let result_str = String::from_utf8(ascii_data.to_vec()).unwrap();
 
         assert_eq!(result_str, expected, "Failed for input {error_code}");
@@ -295,12 +296,16 @@ mod tests {
             let mut store = store.borrow_mut();
 
             let mut memory_data = [0u8; 256];
-            memory.read(&*store, 0, &mut memory_data).unwrap();
+            memory
+                .read(&*store, INITIAL_MEMORY_OFFSET as usize, &mut memory_data)
+                .unwrap();
 
             entrypoint.call(&mut *store, a as i64).unwrap();
 
             // let memory_data = memory.data(&*store);
-            memory.read(&*store, 0, &mut memory_data).unwrap();
+            memory
+                .read(&*store, INITIAL_MEMORY_OFFSET as usize, &mut memory_data)
+                .unwrap();
 
             let len = memory_data[0] as u32;
 
@@ -309,10 +314,14 @@ mod tests {
             let result_str = String::from_utf8(ascii_data.to_vec()).unwrap();
 
             // Wipe memory for the next iteration
-            memory.write(&mut *store, 0, &[0; 256]).unwrap();
+            memory
+                .write(&mut *store, INITIAL_MEMORY_OFFSET as usize, &[0; 256])
+                .unwrap();
 
             // let memory_data = memory.data(&*store);
-            memory.read(&*store, 0, &mut memory_data).unwrap();
+            memory
+                .read(&*store, INITIAL_MEMORY_OFFSET as usize, &mut memory_data)
+                .unwrap();
 
             assert_eq!(result_str, expected, "Failed for input {a}");
 
