@@ -18,7 +18,7 @@ walrus = "0.23"
 wasmparser = "0.228"
 thiserror = "2"
 relooper = "0.1.0"
-hashers = "1.0.1"
+fxhash = "0.2.1"
 
 [dev-dependencies]
 anyhow.workspace = true

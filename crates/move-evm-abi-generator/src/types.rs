@@ -124,6 +124,7 @@ impl Type {
                     module_id.address,
                     module_id.module_name.as_str(),
                 ) {
+                    ("ID", STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => Self::Bytes32,
                     ("UID", STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => Self::Bytes32,
                     ("String", STANDARD_LIB_ADDRESS, STDLIB_MODULE_NAME_STRING) => Self::String,
                     ("String", STANDARD_LIB_ADDRESS, STDLIB_MODULE_NAME_ASCII) => Self::String,

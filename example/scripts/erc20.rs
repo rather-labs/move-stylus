@@ -17,7 +17,7 @@ sol!(
         event Approval(address indexed owner, address indexed spender, uint256 value);
 
         #[derive(Debug)]
-        event NewUID(address indexed uid);
+        event NewUID(bytes32 indexed uid);
 
         #[derive(Debug)]
         event Transfer(address indexed from, address indexed to, uint256 value);

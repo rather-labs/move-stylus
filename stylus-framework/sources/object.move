@@ -21,7 +21,7 @@ public struct UID has store {
 
 #[ext(event(indexes = 1))]
 public struct NewUID has copy, drop {
-    uid: address
+    uid: ID,
 }
 
 /// Creates a new `UID`, which must be stored in an object's `id` field.
@@ -32,7 +32,7 @@ public struct NewUID has copy, drop {
 /// reference to the object associated with that `UID`
 public fun new(ctx: &mut TxContext): UID {
     let res = UID { id: ID { bytes: ctx.fresh_object_address() } };
-    emit(NewUID { uid: res.to_address() });
+    emit(NewUID { uid: res.to_inner() });
     res
 }
 
