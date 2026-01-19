@@ -332,7 +332,8 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
 
             b.i32_const(0xBADF00D);
 
-            // TODO: if calling from a runtime fn, this could be an u64
+            // TODO: could we eventually need a u64 here? For example when propagating the error from within a runtime function
+            // which returns a ValType::I64?
             if let Some(return_block_id) = return_block_id {
                 b.br(return_block_id);
             } else {
