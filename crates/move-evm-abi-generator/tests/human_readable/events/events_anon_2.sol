@@ -26,6 +26,12 @@ interface EventsAnon2 {
         EventEnum[] b;
     }
 
+    enum EventEnum {
+        EVENT_1,
+        EVENT_2,
+        EVENT_3,
+    }
+
     function emitTestAnonEvent1(uint32 a, address b, uint32 c, address d, uint128 e) external;
     function emitTestAnonEvent2(uint32 a, uint8[] b, uint32 c, address d, uint128 e) external;
     function emitTestAnonEvent3(uint64 a, string b) external;

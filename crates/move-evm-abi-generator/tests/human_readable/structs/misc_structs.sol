@@ -21,6 +21,16 @@ interface MiscStructs {
         bool[] b;
     }
 
-    function testMisc(uint32 a, uint128 b, GenericEnum c, SimpleEnum d, NestedStructUint32Uint128 e) external (GenericStructUint32Uint128);
+    enum GenericEnum {
+        A,
+        B,
+    }
+
+    enum SimpleEnum {
+        A,
+        B,
+    }
+
+    function testMisc(uint32 a, uint128 b, GenericEnum c, SimpleEnum d, NestedStructUint32Uint128 e) external returns (GenericStructUint32Uint128);
 
 }
