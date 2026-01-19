@@ -426,8 +426,6 @@ mod tests {
         unpack_vec(&data, int_type, &expected_result_bytes);
     }
 
-    // TODO: fix this case, its throwing a runtime error, but it should be ok.
-    // it fails with 3 ELEMENTS, not with 1, 2 or 4... ?????
     #[test]
     fn test_unpack_vector_address() {
         type SolType = sol!((address[],));
