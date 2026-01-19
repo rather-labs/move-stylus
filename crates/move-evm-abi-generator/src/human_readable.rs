@@ -40,11 +40,10 @@ pub fn process_abi(abi: &Abi) -> String {
 
 pub fn process_functions(contract_abi: &mut String, abi: &Abi) {
     // Sort functions by identifier for deterministic output
-    let mut function_indices: Vec<usize> = (0..abi.functions.len()).collect();
-    function_indices.sort_by_key(|&i| &abi.functions[i].identifier);
+    let mut functions: Vec<_> = abi.functions.iter().collect();
+    functions.sort_by_key(|f| &f.identifier);
 
-    for &i in &function_indices {
-        let function = &abi.functions[i];
+    for function in functions {
         if function.visibility == Visibility::Private
             && !function.is_entry
             && function.function_type != FunctionType::Constructor
@@ -110,11 +109,10 @@ pub fn process_functions(contract_abi: &mut String, abi: &Abi) {
 
 pub fn process_structs(contract_abi: &mut String, abi: &Abi) {
     // Sort structs by identifier for deterministic output
-    let mut struct_indices: Vec<usize> = (0..abi.structs.len()).collect();
-    struct_indices.sort_by_key(|&i| &abi.structs[i].identifier);
+    let mut structs: Vec<_> = abi.structs.iter().collect();
+    structs.sort_by_key(|s| &s.identifier);
 
-    for &i in &struct_indices {
-        let struct_ = &abi.structs[i];
+    for struct_ in structs {
         // Declaration
         contract_abi.push_str("    struct ");
         contract_abi.push_str(&struct_.identifier);
@@ -132,12 +130,11 @@ pub fn process_structs(contract_abi: &mut String, abi: &Abi) {
 }
 
 pub fn process_enums(contract_abi: &mut String, abi: &Abi) {
-    // Sort structs by identifier for deterministic output
-    let mut enums_indices: Vec<usize> = (0..abi.enums.len()).collect();
-    enums_indices.sort_by_key(|&i| &abi.enums[i].identifier);
+    // Sort enums by identifier for deterministic output
+    let mut enums: Vec<_> = abi.enums.iter().collect();
+    enums.sort_by_key(|e| &e.identifier);
 
-    for &i in &enums_indices {
-        let enum_ = &abi.enums[i];
+    for enum_ in enums {
         // Declaration
         contract_abi.push_str("    enum ");
         contract_abi.push_str(&enum_.identifier);
