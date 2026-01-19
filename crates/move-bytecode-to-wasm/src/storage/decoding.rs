@@ -9,6 +9,7 @@ use walrus::{
 use crate::{
     CompilationContext,
     data::{DATA_SLOT_DATA_PTR_OFFSET, RuntimeErrorData},
+    error::RuntimeError,
     hostio::host_functions::{native_keccak256, storage_load_bytes32},
     runtime::RuntimeFunction,
     storage::storage_layout::field_size,
@@ -103,7 +104,13 @@ pub fn add_read_and_decode_storage_struct_instructions(
                 },
                 |else_| {
                     // If they don't match, trap
-                    else_.unreachable();
+                    else_.return_error(
+                        module,
+                        compilation_ctx,
+                        Some(ValType::I32),
+                        runtime_error_data,
+                        RuntimeError::StorageObjectTypeMismatch,
+                    );
                 },
             );
 
