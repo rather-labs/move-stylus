@@ -45,7 +45,7 @@ impl ExportAbi {
                 package.root_compiled_units.iter().collect()
             };
 
-        let package_modules = package_module_data(&package, &root_compiled_units, verbose)
+        let package_modules = package_module_data(&package, &root_compiled_units, verbose, false)
             .map_err(print_error_diagnostic)?;
 
         // If neither flag is set, default to generating JSON

@@ -184,6 +184,7 @@ impl ModuleData<'_> {
         move_module_dependencies: &'move_package [(PackageName, CompiledUnitWithSource)],
         root_compiled_units: &[&'move_package CompiledUnitWithSource],
         special_attributes: SpecialAttributes,
+        test_mode: bool,
     ) -> Result<ModuleData<'move_package>> {
         let move_module_unit = &move_module.unit.module;
 
@@ -235,6 +236,7 @@ impl ModuleData<'_> {
             &datatype_handles_map,
             move_module_dependencies,
             &special_attributes,
+            test_mode,
         )?;
 
         let signatures = move_module_unit
@@ -727,6 +729,7 @@ impl ModuleData<'_> {
         datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
         move_module_dependencies: &'move_package [(PackageName, CompiledUnitWithSource)],
         special_attributes: &SpecialAttributes,
+        test_mode: bool,
     ) -> Result<FunctionData<'move_package>> {
         // Return types of functions in intermediate types. Used to fill the stack type
         let mut functions_returns = Vec::new();
@@ -829,6 +832,7 @@ impl ModuleData<'_> {
                     datatype_handles_map,
                     move_module,
                     move_module_dependencies,
+                    test_mode,
                 )?;
 
                 if is_init && init.replace(function_id.clone()).is_some() {
@@ -958,6 +962,7 @@ impl ModuleData<'_> {
 
     /// Checks if the given function (by index) is a valid `init` function.
     // This behavior is not enforced by the move compiler itself.
+    #[allow(clippy::too_many_arguments)]
     fn is_init(
         function_id: &FunctionId,
         move_function_arguments: &Signature,
@@ -966,6 +971,7 @@ impl ModuleData<'_> {
         datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
         module: &CompiledModule,
         move_module_dependencies: &[(PackageName, CompiledUnitWithSource)],
+        test_mode: bool,
     ) -> Result<bool> {
         // Constants
         const INIT_FUNCTION_NAME: &str = "init";
@@ -975,7 +981,7 @@ impl ModuleData<'_> {
             return Ok(false);
         }
 
-        if function_def.visibility != Visibility::Private {
+        if function_def.visibility != Visibility::Private && !test_mode {
             return Err(CompilationContextError::InitFunctionBadPrivacy);
         }
 
