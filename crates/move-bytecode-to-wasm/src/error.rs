@@ -157,6 +157,7 @@ pub enum RuntimeError {
     FrozenObjectsCannotBeTransferred,
     SharedObjectsCannotBeTransferred,
     StorageObjectNotFound,
+    FrozenObjectsCannotBeDeleted,
     Overflow,
     OutOfBounds,
 }
@@ -173,6 +174,7 @@ impl RuntimeError {
                 b"Shared objects cannot be transferred"
             }
             RuntimeError::StorageObjectNotFound => b"Object not found",
+            RuntimeError::FrozenObjectsCannotBeDeleted => b"Frozen objects cannot be deleted",
             RuntimeError::Overflow => b"Overflow",
             RuntimeError::OutOfBounds => b"Out of bounds",
         }
