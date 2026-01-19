@@ -30,6 +30,7 @@ pub fn process_abi(abi: &Abi) -> String {
         result.push('\n');
     }
     process_structs(&mut result, abi);
+    process_enums(&mut result, abi);
     process_functions(&mut result, abi);
 
     result.push_str("\n}");
@@ -123,6 +124,27 @@ pub fn process_structs(contract_abi: &mut String, abi: &Abi) {
             contract_abi.push_str(&field.type_.name());
             contract_abi.push(' ');
             contract_abi.push_str(&field.identifier);
+            contract_abi.push_str(";\n");
+        }
+
+        contract_abi.push_str("    }\n\n");
+    }
+}
+
+pub fn process_enums(contract_abi: &mut String, abi: &Abi) {
+    // Sort structs by identifier for deterministic output
+    let mut enums_indices: Vec<usize> = (0..abi.enums.len()).collect();
+    enums_indices.sort_by_key(|&i| &abi.enums[i].identifier);
+
+    for &i in &enums_indices {
+        let enum_ = &abi.enums[i];
+        // Declaration
+        contract_abi.push_str("    enum ");
+        contract_abi.push_str(&enum_.identifier);
+        contract_abi.push_str(" {\n");
+        for variant in &enum_.variants {
+            contract_abi.push_str("        ");
+            contract_abi.push_str(variant.as_str());
             contract_abi.push_str(";\n");
         }
 

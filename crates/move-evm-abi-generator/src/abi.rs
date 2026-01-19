@@ -53,6 +53,12 @@ pub struct Struct_ {
 }
 
 #[derive(Debug)]
+pub struct Enum_ {
+    pub(crate) identifier: Symbol,
+    pub(crate) variants: Vec<Symbol>,
+}
+
+#[derive(Debug)]
 pub struct Event {
     pub(crate) identifier: Symbol,
     pub(crate) fields: Vec<EventField>,
@@ -78,6 +84,7 @@ pub struct Abi {
     pub(crate) contract_name: Symbol,
     pub(crate) functions: Vec<Function>,
     pub(crate) structs: Vec<Struct_>,
+    pub(crate) enums: Vec<Enum_>,
     pub(crate) events: Vec<Event>,
     pub(crate) abi_errors: Vec<Struct_>,
 }
@@ -96,23 +103,31 @@ impl Abi {
         // Create a single HashSet to collect all structs that need to be processed
         // This includes structs from events, errors, and functions
         let mut structs_to_process = HashSet::new();
+        let mut enums_to_process = HashSet::new();
 
         let events = Self::process_events(event_structs, modules_data, &mut structs_to_process);
 
         let abi_errors =
             Self::process_abi_errors(error_structs, modules_data, &mut structs_to_process);
 
-        let functions =
-            Self::process_functions(processing_module, modules_data, &mut structs_to_process);
+        let functions = Self::process_functions(
+            processing_module,
+            modules_data,
+            &mut structs_to_process,
+            &mut enums_to_process,
+        );
 
         let mut processed_structs = HashSet::new();
         let structs =
             Self::process_structs(structs_to_process, modules_data, &mut processed_structs);
 
+        let enums = Self::process_enums(enums_to_process, modules_data, &mut HashSet::new());
+
         Abi {
             contract_name: processing_module.special_attributes.module_name,
             functions,
             structs,
+            enums,
             events,
             abi_errors,
         }
@@ -124,6 +139,7 @@ impl Abi {
         processing_module: &ModuleData,
         modules_data: &HashMap<ModuleId, ModuleData>,
         structs_to_process: &mut HashSet<IntermediateType>,
+        enums_to_process: &mut HashSet<IntermediateType>,
     ) -> Vec<Function> {
         let mut result = Vec::new();
 
@@ -265,6 +281,8 @@ impl Abi {
                                 identifier: param.name,
                                 type_: Type::from_intermediate_type(itype, modules_data),
                             });
+
+                            enums_to_process.insert(itype.clone());
                         }
                     }
                     IntermediateType::IGenericEnumInstance {
@@ -286,6 +304,8 @@ impl Abi {
                                 identifier: param.name,
                                 type_: Type::from_intermediate_type(itype, modules_data),
                             });
+
+                            enums_to_process.insert(itype.clone());
                         }
                     }
                     _ => {
@@ -300,8 +320,27 @@ impl Abi {
             let return_type = if function.signature.returns.is_empty() {
                 Type::None
             } else if function.signature.returns.len() == 1 {
-                if Self::should_process_struct(&function.signature.returns[0], modules_data) {
-                    structs_to_process.insert(function.signature.returns[0].clone());
+                match &function.signature.returns[0] {
+                    IntermediateType::IEnum { module_id, index }
+                    | IntermediateType::IGenericEnumInstance {
+                        module_id, index, ..
+                    } => {
+                        let enum_module = modules_data.get(module_id).unwrap();
+                        let enum_ = enum_module.enums.get_by_index(*index).unwrap();
+                        if enum_.is_simple {
+                            enums_to_process.insert(function.signature.returns[0].clone());
+                        }
+                    }
+                    IntermediateType::IStruct { .. }
+                    | IntermediateType::IGenericStructInstance { .. }
+                        if Self::should_process_struct(
+                            &function.signature.returns[0],
+                            modules_data,
+                        ) =>
+                    {
+                        structs_to_process.insert(function.signature.returns[0].clone());
+                    }
+                    _ => {}
                 }
 
                 Type::from_intermediate_type(&function.signature.returns[0], modules_data)
@@ -310,10 +349,24 @@ impl Abi {
                     .signature
                     .returns
                     .iter()
-                    .inspect(|t| {
-                        if Self::should_process_struct(t, modules_data) {
+                    .inspect(|t| match *t {
+                        IntermediateType::IEnum { module_id, index }
+                        | IntermediateType::IGenericEnumInstance {
+                            module_id, index, ..
+                        } => {
+                            let enum_module = modules_data.get(module_id).unwrap();
+                            let enum_ = enum_module.enums.get_by_index(*index).unwrap();
+                            if enum_.is_simple {
+                                enums_to_process.insert((*t).clone());
+                            }
+                        }
+                        IntermediateType::IStruct { .. }
+                        | IntermediateType::IGenericStructInstance { .. }
+                            if Self::should_process_struct(t, modules_data) =>
+                        {
                             structs_to_process.insert((*t).clone());
                         }
+                        _ => {}
                     })
                     .map(|t| Type::from_intermediate_type(t, modules_data))
                     .collect();
@@ -423,6 +476,54 @@ impl Abi {
             }
             _ => panic!("processing a storager struct that has no id as first parameter"),
         }
+    }
+
+    pub fn process_enums(
+        enums: HashSet<IntermediateType>,
+        modules_data: &HashMap<ModuleId, ModuleData>,
+        processed_enums: &mut HashSet<IntermediateType>,
+    ) -> Vec<Enum_> {
+        let mut result = Vec::new();
+        for enum_itype in enums {
+            if processed_enums.contains(&enum_itype) {
+                continue;
+            }
+
+            let (module_id, index, types) = match &enum_itype {
+                IntermediateType::IEnum {
+                    module_id, index, ..
+                } => (module_id, index, None),
+                IntermediateType::IGenericEnumInstance {
+                    module_id,
+                    index,
+                    types,
+                    ..
+                } => (module_id, index, Some(types)),
+                t => panic!("found {t:?} instead of enum"),
+            };
+
+            let enum_module = modules_data.get(module_id).unwrap();
+            let enum_ = enum_module.enums.get_by_index(*index).unwrap();
+            let enum_ = match types {
+                Some(types) => enum_.instantiate(types),
+                None => enum_.clone(),
+            };
+
+            let parsed_enum = enum_module
+                .special_attributes
+                .enums
+                .iter()
+                .find(|e| *e.name == *enum_.identifier)
+                .unwrap();
+
+            processed_enums.insert(enum_itype);
+            result.push(Enum_ {
+                identifier: enum_.identifier,
+                variants: parsed_enum.variants.iter().map(|v| v.0).collect(),
+            });
+        }
+
+        result
     }
 
     pub fn process_structs(
@@ -649,7 +750,19 @@ impl Abi {
                     && !is_bytes_n(&struct_.identifier, module_id)
                     && struct_.type_ != IStructType::OneTimeWitness
             }
+
             _ => false,
         }
     }
 }
+/*
+IntermediateType::IEnum { module_id, index }
+            | IntermediateType::IGenericEnumInstance {
+                module_id, index, ..
+            } => {
+                let enum_module = modules_data.get(module_id).unwrap();
+                let enum_ = enum_module.enums.get_by_index(*index).unwrap();
+
+                enum_.is_simple
+            }
+*/
