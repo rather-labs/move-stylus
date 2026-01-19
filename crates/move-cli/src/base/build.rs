@@ -49,6 +49,7 @@ impl Build {
             emit_wat,
             verbose,
             !config.dev_mode,
+            false,
         ) {
             print_error_diagnostic(*compilation_error)
         }
