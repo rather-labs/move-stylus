@@ -321,12 +321,21 @@ impl Abi {
                 Type::None
             } else if function.signature.returns.len() == 1 {
                 match &function.signature.returns[0] {
-                    IntermediateType::IEnum { module_id, index }
-                    | IntermediateType::IGenericEnumInstance {
-                        module_id, index, ..
+                    IntermediateType::IEnum { module_id, index } => {
+                        let enum_module = modules_data.get(module_id).unwrap();
+                        let enum_ = enum_module.enums.get_by_index(*index).unwrap();
+                        if enum_.is_simple {
+                            enums_to_process.insert(function.signature.returns[0].clone());
+                        }
+                    }
+                    IntermediateType::IGenericEnumInstance {
+                        module_id,
+                        index,
+                        types,
                     } => {
                         let enum_module = modules_data.get(module_id).unwrap();
                         let enum_ = enum_module.enums.get_by_index(*index).unwrap();
+                        let enum_ = enum_.instantiate(types);
                         if enum_.is_simple {
                             enums_to_process.insert(function.signature.returns[0].clone());
                         }
@@ -350,14 +359,23 @@ impl Abi {
                     .returns
                     .iter()
                     .inspect(|t| match *t {
-                        IntermediateType::IEnum { module_id, index }
-                        | IntermediateType::IGenericEnumInstance {
-                            module_id, index, ..
-                        } => {
+                        IntermediateType::IEnum { module_id, index } => {
                             let enum_module = modules_data.get(module_id).unwrap();
                             let enum_ = enum_module.enums.get_by_index(*index).unwrap();
                             if enum_.is_simple {
                                 enums_to_process.insert((*t).clone());
+                            }
+                        }
+                        IntermediateType::IGenericEnumInstance {
+                            module_id,
+                            index,
+                            types,
+                        } => {
+                            let enum_module = modules_data.get(module_id).unwrap();
+                            let enum_ = enum_module.enums.get_by_index(*index).unwrap();
+                            let enum_ = enum_.instantiate(types);
+                            if enum_.is_simple {
+                                enums_to_process.insert(function.signature.returns[0].clone());
                             }
                         }
                         IntermediateType::IStruct { .. }

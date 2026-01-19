@@ -19,40 +19,30 @@ sol! {
     #[sol(rpc)]
     #[allow(missing_docs)]
     contract PrimitiveOperations {
-        function castU8(uint128 x) external view returns (uint8);
-        function sumU256(uint256 x, uint256 y) external view returns (uint256);
-        function subU128(uint128 x, uint128 y) external view returns (uint128);
-        function mulU64(uint64 x, uint64 y) external view returns (uint64);
-        function divU32(uint32 x, uint32 y) external view returns (uint32);
-        function modU16(uint16 x, uint16 y) external view returns (uint16);
-
-        function orU256(uint256 x, uint256 y) external view returns (uint256);
-        function xorU128(uint128 x, uint128 y) external view returns (uint128);
-        function andU64(uint64 x, uint64 y) external view returns (uint64);
-        function shiftLeftU32(uint32 x, uint8 y) external view returns (uint32);
-        function shiftRightU16(uint16 x, uint8 y) external view returns (uint16);
-
-        function notTrue() external pure returns (bool);
-        function not(bool x) external pure returns (bool);
-        function and(bool x, bool y) external pure returns (bool);
-        function or(bool x, bool y) external pure returns (bool);
-
-        function lessThanU256(uint256 x, uint256 y) external view returns (bool);
-        function lessThanEqU128(uint128 x, uint128 y) external view returns (bool);
-        function greaterThanU64(uint64 x, uint64 y) external view returns (bool);
-        function greaterThanEqU32(uint32 x, uint32 y) external view returns (bool);
-
-        function vecFromU256(uint256 a, uint256 b) external pure returns (uint256[]);
-        function vecLenU128(uint128[] memory arr) external pure returns (uint256);
-        function vecPopBackU64(uint64[] memory arr) external pure returns (uint64[] memory);
-        function vecSwapU32(uint32[] memory arr, uint64 i, uint64 j)
-            external
-            pure
-            returns (uint32[] memory);
-        function vecPushBackU16(uint16[] memory arr, uint16 value)
-            external
-            pure
-            returns (uint16[] memory);
+        function and(bool x, bool y) external returns (bool);
+        function andU64(uint64 x, uint64 y) external returns (uint64);
+        function castU8(uint128 x) external returns (uint8);
+        function divU32(uint32 x, uint32 y) external returns (uint32);
+        function greaterThanEqU32(uint32 a, uint32 b) external returns (bool);
+        function greaterThanU64(uint64 a, uint64 b) external returns (bool);
+        function lessThanEqU128(uint128 a, uint128 b) external returns (bool);
+        function lessThanU256(uint256 a, uint256 b) external returns (bool);
+        function modU16(uint16 x, uint16 y) external returns (uint16);
+        function mulU64(uint64 x, uint64 y) external returns (uint64);
+        function not(bool x) external returns (bool);
+        function notTrue() external returns (bool);
+        function or(bool x, bool y) external returns (bool);
+        function orU256(uint256 x, uint256 y) external returns (uint256);
+        function shiftLeftU32(uint32 x, uint8 slots) external returns (uint32);
+        function shiftRightU16(uint16 x, uint8 slots) external returns (uint16);
+        function subU128(uint128 x, uint128 y) external returns (uint128);
+        function sumU256(uint256 x, uint256 y) external returns (uint256);
+        function vecFromU256(uint256 x, uint256 y) external returns (uint256[]);
+        function vecLenU128(uint128[] x) external returns (uint64);
+        function vecPopBackU64(uint64[] x) external returns (uint64[]);
+        function vecPushBackU16(uint16[] x, uint16 y) external returns (uint16[]);
+        function vecSwapU32(uint32[] x, uint64 id1, uint64 id2) external returns (uint32[]);
+        function xorU128(uint128 x, uint128 y) external returns (uint128);
     }
 }
 
@@ -269,7 +259,7 @@ async fn main() -> eyre::Result<()> {
 
     let res = example.vecLenU128(vec![1, 2, 3, 4]).call().await?;
     println!("vecLenU128([1, 2, 3, 4]): {res}");
-    assert_eq!(res, U256::from(4), "vecLenU128 should return length 4");
+    assert_eq!(res, 4, "vecLenU128 should return length 4");
 
     let res = example.vecPopBackU64(vec![1, 2, 3, 4]).call().await?;
     println!("vecPopBackU64([1, 2, 3, 4]): {res:?}");

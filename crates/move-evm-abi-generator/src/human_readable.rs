@@ -145,7 +145,7 @@ pub fn process_enums(contract_abi: &mut String, abi: &Abi) {
         for variant in &enum_.variants {
             contract_abi.push_str("        ");
             contract_abi.push_str(variant.as_str());
-            contract_abi.push_str(";\n");
+            contract_abi.push_str(",\n");
         }
 
         contract_abi.push_str("    }\n\n");
