@@ -325,50 +325,57 @@ pub fn add_read_and_decode_storage_enum_instructions(
 
     // Decode fields for the active variant
     let mut inner_result = Ok(());
-    enum_.match_on_variant(builder, variant_index, |variant, block| {
-        for (index, field) in variant.fields.iter().enumerate() {
-            let field_size = field_size(field, compilation_ctx);
+    enum_.match_on_variant(
+        builder,
+        module,
+        compilation_ctx,
+        runtime_error_data,
+        variant_index,
+        |variant, block, mod_ref, err_ref| {
+            for (index, field) in variant.fields.iter().enumerate() {
+                let field_size = field_size(field, compilation_ctx);
 
-            let field_size = match field_size {
-                Ok(fs) => fs as i32,
-                Err(e) => {
-                    inner_result = Err(e);
-                    break;
-                }
-            };
-            // Increase the slot_offset by the size of the field.
-            // If the entire slot has been read, advance to the next slot and load its data.
-            block
-                .local_get(slot_ptr)
-                .local_get(slot_offset)
-                .i32_const(field_size)
-                .call(accumulate_or_advance_slot_read_fn)
-                .local_set(slot_offset);
+                let field_size = match field_size {
+                    Ok(fs) => fs as i32,
+                    Err(e) => {
+                        inner_result = Err(e);
+                        break;
+                    }
+                };
+                // Increase the slot_offset by the size of the field.
+                // If the entire slot has been read, advance to the next slot and load its data.
+                block
+                    .local_get(slot_ptr)
+                    .local_get(slot_offset)
+                    .i32_const(field_size)
+                    .call(accumulate_or_advance_slot_read_fn)
+                    .local_set(slot_offset);
 
-            // Decode the field according to its type
-            inner_result = add_decode_intermediate_type_instructions(
-                module,
-                block,
-                compilation_ctx,
-                runtime_error_data,
-                field_ptr,
-                slot_ptr,
-                slot_offset,
-                owner_ptr,
-                field,
-            );
+                // Decode the field according to its type
+                inner_result = add_decode_intermediate_type_instructions(
+                    mod_ref,
+                    block,
+                    compilation_ctx,
+                    err_ref,
+                    field_ptr,
+                    slot_ptr,
+                    slot_offset,
+                    owner_ptr,
+                    field,
+                );
 
-            // Store the field in the enum at offset index * 4 (after the 4-byte tag)
-            block.local_get(enum_ptr).local_get(field_ptr).store(
-                compilation_ctx.memory_id,
-                StoreKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 4 + 4 * index as u32,
-                },
-            );
-        }
-    });
+                // Store the field in the enum at offset index * 4 (after the 4-byte tag)
+                block.local_get(enum_ptr).local_get(field_ptr).store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 4 + 4 * index as u32,
+                    },
+                );
+            }
+        },
+    );
 
     inner_result?;
 
