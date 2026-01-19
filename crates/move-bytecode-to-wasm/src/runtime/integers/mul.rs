@@ -453,8 +453,8 @@ mod tests {
     use super::*;
     use crate::{
         data::DATA_ABORT_MESSAGE_PTR_OFFSET,
-        test_compilation_context, test_runtime_error_data,
-        test_tools::{build_module, setup_wasmtime_module},
+        test_compilation_context,
+        test_tools::{INITIAL_MEMORY_OFFSET, build_module, setup_wasmtime_module},
     };
     use alloy_primitives::{U256, keccak256};
     use alloy_sol_types::{SolType, sol};
@@ -856,7 +856,7 @@ mod tests {
         let (mut raw_module, allocator_func, memory_id, ctx_globals) =
             build_module(Some(heap_size * 2));
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -910,7 +910,7 @@ mod tests {
         let n2_l = raw_module.locals.add(val_type);
 
         let ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mul_f = mul_fn(&mut raw_module, &ctx, &mut test_runtime_error_data!());
+        let mul_f = mul_fn(&mut raw_module, &ctx, &mut RuntimeErrorData::new());
 
         builder
             .func_body()

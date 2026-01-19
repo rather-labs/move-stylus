@@ -539,8 +539,7 @@ mod tests {
     use crate::data::DATA_ABORT_MESSAGE_PTR_OFFSET;
     use crate::error::RuntimeError;
     use crate::test_compilation_context;
-    use crate::test_runtime_error_data;
-    use crate::test_tools::{build_module, setup_wasmtime_module};
+    use crate::test_tools::{INITIAL_MEMORY_OFFSET, build_module, setup_wasmtime_module};
     use alloy_primitives::U256;
     use alloy_primitives::keccak256;
     use alloy_sol_types::{SolType, sol};
@@ -556,42 +555,8 @@ mod tests {
     #[case(u128::MAX, 127, u128::MAX << 127)]
     fn test_u128_shift_left(#[case] n: u128, #[case] shift_amount: i32, #[case] expected: u128) {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
-            build_module(Some(TYPE_HEAP_SIZE));
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
-        );
-
-        let shift_amount_local = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // Number to shift pointer
-        func_body.i32_const(0);
-        // Shift left amount
-        func_body.local_get(shift_amount_local);
-        // Heap size
-        func_body.i32_const(TYPE_HEAP_SIZE);
-
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
-        let shift_left_f =
-            heap_int_shift_left(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
-                .unwrap();
-        // Shift left
-        func_body.call(shift_left_f);
-
-        let function = function_builder.finish(vec![shift_amount_local], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        // display_module(&mut raw_module);
-
-        let data = [n.to_le_bytes()].concat();
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
+        let (mut store, instance, entrypoint) =
+            setup_heap_shift_test(n.to_le_bytes().to_vec(), TYPE_HEAP_SIZE, false);
 
         let pointer: i32 = entrypoint
             .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
@@ -614,63 +579,7 @@ mod tests {
         let (mut store, instance, entrypoint) =
             setup_heap_shift_test(n.to_le_bytes().to_vec(), TYPE_HEAP_SIZE, false);
 
-        let shift_amount_local = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
-        let shift_left_f =
-            heap_int_shift_left(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
-                .unwrap();
-
-        func_body
-            // Number to shift pointer
-            .i32_const(0)
-            // Shift left amount
-            .local_get(shift_amount_local)
-            // Heap size
-            .i32_const(TYPE_HEAP_SIZE)
-            // Shift left
-            .call(shift_left_f)
-            // Drop the result
-            .drop();
-
-        let error_ptr = raw_module.locals.add(ValType::I32);
-        // Load the abort message pointer. The fn should have failed so the pointer to the error should be stored here.
-        func_body
-            .i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)
-            .load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            )
-            .local_tee(error_ptr);
-
-        // Skip the first 4 bytes corresponding to the length
-        func_body.i32_const(4).binop(BinaryOp::I32Add);
-
-        // Error length
-        func_body.local_get(error_ptr).load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        );
-
-        let function = function_builder.finish(vec![shift_amount_local], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        let data = [n.to_le_bytes()].concat();
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
-
-        let (pointer, error_length): (i32, i32) = entrypoint
+        let _: i32 = entrypoint
             .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
             .unwrap();
 
@@ -680,40 +589,8 @@ mod tests {
     #[test]
     fn test_u128_shift_left_fuzz() {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
-            build_module(Some(TYPE_HEAP_SIZE));
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
-        );
-
-        let shift_amount_local = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // Number to shift pointer
-        func_body
-            .i32_const(0)
-            // Shift left amount
-            .local_get(shift_amount_local)
-            // Heap size
-            .i32_const(TYPE_HEAP_SIZE);
-
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
-        let shift_left_f =
-            heap_int_shift_left(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
-                .unwrap();
-        // Shift left
-        func_body.call(shift_left_f);
-
-        let function = function_builder.finish(vec![shift_amount_local], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
+        let (mut store, instance, entrypoint) =
+            setup_heap_shift_test(vec![0; TYPE_HEAP_SIZE as usize], TYPE_HEAP_SIZE, false);
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let reset_memory = Rc::new(AssertUnwindSafe(
@@ -767,42 +644,8 @@ mod tests {
     #[case(U256::MAX, 255, U256::MAX << 255)]
     fn test_u256_shift_left(#[case] n: U256, #[case] shift_amount: i32, #[case] expected: U256) {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
-            build_module(Some(TYPE_HEAP_SIZE));
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
-        );
-
-        let shift_amount_local = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // Number to shift pointer
-        func_body.i32_const(0);
-        // Shift left amount
-        func_body.local_get(shift_amount_local);
-        // Heap size
-        func_body.i32_const(TYPE_HEAP_SIZE);
-
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
-        let shift_left_f =
-            heap_int_shift_left(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
-                .unwrap();
-        // Shift left
-        func_body.call(shift_left_f);
-
-        let function = function_builder.finish(vec![shift_amount_local], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        // display_module(&mut raw_module);
-
-        let data = [n.to_le_bytes::<32>()].concat();
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
+        let (mut store, instance, entrypoint) =
+            setup_heap_shift_test(n.to_le_bytes::<32>().to_vec(), TYPE_HEAP_SIZE, false);
 
         let pointer: i32 = entrypoint
             .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
@@ -823,69 +666,7 @@ mod tests {
         let (mut store, instance, entrypoint) =
             setup_heap_shift_test(n.to_le_bytes::<32>().to_vec(), TYPE_HEAP_SIZE, false);
 
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32, ValType::I32],
-        );
-
-        let shift_amount_local = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
-        let shift_left_f =
-            heap_int_shift_left(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
-                .unwrap();
-
-        func_body
-            // Number to shift pointer
-            .i32_const(0)
-            // Shift left amount
-            .local_get(shift_amount_local)
-            // Heap size
-            .i32_const(TYPE_HEAP_SIZE)
-            // Shift left
-            .call(shift_left_f)
-            // Drop the result
-            .drop();
-
-        let error_ptr = raw_module.locals.add(ValType::I32);
-        // Load the abort message pointer. The fn should have failed so the pointer to the error should be stored here.
-        func_body
-            .i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)
-            .load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            )
-            .local_tee(error_ptr);
-
-        // Skip the first 4 bytes corresponding to the length
-        func_body.i32_const(4).binop(BinaryOp::I32Add);
-
-        // Error length
-        func_body.local_get(error_ptr).load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        );
-
-        let function = function_builder.finish(vec![shift_amount_local], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        let data = [n.to_le_bytes::<32>()].concat();
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
-
-        let (pointer, error_length): (i32, i32) = entrypoint
+        let _: i32 = entrypoint
             .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
             .unwrap();
 
@@ -895,41 +676,8 @@ mod tests {
     #[test]
     fn test_u256_shift_left_fuzz() {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(Some(TYPE_HEAP_SIZE));
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
-        );
-
-        let shift_amount_local = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // Number to shift pointer
-        func_body
-            .i32_const(0)
-            // Shift left amount
-            .local_get(shift_amount_local)
-            // Heap size
-            .i32_const(TYPE_HEAP_SIZE);
-
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let mut runtime_error_data = test_runtime_error_data!();
-        let shift_left_f =
-            heap_int_shift_left(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
-                .unwrap();
-        // Shift left
-        func_body.call(shift_left_f);
-
-        let function = function_builder.finish(vec![shift_amount_local], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
+        let (mut store, instance, entrypoint) =
+            setup_heap_shift_test(vec![0; TYPE_HEAP_SIZE as usize], TYPE_HEAP_SIZE, false);
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let reset_memory = Rc::new(AssertUnwindSafe(
@@ -986,37 +734,8 @@ mod tests {
     fn test_u128_shift_right(#[case] n: u128, #[case] shift_amount: i32, #[case] expected: u128) {
         const TYPE_HEAP_SIZE: i32 = 16;
 
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
-        );
-
-        let shift_amount_local = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // Number to shift pointer
-        func_body.i32_const(0);
-        // Shift left amount
-        func_body.local_get(shift_amount_local);
-        // Heap size
-        func_body.i32_const(TYPE_HEAP_SIZE);
-
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
-        let shift_right_f =
-            heap_int_shift_right(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
-                .unwrap();
-        // Shift right
-        func_body.call(shift_right_f);
-
-        let function = function_builder.finish(vec![shift_amount_local], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        let data = [n.to_le_bytes()].concat();
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
+        let (mut store, instance, entrypoint) =
+            setup_heap_shift_test(n.to_le_bytes().to_vec(), TYPE_HEAP_SIZE, true);
 
         let pointer: i32 = entrypoint
             .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
@@ -1038,69 +757,7 @@ mod tests {
         let (mut store, instance, entrypoint) =
             setup_heap_shift_test(n.to_le_bytes().to_vec(), TYPE_HEAP_SIZE, false);
 
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32, ValType::I32],
-        );
-
-        let shift_amount_local = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
-        let shift_right_f =
-            heap_int_shift_right(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
-                .unwrap();
-
-        func_body
-            // Number to shift pointer
-            .i32_const(0)
-            // Shift left amount
-            .local_get(shift_amount_local)
-            // Heap size
-            .i32_const(TYPE_HEAP_SIZE)
-            // Shift right
-            .call(shift_right_f)
-            // Drop the result
-            .drop();
-
-        let error_ptr = raw_module.locals.add(ValType::I32);
-        // Load the abort message pointer. The fn should have failed so the pointer to the error should be stored here.
-        func_body
-            .i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)
-            .load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            )
-            .local_tee(error_ptr);
-
-        // Skip the first 4 bytes corresponding to the length
-        func_body.i32_const(4).binop(BinaryOp::I32Add);
-
-        // Error length
-        func_body.local_get(error_ptr).load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        );
-
-        let function = function_builder.finish(vec![shift_amount_local], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        let data = [n.to_le_bytes()].concat();
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
-
-        let (pointer, error_length): (i32, i32) = entrypoint
+        let _: i32 = entrypoint
             .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
             .unwrap();
 
@@ -1110,40 +767,8 @@ mod tests {
     #[test]
     fn test_u128_shift_right_fuzz() {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
-            build_module(Some(TYPE_HEAP_SIZE));
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
-        );
-
-        let shift_amount_local = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // Number to shift pointer
-        func_body
-            .i32_const(0)
-            // Shift left amount
-            .local_get(shift_amount_local)
-            // Heap size
-            .i32_const(TYPE_HEAP_SIZE);
-
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
-        let shift_left_f =
-            heap_int_shift_right(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
-                .unwrap();
-        // Shift left
-        func_body.call(shift_left_f);
-
-        let function = function_builder.finish(vec![shift_amount_local], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
+        let (mut store, instance, entrypoint) =
+            setup_heap_shift_test(vec![0; TYPE_HEAP_SIZE as usize], TYPE_HEAP_SIZE, true);
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let reset_memory = Rc::new(AssertUnwindSafe(
@@ -1197,42 +822,8 @@ mod tests {
     #[case(U256::MAX, 255, U256::MAX >> 255)]
     fn test_u256_shift_right(#[case] n: U256, #[case] shift_amount: i32, #[case] expected: U256) {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
-            build_module(Some(TYPE_HEAP_SIZE));
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
-        );
-
-        let shift_amount_local = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // Number to shift pointer
-        func_body.i32_const(0);
-        // Shift left amount
-        func_body.local_get(shift_amount_local);
-        // Heap size
-        func_body.i32_const(TYPE_HEAP_SIZE);
-
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
-        let shift_right_f =
-            heap_int_shift_right(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
-                .unwrap();
-        // Shift right
-        func_body.call(shift_right_f);
-
-        let function = function_builder.finish(vec![shift_amount_local], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        // display_module(&mut raw_module);
-
-        let data = [n.to_le_bytes::<32>()].concat();
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
+        let (mut store, instance, entrypoint) =
+            setup_heap_shift_test(n.to_le_bytes::<32>().to_vec(), TYPE_HEAP_SIZE, true);
 
         let pointer: i32 = entrypoint
             .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
@@ -1253,69 +844,7 @@ mod tests {
         let (mut store, instance, entrypoint) =
             setup_heap_shift_test(n.to_le_bytes::<32>().to_vec(), TYPE_HEAP_SIZE, true);
 
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32, ValType::I32],
-        );
-
-        let shift_amount_local = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
-        let shift_right_f =
-            heap_int_shift_right(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
-                .unwrap();
-
-        func_body
-            // Number to shift pointer
-            .i32_const(0)
-            // Shift right amount
-            .local_get(shift_amount_local)
-            // Heap size
-            .i32_const(TYPE_HEAP_SIZE)
-            // Shift right
-            .call(shift_right_f)
-            // Drop the result
-            .drop();
-
-        let error_ptr = raw_module.locals.add(ValType::I32);
-        // Load the abort message pointer. The fn should have failed so the pointer to the error should be stored here.
-        func_body
-            .i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)
-            .load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            )
-            .local_tee(error_ptr);
-
-        // Skip the first 4 bytes corresponding to the length
-        func_body.i32_const(4).binop(BinaryOp::I32Add);
-
-        // Error length
-        func_body.local_get(error_ptr).load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        );
-
-        let function = function_builder.finish(vec![shift_amount_local], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        let data = [n.to_le_bytes::<32>()].concat();
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
-
-        let (pointer, error_length): (i32, i32) = entrypoint
+        let _: i32 = entrypoint
             .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
             .unwrap();
 
@@ -1325,40 +854,8 @@ mod tests {
     #[test]
     fn test_u256_shift_right_fuzz() {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
-            build_module(Some(TYPE_HEAP_SIZE));
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
-        );
-
-        let shift_amount_local = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // Number to shift pointer
-        func_body
-            .i32_const(0)
-            // Shift left amount
-            .local_get(shift_amount_local)
-            // Heap size
-            .i32_const(TYPE_HEAP_SIZE);
-
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
-        let shift_left_f =
-            heap_int_shift_right(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
-                .unwrap();
-        // Shift left
-        func_body.call(shift_left_f);
-
-        let function = function_builder.finish(vec![shift_amount_local], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
+        let (mut store, instance, entrypoint) =
+            setup_heap_shift_test(vec![0; TYPE_HEAP_SIZE as usize], TYPE_HEAP_SIZE, true);
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let reset_memory = Rc::new(AssertUnwindSafe(

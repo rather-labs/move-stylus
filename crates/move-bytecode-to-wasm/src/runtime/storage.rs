@@ -1703,7 +1703,6 @@ pub fn cache_storage_object_changes(
 #[cfg(test)]
 mod tests {
     use crate::test_compilation_context;
-    use crate::test_runtime_error_data;
     use crate::test_tools::{
         INITIAL_MEMORY_OFFSET, build_module, get_linker_with_native_keccak256,
         setup_wasmtime_module,
@@ -1995,7 +1994,7 @@ mod tests {
         let (mut module, allocator_func, memory_id, compilation_ctx) = build_module(Some(40)); // slot (32 bytes) + index (4 bytes) + elem_size (4 bytes)
 
         let ctx = test_compilation_context!(memory_id, allocator_func, compilation_ctx);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let slot_ptr = module.locals.add(ValType::I32);
         let index = module.locals.add(ValType::I32);
@@ -2088,7 +2087,7 @@ mod tests {
         // slot (32 bytes) + outer_index (4 bytes) + inner_index (4 bytes) + elem_size (4 bytes)
         let (mut module, allocator_func, memory_id, compilation_ctx) = build_module(Some(44));
         let ctx = test_compilation_context!(memory_id, allocator_func, compilation_ctx);
-        let mut runtime_error_data = test_runtime_error_data!();
+        let mut runtime_error_data = RuntimeErrorData::new();
 
         let slot_ptr = module.locals.add(ValType::I32);
         let outer_index = module.locals.add(ValType::I32);

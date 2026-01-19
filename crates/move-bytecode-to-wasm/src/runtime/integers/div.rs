@@ -496,7 +496,6 @@ mod tests {
     use std::rc::Rc;
 
     use crate::test_compilation_context;
-    use crate::test_runtime_error_data;
     use crate::test_tools::{
         INITIAL_MEMORY_OFFSET, build_module, get_linker_with_host_debug_functions,
         setup_wasmtime_module,
@@ -681,44 +680,11 @@ mod tests {
     #[case(10, 0, 0)]
     fn test_div_u128(#[case] n1: u128, #[case] n2: u128, #[case] quotient: u128) {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
-            build_module(Some(TYPE_HEAP_SIZE * 2));
-
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
-        );
-
-        let n1_ptr = raw_module.locals.add(ValType::I32);
-        let n2_ptr = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // arguments for heap_integers_div (n1_ptr, n2_ptr, size in heap and return quotient)
-        func_body
-            .i32_const(0)
-            .i32_const(TYPE_HEAP_SIZE)
-            .i32_const(128)
-            .i32_const(1);
-
-        let heap_integers_div_f =
-            heap_integers_div_mod(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
-                .unwrap();
-        func_body.call(heap_integers_div_f);
-
-        let linker = get_linker_with_host_debug_functions();
-        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-        let data = [n1.to_le_bytes(), n2.to_le_bytes()].concat();
-        let (_, instance, mut store, entrypoint) = setup_wasmtime_module(
-            &mut raw_module,
-            data.to_vec(),
-            "test_function",
-            Some(linker),
+        let (mut store, instance, entrypoint) = setup_heap_div_test(
+            n1.to_le_bytes().to_vec(),
+            n2.to_le_bytes().to_vec(),
+            TYPE_HEAP_SIZE,
+            true,
         );
 
         let quotient_ptr: i32 = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
@@ -739,15 +705,11 @@ mod tests {
     #[test]
     pub fn test_div_u128_fuzz() {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
-            build_module(Some(TYPE_HEAP_SIZE * 2));
-
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
+        let (mut store, instance, entrypoint) = setup_heap_div_test(
+            vec![0; TYPE_HEAP_SIZE as usize],
+            vec![0; TYPE_HEAP_SIZE as usize],
+            TYPE_HEAP_SIZE,
+            true,
         );
         let memory = instance.get_memory(&mut store, "memory").unwrap();
 
@@ -815,46 +777,11 @@ mod tests {
     )]
     fn test_mod_u128(#[case] n1: u128, #[case] n2: u128, #[case] remainder: u128) {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
-            build_module(Some(TYPE_HEAP_SIZE * 2));
-
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
-        );
-
-        let n1_ptr = raw_module.locals.add(ValType::I32);
-        let n2_ptr = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // arguments for heap_integers_div (n1_ptr, n2_ptr, size in heap and return remainder)
-        func_body
-            .i32_const(0)
-            .i32_const(TYPE_HEAP_SIZE)
-            .i32_const(128)
-            .i32_const(0);
-
-        let heap_integers_div_f =
-            heap_integers_div_mod(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
-                .unwrap();
-        // Shift left
-        func_body.call(heap_integers_div_f);
-
-        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-        let data = [n1.to_le_bytes(), n2.to_le_bytes()].concat();
-
-        let linker = get_linker_with_host_debug_functions();
-        let (_, instance, mut store, entrypoint) = setup_wasmtime_module(
-            &mut raw_module,
-            data.to_vec(),
-            "test_function",
-            Some(linker),
+        let (mut store, instance, entrypoint) = setup_heap_div_test(
+            n1.to_le_bytes().to_vec(),
+            n2.to_le_bytes().to_vec(),
+            TYPE_HEAP_SIZE,
+            false,
         );
 
         let remainder_ptr: i32 = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
@@ -876,16 +803,11 @@ mod tests {
     #[test]
     pub fn test_mod_u128_fuzz() {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
-            build_module(Some(TYPE_HEAP_SIZE * 2));
-
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
+        let (mut store, instance, entrypoint) = setup_heap_div_test(
+            vec![0; TYPE_HEAP_SIZE as usize],
+            vec![0; TYPE_HEAP_SIZE as usize],
+            TYPE_HEAP_SIZE,
+            false,
         );
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
@@ -970,10 +892,6 @@ mod tests {
     )]
     fn test_div_u256(#[case] n1: U256, #[case] n2: U256, #[case] quotient: U256) {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
-            build_module(Some(TYPE_HEAP_SIZE * 2));
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
 
         let (mut store, instance, entrypoint) = setup_heap_div_test(
             n1.to_le_bytes::<32>().to_vec(),
@@ -1000,15 +918,11 @@ mod tests {
     #[test]
     pub fn test_div_u256_fuzz() {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
-            build_module(Some(TYPE_HEAP_SIZE * 2));
-
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
+        let (mut store, instance, entrypoint) = setup_heap_div_test(
+            vec![0; TYPE_HEAP_SIZE as usize],
+            vec![0; TYPE_HEAP_SIZE as usize],
+            TYPE_HEAP_SIZE,
+            true,
         );
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
@@ -1105,16 +1019,11 @@ mod tests {
     #[case(U256::from(10), U256::from(0), U256::from(0))]
     fn test_mod_u256(#[case] n1: U256, #[case] n2: U256, #[case] remainder: U256) {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
-            build_module(Some(TYPE_HEAP_SIZE * 2));
-
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
+        let (mut store, instance, entrypoint) = setup_heap_div_test(
+            n1.to_le_bytes::<32>().to_vec(),
+            n2.to_le_bytes::<32>().to_vec(),
+            TYPE_HEAP_SIZE,
+            false,
         );
 
         let remainder_ptr: i32 = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
@@ -1136,15 +1045,11 @@ mod tests {
     #[test]
     pub fn test_mod_u256_fuzz() {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
-            build_module(Some(TYPE_HEAP_SIZE * 2));
-
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
-        let mut runtime_error_data = test_runtime_error_data!();
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
+        let (mut store, instance, entrypoint) = setup_heap_div_test(
+            vec![0; TYPE_HEAP_SIZE as usize],
+            vec![0; TYPE_HEAP_SIZE as usize],
+            TYPE_HEAP_SIZE,
+            false,
         );
         let memory = instance.get_memory(&mut store, "memory").unwrap();
 
