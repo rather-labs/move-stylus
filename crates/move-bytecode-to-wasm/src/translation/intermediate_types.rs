@@ -456,7 +456,7 @@ impl IntermediateType {
                     | IntermediateType::IRef(_)
                     | IntermediateType::IMutRef(_)
                     | IntermediateType::ITypeParameter(_) => {
-                        // Unreachable - these cases are handled in the outer match
+                        // These cases are handled in the outer match
                     }
                 }
             }

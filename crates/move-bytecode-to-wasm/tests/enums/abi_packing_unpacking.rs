@@ -1,6 +1,8 @@
 use crate::common::run_test;
 use crate::declare_fixture;
+use alloy_primitives::keccak256;
 use alloy_sol_types::{SolCall, SolType, SolValue, abi::TokenSeq, sol};
+use move_bytecode_to_wasm::error::RuntimeError;
 use move_test_runner::wasm_runner::RuntimeSandbox;
 use rstest::{fixture, rstest};
 
@@ -45,10 +47,19 @@ fn test_enum_abi_packing_unpacking<T: SolCall, V: SolValue>(
 }
 
 #[test]
-#[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
 fn test_enum_abi_unpacking_out_of_bounds() {
     // Calldata with non-extistant enum member 4
     let call_data = [packUnpackCall::SELECTOR.to_vec(), (4,).abi_encode()].concat();
     let runtime = runtime();
-    runtime.call_entrypoint(call_data).unwrap();
+
+    let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+    assert_eq!(result, 1);
+
+    let error_message = String::from_utf8_lossy(RuntimeError::OutOfBounds.as_bytes());
+    let expected = [
+        keccak256(b"Error(string)")[..4].to_vec(),
+        <sol!((string,))>::abi_encode_params(&(error_message,)),
+    ]
+    .concat();
+    assert_eq!(result_data, expected);
 }

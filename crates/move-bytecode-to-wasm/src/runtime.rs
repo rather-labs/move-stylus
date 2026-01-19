@@ -536,9 +536,14 @@ impl RuntimeFunction {
                     generics[0],
                 )?
             }
-            (Self::UnpackEnum, _) => {
+            (Self::UnpackEnum, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
-                unpacking::enums::unpack_enum_function(module, compilation_ctx, generics[0])?
+                unpacking::enums::unpack_enum_function(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    generics[0],
+                )?
             }
             (Self::UnpackStruct, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
