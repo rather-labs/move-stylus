@@ -121,7 +121,7 @@ impl Abi {
         let structs =
             Self::process_structs(structs_to_process, modules_data, &mut processed_structs);
 
-        let enums = Self::process_enums(enums_to_process, modules_data, &mut HashSet::new());
+        let enums = Self::process_enums(enums_to_process, modules_data);
 
         Abi {
             contract_name: processing_module.special_attributes.module_name,
@@ -454,14 +454,9 @@ impl Abi {
     pub fn process_enums(
         enums: HashSet<IntermediateType>,
         modules_data: &HashMap<ModuleId, ModuleData>,
-        processed_enums: &mut HashSet<IntermediateType>,
     ) -> Vec<Enum_> {
         let mut result = Vec::new();
         for enum_itype in enums {
-            if processed_enums.contains(&enum_itype) {
-                continue;
-            }
-
             let (module_id, index, types) = match &enum_itype {
                 IntermediateType::IEnum {
                     module_id, index, ..
@@ -489,7 +484,6 @@ impl Abi {
                 .find(|e| *e.name == *enum_.identifier)
                 .unwrap();
 
-            processed_enums.insert(enum_itype);
             result.push(Enum_ {
                 identifier: enum_.identifier,
                 variants: parsed_enum.variants.iter().map(|v| v.0).collect(),
