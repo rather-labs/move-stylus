@@ -7,3 +7,5 @@ __fuzz__
 
 .env
 .env.bak
+
+.DS_Store
