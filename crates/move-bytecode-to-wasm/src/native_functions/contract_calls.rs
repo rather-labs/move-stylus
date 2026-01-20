@@ -24,6 +24,7 @@ use crate::{
         contract_call_result::{ContractCallEmptyResult, ContractCallResult},
         uid::Uid,
     },
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 
 use super::error::NativeFunctionError;
@@ -251,6 +252,7 @@ pub fn add_external_contract_call_fn(
                     calldata_reference_pointer,
                     compilation_ctx,
                     Some(runtime_error_data),
+                    None,
                 )?;
 
                 builder
@@ -267,6 +269,7 @@ pub fn add_external_contract_call_fn(
                     calldata_reference_pointer,
                     compilation_ctx,
                     Some(runtime_error_data),
+                    None,
                 )?;
 
                 builder
@@ -709,7 +712,11 @@ pub fn add_external_contract_call_fn(
                     )
                     .local_tee(uid_ptr)
                     .i32_const(0)
-                    .call(locate_storage_data_fn)
+                    .call_runtime_function(
+                        compilation_ctx,
+                        locate_storage_data_fn,
+                        &RuntimeFunction::LocateStorageData,
+                    )
                     .local_set(owner_ptr);
 
                 // The slot for this struct written in DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET
@@ -730,7 +737,11 @@ pub fn add_external_contract_call_fn(
                             .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
                             .local_get(uid_ptr)
                             .local_get(owner_ptr)
-                            .call(read_and_decode_from_storage_fn)
+                            .call_runtime_function(
+                                compilation_ctx,
+                                read_and_decode_from_storage_fn,
+                                &RuntimeFunction::ReadAndDecodeFromStorage,
+                            )
                             .local_set(new_struct_ptr);
 
                         // Once we return from the reading the allegedly modified object from storage, we

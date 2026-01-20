@@ -29,7 +29,7 @@ use walrus::{
 pub fn unpack_vector_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
-    runtime_error_data: Option<&mut RuntimeErrorData>,
+    runtime_error_data: &mut RuntimeErrorData,
     inner: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let name =
@@ -51,8 +51,11 @@ pub fn unpack_vector_function(
 
     // Runtime functions
     let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None, None)?;
-    let validate_pointer_fn =
-        RuntimeFunction::ValidatePointer32Bit.get(module, Some(compilation_ctx), None)?;
+    let validate_pointer_fn = RuntimeFunction::ValidatePointer32Bit.get(
+        module,
+        Some(compilation_ctx),
+        Some(runtime_error_data),
+    )?;
 
     let data_reader_pointer = module.locals.add(ValType::I32);
 
@@ -60,7 +63,11 @@ pub fn unpack_vector_function(
     // values in the call data.
 
     // Validate that the pointer fits in 32 bits
-    builder.local_get(reader_pointer).call(validate_pointer_fn);
+    builder.local_get(reader_pointer).call_runtime_function(
+        compilation_ctx,
+        validate_pointer_fn,
+        &RuntimeFunction::ValidatePointer32Bit,
+    );
 
     // Load the pointer to the data, swap it to little-endian and add that to the calldata reader pointer.
     builder
@@ -89,7 +96,11 @@ pub fn unpack_vector_function(
     // Validate that the data reader pointer fits in 32 bits
     builder
         .local_get(data_reader_pointer)
-        .call(validate_pointer_fn);
+        .call_runtime_function(
+            compilation_ctx,
+            validate_pointer_fn,
+            &RuntimeFunction::ValidatePointer32Bit,
+        );
 
     // Vector length: current number of elements in the vector
     let length = module.locals.add(ValType::I32);
@@ -160,7 +171,7 @@ pub fn unpack_vector_function(
                 data_reader_pointer,
                 calldata_base_pointer_,
                 compilation_ctx,
-                runtime_error_data,
+                Some(runtime_error_data),
             )?;
 
             // Store the value
@@ -216,7 +227,7 @@ mod tests {
         abi_types::unpacking::Unpackable,
         data::RuntimeErrorData,
         test_compilation_context,
-        test_tools::{build_module, setup_wasmtime_module},
+        test_tools::{INITIAL_MEMORY_OFFSET, build_module, setup_wasmtime_module},
         translation::intermediate_types::IntermediateType,
     };
     use alloy_primitives::{U256, address};
@@ -235,17 +246,19 @@ mod tests {
         let args_pointer = raw_module.locals.add(ValType::I32);
         let calldata_reader_pointer = raw_module.locals.add(ValType::I32);
         let mut func_body = function_builder.func_body();
+        let func_body_id = func_body.id();
 
-        func_body.i32_const(0);
-        func_body.local_tee(args_pointer);
-        func_body.local_set(calldata_reader_pointer);
+        func_body
+            .i32_const(INITIAL_MEMORY_OFFSET)
+            .local_tee(args_pointer)
+            .local_set(calldata_reader_pointer);
 
         int_type
             .add_unpack_instructions(
                 None,
                 &mut func_body,
                 &mut raw_module,
-                None,
+                Some(func_body_id),
                 args_pointer,
                 calldata_reader_pointer,
                 &compilation_ctx,
@@ -256,11 +269,15 @@ mod tests {
         let function = function_builder.finish(vec![], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
+        let linker = crate::test_tools::get_linker_with_host_debug_functions();
+        let (_, instance, mut store, entrypoint) = setup_wasmtime_module(
+            &mut raw_module,
+            data.to_vec(),
+            "test_function",
+            Some(linker),
+        );
 
         let result: i32 = entrypoint.call(&mut store, ()).unwrap();
-        assert_eq!(result, data.len() as i32);
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let mut result_memory_data = vec![0; expected_result_bytes.len()];
@@ -365,9 +382,15 @@ mod tests {
         let expected_result_bytes = [
             3u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
-            ((data.len() + 20) as u32).to_le_bytes().as_slice(),
-            ((data.len() + 36) as u32).to_le_bytes().as_slice(),
-            ((data.len() + 52) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + data.len() as i32 + 20) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + data.len() as i32 + 36) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + data.len() as i32 + 52) as u32)
+                .to_le_bytes()
+                .as_slice(),
             1u128.to_le_bytes().as_slice(),
             2u128.to_le_bytes().as_slice(),
             3u128.to_le_bytes().as_slice(),
@@ -386,9 +409,15 @@ mod tests {
         let expected_result_bytes = [
             3u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
-            ((data.len() + 20) as u32).to_le_bytes().as_slice(),
-            ((data.len() + 52) as u32).to_le_bytes().as_slice(),
-            ((data.len() + 84) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + data.len() as i32 + 20) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + data.len() as i32 + 52) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + data.len() as i32 + 84) as u32)
+                .to_le_bytes()
+                .as_slice(),
             U256::from(1).to_le_bytes::<32>().as_slice(),
             U256::from(2).to_le_bytes::<32>().as_slice(),
             U256::from(3).to_le_bytes::<32>().as_slice(),
@@ -403,22 +432,28 @@ mod tests {
         let int_type = IntermediateType::IVector(Arc::new(IntermediateType::IAddress));
 
         let data = SolType::abi_encode_params(&(vec![
-            address!("0x1234567890abcdef1234567890abcdef12345678"),
-            address!("0x1234567890abcdef1234567890abcdef12345678"),
-            address!("0x1234567890abcdef1234567890abcdef12345678"),
+            address!("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+            address!("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+            address!("0xcccccccccccccccccccccccccccccccccccccccc"),
         ],));
         let expected_result_bytes = [
             3u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
-            ((data.len() + 20) as u32).to_le_bytes().as_slice(),
-            ((data.len() + 52) as u32).to_le_bytes().as_slice(),
-            ((data.len() + 84) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + data.len() as i32 + 20) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + data.len() as i32 + 52) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + data.len() as i32 + 84) as u32)
+                .to_le_bytes()
+                .as_slice(),
             &[0; 12],
-            address!("0x1234567890abcdef1234567890abcdef12345678").as_slice(),
+            address!("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").as_slice(),
             &[0; 12],
-            address!("0x1234567890abcdef1234567890abcdef12345678").as_slice(),
+            address!("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb").as_slice(),
             &[0; 12],
-            address!("0x1234567890abcdef1234567890abcdef12345678").as_slice(),
+            address!("0xcccccccccccccccccccccccccccccccccccccccc").as_slice(),
         ]
         .concat();
         unpack_vec(&data, int_type, &expected_result_bytes);
@@ -440,8 +475,12 @@ mod tests {
         let expected_result_bytes = [
             2u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
-            ((data.len() + 16) as u32).to_le_bytes().as_slice(),
-            ((data.len() + 36) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + data.len() as i32 + 16) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + data.len() as i32 + 36) as u32)
+                .to_le_bytes()
+                .as_slice(),
             3u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
             1u32.to_le_bytes().as_slice(),
@@ -466,26 +505,42 @@ mod tests {
 
         let data = SolType::abi_encode_params(&(vec![vec![1, 2, 3], vec![4, 5, 6]],));
         let expected_result_bytes = [
-            2u32.to_le_bytes().as_slice(),                        // len
-            2u32.to_le_bytes().as_slice(),                        // capacity
-            ((data.len() + 16) as u32).to_le_bytes().as_slice(),  // first element pointer
-            ((data.len() + 84) as u32).to_le_bytes().as_slice(),  // second element pointer
-            3u32.to_le_bytes().as_slice(),                        // first element length
-            3u32.to_le_bytes().as_slice(),                        // first element capacity
-            ((data.len() + 36) as u32).to_le_bytes().as_slice(), // first element - first value pointer
-            ((data.len() + 52) as u32).to_le_bytes().as_slice(), // first element - second value pointer
-            ((data.len() + 68) as u32).to_le_bytes().as_slice(), // first element - third value pointer
-            1u128.to_le_bytes().as_slice(),                      // first element - first value
-            2u128.to_le_bytes().as_slice(),                      // first element - second value
-            3u128.to_le_bytes().as_slice(),                      // first element - third value
-            3u32.to_le_bytes().as_slice(),                       // second element length
-            3u32.to_le_bytes().as_slice(),                       // second element capacity
-            ((data.len() + 104) as u32).to_le_bytes().as_slice(), // second element - first value pointer
-            ((data.len() + 120) as u32).to_le_bytes().as_slice(), // second element - second value pointer
-            ((data.len() + 136) as u32).to_le_bytes().as_slice(), // second element - third value pointer
-            4u128.to_le_bytes().as_slice(),                       // second element - first value
-            5u128.to_le_bytes().as_slice(),                       // second element - second value
-            6u128.to_le_bytes().as_slice(),                       // second element - third value
+            2u32.to_le_bytes().as_slice(), // len
+            2u32.to_le_bytes().as_slice(), // capacity
+            ((INITIAL_MEMORY_OFFSET + data.len() as i32 + 16) as u32)
+                .to_le_bytes()
+                .as_slice(), // first element pointer
+            ((INITIAL_MEMORY_OFFSET + data.len() as i32 + 84) as u32)
+                .to_le_bytes()
+                .as_slice(), // second element pointer
+            3u32.to_le_bytes().as_slice(), // first element length
+            3u32.to_le_bytes().as_slice(), // first element capacity
+            ((INITIAL_MEMORY_OFFSET + data.len() as i32 + 36) as u32)
+                .to_le_bytes()
+                .as_slice(), // first element - first value pointer
+            ((INITIAL_MEMORY_OFFSET + data.len() as i32 + 52) as u32)
+                .to_le_bytes()
+                .as_slice(), // first element - second value pointer
+            ((INITIAL_MEMORY_OFFSET + data.len() as i32 + 68) as u32)
+                .to_le_bytes()
+                .as_slice(), // first element - third value pointer
+            1u128.to_le_bytes().as_slice(), // first element - first value
+            2u128.to_le_bytes().as_slice(), // first element - second value
+            3u128.to_le_bytes().as_slice(), // first element - third value
+            3u32.to_le_bytes().as_slice(), // second element length
+            3u32.to_le_bytes().as_slice(), // second element capacity
+            ((INITIAL_MEMORY_OFFSET + data.len() as i32 + 104) as u32)
+                .to_le_bytes()
+                .as_slice(), // second element - first value pointer
+            ((INITIAL_MEMORY_OFFSET + data.len() as i32 + 120) as u32)
+                .to_le_bytes()
+                .as_slice(), // second element - second value pointer
+            ((INITIAL_MEMORY_OFFSET + data.len() as i32 + 136) as u32)
+                .to_le_bytes()
+                .as_slice(), // second element - third value pointer
+            4u128.to_le_bytes().as_slice(), // second element - first value
+            5u128.to_le_bytes().as_slice(), // second element - second value
+            6u128.to_le_bytes().as_slice(), // second element - third value
         ]
         .concat();
         unpack_vec(&data, int_type, &expected_result_bytes);

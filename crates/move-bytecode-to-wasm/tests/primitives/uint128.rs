@@ -1,6 +1,8 @@
 use crate::common::run_test;
 use crate::declare_fixture;
+use alloy_primitives::keccak256;
 use alloy_sol_types::{SolCall, SolType, SolValue, abi::TokenSeq, sol};
+use move_bytecode_to_wasm::error::RuntimeError;
 use move_test_runner::wasm_runner::RuntimeSandbox;
 use rstest::{fixture, rstest};
 
@@ -68,8 +70,6 @@ fn test_uint_128<T: SolCall, V: SolValue>(
 #[case(sumCall::new((18446744073709551616,18446744073709551616)), (36893488147419103232_u128,))]
 #[case(sumCall::new((79228162514264337593543950335,79228162514264337593543950335)), (158456325028528675187087900670_u128,))]
 #[case(sumCall::new((79228162514264337593543950336,79228162514264337593543950336)), (158456325028528675187087900672_u128,))]
-#[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
-#[case(sumCall::new((u128::MAX, 42)), ((),))]
 fn test_uint_128_sum<T: SolCall, V: SolValue>(
     #[by_ref] runtime: &RuntimeSandbox,
     #[case] call_data: T,
@@ -86,23 +86,31 @@ fn test_uint_128_sum<T: SolCall, V: SolValue>(
 }
 
 #[rstest]
+#[case(sumCall::new((u128::MAX, 42)))]
+fn test_uint_128_sum_overflow<T: SolCall>(
+    #[by_ref] runtime: &RuntimeSandbox,
+    #[case] call_data: T,
+) {
+    let (result, return_data) = runtime.call_entrypoint(call_data.abi_encode()).unwrap();
+    // Functions should return 1 in case of overflow
+    assert_eq!(result, 1_i32);
+    let error_message = String::from_utf8_lossy(RuntimeError::Overflow.as_bytes());
+    let expected_data = [
+        keccak256(b"Error(string)")[..4].to_vec(),
+        <sol!((string,))>::abi_encode_params(&(error_message,)),
+    ]
+    .concat();
+    assert_eq!(return_data, expected_data);
+}
+
+#[rstest]
 #[case(subCall::new((2,1)), (1,))]
 #[case(subCall::new((8589934590, 4294967295)), (4294967295_u128,))]
 #[case(subCall::new((8589934592, 4294967296)), (4294967296_u128,))]
 #[case(subCall::new((36893488147419103232, 18446744073709551616)), (18446744073709551616_u128,))]
 #[case(subCall::new((158456325028528675187087900670, 79228162514264337593543950335)), (79228162514264337593543950335_u128,))]
 #[case(subCall::new((158456325028528675187087900672, 79228162514264337593543950336)), (79228162514264337593543950336_u128,))]
-#[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
-#[case(subCall::new((1, 2)), ((),))]
-#[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
-#[case(subCall::new((4294967296, 8589934592)), ((),))]
-#[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
-#[case(subCall::new((18446744073709551616, 36893488147419103232)), ((),))]
-#[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
-#[case(subCall::new((79228162514264337593543950336, 158456325028528675187087900672)), ((),))]
 #[case(subCall::new((36893488147419103230, 18446744073709551615)), (18446744073709551615_u128,))]
-#[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
-#[case(subCall::new((1, u128::MAX)), ((),))]
 fn test_uint_128_sub<T: SolCall, V: SolValue>(
     #[by_ref] runtime: &RuntimeSandbox,
     #[case] call_data: T,
@@ -116,6 +124,28 @@ fn test_uint_128_sub<T: SolCall, V: SolValue>(
         expected_result.abi_encode(),
     )
     .unwrap();
+}
+
+#[rstest]
+#[case(subCall::new((1, 2)))]
+#[case(subCall::new((4294967296, 8589934592)))]
+#[case(subCall::new((18446744073709551616, 36893488147419103232)))]
+#[case(subCall::new((79228162514264337593543950336, 158456325028528675187087900672)))]
+#[case(subCall::new((1, u128::MAX)))]
+fn test_uint_128_sub_overflow<T: SolCall>(
+    #[by_ref] runtime: &RuntimeSandbox,
+    #[case] call_data: T,
+) {
+    let (result, return_data) = runtime.call_entrypoint(call_data.abi_encode()).unwrap();
+    // Functions should return 1 in case of overflow
+    assert_eq!(result, 1_i32);
+    let error_message = String::from_utf8_lossy(RuntimeError::Overflow.as_bytes());
+    let expected_data = [
+        keccak256(b"Error(string)")[..4].to_vec(),
+        <sol!((string,))>::abi_encode_params(&(error_message,)),
+    ]
+    .concat();
+    assert_eq!(return_data, expected_data);
 }
 
 #[rstest]
@@ -133,14 +163,6 @@ fn test_uint_128_sub<T: SolCall, V: SolValue>(
     9_223_372_036_854_775_808,
     85_070_591_730_234_615_865_843_651_857_942_052_864
 )]
-#[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
-#[case(u128::MAX, 2, 0)]
-#[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
-#[case(u128::MAX, 5, 0)]
-#[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
-#[case(u128::MAX, u64::MAX as u128, 0)]
-#[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
-#[case(u64::MAX as u128 * 2, u64::MAX as u128 * 2, 0)]
 fn test_uint_128_mul(
     #[by_ref] runtime: &RuntimeSandbox,
     #[case] n1: u128,
@@ -153,6 +175,30 @@ fn test_uint_128_mul(
         <(&u128,)>::abi_encode(&(&expected_result,)),
     )
     .unwrap();
+}
+
+#[rstest]
+#[case(u128::MAX, 2)]
+#[case(u128::MAX, 5)]
+#[case(u128::MAX, u64::MAX as u128)]
+#[case(u64::MAX as u128 * 2, u64::MAX as u128 * 2)]
+fn test_uint_128_mul_overflow(
+    #[by_ref] runtime: &RuntimeSandbox,
+    #[case] n1: u128,
+    #[case] n2: u128,
+) {
+    let (result, return_data) = runtime
+        .call_entrypoint(mulCall::new((n1, n2)).abi_encode())
+        .unwrap();
+    // Functions should return 1 in case of overflow
+    assert_eq!(result, 1_i32);
+    let error_message = String::from_utf8_lossy(RuntimeError::Overflow.as_bytes());
+    let expected_data = [
+        keccak256(b"Error(string)")[..4].to_vec(),
+        <sol!((string,))>::abi_encode_params(&(error_message,)),
+    ]
+    .concat();
+    assert_eq!(return_data, expected_data);
 }
 
 #[rstest]

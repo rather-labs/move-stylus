@@ -57,7 +57,7 @@ pub fn add_revert_fn(
 
     builder
         .local_get(encoded_error_ptr)
-        .add_handle_error_instructions(module, compilation_ctx);
+        .add_handle_error_instructions(module, compilation_ctx, None);
 
     Ok(function.finish(vec![error_struct_ptr], &mut module.funcs))
 }

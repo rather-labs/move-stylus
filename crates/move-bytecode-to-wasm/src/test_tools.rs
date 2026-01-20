@@ -5,14 +5,21 @@ use wasmtime::{Caller, Engine, Instance, Linker, Module as WasmModule, Store, Ty
 
 use crate::{compilation_context::globals::CompilationContextGlobals, memory::setup_module_memory};
 
+pub const INITIAL_MEMORY_OFFSET: i32 = 2000;
+
 pub fn build_module(
     initial_memory_offset: Option<i32>,
 ) -> (Module, FunctionId, MemoryId, CompilationContextGlobals) {
     let config = ModuleConfig::new();
     let mut module = Module::with_config(config);
 
-    let (allocator_func, memory_id, compilation_context_globals) =
-        setup_module_memory(&mut module, initial_memory_offset);
+    #[cfg(feature = "inject-host-debug-fns")]
+    crate::test_tools::inject_debug_fns(&mut module);
+
+    let (allocator_func, memory_id, compilation_context_globals) = setup_module_memory(
+        &mut module,
+        Some(initial_memory_offset.unwrap_or(0) + INITIAL_MEMORY_OFFSET),
+    );
 
     (
         module,
@@ -49,7 +56,13 @@ where
         .unwrap();
 
     let memory = instance.get_memory(&mut store, "memory").unwrap();
-    memory.write(&mut store, 0, &initial_memory_data).unwrap();
+    memory
+        .write(
+            &mut store,
+            INITIAL_MEMORY_OFFSET as usize,
+            &initial_memory_data,
+        )
+        .unwrap();
 
     (linker, instance, store, entrypoint)
 }
@@ -75,6 +88,34 @@ pub fn get_linker_with_host_debug_functions<T>() -> Linker<T> {
         .unwrap();
 
     linker
+        .func_wrap(
+            "",
+            "print_memory_from",
+            |mut caller: Caller<'_, T>, ptr: i32, len: i32| {
+                let memory = match caller.get_export("memory") {
+                    Some(wasmtime::Extern::Memory(mem)) => mem,
+                    _ => panic!("failed to find host memory"),
+                };
+
+                let mut result = vec![0; len as usize];
+                memory.read(&caller, ptr as usize, &mut result).unwrap();
+                println!("Data {result:?}");
+
+                println!("In chunks of 32 bytes:");
+                for chunk in result.chunks(32) {
+                    // print each byte in hex, for example
+                    for b in chunk {
+                        print!("{b:?} ");
+                    }
+                    println!(); // newline after each 32‑byte chunk
+                }
+
+                println!("--- --- ---\n");
+            },
+        )
+        .unwrap();
+
+    linker
         .func_wrap("", "print_u128", |mut caller: Caller<'_, T>, ptr: i32| {
             println!("--- u128 ---\nPointer {ptr}");
 
@@ -89,6 +130,32 @@ pub fn get_linker_with_host_debug_functions<T>() -> Linker<T> {
             println!("Decimal data {}", u128::from_le_bytes(result));
             println!("--- end u128 ---\n");
         })
+        .unwrap();
+
+    linker
+        .func_wrap(
+            "",
+            "print_address",
+            |mut caller: Caller<'_, T>, ptr: i32| {
+                println!("--- address ---\nPointer {ptr}");
+
+                let memory = match caller.get_export("memory") {
+                    Some(wasmtime::Extern::Memory(mem)) => mem,
+                    _ => panic!("failed to find host memory"),
+                };
+
+                let mut result = [0; 32];
+                memory.read(&caller, ptr as usize, &mut result).unwrap();
+                println!(
+                    "Data 0x{}",
+                    result[12..]
+                        .iter()
+                        .map(|b| format!("{b:02x}"))
+                        .collect::<String>()
+                );
+                println!("--- end address ---\n");
+            },
+        )
         .unwrap();
     linker
 }

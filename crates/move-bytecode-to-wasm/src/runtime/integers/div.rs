@@ -5,6 +5,7 @@ use walrus::{
 
 use crate::{
     CompilationContext,
+    data::RuntimeErrorData,
     runtime::{RuntimeFunction, error::RuntimeFunctionError},
 };
 
@@ -41,6 +42,7 @@ const F_SET_BIT: &str = "set_bit";
 pub fn heap_integers_div_mod(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let mut function = FunctionBuilder::new(
         &mut module.types,
@@ -50,7 +52,8 @@ pub fn heap_integers_div_mod(
 
     let check_if_a_less_than_b_f =
         RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None)?;
-    let sub_f = RuntimeFunction::HeapIntSub.get(module, Some(compilation_ctx), None)?;
+    let sub_f =
+        RuntimeFunction::HeapIntSub.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
     let is_zero = RuntimeFunction::IsZero.get(module, Some(compilation_ctx), None)?;
     let left_shift_number = shift_1bit_left(module, compilation_ctx);
     let get_bit = get_bit(module, compilation_ctx);
@@ -494,7 +497,8 @@ mod tests {
 
     use crate::test_compilation_context;
     use crate::test_tools::{
-        build_module, get_linker_with_host_debug_functions, setup_wasmtime_module,
+        INITIAL_MEMORY_OFFSET, build_module, get_linker_with_host_debug_functions,
+        setup_wasmtime_module,
     };
     use alloy_primitives::U256;
     use rstest::rstest;
@@ -526,8 +530,9 @@ mod tests {
     #[case(u128::MAX, 100, 1)]
     fn test_get_bit(#[case] a: u128, #[case] n: i32, #[case] expected: i64) {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
             build_module(Some(TYPE_HEAP_SIZE));
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[ValType::I64]);
@@ -536,10 +541,11 @@ mod tests {
 
         let mut func_body = function_builder.func_body();
 
-        func_body.i32_const(0).i32_const(n).i32_const(128);
+        func_body
+            .i32_const(INITIAL_MEMORY_OFFSET)
+            .i32_const(n)
+            .i32_const(128);
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
         let shift_64bits_right_f = get_bit(&mut raw_module, &compilation_ctx);
         func_body.call(shift_64bits_right_f);
 
@@ -572,7 +578,7 @@ mod tests {
     #[case(u64::MAX as u128, (u64::MAX as u128) << 1)]
     fn test_shift_1bit_left_u128(#[case] a: u128, #[case] expected: u128) {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
             build_module(Some(TYPE_HEAP_SIZE));
 
         let mut function_builder =
@@ -583,10 +589,9 @@ mod tests {
         let mut func_body = function_builder.func_body();
 
         // arguments for shift_64bits_right (a_ptr, size in heap)
-        func_body.i32_const(0).i32_const(16);
+        func_body.i32_const(INITIAL_MEMORY_OFFSET).i32_const(16);
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
         let shift_64bits_right_f = shift_1bit_left(&mut raw_module, &compilation_ctx);
         func_body.call(shift_64bits_right_f);
 
@@ -606,7 +611,8 @@ mod tests {
         entrypoint.call(&mut store, 0).unwrap();
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
-        let result = &memory.data(&mut store)[0..TYPE_HEAP_SIZE as usize];
+        let result = &memory.data(&mut store)
+            [INITIAL_MEMORY_OFFSET as usize..(INITIAL_MEMORY_OFFSET + TYPE_HEAP_SIZE) as usize];
 
         assert_eq!(result, expected.to_le_bytes());
     }
@@ -622,7 +628,7 @@ mod tests {
     #[case(U256::from(u128::MAX), U256::from(u128::MAX) << 1)]
     fn test_shift_1bit_left_u256(#[case] a: U256, #[case] expected: U256) {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
             build_module(Some(TYPE_HEAP_SIZE));
 
         let mut function_builder =
@@ -633,10 +639,9 @@ mod tests {
         let mut func_body = function_builder.func_body();
 
         // arguments for shift_64bits_right (a_ptr, size in heap)
-        func_body.i32_const(0).i32_const(32);
+        func_body.i32_const(INITIAL_MEMORY_OFFSET).i32_const(32);
 
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
         let shift_64bits_right_f = shift_1bit_left(&mut raw_module, &compilation_ctx);
         func_body.call(shift_64bits_right_f);
 
@@ -654,7 +659,8 @@ mod tests {
 
         entrypoint.call(&mut store, 0).unwrap();
         let memory = instance.get_memory(&mut store, "memory").unwrap();
-        let result = &memory.data(&mut store)[0..TYPE_HEAP_SIZE as usize];
+        let result = &memory.data(&mut store)
+            [INITIAL_MEMORY_OFFSET as usize..(INITIAL_MEMORY_OFFSET + TYPE_HEAP_SIZE) as usize];
 
         assert_eq!(result, expected.to_le_bytes::<32>());
     }
@@ -674,41 +680,11 @@ mod tests {
     #[case(10, 0, 0)]
     fn test_div_u128(#[case] n1: u128, #[case] n2: u128, #[case] quotient: u128) {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(Some(TYPE_HEAP_SIZE * 2));
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
-        );
-
-        let n1_ptr = raw_module.locals.add(ValType::I32);
-        let n2_ptr = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // arguments for heap_integers_div (n1_ptr, n2_ptr, size in heap and return quotient)
-        func_body
-            .i32_const(0)
-            .i32_const(TYPE_HEAP_SIZE)
-            .i32_const(128)
-            .i32_const(1);
-
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let heap_integers_div_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
-        func_body.call(heap_integers_div_f);
-
-        let linker = get_linker_with_host_debug_functions();
-        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-        let data = [n1.to_le_bytes(), n2.to_le_bytes()].concat();
-        let (_, instance, mut store, entrypoint) = setup_wasmtime_module(
-            &mut raw_module,
-            data.to_vec(),
-            "test_function",
-            Some(linker),
+        let (mut store, instance, entrypoint) = setup_heap_div_test(
+            n1.to_le_bytes().to_vec(),
+            n2.to_le_bytes().to_vec(),
+            TYPE_HEAP_SIZE,
+            true,
         );
 
         let quotient_ptr: i32 = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
@@ -729,38 +705,12 @@ mod tests {
     #[test]
     pub fn test_div_u128_fuzz() {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(Some(TYPE_HEAP_SIZE * 2));
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
+        let (mut store, instance, entrypoint) = setup_heap_div_test(
+            vec![0; TYPE_HEAP_SIZE as usize],
+            vec![0; TYPE_HEAP_SIZE as usize],
+            TYPE_HEAP_SIZE,
+            true,
         );
-
-        let n1_ptr = raw_module.locals.add(ValType::I32);
-        let n2_ptr = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // arguments for heap_integers_div (n1_ptr, n2_ptr, size in heap and return quotient)
-        func_body
-            .i32_const(0)
-            .i32_const(TYPE_HEAP_SIZE)
-            .i32_const(128)
-            .i32_const(1);
-
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let heap_integers_div_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
-        func_body.call(heap_integers_div_f);
-
-        let linker = get_linker_with_host_debug_functions();
-        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, vec![], "test_function", Some(linker));
-
         let memory = instance.get_memory(&mut store, "memory").unwrap();
 
         let reset_memory = Rc::new(AssertUnwindSafe(
@@ -776,7 +726,9 @@ mod tests {
             .for_each(|&(n1, n2): &(u128, u128)| {
                 let mut store = store.borrow_mut();
                 let data = [n1.to_le_bytes(), n2.to_le_bytes()].concat();
-                memory.write(&mut *store, 0, &data).unwrap();
+                memory
+                    .write(&mut *store, INITIAL_MEMORY_OFFSET as usize, &data)
+                    .unwrap();
 
                 let expected_quotient = n1 / n2;
 
@@ -825,43 +777,11 @@ mod tests {
     )]
     fn test_mod_u128(#[case] n1: u128, #[case] n2: u128, #[case] remainder: u128) {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(Some(TYPE_HEAP_SIZE * 2));
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
-        );
-
-        let n1_ptr = raw_module.locals.add(ValType::I32);
-        let n2_ptr = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // arguments for heap_integers_div (n1_ptr, n2_ptr, size in heap and return remainder)
-        func_body
-            .i32_const(0)
-            .i32_const(TYPE_HEAP_SIZE)
-            .i32_const(128)
-            .i32_const(0);
-
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let heap_integers_div_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
-        // Shift left
-        func_body.call(heap_integers_div_f);
-
-        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-        let data = [n1.to_le_bytes(), n2.to_le_bytes()].concat();
-
-        let linker = get_linker_with_host_debug_functions();
-        let (_, instance, mut store, entrypoint) = setup_wasmtime_module(
-            &mut raw_module,
-            data.to_vec(),
-            "test_function",
-            Some(linker),
+        let (mut store, instance, entrypoint) = setup_heap_div_test(
+            n1.to_le_bytes().to_vec(),
+            n2.to_le_bytes().to_vec(),
+            TYPE_HEAP_SIZE,
+            false,
         );
 
         let remainder_ptr: i32 = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
@@ -883,37 +803,12 @@ mod tests {
     #[test]
     pub fn test_mod_u128_fuzz() {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(Some(TYPE_HEAP_SIZE * 2));
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
+        let (mut store, instance, entrypoint) = setup_heap_div_test(
+            vec![0; TYPE_HEAP_SIZE as usize],
+            vec![0; TYPE_HEAP_SIZE as usize],
+            TYPE_HEAP_SIZE,
+            false,
         );
-
-        let n1_ptr = raw_module.locals.add(ValType::I32);
-        let n2_ptr = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // arguments for heap_integers_div (n1_ptr, n2_ptr, size in heap and return mod)
-        func_body
-            .i32_const(0)
-            .i32_const(TYPE_HEAP_SIZE)
-            .i32_const(128)
-            .i32_const(0);
-
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let heap_integers_div_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
-        func_body.call(heap_integers_div_f);
-
-        let linker = get_linker_with_host_debug_functions();
-        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, vec![], "test_function", Some(linker));
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
 
@@ -930,7 +825,9 @@ mod tests {
             .for_each(|&(n1, n2): &(u128, u128)| {
                 let mut store = store.borrow_mut();
                 let data = [n1.to_le_bytes(), n2.to_le_bytes()].concat();
-                memory.write(&mut *store, 0, &data).unwrap();
+                memory
+                    .write(&mut *store, INITIAL_MEMORY_OFFSET as usize, &data)
+                    .unwrap();
 
                 let expected_quotient = n1 % n2;
 
@@ -995,39 +892,13 @@ mod tests {
     )]
     fn test_div_u256(#[case] n1: U256, #[case] n2: U256, #[case] quotient: U256) {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(Some(TYPE_HEAP_SIZE * 2));
 
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
+        let (mut store, instance, entrypoint) = setup_heap_div_test(
+            n1.to_le_bytes::<32>().to_vec(),
+            n2.to_le_bytes::<32>().to_vec(),
+            TYPE_HEAP_SIZE,
+            true,
         );
-
-        let n1_ptr = raw_module.locals.add(ValType::I32);
-        let n2_ptr = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // arguments for heap_integers_div (n1_ptr, n2_ptr, size in heap and return quotient)
-        func_body
-            .i32_const(0)
-            .i32_const(TYPE_HEAP_SIZE)
-            .i32_const(256)
-            .i32_const(1);
-
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let heap_integers_div_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
-        // Shift left
-        func_body.call(heap_integers_div_f);
-
-        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        let data = [n1.to_le_bytes::<32>(), n2.to_le_bytes::<32>()].concat();
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
 
         let quotient_ptr: i32 = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
 
@@ -1047,37 +918,12 @@ mod tests {
     #[test]
     pub fn test_div_u256_fuzz() {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(Some(TYPE_HEAP_SIZE * 2));
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
+        let (mut store, instance, entrypoint) = setup_heap_div_test(
+            vec![0; TYPE_HEAP_SIZE as usize],
+            vec![0; TYPE_HEAP_SIZE as usize],
+            TYPE_HEAP_SIZE,
+            true,
         );
-
-        let n1_ptr = raw_module.locals.add(ValType::I32);
-        let n2_ptr = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // arguments for heap_integers_div (n1_ptr, n2_ptr, size in heap and return quotient)
-        func_body
-            .i32_const(0)
-            .i32_const(TYPE_HEAP_SIZE)
-            .i32_const(256)
-            .i32_const(1);
-
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let heap_integers_div_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
-        func_body.call(heap_integers_div_f);
-
-        let linker = get_linker_with_host_debug_functions();
-        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, vec![], "test_function", Some(linker));
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
 
@@ -1095,7 +941,9 @@ mod tests {
                 let mut store = store.borrow_mut();
                 let data = [n1, n2].concat();
 
-                memory.write(&mut *store, 0, &data).unwrap();
+                memory
+                    .write(&mut *store, INITIAL_MEMORY_OFFSET as usize, &data)
+                    .unwrap();
 
                 let n1 = U256::from_le_bytes(n1);
                 let n2 = U256::from_le_bytes(n2);
@@ -1171,39 +1019,12 @@ mod tests {
     #[case(U256::from(10), U256::from(0), U256::from(0))]
     fn test_mod_u256(#[case] n1: U256, #[case] n2: U256, #[case] remainder: U256) {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(Some(TYPE_HEAP_SIZE * 2));
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
+        let (mut store, instance, entrypoint) = setup_heap_div_test(
+            n1.to_le_bytes::<32>().to_vec(),
+            n2.to_le_bytes::<32>().to_vec(),
+            TYPE_HEAP_SIZE,
+            false,
         );
-
-        let n1_ptr = raw_module.locals.add(ValType::I32);
-        let n2_ptr = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // arguments for heap_integers_div (n1_ptr, n2_ptr, size in heap and return remainder)
-        func_body
-            .i32_const(0)
-            .i32_const(TYPE_HEAP_SIZE)
-            .i32_const(256)
-            .i32_const(0);
-
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let heap_integers_div_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
-        // Shift left
-        func_body.call(heap_integers_div_f);
-
-        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        let data = [n1.to_le_bytes::<32>(), n2.to_le_bytes::<32>()].concat();
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
 
         let remainder_ptr: i32 = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
 
@@ -1224,38 +1045,12 @@ mod tests {
     #[test]
     pub fn test_mod_u256_fuzz() {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(Some(TYPE_HEAP_SIZE * 2));
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
+        let (mut store, instance, entrypoint) = setup_heap_div_test(
+            vec![0; TYPE_HEAP_SIZE as usize],
+            vec![0; TYPE_HEAP_SIZE as usize],
+            TYPE_HEAP_SIZE,
+            false,
         );
-
-        let n1_ptr = raw_module.locals.add(ValType::I32);
-        let n2_ptr = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // arguments for heap_integers_div (n1_ptr, n2_ptr, size in heap and return quotient)
-        func_body
-            .i32_const(0)
-            .i32_const(TYPE_HEAP_SIZE)
-            .i32_const(256)
-            .i32_const(0);
-
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let heap_integers_div_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
-        func_body.call(heap_integers_div_f);
-
-        let linker = get_linker_with_host_debug_functions();
-        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, vec![], "test_function", Some(linker));
-
         let memory = instance.get_memory(&mut store, "memory").unwrap();
 
         let reset_memory = Rc::new(AssertUnwindSafe(
@@ -1272,7 +1067,9 @@ mod tests {
                 let mut store = store.borrow_mut();
                 let data = [n1, n2].concat();
 
-                memory.write(&mut *store, 0, &data).unwrap();
+                memory
+                    .write(&mut *store, INITIAL_MEMORY_OFFSET as usize, &data)
+                    .unwrap();
 
                 let n1 = U256::from_le_bytes(n1);
                 let n2 = U256::from_le_bytes(n2);
@@ -1306,5 +1103,63 @@ mod tests {
 
                 reset_memory.call(&mut *store, ()).unwrap();
             });
+    }
+
+    fn setup_heap_div_test(
+        n1_bytes: Vec<u8>,
+        n2_bytes: Vec<u8>,
+        heap_size: i32,
+        return_quotient: bool,
+    ) -> (
+        wasmtime::Store<()>,
+        wasmtime::Instance,
+        wasmtime::TypedFunc<(i32, i32), i32>,
+    ) {
+        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
+            build_module(Some(heap_size * 2));
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
+        let mut runtime_error_data = RuntimeErrorData::new();
+
+        let mut function_builder = FunctionBuilder::new(
+            &mut raw_module.types,
+            &[ValType::I32, ValType::I32],
+            &[ValType::I32],
+        );
+
+        let n1_ptr = raw_module.locals.add(ValType::I32);
+        let n2_ptr = raw_module.locals.add(ValType::I32);
+
+        let div_f =
+            heap_integers_div_mod(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
+                .unwrap();
+
+        let mut func_body = function_builder.func_body();
+
+        func_body
+            .i32_const(INITIAL_MEMORY_OFFSET)
+            .i32_const(INITIAL_MEMORY_OFFSET + heap_size);
+
+        if heap_size == 16 {
+            func_body.i32_const(128);
+        } else {
+            func_body.i32_const(256);
+        }
+
+        if return_quotient {
+            func_body.i32_const(1);
+        } else {
+            func_body.i32_const(0);
+        }
+
+        func_body.call(div_f);
+
+        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let data = [n1_bytes, n2_bytes].concat();
+        let (_, instance, store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, data, "test_function", None);
+
+        (store, instance, entrypoint)
     }
 }

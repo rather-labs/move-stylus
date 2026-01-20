@@ -119,9 +119,6 @@ pub fn translate_package<'move_package>(
         let (mut module, allocator_func, memory_id, compilation_context_globals) =
             hostio::new_module_with_host();
 
-        #[cfg(feature = "inject-host-debug-fns")]
-        crate::test_tools::inject_debug_fns(&mut module);
-
         // Function table
         let function_table_id = module.tables.add_local(false, 0, None, RefType::Funcref);
         let mut function_table = FunctionTable::new(function_table_id);
