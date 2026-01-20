@@ -1,10 +1,16 @@
 //! This module contains aux functions used in unit tests in this module
 #![allow(dead_code)]
+use crate::{
+    compilation_context::globals::CompilationContextGlobals, data::DATA_ABORT_MESSAGE_PTR_OFFSET,
+    error::RuntimeError, memory::setup_module_memory,
+};
+use alloy_primitives::keccak256;
+use alloy_sol_types::{SolType, sol};
 use walrus::{FunctionId, MemoryId, Module, ModuleConfig, ValType};
 use wasmtime::{Caller, Engine, Instance, Linker, Module as WasmModule, Store, TypedFunc};
 
-use crate::{compilation_context::globals::CompilationContextGlobals, memory::setup_module_memory};
-
+// Reserved memory for runtime errors and other data.
+// The tests will be write from this point on.
 pub const INITIAL_MEMORY_OFFSET: i32 = 2000;
 
 pub fn build_module(
@@ -226,6 +232,51 @@ macro_rules! test_compilation_context {
             },
         }
     };
+}
+
+/// Helper to verify that a runtime error was correctly written to memory
+pub fn assert_runtime_error(
+    mut store: wasmtime::Store<()>,
+    instance: &wasmtime::Instance,
+    error: RuntimeError,
+) {
+    let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+    // Read the error pointer from the data segment
+    let mut error_ptr_bytes = vec![0; 4];
+    memory
+        .read(
+            &mut store,
+            DATA_ABORT_MESSAGE_PTR_OFFSET as usize,
+            &mut error_ptr_bytes,
+        )
+        .unwrap();
+
+    let error_ptr = i32::from_le_bytes(error_ptr_bytes.try_into().unwrap());
+
+    // If the error pointer is 0, it means that no error occurred
+    assert_ne!(error_ptr, 0);
+
+    // Load the length
+    let mut error_length_bytes = vec![0; 4];
+    memory
+        .read(&mut store, error_ptr as usize, &mut error_length_bytes)
+        .unwrap();
+
+    let error_length = i32::from_le_bytes(error_length_bytes.try_into().unwrap());
+
+    let mut result_data = vec![0; error_length as usize];
+    memory
+        .read(&mut store, (error_ptr + 4) as usize, &mut result_data)
+        .unwrap();
+
+    let error_message = String::from_utf8_lossy(error.as_bytes());
+    let expected = [
+        keccak256(b"Error(string)")[..4].to_vec(),
+        <sol!((string,))>::abi_encode_params(&(error_message,)),
+    ]
+    .concat();
+    assert_eq!(result_data, expected);
 }
 
 #[cfg(feature = "inject-host-debug-fns")]

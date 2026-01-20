@@ -329,12 +329,11 @@ pub fn add_u64(
 
 #[cfg(test)]
 mod tests {
-    use crate::data::DATA_ABORT_MESSAGE_PTR_OFFSET;
     use crate::test_compilation_context;
-    use crate::test_tools::{INITIAL_MEMORY_OFFSET, build_module, setup_wasmtime_module};
+    use crate::test_tools::{
+        INITIAL_MEMORY_OFFSET, assert_runtime_error, build_module, setup_wasmtime_module,
+    };
     use alloy_primitives::U256;
-    use alloy_primitives::keccak256;
-    use alloy_sol_types::{SolType, sol};
     use rstest::rstest;
     use std::cell::RefCell;
     use std::panic::AssertUnwindSafe;
@@ -586,7 +585,7 @@ mod tests {
     ) {
         let (mut store, instance, entrypoint) = setup_heap_add_test(n1_bytes, n2_bytes, heap_size);
         let _: i32 = entrypoint.call(&mut store, (0, heap_size)).unwrap();
-        assert_overflow_error(store, &instance);
+        assert_runtime_error(store, &instance, RuntimeError::Overflow);
     }
 
     #[rstest]
@@ -609,7 +608,7 @@ mod tests {
             setup_stack_add_test::<(i32, i32), i32>(add_u32, ValType::I32);
         let _: i32 = entrypoint.call(&mut store, (n1, n2)).unwrap();
 
-        assert_overflow_error(store, &instance);
+        assert_runtime_error(store, &instance, RuntimeError::Overflow);
     }
 
     #[test]
@@ -674,7 +673,7 @@ mod tests {
             setup_stack_add_test::<(i64, i64), i64>(add_u64, ValType::I64);
         let _: i64 = entrypoint.call(&mut store, (n1, n2)).unwrap();
 
-        assert_overflow_error(store, &instance);
+        assert_runtime_error(store, &instance, RuntimeError::Overflow);
     }
 
     #[test]
@@ -800,46 +799,5 @@ mod tests {
         let (_, instance, store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
         (store, instance, entrypoint)
-    }
-
-    /// Helper to verify that an overflow error was correctly written to memory
-    fn assert_overflow_error(mut store: wasmtime::Store<()>, instance: &wasmtime::Instance) {
-        let memory = instance.get_memory(&mut store, "memory").unwrap();
-
-        // Read the error pointer from the data segment
-        let mut error_ptr_bytes = vec![0; 4];
-        memory
-            .read(
-                &mut store,
-                DATA_ABORT_MESSAGE_PTR_OFFSET as usize,
-                &mut error_ptr_bytes,
-            )
-            .unwrap();
-
-        let error_ptr = i32::from_le_bytes(error_ptr_bytes.try_into().unwrap());
-
-        // If the error pointer is 0, it means that no error occurred
-        assert_ne!(error_ptr, 0);
-
-        // Load the length
-        let mut error_length_bytes = vec![0; 4];
-        memory
-            .read(&mut store, error_ptr as usize, &mut error_length_bytes)
-            .unwrap();
-
-        let error_length = i32::from_le_bytes(error_length_bytes.try_into().unwrap());
-
-        let mut result_data = vec![0; error_length as usize];
-        memory
-            .read(&mut store, (error_ptr + 4) as usize, &mut result_data)
-            .unwrap();
-
-        let error_message = String::from_utf8_lossy(RuntimeError::Overflow.as_bytes());
-        let expected = [
-            keccak256(b"Error(string)")[..4].to_vec(),
-            <sol!((string,))>::abi_encode_params(&(error_message,)),
-        ]
-        .concat();
-        assert_eq!(result_data, expected);
     }
 }
