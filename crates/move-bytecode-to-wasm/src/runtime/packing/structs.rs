@@ -849,40 +849,39 @@ mod tests {
                         .call(&mut *store.0.borrow_mut(), data.len() as i32)
                         .unwrap();
 
-                    if result_ptr != 0xBADF00D {
-                        sol! {
-                            struct TestStruct {
-                                uint8 a;
-                                uint64 b;
-                                uint128 c;
-                                bool d;
-                                address e;
-                            }
+                    sol! {
+                        struct TestStruct {
+                            uint8 a;
+                            uint64 b;
+                            uint128 c;
+                            bool d;
+                            address e;
                         }
-                        let addr = alloy_primitives::Address::from_slice(&addr_bytes);
-                        let expected = TestStruct {
-                            a,
-                            b,
-                            c,
-                            d,
-                            e: addr,
-                        }
-                        .abi_encode();
-
-                        let mut result_memory_data = vec![0; expected.len()];
-                        memory
-                            .read(
-                                &mut *store.0.borrow_mut(),
-                                result_ptr as usize,
-                                &mut result_memory_data,
-                            )
-                            .unwrap();
-
-                        assert_eq!(
-                            result_memory_data, expected,
-                            "Packed struct with mixed types did not match expected result",
-                        );
                     }
+                    let addr = alloy_primitives::Address::from_slice(&addr_bytes);
+                    let expected = TestStruct {
+                        a,
+                        b,
+                        c,
+                        d,
+                        e: addr,
+                    }
+                    .abi_encode();
+
+                    let mut result_memory_data = vec![0; expected.len()];
+                    memory
+                        .read(
+                            &mut *store.0.borrow_mut(),
+                            result_ptr as usize,
+                            &mut result_memory_data,
+                        )
+                        .unwrap();
+
+                    assert_eq!(
+                        result_memory_data, expected,
+                        "Packed struct with mixed types did not match expected result",
+                    );
+
                     reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
                 },
             );
@@ -1040,38 +1039,37 @@ mod tests {
                         .call(&mut *store.0.borrow_mut(), data.len() as i32)
                         .unwrap();
 
-                    if result_ptr != 0xBADF00D {
-                        sol! {
-                            struct TestStruct {
-                                uint64 a;
-                                uint128 b;
-                                bool c;
-                                uint128[] d;
-                                uint32[] e;
-                            }
+                    sol! {
+                        struct TestStruct {
+                            uint64 a;
+                            uint128 b;
+                            bool c;
+                            uint128[] d;
+                            uint32[] e;
                         }
-                        let expected = TestStruct {
-                            a,
-                            b,
-                            c,
-                            d: vec_u128.clone(),
-                            e: vec_u32.clone(),
-                        }
-                        .abi_encode_sequence();
-                        let mut result_memory_data = vec![0; expected.len()];
-                        memory
-                            .read(
-                                &mut *store.0.borrow_mut(),
-                                result_ptr as usize,
-                                &mut result_memory_data,
-                            )
-                            .unwrap();
-
-                        assert_eq!(
-                            result_memory_data, expected,
-                            "Packed struct with vectors did not match expected result",
-                        );
                     }
+                    let expected = TestStruct {
+                        a,
+                        b,
+                        c,
+                        d: vec_u128.clone(),
+                        e: vec_u32.clone(),
+                    }
+                    .abi_encode_sequence();
+                    let mut result_memory_data = vec![0; expected.len()];
+                    memory
+                        .read(
+                            &mut *store.0.borrow_mut(),
+                            result_ptr as usize,
+                            &mut result_memory_data,
+                        )
+                        .unwrap();
+
+                    assert_eq!(
+                        result_memory_data, expected,
+                        "Packed struct with vectors did not match expected result",
+                    );
+
                     reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
                 },
             );
@@ -1216,42 +1214,41 @@ mod tests {
                         .call(&mut *store.0.borrow_mut(), data.len() as i32)
                         .unwrap();
 
-                    if result_ptr != 0xBADF00D {
-                        sol! {
-                            struct SubStruct {
-                                bool x;
-                                address y;
-                            }
-                            struct TestStruct {
-                                uint64 a;
-                                uint128 b;
-                                SubStruct c;
-                            }
+                    sol! {
+                        struct SubStruct {
+                            bool x;
+                            address y;
                         }
-                        let addr = alloy_primitives::Address::from_slice(&addr_bytes);
-                        let expected = TestStruct {
-                            a,
-                            b,
-                            c: SubStruct {
-                                x: sub_bool,
-                                y: addr,
-                            },
+                        struct TestStruct {
+                            uint64 a;
+                            uint128 b;
+                            SubStruct c;
                         }
-                        .abi_encode_sequence();
-                        let mut result_memory_data = vec![0; expected.len()];
-                        memory
-                            .read(
-                                &mut *store.0.borrow_mut(),
-                                result_ptr as usize,
-                                &mut result_memory_data,
-                            )
-                            .unwrap();
-
-                        assert_eq!(
-                            result_memory_data, expected,
-                            "Packed struct with simple substruct did not match expected result",
-                        );
                     }
+                    let addr = alloy_primitives::Address::from_slice(&addr_bytes);
+                    let expected = TestStruct {
+                        a,
+                        b,
+                        c: SubStruct {
+                            x: sub_bool,
+                            y: addr,
+                        },
+                    }
+                    .abi_encode_sequence();
+                    let mut result_memory_data = vec![0; expected.len()];
+                    memory
+                        .read(
+                            &mut *store.0.borrow_mut(),
+                            result_ptr as usize,
+                            &mut result_memory_data,
+                        )
+                        .unwrap();
+
+                    assert_eq!(
+                        result_memory_data, expected,
+                        "Packed struct with simple substruct did not match expected result",
+                    );
+
                     reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
                 },
             );
@@ -1428,41 +1425,40 @@ mod tests {
                         .call(&mut *store.0.borrow_mut(), data.len() as i32)
                         .unwrap();
 
-                    if result_ptr != 0xBADF00D {
-                        sol! {
-                            struct SubStruct {
-                                uint128[] x;
-                                uint32[] y;
-                            }
-                            struct TestStruct {
-                                uint64 a;
-                                uint128 b;
-                                SubStruct c;
-                            }
+                    sol! {
+                        struct SubStruct {
+                            uint128[] x;
+                            uint32[] y;
                         }
-                        let expected = TestStruct {
-                            a,
-                            b,
-                            c: SubStruct {
-                                x: vec_u128.clone(),
-                                y: vec_u32.clone(),
-                            },
+                        struct TestStruct {
+                            uint64 a;
+                            uint128 b;
+                            SubStruct c;
                         }
-                        .abi_encode_sequence();
-                        let mut result_memory_data = vec![0; expected.len()];
-                        memory
-                            .read(
-                                &mut *store.0.borrow_mut(),
-                                result_ptr as usize,
-                                &mut result_memory_data,
-                            )
-                            .unwrap();
-
-                        assert_eq!(
-                            result_memory_data, expected,
-                            "Packed struct with dynamic substruct did not match expected result",
-                        );
                     }
+                    let expected = TestStruct {
+                        a,
+                        b,
+                        c: SubStruct {
+                            x: vec_u128.clone(),
+                            y: vec_u32.clone(),
+                        },
+                    }
+                    .abi_encode_sequence();
+                    let mut result_memory_data = vec![0; expected.len()];
+                    memory
+                        .read(
+                            &mut *store.0.borrow_mut(),
+                            result_ptr as usize,
+                            &mut result_memory_data,
+                        )
+                        .unwrap();
+
+                    assert_eq!(
+                        result_memory_data, expected,
+                        "Packed struct with dynamic substruct did not match expected result",
+                    );
+
                     reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
                 },
             );

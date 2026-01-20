@@ -534,6 +534,7 @@ mod tests {
     use std::panic::AssertUnwindSafe;
     use std::rc::Rc;
 
+    use crate::data::BAD_F00D;
     use crate::error::RuntimeError;
     use crate::test_compilation_context;
     use crate::test_tools::{
@@ -580,7 +581,7 @@ mod tests {
             .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
             .unwrap();
 
-        assert_runtime_error(store, &instance, RuntimeError::Overflow);
+        assert_runtime_error(&mut store, &instance, RuntimeError::Overflow);
     }
 
     #[test]
@@ -613,13 +614,15 @@ mod tests {
 
                 match result {
                     Ok(pointer) => {
-                        if pointer != 0xBADF00D {
+                        if pointer != BAD_F00D {
                             let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
                             memory
                                 .read(&mut *store, pointer as usize, &mut result_memory_data)
                                 .unwrap();
                             let expected = n.checked_shl(shift as u32).unwrap_or(0);
                             assert_eq!(result_memory_data, expected.to_le_bytes().to_vec());
+                        } else {
+                            assert_runtime_error(&mut store, &instance, RuntimeError::Overflow);
                         }
                     }
                     Err(_) => {
@@ -667,7 +670,7 @@ mod tests {
             .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
             .unwrap();
 
-        assert_runtime_error(store, &instance, RuntimeError::Overflow);
+        assert_runtime_error(&mut store, &instance, RuntimeError::Overflow);
     }
 
     #[test]
@@ -700,7 +703,7 @@ mod tests {
 
                 match result {
                     Ok(pointer) => {
-                        if pointer != 0xBADF00D {
+                        if pointer != BAD_F00D {
                             let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
                             memory
                                 .read(&mut *store, pointer as usize, &mut result_memory_data)
@@ -708,8 +711,7 @@ mod tests {
                             let expected = n << shift as usize;
                             assert_eq!(result_memory_data, expected.to_le_bytes::<32>().to_vec());
                         } else {
-                            // Data is empty because we are reseting memory, should we not reset it?
-                            // assert_overflow_error(&mut *store, &instance);
+                            assert_runtime_error(&mut store, &instance, RuntimeError::Overflow);
                         }
                     }
                     Err(_) => {
@@ -758,7 +760,7 @@ mod tests {
             .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
             .unwrap();
 
-        assert_runtime_error(store, &instance, RuntimeError::Overflow);
+        assert_runtime_error(&mut store, &instance, RuntimeError::Overflow);
     }
 
     #[test]
@@ -791,13 +793,15 @@ mod tests {
 
                 match result {
                     Ok(pointer) => {
-                        if pointer != 0xBADF00D {
+                        if pointer != BAD_F00D {
                             let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
                             memory
                                 .read(&mut *store, pointer as usize, &mut result_memory_data)
                                 .unwrap();
                             let expected = n.checked_shr(shift as u32).unwrap_or(0);
                             assert_eq!(result_memory_data, expected.to_le_bytes().to_vec());
+                        } else {
+                            assert_runtime_error(&mut store, &instance, RuntimeError::Overflow);
                         }
                     }
                     Err(_) => {
@@ -845,7 +849,7 @@ mod tests {
             .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
             .unwrap();
 
-        assert_runtime_error(store, &instance, RuntimeError::Overflow);
+        assert_runtime_error(&mut store, &instance, RuntimeError::Overflow);
     }
 
     #[test]
@@ -876,13 +880,15 @@ mod tests {
 
                 match result {
                     Ok(pointer) => {
-                        if pointer != 0xBADF00D {
+                        if pointer != BAD_F00D {
                             let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
                             memory
                                 .read(&mut *store, pointer as usize, &mut result_memory_data)
                                 .unwrap();
                             let expected = n >> shift as usize;
                             assert_eq!(result_memory_data, expected.to_le_bytes::<32>().to_vec());
+                        } else {
+                            assert_runtime_error(&mut store, &instance, RuntimeError::Overflow);
                         }
                     }
                     Err(_) => {

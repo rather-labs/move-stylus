@@ -236,17 +236,17 @@ macro_rules! test_compilation_context {
 
 /// Helper to verify that a runtime error was correctly written to memory
 pub fn assert_runtime_error(
-    mut store: wasmtime::Store<()>,
+    store: &mut wasmtime::Store<()>,
     instance: &wasmtime::Instance,
     error: RuntimeError,
 ) {
-    let memory = instance.get_memory(&mut store, "memory").unwrap();
+    let memory = instance.get_memory(&mut *store, "memory").unwrap();
 
     // Read the error pointer from the data segment
     let mut error_ptr_bytes = vec![0; 4];
     memory
         .read(
-            &mut store,
+            &mut *store,
             DATA_ABORT_MESSAGE_PTR_OFFSET as usize,
             &mut error_ptr_bytes,
         )
@@ -260,14 +260,14 @@ pub fn assert_runtime_error(
     // Load the length
     let mut error_length_bytes = vec![0; 4];
     memory
-        .read(&mut store, error_ptr as usize, &mut error_length_bytes)
+        .read(&mut *store, error_ptr as usize, &mut error_length_bytes)
         .unwrap();
 
     let error_length = i32::from_le_bytes(error_length_bytes.try_into().unwrap());
 
     let mut result_data = vec![0; error_length as usize];
     memory
-        .read(&mut store, (error_ptr + 4) as usize, &mut result_data)
+        .read(&mut *store, (error_ptr + 4) as usize, &mut result_data)
         .unwrap();
 
     let error_message = String::from_utf8_lossy(error.as_bytes());

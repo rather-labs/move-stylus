@@ -6,7 +6,7 @@ use walrus::{
 use crate::{
     CompilationContext,
     compilation_context::ModuleId,
-    data::{DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_SLOT_DATA_PTR_OFFSET, RuntimeErrorData},
+    data::{BAD_F00D, DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_SLOT_DATA_PTR_OFFSET, RuntimeErrorData},
     error::RuntimeError,
     native_functions::NativeFunction,
     runtime::RuntimeFunction,
@@ -330,7 +330,7 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
                 .binop(BinaryOp::I32Eq)
                 .br_if(block_id);
 
-            b.i32_const(0xBADF00D);
+            b.i32_const(BAD_F00D);
 
             // TODO: could we eventually need a u64 here? For example when propagating the error from within a runtime function
             // which returns a ValType::I64?
@@ -371,10 +371,10 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
         // Depending on the return type, we push an i32, i64 or nothing to the stack.
         match return_type {
             Some(ValType::I32) => {
-                self.i32_const(0xBADF00D).return_();
+                self.i32_const(BAD_F00D).return_();
             }
             Some(ValType::I64) => {
-                self.i64_const(0xBADF00D).return_();
+                self.i64_const(BAD_F00D as i64).return_();
             }
             Some(_) | None => {
                 self.return_();

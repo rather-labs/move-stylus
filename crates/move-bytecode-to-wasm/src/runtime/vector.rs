@@ -6,7 +6,7 @@ use walrus::{
 use super::{RuntimeFunction, error::RuntimeFunctionError};
 use crate::{
     CompilationContext,
-    data::RuntimeErrorData,
+    data::{DEAD_BEEF, RuntimeErrorData},
     translation::intermediate_types::{
         IntermediateType, error::IntermediateTypeError, heap_integers::IU128,
     },
@@ -476,16 +476,14 @@ pub fn vec_push_back_function(
             // of the original vector, we create a marker that can be detected after function calls.
             // After a call_indirect, we check for this flag and update any mutable references
             // that still point to the old location, following the chain to the new vector.
-            then.local_get(vec_ptr)
-                .i32_const(0xDEADBEEF_u32 as i32)
-                .store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
+            then.local_get(vec_ptr).i32_const(DEAD_BEEF).store(
+                compilation_ctx.memory_id,
+                StoreKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
             // Set the original vector pointer to the new vector pointer.
             // This way we can update the reference to it, as explained above
             then.local_get(vec_ptr).local_get(new_vec_ptr).store(
@@ -662,7 +660,7 @@ pub fn vec_update_mut_ref_function(
                     offset: 0,
                 },
             )
-            .i32_const(0xDEADBEEF_u32 as i32)
+            .i32_const(DEAD_BEEF)
             .binop(BinaryOp::I32Eq)
             .if_else(
                 None,

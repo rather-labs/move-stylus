@@ -505,7 +505,7 @@ mod tests {
 
         let _: i32 = entrypoint.call(&mut store, (0, SIZE)).unwrap();
 
-        assert_runtime_error(store, &instance, RuntimeError::Overflow);
+        assert_runtime_error(&mut store, &instance, RuntimeError::Overflow);
     }
 
     #[test]
@@ -528,36 +528,28 @@ mod tests {
         bolero::check!()
             .with_type()
             .for_each(|&(a, b): &(u128, u128)| {
+                let mut store = store.borrow_mut();
                 let data = [a.to_le_bytes(), b.to_le_bytes()].concat();
                 memory
-                    .write(
-                        &mut *store.borrow_mut(),
-                        INITIAL_MEMORY_OFFSET as usize,
-                        &data,
-                    )
+                    .write(&mut *store, INITIAL_MEMORY_OFFSET as usize, &data)
                     .unwrap();
 
                 let overflowing_mul = a.overflowing_mul(b);
                 let expected = overflowing_mul.0;
                 let overflows = overflowing_mul.1;
 
-                let result: Result<i32, _> =
-                    entrypoint.call(&mut *store.borrow_mut(), (0, TYPE_HEAP_SIZE));
+                let result: Result<i32, _> = entrypoint.call(&mut *store, (0, TYPE_HEAP_SIZE));
 
                 match result {
                     Ok(pointer) => {
                         let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
                         if !overflows {
                             memory
-                                .read(
-                                    &mut *store.0.borrow_mut(),
-                                    pointer as usize,
-                                    &mut result_memory_data,
-                                )
+                                .read(&mut *store, pointer as usize, &mut result_memory_data)
                                 .unwrap();
                             assert_eq!(result_memory_data, expected.to_le_bytes().to_vec());
                         } else {
-                            assert_eq!(0xBADF00D, pointer);
+                            assert_runtime_error(&mut store, &instance, RuntimeError::Overflow);
                         }
                     }
                     Err(_) => {
@@ -565,7 +557,7 @@ mod tests {
                     }
                 }
 
-                reset_memory.call(&mut *store.borrow_mut(), ()).unwrap();
+                reset_memory.call(&mut *store, ()).unwrap();
             });
     }
 
@@ -647,7 +639,7 @@ mod tests {
             TYPE_HEAP_SIZE,
         );
         let _: i32 = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
-        assert_runtime_error(store, &instance, RuntimeError::Overflow);
+        assert_runtime_error(&mut store, &instance, RuntimeError::Overflow);
     }
 
     #[test]
@@ -671,39 +663,31 @@ mod tests {
 
         bolero::check!().with_type().for_each(
             |&(a, b): &([u8; TYPE_HEAP_SIZE as usize], [u8; TYPE_HEAP_SIZE as usize])| {
+                let mut store = store.borrow_mut();
                 let data = [a, b].concat();
                 let a = U256::from_le_bytes::<32>(a);
                 let b = U256::from_le_bytes::<32>(b);
                 memory
-                    .write(
-                        &mut *store.borrow_mut(),
-                        INITIAL_MEMORY_OFFSET as usize,
-                        &data,
-                    )
+                    .write(&mut *store, INITIAL_MEMORY_OFFSET as usize, &data)
                     .unwrap();
 
                 let overflowing_mul = a.overflowing_mul(b);
                 let expected = overflowing_mul.0;
                 let overflows = overflowing_mul.1;
 
-                let result: Result<i32, _> =
-                    entrypoint.call(&mut *store.borrow_mut(), (0, TYPE_HEAP_SIZE));
+                let result: Result<i32, _> = entrypoint.call(&mut *store, (0, TYPE_HEAP_SIZE));
 
                 match result {
                     Ok(pointer) => {
                         let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
                         if !overflows {
                             memory
-                                .read(
-                                    &mut *store.0.borrow_mut(),
-                                    pointer as usize,
-                                    &mut result_memory_data,
-                                )
+                                .read(&mut *store, pointer as usize, &mut result_memory_data)
                                 .unwrap();
 
                             assert_eq!(result_memory_data, expected.to_le_bytes::<32>().to_vec());
                         } else {
-                            assert_eq!(0xBADF00D, pointer);
+                            assert_runtime_error(&mut store, &instance, RuntimeError::Overflow);
                         }
                     }
                     Err(_) => {
@@ -711,7 +695,7 @@ mod tests {
                     }
                 }
 
-                reset_memory.call(&mut *store.borrow_mut(), ()).unwrap();
+                reset_memory.call(&mut *store, ()).unwrap();
             },
         );
     }
@@ -737,7 +721,7 @@ mod tests {
         let (mut store, instance, entrypoint) =
             setup_stack_mul_test::<(i32, i32), i32>(mul_u32, ValType::I32);
         let _: i32 = entrypoint.call(&mut store, (n1, n2)).unwrap();
-        assert_runtime_error(store, &instance, RuntimeError::Overflow);
+        assert_runtime_error(&mut store, &instance, RuntimeError::Overflow);
     }
 
     #[test]
@@ -765,7 +749,7 @@ mod tests {
                     Ok(res) => {
                         if a.checked_mul(b).is_none() {
                             // Overflow case: function should return 1
-                            assert_eq!(0xBADF00D, res);
+                            assert_runtime_error(&mut store, &instance, RuntimeError::Overflow);
                         } else {
                             // Normal case: function should return the expected result
                             assert_eq!(expected, res);
@@ -801,7 +785,7 @@ mod tests {
         let (mut store, instance, entrypoint) =
             setup_stack_mul_test::<(i64, i64), i64>(mul_u64, ValType::I64);
         let _: i64 = entrypoint.call(&mut store, (n1, n2)).unwrap();
-        assert_runtime_error(store, &instance, RuntimeError::Overflow);
+        assert_runtime_error(&mut store, &instance, RuntimeError::Overflow);
     }
 
     #[test]
@@ -828,8 +812,8 @@ mod tests {
                 match result {
                     Ok(res) => {
                         if a.checked_mul(b).is_none() {
-                            // Overflow case: function should return 1
-                            assert_eq!(0xBADF00D, res);
+                            // Overflow case
+                            assert_runtime_error(&mut store, &instance, RuntimeError::Overflow);
                         } else {
                             // Normal case: function should return the expected result
                             assert_eq!(expected, res);

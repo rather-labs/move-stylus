@@ -437,14 +437,12 @@ mod tests {
         // the return is the pointer to the packed value
         let result: i32 = entrypoint.call(&mut store, ()).unwrap();
 
-        if result != 0xBADF00D {
-            let memory = instance.get_memory(&mut store, "memory").unwrap();
-            let mut result_memory_data = vec![0; expected_result.len()];
-            memory
-                .read(&mut store, result as usize, &mut result_memory_data)
-                .unwrap();
-            assert_eq!(result_memory_data, expected_result);
-        }
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+        let mut result_memory_data = vec![0; expected_result.len()];
+        memory
+            .read(&mut store, result as usize, &mut result_memory_data)
+            .unwrap();
+        assert_eq!(result_memory_data, expected_result);
     }
 
     #[test]
@@ -534,22 +532,20 @@ mod tests {
                     .call(&mut *store.0.borrow_mut(), data.len() as i32)
                     .unwrap();
 
-                if result_ptr != 0xBADF00D {
-                    let expected = values.abi_encode();
-                    let mut result_memory_data = vec![0; expected.len()];
-                    memory
-                        .read(
-                            &mut *store.0.borrow_mut(),
-                            result_ptr as usize,
-                            &mut result_memory_data,
-                        )
-                        .unwrap();
+                let expected = values.abi_encode();
+                let mut result_memory_data = vec![0; expected.len()];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        result_ptr as usize,
+                        &mut result_memory_data,
+                    )
+                    .unwrap();
 
-                    assert_eq!(
-                        result_memory_data, expected,
-                        "Packed vec<u8> did not match expected result",
-                    );
-                }
+                assert_eq!(
+                    result_memory_data, expected,
+                    "Packed vec<u8> did not match expected result",
+                );
 
                 reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
             });
@@ -640,22 +636,21 @@ mod tests {
                     .call(&mut *store.0.borrow_mut(), data.len() as i32)
                     .unwrap();
 
-                if result_ptr != 0xBADF00D {
-                    let expected = values.abi_encode();
-                    let mut result_memory_data = vec![0; expected.len()];
-                    memory
-                        .read(
-                            &mut *store.0.borrow_mut(),
-                            result_ptr as usize,
-                            &mut result_memory_data,
-                        )
-                        .unwrap();
+                let expected = values.abi_encode();
+                let mut result_memory_data = vec![0; expected.len()];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        result_ptr as usize,
+                        &mut result_memory_data,
+                    )
+                    .unwrap();
 
-                    assert_eq!(
-                        result_memory_data, expected,
-                        "Packed vec<u16> did not match expected result",
-                    );
-                }
+                assert_eq!(
+                    result_memory_data, expected,
+                    "Packed vec<u16> did not match expected result",
+                );
+
                 reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
             });
     }
@@ -745,22 +740,21 @@ mod tests {
                     .call(&mut *store.0.borrow_mut(), data.len() as i32)
                     .unwrap();
 
-                if result_ptr != 0xBADF00D {
-                    let expected = values.abi_encode();
-                    let mut result_memory_data = vec![0; expected.len()];
-                    memory
-                        .read(
-                            &mut *store.0.borrow_mut(),
-                            result_ptr as usize,
-                            &mut result_memory_data,
-                        )
-                        .unwrap();
+                let expected = values.abi_encode();
+                let mut result_memory_data = vec![0; expected.len()];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        result_ptr as usize,
+                        &mut result_memory_data,
+                    )
+                    .unwrap();
 
-                    assert_eq!(
-                        result_memory_data, expected,
-                        "Packed vec<u32> did not match expected result",
-                    );
-                }
+                assert_eq!(
+                    result_memory_data, expected,
+                    "Packed vec<u32> did not match expected result",
+                );
+
                 reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
             });
     }
@@ -850,22 +844,21 @@ mod tests {
                     .call(&mut *store.0.borrow_mut(), data.len() as i32)
                     .unwrap();
 
-                if result_ptr != 0xBADF00D {
-                    let expected = values.abi_encode();
-                    let mut result_memory_data = vec![0; expected.len()];
-                    memory
-                        .read(
-                            &mut *store.0.borrow_mut(),
-                            result_ptr as usize,
-                            &mut result_memory_data,
-                        )
-                        .unwrap();
+                let expected = values.abi_encode();
+                let mut result_memory_data = vec![0; expected.len()];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        result_ptr as usize,
+                        &mut result_memory_data,
+                    )
+                    .unwrap();
 
-                    assert_eq!(
-                        result_memory_data, expected,
-                        "Packed vec<u64> did not match expected result",
-                    );
-                }
+                assert_eq!(
+                    result_memory_data, expected,
+                    "Packed vec<u64> did not match expected result",
+                );
+
                 reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
             });
     }
@@ -962,22 +955,21 @@ mod tests {
                     .call(&mut *store.0.borrow_mut(), data.len() as i32)
                     .unwrap();
 
-                if result_ptr != 0xBADF00D {
-                    let expected = values.abi_encode();
-                    let mut result_memory_data = vec![0; expected.len()];
-                    memory
-                        .read(
-                            &mut *store.0.borrow_mut(),
-                            result_ptr as usize,
-                            &mut result_memory_data,
-                        )
-                        .unwrap();
+                let expected = values.abi_encode();
+                let mut result_memory_data = vec![0; expected.len()];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        result_ptr as usize,
+                        &mut result_memory_data,
+                    )
+                    .unwrap();
 
-                    assert_eq!(
-                        result_memory_data, expected,
-                        "Packed vec<u128> did not match expected result",
-                    );
-                }
+                assert_eq!(
+                    result_memory_data, expected,
+                    "Packed vec<u128> did not match expected result",
+                );
+
                 reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
             });
     }
@@ -1074,27 +1066,26 @@ mod tests {
                     .call(&mut *store.0.borrow_mut(), data.len() as i32)
                     .unwrap();
 
-                if result_ptr != 0xBADF00D {
-                    let expected = values
-                        .iter()
-                        .map(|v| U256::from_le_bytes(*v))
-                        .collect::<Vec<U256>>()
-                        .abi_encode();
+                let expected = values
+                    .iter()
+                    .map(|v| U256::from_le_bytes(*v))
+                    .collect::<Vec<U256>>()
+                    .abi_encode();
 
-                    let mut result_memory_data = vec![0; expected.len()];
-                    memory
-                        .read(
-                            &mut *store.0.borrow_mut(),
-                            result_ptr as usize,
-                            &mut result_memory_data,
-                        )
-                        .unwrap();
+                let mut result_memory_data = vec![0; expected.len()];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        result_ptr as usize,
+                        &mut result_memory_data,
+                    )
+                    .unwrap();
 
-                    assert_eq!(
-                        result_memory_data, expected,
-                        "Packed vec<u256> did not match expected result",
-                    );
-                }
+                assert_eq!(
+                    result_memory_data, expected,
+                    "Packed vec<u256> did not match expected result",
+                );
+
                 reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
             });
     }
@@ -1193,27 +1184,26 @@ mod tests {
                     .call(&mut *store.0.borrow_mut(), data.len() as i32)
                     .unwrap();
 
-                if result_ptr != 0xBADF00D {
-                    let expected = values
-                        .iter()
-                        .map(Address::from)
-                        .collect::<Vec<Address>>()
-                        .abi_encode();
+                let expected = values
+                    .iter()
+                    .map(Address::from)
+                    .collect::<Vec<Address>>()
+                    .abi_encode();
 
-                    let mut result_memory_data = vec![0; expected.len()];
-                    memory
-                        .read(
-                            &mut *store.0.borrow_mut(),
-                            result_ptr as usize,
-                            &mut result_memory_data,
-                        )
-                        .unwrap();
+                let mut result_memory_data = vec![0; expected.len()];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        result_ptr as usize,
+                        &mut result_memory_data,
+                    )
+                    .unwrap();
 
-                    assert_eq!(
-                        result_memory_data, expected,
-                        "Packed vec<address> did not match expected result",
-                    );
-                }
+                assert_eq!(
+                    result_memory_data, expected,
+                    "Packed vec<address> did not match expected result",
+                );
+
                 reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
             });
     }
@@ -1318,22 +1308,21 @@ mod tests {
                     .call(&mut *store.0.borrow_mut(), data.len() as i32)
                     .unwrap();
 
-                if result_ptr != 0xBADF00D {
-                    let expected = values.abi_encode();
-                    let mut result_memory_data = vec![0; expected.len()];
-                    memory
-                        .read(
-                            &mut *store.0.borrow_mut(),
-                            result_ptr as usize,
-                            &mut result_memory_data,
-                        )
-                        .unwrap();
+                let expected = values.abi_encode();
+                let mut result_memory_data = vec![0; expected.len()];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        result_ptr as usize,
+                        &mut result_memory_data,
+                    )
+                    .unwrap();
 
-                    assert_eq!(
-                        result_memory_data, expected,
-                        "Packed vec<vec<u32>> did not match expected result",
-                    );
-                }
+                assert_eq!(
+                    result_memory_data, expected,
+                    "Packed vec<vec<u32>> did not match expected result",
+                );
+
                 reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
             });
     }
@@ -1447,22 +1436,21 @@ mod tests {
                     .call(&mut *store.0.borrow_mut(), data.len() as i32)
                     .unwrap();
 
-                if result_ptr != 0xBADF00D {
-                    let expected = values.abi_encode();
-                    let mut result_memory_data = vec![0; expected.len()];
-                    memory
-                        .read(
-                            &mut *store.0.borrow_mut(),
-                            result_ptr as usize,
-                            &mut result_memory_data,
-                        )
-                        .unwrap();
+                let expected = values.abi_encode();
+                let mut result_memory_data = vec![0; expected.len()];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        result_ptr as usize,
+                        &mut result_memory_data,
+                    )
+                    .unwrap();
 
-                    assert_eq!(
-                        result_memory_data, expected,
-                        "Packed vec<vec<u128>> did not match expected result",
-                    );
-                }
+                assert_eq!(
+                    result_memory_data, expected,
+                    "Packed vec<vec<u128>> did not match expected result",
+                );
+
                 reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
             });
     }
