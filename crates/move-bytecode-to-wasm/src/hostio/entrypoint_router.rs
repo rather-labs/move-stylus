@@ -242,7 +242,7 @@ pub fn build_entrypoint_router(
             .local_tee(ptr);
 
         // Check if the ptr is null
-        abort_block.i32_const(0).binop(BinaryOp::I32Eq);
+        abort_block.unop(UnaryOp::I32Eqz);
 
         // If the ptr is null, jump to the end of the block, skipping the error message loading
         abort_block.br_if(abort_block_id);

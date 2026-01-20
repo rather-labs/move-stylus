@@ -12,7 +12,7 @@ use crate::{
 };
 use walrus::{
     InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg},
+    ir::{BinaryOp, LoadKind, MemArg, UnaryOp},
 };
 
 use super::error::StorageError;
@@ -204,11 +204,7 @@ pub fn add_delete_storage_vector_instructions(
         let block_id = block.id();
 
         // Check if length == 0. If so, skip the rest of the instructions.
-        block
-            .local_get(len)
-            .i32_const(0)
-            .binop(BinaryOp::I32Eq)
-            .br_if(block_id);
+        block.local_get(len).unop(UnaryOp::I32Eqz).br_if(block_id);
 
         // Element size in STORAGE
         match field_size(inner, compilation_ctx) {

@@ -46,134 +46,14 @@ pub fn u64_to_ascii_base_10(
     let scale = module.locals.add(ValType::I64); // current power of 10
 
     // Handle n = 0 case
-    builder
-        .local_get(n)
-        .i64_const(0)
-        .binop(BinaryOp::I64Eq)
-        .if_else(
-            None,
-            |z| {
-                z.i32_const(1)
-                    .call(compilation_ctx.allocator)
-                    .local_tee(ptr)
-                    .i32_const(1)
-                    .store(
-                        compilation_ctx.memory_id,
-                        StoreKind::I32_8 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
-
-                // store the '0' digit
-                z.i32_const(1)
-                    .call(compilation_ctx.allocator)
-                    .i32_const(0x30)
-                    .store(
-                        compilation_ctx.memory_id,
-                        StoreKind::I32_8 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
-            },
-            |nz| {
-                const SCALE_10_POW_19_I64: i64 = 10_000_000_000_000_000_000u64 as i64;
-
-                // scale = 10^19;
-                nz.i64_const(SCALE_10_POW_19_I64).local_set(scale);
-
-                // len = 20
-                nz.i32_const(20).local_set(len);
-
-                // allocate memory for the length
-                nz.i32_const(1)
-                    .call(compilation_ctx.allocator)
-                    .local_set(ptr);
-
-                // while (scale > n) { scale /= 10; len--; }
-                nz.block(None, |block| {
-                    let block_id = block.id();
-
-                    block.loop_(None, |lp| {
-                        let lp_id = lp.id();
-                        lp.local_get(scale)
-                            .local_get(n)
-                            .binop(BinaryOp::I64LeU)
-                            .br_if(block_id);
-
-                        lp.local_get(scale)
-                            .i64_const(10)
-                            .binop(BinaryOp::I64DivU)
-                            .local_set(scale);
-
-                        lp.local_get(len)
-                            .i32_const(1)
-                            .binop(BinaryOp::I32Sub)
-                            .local_set(len);
-                        lp.br(lp_id);
-                    });
-                });
-
-                // while (true) {
-                //   digit = n / scale; *write_ptr++ = '0' + digit; n -= digit * scale;
-                //   if (scale == 1) break; scale /= 10;
-                // }
-                nz.block(None, |block| {
-                    let block_id = block.id();
-                    let write_ptr = module.locals.add(ValType::I32);
-                    block.loop_(None, |lp| {
-                        let lp_id = lp.id();
-
-                        // Allocate 1 byte for the digit
-                        lp.i32_const(1)
-                            .call(compilation_ctx.allocator)
-                            .local_tee(write_ptr);
-
-                        // digit = (n / scale) + '0'
-                        lp.local_get(n)
-                            .local_get(scale)
-                            .binop(BinaryOp::I64DivU)
-                            .i64_const(0x30)
-                            .binop(BinaryOp::I64Add)
-                            .unop(UnaryOp::I32WrapI64);
-
-                        // store the digit
-                        lp.store(
-                            compilation_ctx.memory_id,
-                            StoreKind::I32_8 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        );
-
-                        // n -= digit * scale
-                        lp.local_get(n)
-                            .local_get(scale)
-                            .binop(BinaryOp::I64RemU)
-                            .local_set(n);
-
-                        // if (scale == 1) break;
-                        lp.local_get(scale)
-                            .i64_const(1)
-                            .binop(BinaryOp::I64Eq)
-                            .br_if(block_id);
-
-                        // scale /= 10; continue
-                        lp.local_get(scale)
-                            .i64_const(10)
-                            .binop(BinaryOp::I64DivU)
-                            .local_set(scale);
-
-                        lp.br(lp_id);
-                    });
-                });
-
-                // Store the length
-                nz.local_get(ptr).local_get(len).store(
+    builder.local_get(n).unop(UnaryOp::I64Eqz).if_else(
+        None,
+        |z| {
+            z.i32_const(1)
+                .call(compilation_ctx.allocator)
+                .local_tee(ptr)
+                .i32_const(1)
+                .store(
                     compilation_ctx.memory_id,
                     StoreKind::I32_8 { atomic: false },
                     MemArg {
@@ -181,8 +61,124 @@ pub fn u64_to_ascii_base_10(
                         offset: 0,
                     },
                 );
-            },
-        );
+
+            // store the '0' digit
+            z.i32_const(1)
+                .call(compilation_ctx.allocator)
+                .i32_const(0x30)
+                .store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32_8 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+        },
+        |nz| {
+            const SCALE_10_POW_19_I64: i64 = 10_000_000_000_000_000_000u64 as i64;
+
+            // scale = 10^19;
+            nz.i64_const(SCALE_10_POW_19_I64).local_set(scale);
+
+            // len = 20
+            nz.i32_const(20).local_set(len);
+
+            // allocate memory for the length
+            nz.i32_const(1)
+                .call(compilation_ctx.allocator)
+                .local_set(ptr);
+
+            // while (scale > n) { scale /= 10; len--; }
+            nz.block(None, |block| {
+                let block_id = block.id();
+
+                block.loop_(None, |lp| {
+                    let lp_id = lp.id();
+                    lp.local_get(scale)
+                        .local_get(n)
+                        .binop(BinaryOp::I64LeU)
+                        .br_if(block_id);
+
+                    lp.local_get(scale)
+                        .i64_const(10)
+                        .binop(BinaryOp::I64DivU)
+                        .local_set(scale);
+
+                    lp.local_get(len)
+                        .i32_const(1)
+                        .binop(BinaryOp::I32Sub)
+                        .local_set(len);
+                    lp.br(lp_id);
+                });
+            });
+
+            // while (true) {
+            //   digit = n / scale; *write_ptr++ = '0' + digit; n -= digit * scale;
+            //   if (scale == 1) break; scale /= 10;
+            // }
+            nz.block(None, |block| {
+                let block_id = block.id();
+                let write_ptr = module.locals.add(ValType::I32);
+                block.loop_(None, |lp| {
+                    let lp_id = lp.id();
+
+                    // Allocate 1 byte for the digit
+                    lp.i32_const(1)
+                        .call(compilation_ctx.allocator)
+                        .local_tee(write_ptr);
+
+                    // digit = (n / scale) + '0'
+                    lp.local_get(n)
+                        .local_get(scale)
+                        .binop(BinaryOp::I64DivU)
+                        .i64_const(0x30)
+                        .binop(BinaryOp::I64Add)
+                        .unop(UnaryOp::I32WrapI64);
+
+                    // store the digit
+                    lp.store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I32_8 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+
+                    // n -= digit * scale
+                    lp.local_get(n)
+                        .local_get(scale)
+                        .binop(BinaryOp::I64RemU)
+                        .local_set(n);
+
+                    // if (scale == 1) break;
+                    lp.local_get(scale)
+                        .i64_const(1)
+                        .binop(BinaryOp::I64Eq)
+                        .br_if(block_id);
+
+                    // scale /= 10; continue
+                    lp.local_get(scale)
+                        .i64_const(10)
+                        .binop(BinaryOp::I64DivU)
+                        .local_set(scale);
+
+                    lp.br(lp_id);
+                });
+            });
+
+            // Store the length
+            nz.local_get(ptr).local_get(len).store(
+                compilation_ctx.memory_id,
+                StoreKind::I32_8 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+        },
+    );
 
     builder.local_get(ptr);
 

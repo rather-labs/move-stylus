@@ -734,62 +734,58 @@ pub fn allocate_vector_with_header_function(
     let pointer = module.locals.add(ValType::I32);
 
     // If the len is 0 we just allocate 8 bytes representing 0 length and 0 capacity
-    builder
-        .local_get(capacity)
-        .i32_const(0)
-        .binop(BinaryOp::I32Eq)
-        .if_else(
-            None,
-            |then| {
-                then.i32_const(8)
-                    .call(compilation_ctx.allocator)
-                    .local_set(pointer);
-            },
-            |else_| {
-                // This is a failsafe to prevent UB if static checks failed
-                else_
-                    .local_get(len)
-                    .local_get(capacity)
-                    .binop(BinaryOp::I32GtU)
-                    .if_else(
-                        None,
-                        |then_| {
-                            then_.unreachable(); // Trap if len > capacity
-                        },
-                        |_| {},
-                    );
-
-                // Allocate memory: capacity * element size + 8 bytes for header
-                else_
-                    .local_get(capacity)
-                    .local_get(data_size)
-                    .binop(BinaryOp::I32Mul)
-                    .i32_const(8)
-                    .binop(BinaryOp::I32Add)
-                    .call(compilation_ctx.allocator)
-                    .local_set(pointer);
-
-                // Write length at offset 0
-                else_.local_get(pointer).local_get(len).store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
+    builder.local_get(capacity).unop(UnaryOp::I32Eqz).if_else(
+        None,
+        |then| {
+            then.i32_const(8)
+                .call(compilation_ctx.allocator)
+                .local_set(pointer);
+        },
+        |else_| {
+            // This is a failsafe to prevent UB if static checks failed
+            else_
+                .local_get(len)
+                .local_get(capacity)
+                .binop(BinaryOp::I32GtU)
+                .if_else(
+                    None,
+                    |then_| {
+                        then_.unreachable(); // Trap if len > capacity
                     },
+                    |_| {},
                 );
 
-                // Write capacity at offset 4
-                else_.local_get(pointer).local_get(capacity).store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 4,
-                    },
-                );
-            },
-        );
+            // Allocate memory: capacity * element size + 8 bytes for header
+            else_
+                .local_get(capacity)
+                .local_get(data_size)
+                .binop(BinaryOp::I32Mul)
+                .i32_const(8)
+                .binop(BinaryOp::I32Add)
+                .call(compilation_ctx.allocator)
+                .local_set(pointer);
+
+            // Write length at offset 0
+            else_.local_get(pointer).local_get(len).store(
+                compilation_ctx.memory_id,
+                StoreKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+
+            // Write capacity at offset 4
+            else_.local_get(pointer).local_get(capacity).store(
+                compilation_ctx.memory_id,
+                StoreKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 4,
+                },
+            );
+        },
+    );
 
     // Return the pointer
     builder.local_get(pointer);
@@ -849,23 +845,19 @@ pub fn copy_local_function(
         .local_set(len);
 
     // Calculate the capacity
-    builder
-        .local_get(len)
-        .i32_const(0)
-        .binop(BinaryOp::I32Eq)
-        .if_else(
-            None,
-            |then| {
-                then.i32_const(1).local_set(capacity);
-            },
-            |else_| {
-                else_
-                    .local_get(len)
-                    .local_get(multiplier)
-                    .binop(BinaryOp::I32Mul)
-                    .local_set(capacity);
-            },
-        );
+    builder.local_get(len).unop(UnaryOp::I32Eqz).if_else(
+        None,
+        |then| {
+            then.i32_const(1).local_set(capacity);
+        },
+        |else_| {
+            else_
+                .local_get(len)
+                .local_get(multiplier)
+                .binop(BinaryOp::I32Mul)
+                .local_set(capacity);
+        },
+    );
 
     // Allocate memory and write length and capacity at the beginning
     let allocate_vector_with_header_function =
@@ -904,8 +896,7 @@ pub fn copy_local_function(
         // Check if length == 0
         outer_block
             .local_get(len)
-            .i32_const(0)
-            .binop(BinaryOp::I32Eq)
+            .unop(UnaryOp::I32Eqz)
             .br_if(outer_block_id);
 
         outer_block.loop_(None, |loop_block| {
