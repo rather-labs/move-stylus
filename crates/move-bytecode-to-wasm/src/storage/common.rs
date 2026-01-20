@@ -294,8 +294,11 @@ pub fn add_delete_field_instructions(
     itype: &IntermediateType,
     size: i32,
 ) -> Result<(), StorageError> {
-    let accumulate_or_advance_slot_delete_fn =
-        RuntimeFunction::AccumulateOrAdvanceSlotDelete.get(module, Some(compilation_ctx), None)?;
+    let accumulate_or_advance_slot_delete_fn = RuntimeFunction::AccumulateOrAdvanceSlotDelete.get(
+        module,
+        Some(compilation_ctx),
+        Some(runtime_error_data),
+    )?;
 
     // Use accumulate_or_advance_slot with mode=2 (delete) to handle slot advancement
     // Mode 2 will wipe the slot to zero before advancing when needed

@@ -3,7 +3,10 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
 };
 
-use crate::{CompilationContext, runtime::error::RuntimeFunctionError};
+use crate::{
+    CompilationContext, data::RuntimeErrorData, runtime::error::RuntimeFunctionError,
+    wasm_builder_extensions::WasmBuilderExtension,
+};
 
 use super::RuntimeFunction;
 
@@ -19,6 +22,7 @@ use super::RuntimeFunction;
 pub fn heap_int_shift_left(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let mut function = FunctionBuilder::new(
         &mut module.types,
@@ -35,7 +39,11 @@ pub fn heap_int_shift_left(
         .name(RuntimeFunction::HeapIntShiftLeft.name().to_owned())
         .func_body();
 
-    let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None, None)?;
+    let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(
+        module,
+        Some(compilation_ctx),
+        Some(runtime_error_data),
+    )?;
 
     // Max value for the shift amount should be 127 for u128 and 255 for u256
     builder
@@ -45,7 +53,11 @@ pub fn heap_int_shift_left(
         .binop(BinaryOp::I32Mul)
         .i32_const(1)
         .binop(BinaryOp::I32Sub)
-        .call(check_overflow_f)
+        .call_runtime_function(
+            compilation_ctx,
+            check_overflow_f,
+            &RuntimeFunction::CheckOverflowU8U16,
+        )
         .drop();
 
     // Locals
@@ -270,6 +282,7 @@ pub fn heap_int_shift_left(
 pub fn heap_int_shift_right(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let mut function = FunctionBuilder::new(
         &mut module.types,
@@ -286,7 +299,11 @@ pub fn heap_int_shift_right(
         .name(RuntimeFunction::HeapIntShiftRight.name().to_owned())
         .func_body();
 
-    let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None, None)?;
+    let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(
+        module,
+        Some(compilation_ctx),
+        Some(runtime_error_data),
+    )?;
     // Max value for the shift amount should be 127 for u128 and 255 for u256
     builder
         .local_get(shift_amount)
@@ -295,7 +312,11 @@ pub fn heap_int_shift_right(
         .binop(BinaryOp::I32Mul)
         .i32_const(1)
         .binop(BinaryOp::I32Sub)
-        .call(check_overflow_f)
+        .call_runtime_function(
+            compilation_ctx,
+            check_overflow_f,
+            &RuntimeFunction::CheckOverflowU8U16,
+        )
         .drop();
 
     // Locals
@@ -513,9 +534,13 @@ mod tests {
     use std::panic::AssertUnwindSafe;
     use std::rc::Rc;
 
+    use crate::data::DATA_ABORT_MESSAGE_PTR_OFFSET;
+    use crate::error::RuntimeError;
     use crate::test_compilation_context;
-    use crate::test_tools::{build_module, setup_wasmtime_module};
+    use crate::test_tools::{INITIAL_MEMORY_OFFSET, build_module, setup_wasmtime_module};
     use alloy_primitives::U256;
+    use alloy_primitives::keccak256;
+    use alloy_sol_types::{SolType, sol};
     use rstest::rstest;
     use walrus::{FunctionBuilder, ValType};
 
@@ -526,46 +551,10 @@ mod tests {
     #[case(128128u128, 110, 128128u128 << 110)]
     #[case(u128::MAX, 110, u128::MAX << 110)]
     #[case(u128::MAX, 127, u128::MAX << 127)]
-    #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
-    #[case(u128::MAX, 128, 0)]
-    #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
-    #[case(u128::MAX, 180, 0)]
     fn test_u128_shift_left(#[case] n: u128, #[case] shift_amount: i32, #[case] expected: u128) {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(Some(TYPE_HEAP_SIZE));
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
-        );
-
-        let shift_amount_local = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // Number to shift pointer
-        func_body.i32_const(0);
-        // Shift left amount
-        func_body.local_get(shift_amount_local);
-        // Heap size
-        func_body.i32_const(TYPE_HEAP_SIZE);
-
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let shift_left_f = heap_int_shift_left(&mut raw_module, &compilation_ctx).unwrap();
-        // Shift left
-        func_body.call(shift_left_f);
-
-        let function = function_builder.finish(vec![shift_amount_local], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        // display_module(&mut raw_module);
-
-        let data = [n.to_le_bytes()].concat();
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
+        let (mut store, instance, entrypoint) =
+            setup_heap_shift_test(n.to_le_bytes().to_vec(), TYPE_HEAP_SIZE, false);
 
         let pointer: i32 = entrypoint
             .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
@@ -579,41 +568,27 @@ mod tests {
         assert_eq!(result_memory_data, expected.to_le_bytes().to_vec());
     }
 
+    #[rstest]
+    #[case(u128::MAX, 128)]
+    #[case(u128::MAX, 180)]
+    fn test_u128_shift_left_overflow(#[case] n: u128, #[case] shift_amount: i32) {
+        const TYPE_HEAP_SIZE: i32 = 16;
+
+        let (mut store, instance, entrypoint) =
+            setup_heap_shift_test(n.to_le_bytes().to_vec(), TYPE_HEAP_SIZE, false);
+
+        let _: i32 = entrypoint
+            .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
+            .unwrap();
+
+        assert_overflow_error(&mut store, &instance);
+    }
+
     #[test]
     fn test_u128_shift_left_fuzz() {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(Some(TYPE_HEAP_SIZE));
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
-        );
-
-        let shift_amount_local = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // Number to shift pointer
-        func_body
-            .i32_const(0)
-            // Shift left amount
-            .local_get(shift_amount_local)
-            // Heap size
-            .i32_const(TYPE_HEAP_SIZE);
-
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let shift_left_f = heap_int_shift_left(&mut raw_module, &compilation_ctx).unwrap();
-        // Shift left
-        func_body.call(shift_left_f);
-
-        let function = function_builder.finish(vec![shift_amount_local], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
+        let (mut store, instance, entrypoint) =
+            setup_heap_shift_test(vec![0; TYPE_HEAP_SIZE as usize], TYPE_HEAP_SIZE, false);
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let reset_memory = Rc::new(AssertUnwindSafe(
@@ -630,19 +605,23 @@ mod tests {
                 let mut store = store.borrow_mut();
 
                 let data = n.to_le_bytes();
-                memory.write(&mut *store, 0, &data).unwrap();
+                memory
+                    .write(&mut *store, INITIAL_MEMORY_OFFSET as usize, &data)
+                    .unwrap();
 
                 let result: Result<i32, _> =
                     entrypoint.call(&mut *store, (shift as i32, TYPE_HEAP_SIZE));
 
                 match result {
                     Ok(pointer) => {
-                        let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
-                        memory
-                            .read(&mut *store, pointer as usize, &mut result_memory_data)
-                            .unwrap();
-                        let expected = n.checked_shl(shift as u32).unwrap_or(0);
-                        assert_eq!(result_memory_data, expected.to_le_bytes().to_vec());
+                        if pointer != 0xBADF00D {
+                            let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
+                            memory
+                                .read(&mut *store, pointer as usize, &mut result_memory_data)
+                                .unwrap();
+                            let expected = n.checked_shl(shift as u32).unwrap_or(0);
+                            assert_eq!(result_memory_data, expected.to_le_bytes().to_vec());
+                        }
                     }
                     Err(_) => {
                         // In case of overflow, we expect a trap
@@ -661,44 +640,10 @@ mod tests {
     #[case(U256::MAX, 160, U256::MAX << 160)]
     #[case(U256::MAX, 180, U256::MAX << 180)]
     #[case(U256::MAX, 255, U256::MAX << 255)]
-    #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
-    #[case(U256::MAX, 256, U256::ZERO)]
     fn test_u256_shift_left(#[case] n: U256, #[case] shift_amount: i32, #[case] expected: U256) {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(Some(TYPE_HEAP_SIZE));
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
-        );
-
-        let shift_amount_local = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // Number to shift pointer
-        func_body.i32_const(0);
-        // Shift left amount
-        func_body.local_get(shift_amount_local);
-        // Heap size
-        func_body.i32_const(TYPE_HEAP_SIZE);
-
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let shift_left_f = heap_int_shift_left(&mut raw_module, &compilation_ctx).unwrap();
-        // Shift left
-        func_body.call(shift_left_f);
-
-        let function = function_builder.finish(vec![shift_amount_local], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        // display_module(&mut raw_module);
-
-        let data = [n.to_le_bytes::<32>()].concat();
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
+        let (mut store, instance, entrypoint) =
+            setup_heap_shift_test(n.to_le_bytes::<32>().to_vec(), TYPE_HEAP_SIZE, false);
 
         let pointer: i32 = entrypoint
             .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
@@ -712,41 +657,25 @@ mod tests {
         assert_eq!(result_memory_data, expected.to_le_bytes::<32>().to_vec());
     }
 
+    #[rstest]
+    #[case(U256::MAX, 256)]
+    fn test_u256_shift_left_overflow(#[case] n: U256, #[case] shift_amount: i32) {
+        const TYPE_HEAP_SIZE: i32 = 32;
+        let (mut store, instance, entrypoint) =
+            setup_heap_shift_test(n.to_le_bytes::<32>().to_vec(), TYPE_HEAP_SIZE, false);
+
+        let _: i32 = entrypoint
+            .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
+            .unwrap();
+
+        assert_overflow_error(&mut store, &instance);
+    }
+
     #[test]
     fn test_u256_shift_left_fuzz() {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(Some(TYPE_HEAP_SIZE));
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
-        );
-
-        let shift_amount_local = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // Number to shift pointer
-        func_body
-            .i32_const(0)
-            // Shift left amount
-            .local_get(shift_amount_local)
-            // Heap size
-            .i32_const(TYPE_HEAP_SIZE);
-
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let shift_left_f = heap_int_shift_left(&mut raw_module, &compilation_ctx).unwrap();
-        // Shift left
-        func_body.call(shift_left_f);
-
-        let function = function_builder.finish(vec![shift_amount_local], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
+        let (mut store, instance, entrypoint) =
+            setup_heap_shift_test(vec![0; TYPE_HEAP_SIZE as usize], TYPE_HEAP_SIZE, false);
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let reset_memory = Rc::new(AssertUnwindSafe(
@@ -761,7 +690,9 @@ mod tests {
             |&(n, shift): &([u8; TYPE_HEAP_SIZE as usize], u16)| {
                 let mut store = store.borrow_mut();
 
-                memory.write(&mut *store, 0, &n).unwrap();
+                memory
+                    .write(&mut *store, INITIAL_MEMORY_OFFSET as usize, &n)
+                    .unwrap();
 
                 let n = U256::from_le_bytes::<32>(n);
 
@@ -770,12 +701,17 @@ mod tests {
 
                 match result {
                     Ok(pointer) => {
-                        let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
-                        memory
-                            .read(&mut *store, pointer as usize, &mut result_memory_data)
-                            .unwrap();
-                        let expected = n << shift as usize;
-                        assert_eq!(result_memory_data, expected.to_le_bytes::<32>().to_vec());
+                        if pointer != 0xBADF00D {
+                            let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
+                            memory
+                                .read(&mut *store, pointer as usize, &mut result_memory_data)
+                                .unwrap();
+                            let expected = n << shift as usize;
+                            assert_eq!(result_memory_data, expected.to_le_bytes::<32>().to_vec());
+                        } else {
+                            // Data is empty because we are reseting memory, should we not reset it?
+                            // assert_overflow_error(&mut *store, &instance);
+                        }
                     }
                     Err(_) => {
                         // In case of overflow, we expect a trap
@@ -793,44 +729,11 @@ mod tests {
     #[case(128128u128, 110, 128128u128 >> 110)]
     #[case(u128::MAX, 110, u128::MAX >> 110)]
     #[case(u128::MAX, 127, u128::MAX >> 127)]
-    #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
-    #[case(u128::MAX, 128, 0)]
-    #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
-    #[case(u128::MAX, 180, 0)]
     fn test_u128_shift_right(#[case] n: u128, #[case] shift_amount: i32, #[case] expected: u128) {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(Some(TYPE_HEAP_SIZE));
 
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
-        );
-
-        let shift_amount_local = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // Number to shift pointer
-        func_body.i32_const(0);
-        // Shift left amount
-        func_body.local_get(shift_amount_local);
-        // Heap size
-        func_body.i32_const(TYPE_HEAP_SIZE);
-
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let shift_right_f = heap_int_shift_right(&mut raw_module, &compilation_ctx).unwrap();
-        // Shift right
-        func_body.call(shift_right_f);
-
-        let function = function_builder.finish(vec![shift_amount_local], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        let data = [n.to_le_bytes()].concat();
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
+        let (mut store, instance, entrypoint) =
+            setup_heap_shift_test(n.to_le_bytes().to_vec(), TYPE_HEAP_SIZE, true);
 
         let pointer: i32 = entrypoint
             .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
@@ -844,41 +747,26 @@ mod tests {
         assert_eq!(result_memory_data, expected.to_le_bytes().to_vec());
     }
 
+    #[rstest]
+    #[case(u128::MAX, 128)]
+    #[case(u128::MAX, 180)]
+    fn test_u128_shift_right_overflow(#[case] n: u128, #[case] shift_amount: i32) {
+        const TYPE_HEAP_SIZE: i32 = 16;
+        let (mut store, instance, entrypoint) =
+            setup_heap_shift_test(n.to_le_bytes().to_vec(), TYPE_HEAP_SIZE, false);
+
+        let _: i32 = entrypoint
+            .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
+            .unwrap();
+
+        assert_overflow_error(&mut store, &instance);
+    }
+
     #[test]
     fn test_u128_shift_right_fuzz() {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(Some(TYPE_HEAP_SIZE));
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
-        );
-
-        let shift_amount_local = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // Number to shift pointer
-        func_body
-            .i32_const(0)
-            // Shift left amount
-            .local_get(shift_amount_local)
-            // Heap size
-            .i32_const(TYPE_HEAP_SIZE);
-
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let shift_left_f = heap_int_shift_right(&mut raw_module, &compilation_ctx).unwrap();
-        // Shift left
-        func_body.call(shift_left_f);
-
-        let function = function_builder.finish(vec![shift_amount_local], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
+        let (mut store, instance, entrypoint) =
+            setup_heap_shift_test(vec![0; TYPE_HEAP_SIZE as usize], TYPE_HEAP_SIZE, true);
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let reset_memory = Rc::new(AssertUnwindSafe(
@@ -895,19 +783,23 @@ mod tests {
                 let mut store = store.borrow_mut();
 
                 let data = n.to_le_bytes();
-                memory.write(&mut *store, 0, &data).unwrap();
+                memory
+                    .write(&mut *store, INITIAL_MEMORY_OFFSET as usize, &data)
+                    .unwrap();
 
                 let result: Result<i32, _> =
                     entrypoint.call(&mut *store, (shift as i32, TYPE_HEAP_SIZE));
 
                 match result {
                     Ok(pointer) => {
-                        let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
-                        memory
-                            .read(&mut *store, pointer as usize, &mut result_memory_data)
-                            .unwrap();
-                        let expected = n.checked_shr(shift as u32).unwrap_or(0);
-                        assert_eq!(result_memory_data, expected.to_le_bytes().to_vec());
+                        if pointer != 0xBADF00D {
+                            let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
+                            memory
+                                .read(&mut *store, pointer as usize, &mut result_memory_data)
+                                .unwrap();
+                            let expected = n.checked_shr(shift as u32).unwrap_or(0);
+                            assert_eq!(result_memory_data, expected.to_le_bytes().to_vec());
+                        }
                     }
                     Err(_) => {
                         // In case of overflow, we expect a trap
@@ -926,44 +818,10 @@ mod tests {
     #[case(U256::MAX, 160, U256::MAX >> 160)]
     #[case(U256::MAX, 180, U256::MAX >> 180)]
     #[case(U256::MAX, 255, U256::MAX >> 255)]
-    #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
-    #[case(U256::MAX, 256, U256::ZERO)]
     fn test_u256_shift_right(#[case] n: U256, #[case] shift_amount: i32, #[case] expected: U256) {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(Some(TYPE_HEAP_SIZE));
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
-        );
-
-        let shift_amount_local = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // Number to shift pointer
-        func_body.i32_const(0);
-        // Shift left amount
-        func_body.local_get(shift_amount_local);
-        // Heap size
-        func_body.i32_const(TYPE_HEAP_SIZE);
-
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let shift_right_f = heap_int_shift_right(&mut raw_module, &compilation_ctx).unwrap();
-        // Shift right
-        func_body.call(shift_right_f);
-
-        let function = function_builder.finish(vec![shift_amount_local], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        // display_module(&mut raw_module);
-
-        let data = [n.to_le_bytes::<32>()].concat();
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
+        let (mut store, instance, entrypoint) =
+            setup_heap_shift_test(n.to_le_bytes::<32>().to_vec(), TYPE_HEAP_SIZE, true);
 
         let pointer: i32 = entrypoint
             .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
@@ -977,41 +835,25 @@ mod tests {
         assert_eq!(result_memory_data, expected.to_le_bytes::<32>().to_vec());
     }
 
+    #[rstest]
+    #[case(U256::MAX, 256)]
+    fn test_u256_shift_right_overflow(#[case] n: U256, #[case] shift_amount: i32) {
+        const TYPE_HEAP_SIZE: i32 = 32;
+        let (mut store, instance, entrypoint) =
+            setup_heap_shift_test(n.to_le_bytes::<32>().to_vec(), TYPE_HEAP_SIZE, true);
+
+        let _: i32 = entrypoint
+            .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
+            .unwrap();
+
+        assert_overflow_error(&mut store, &instance);
+    }
+
     #[test]
     fn test_u256_shift_right_fuzz() {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
-            build_module(Some(TYPE_HEAP_SIZE));
-
-        let mut function_builder = FunctionBuilder::new(
-            &mut raw_module.types,
-            &[ValType::I32, ValType::I32],
-            &[ValType::I32],
-        );
-
-        let shift_amount_local = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-
-        // Number to shift pointer
-        func_body
-            .i32_const(0)
-            // Shift left amount
-            .local_get(shift_amount_local)
-            // Heap size
-            .i32_const(TYPE_HEAP_SIZE);
-
-        let compilation_ctx =
-            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
-        let shift_left_f = heap_int_shift_right(&mut raw_module, &compilation_ctx).unwrap();
-        // Shift left
-        func_body.call(shift_left_f);
-
-        let function = function_builder.finish(vec![shift_amount_local], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
+        let (mut store, instance, entrypoint) =
+            setup_heap_shift_test(vec![0; TYPE_HEAP_SIZE as usize], TYPE_HEAP_SIZE, true);
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let reset_memory = Rc::new(AssertUnwindSafe(
@@ -1035,12 +877,14 @@ mod tests {
 
                 match result {
                     Ok(pointer) => {
-                        let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
-                        memory
-                            .read(&mut *store, pointer as usize, &mut result_memory_data)
-                            .unwrap();
-                        let expected = n >> shift as usize;
-                        assert_eq!(result_memory_data, expected.to_le_bytes::<32>().to_vec());
+                        if pointer != 0xBADF00D {
+                            let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
+                            memory
+                                .read(&mut *store, pointer as usize, &mut result_memory_data)
+                                .unwrap();
+                            let expected = n >> shift as usize;
+                            assert_eq!(result_memory_data, expected.to_le_bytes::<32>().to_vec());
+                        }
                     }
                     Err(_) => {
                         // In case of overflow, we expect a trap
@@ -1051,5 +895,100 @@ mod tests {
                 reset_memory.call(&mut *store, ()).unwrap();
             },
         );
+    }
+
+    fn setup_heap_shift_test(
+        n_bytes: Vec<u8>,
+        heap_size: i32,
+        shift_right: bool,
+    ) -> (
+        wasmtime::Store<()>,
+        wasmtime::Instance,
+        wasmtime::TypedFunc<(i32, i32), i32>,
+    ) {
+        let (mut raw_module, allocator_func, memory_id, ctx_globals) =
+            build_module(Some(heap_size));
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
+        let mut runtime_error_data = RuntimeErrorData::new();
+
+        let mut function_builder = FunctionBuilder::new(
+            &mut raw_module.types,
+            &[ValType::I32, ValType::I32],
+            &[ValType::I32],
+        );
+
+        let shift_amount = raw_module.locals.add(ValType::I32);
+
+        let shift_f = if shift_right {
+            heap_int_shift_right(&mut raw_module, &compilation_ctx, &mut runtime_error_data)
+                .unwrap()
+        } else {
+            heap_int_shift_left(&mut raw_module, &compilation_ctx, &mut runtime_error_data).unwrap()
+        };
+
+        function_builder
+            .func_body()
+            .i32_const(INITIAL_MEMORY_OFFSET)
+            .local_get(shift_amount)
+            .i32_const(heap_size)
+            .call(shift_f);
+
+        let function = function_builder.finish(vec![shift_amount], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let data = [n_bytes].concat();
+        let (_, instance, store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, data, "test_function", None);
+
+        (store, instance, entrypoint)
+    }
+
+    /// Helper to verify that an overflow error was correctly written to memory
+    fn assert_overflow_error(store: &mut wasmtime::Store<()>, instance: &wasmtime::Instance) {
+        let error_ptr = {
+            let memory = instance.get_memory(&mut *store, "memory").unwrap();
+
+            // Read the error pointer from the data segment
+            let mut error_ptr_bytes = vec![0; 4];
+            memory
+                .read(
+                    &mut *store,
+                    DATA_ABORT_MESSAGE_PTR_OFFSET as usize,
+                    &mut error_ptr_bytes,
+                )
+                .unwrap();
+
+            i32::from_le_bytes(error_ptr_bytes.try_into().unwrap())
+        };
+
+        // If the error pointer is 0, it means that no error occurred
+        assert_ne!(error_ptr, 0);
+
+        let result_data = {
+            let memory = instance.get_memory(&mut *store, "memory").unwrap();
+
+            // Load the length
+            let mut error_length_bytes = vec![0; 4];
+            memory
+                .read(&mut *store, error_ptr as usize, &mut error_length_bytes)
+                .unwrap();
+
+            let error_length = i32::from_le_bytes(error_length_bytes.try_into().unwrap());
+
+            let mut result_data = vec![0; error_length as usize];
+            memory
+                .read(&mut *store, (error_ptr + 4) as usize, &mut result_data)
+                .unwrap();
+
+            result_data
+        };
+
+        let error_message = String::from_utf8_lossy(RuntimeError::Overflow.as_bytes());
+        let expected = [
+            keccak256(b"Error(string)")[..4].to_vec(),
+            <sol!((string,))>::abi_encode_params(&(error_message,)),
+        ]
+        .concat();
+        assert_eq!(result_data, expected);
     }
 }

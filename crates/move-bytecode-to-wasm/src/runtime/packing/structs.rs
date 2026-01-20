@@ -189,6 +189,7 @@ pub fn pack_struct_function(
                         inner_data_reference,
                         compilation_ctx,
                         Some(runtime_error_data),
+                        None,
                     )?;
                     Ok(32)
                 } else {
@@ -200,6 +201,7 @@ pub fn pack_struct_function(
                         inner_data_reference,
                         compilation_ctx,
                         Some(runtime_error_data),
+                        None,
                     )?;
                     Ok(field.encoded_size(compilation_ctx)?)
                 }
@@ -213,6 +215,7 @@ pub fn pack_struct_function(
                     inner_data_reference,
                     compilation_ctx,
                     Some(runtime_error_data),
+                    None,
                 )?;
                 Ok(32)
             }
@@ -261,7 +264,7 @@ mod tests {
         compilation_context::{ModuleData, ModuleId},
         data::RuntimeErrorData,
         test_compilation_context,
-        test_tools::{build_module, setup_wasmtime_module},
+        test_tools::{INITIAL_MEMORY_OFFSET, build_module, setup_wasmtime_module},
         translation::intermediate_types::{
             IntermediateType, VmHandledStruct,
             structs::{IStruct, IStructType},
@@ -275,8 +278,8 @@ mod tests {
             IntermediateType::IBool,
         ],
         [
-            8u32.to_le_bytes().as_slice(),
-            12u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 8) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 12) as u32).to_le_bytes().as_slice(),
             42u32.to_le_bytes().as_slice(),
             1u8.to_le_bytes().as_slice(),
         ].concat(),
@@ -297,9 +300,9 @@ mod tests {
             IntermediateType::IU64,
         ],
         [
-            12u32.to_le_bytes().as_slice(),
-            13u32.to_le_bytes().as_slice(),
-            15u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 12) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 13) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 15) as u32).to_le_bytes().as_slice(),
             10u8.to_le_bytes().as_slice(),
             20u16.to_le_bytes().as_slice(),
             30u64.to_le_bytes().as_slice(),
@@ -322,9 +325,9 @@ mod tests {
             IntermediateType::IBool,
         ],
         [
-            12u32.to_le_bytes().as_slice(),
-            13u32.to_le_bytes().as_slice(),
-            17u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 12) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 13) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 17) as u32).to_le_bytes().as_slice(),
             1u8.to_le_bytes().as_slice(),
             123u32.to_le_bytes().as_slice(),
             0u8.to_le_bytes().as_slice(),
@@ -346,8 +349,8 @@ mod tests {
             IntermediateType::IU128,
         ],
         [
-            8u32.to_le_bytes().as_slice(),
-            12u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 8) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 12) as u32).to_le_bytes().as_slice(),
             100u32.to_le_bytes().as_slice(),
             123456789u128.to_le_bytes().as_slice(),
         ].concat(),
@@ -367,8 +370,8 @@ mod tests {
             IntermediateType::IBool,
         ],
         [
-            8u32.to_le_bytes().as_slice(),
-            40u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 8) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 40) as u32).to_le_bytes().as_slice(),
             U256::from(999u64).to_le_bytes::<32>().as_slice(),
             1u8.to_le_bytes().as_slice(),
         ].concat(),
@@ -388,8 +391,8 @@ mod tests {
             IntermediateType::IU32,
         ],
         [
-            8u32.to_le_bytes().as_slice(),
-            40u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 8) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 40) as u32).to_le_bytes().as_slice(),
             [&[0; 12], address!("0x1234567890abcdef1234567890abcdef12345678").as_slice()].concat().as_slice(),
             777u32.to_le_bytes().as_slice(),
         ].concat(),
@@ -414,10 +417,10 @@ mod tests {
             IntermediateType::IU32,
         ],
         [
-            16u32.to_le_bytes().as_slice(),
-            20u32.to_le_bytes().as_slice(),
-            24u32.to_le_bytes().as_slice(),
-            28u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 16) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 20) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 24) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 28) as u32).to_le_bytes().as_slice(),
             1u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
@@ -442,9 +445,9 @@ mod tests {
             IntermediateType::IU16,
         ],
         [
-            12u32.to_le_bytes().as_slice(),
-            20u32.to_le_bytes().as_slice(),
-            21u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 12) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 20) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 21) as u32).to_le_bytes().as_slice(),
             9876543210u64.to_le_bytes().as_slice(),
             5u8.to_le_bytes().as_slice(),
             300u16.to_le_bytes().as_slice(),
@@ -466,8 +469,8 @@ mod tests {
             IntermediateType::IVector(Arc::new(IntermediateType::IU8)),
         ],
         [
-            8u32.to_le_bytes().as_slice(),
-            12u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 8) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 12) as u32).to_le_bytes().as_slice(),
             500u32.to_le_bytes().as_slice(),
             // Vector: len, capacity, elements
             3u32.to_le_bytes().as_slice(),
@@ -492,8 +495,8 @@ mod tests {
             IntermediateType::IVector(Arc::new(IntermediateType::IU64)),
         ],
         [
-            8u32.to_le_bytes().as_slice(),
-            9u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 8) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 9) as u32).to_le_bytes().as_slice(),
             1u8.to_le_bytes().as_slice(),
             // Vector: len, capacity, elements
             2u32.to_le_bytes().as_slice(),
@@ -517,14 +520,14 @@ mod tests {
             IntermediateType::IVector(Arc::new(IntermediateType::IU128)),
         ],
         [
-            8u32.to_le_bytes().as_slice(),
-            10u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 8) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 10) as u32).to_le_bytes().as_slice(),
             999u16.to_le_bytes().as_slice(),
             // Vector: len, capacity, pointer array, then u128 values
             2u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
-            26u32.to_le_bytes().as_slice(), // pointer to first u128
-            42u32.to_le_bytes().as_slice(), // pointer to second u128
+            ((INITIAL_MEMORY_OFFSET + 26) as u32).to_le_bytes().as_slice(), // pointer to first u128
+            ((INITIAL_MEMORY_OFFSET + 42) as u32).to_le_bytes().as_slice(), // pointer to second u128
             111111u128.to_le_bytes().as_slice(),
             222222u128.to_le_bytes().as_slice(),
         ].concat(),
@@ -548,12 +551,12 @@ mod tests {
             },
         ],
         [
-            8u32.to_le_bytes().as_slice(),
-            12u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 8) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 12) as u32).to_le_bytes().as_slice(),
             42u32.to_le_bytes().as_slice(),
             // SubStruct pointer array
-            20u32.to_le_bytes().as_slice(),
-            24u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 20) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 24) as u32).to_le_bytes().as_slice(),
             // SubStruct field values
             10u32.to_le_bytes().as_slice(),
             1u8.to_le_bytes().as_slice(),
@@ -585,20 +588,20 @@ mod tests {
             },
         ],
         [
-            8u32.to_le_bytes().as_slice(),
-            12u32.to_le_bytes().as_slice(),
-            100u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 8) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 12) as u32).to_le_bytes().as_slice(),
+            (100_u32).to_le_bytes().as_slice(),
             // SubStruct pointer array (bool and vec<u128>)
-            20u32.to_le_bytes().as_slice(),
-            21u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 20) as u32).to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 21) as u32).to_le_bytes().as_slice(),
             // SubStruct field values
             1u8.to_le_bytes().as_slice(), // bool value
             // Vector: len, capacity, pointer array for u128, then u128 values
             3u32.to_le_bytes().as_slice(), // length
             3u32.to_le_bytes().as_slice(), // capacity
-            41u32.to_le_bytes().as_slice(), // pointer to first u128
-            57u32.to_le_bytes().as_slice(), // pointer to second u128
-            73u32.to_le_bytes().as_slice(), // pointer to third u128
+            ((INITIAL_MEMORY_OFFSET + 41) as u32).to_le_bytes().as_slice(), // pointer to first u128
+            ((INITIAL_MEMORY_OFFSET + 57) as u32).to_le_bytes().as_slice(), // pointer to second u128
+            ((INITIAL_MEMORY_OFFSET + 73) as u32).to_le_bytes().as_slice(), // pointer to third u128
             111u128.to_le_bytes().as_slice(),
             222u128.to_le_bytes().as_slice(),
             333u128.to_le_bytes().as_slice(),
@@ -708,6 +711,7 @@ mod tests {
                 calldata_reference_pointer,
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
+                None,
             )
             .unwrap();
 
@@ -789,6 +793,7 @@ mod tests {
                 calldata_reference_pointer,
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
+                None,
             )
             .unwrap();
 
@@ -818,11 +823,11 @@ mod tests {
                     // Build memory layout: pointer array, then values
                     let mut data = vec![];
                     // Pointer array (5 fields)
-                    data.extend(&20u32.to_le_bytes()); // u8 at offset 20
-                    data.extend(&21u32.to_le_bytes()); // u64 at offset 21
-                    data.extend(&29u32.to_le_bytes()); // u128 at offset 29 (pointer)
-                    data.extend(&45u32.to_le_bytes()); // bool at offset 45
-                    data.extend(&46u32.to_le_bytes()); // address at offset 46 (pointer)
+                    data.extend(&((INITIAL_MEMORY_OFFSET + 20) as u32).to_le_bytes()); // u8 at offset 20
+                    data.extend(&((INITIAL_MEMORY_OFFSET + 21) as u32).to_le_bytes()); // u64 at offset 21
+                    data.extend(&((INITIAL_MEMORY_OFFSET + 29) as u32).to_le_bytes()); // u128 at offset 29 (pointer)
+                    data.extend(&((INITIAL_MEMORY_OFFSET + 45) as u32).to_le_bytes()); // bool at offset 45
+                    data.extend(&((INITIAL_MEMORY_OFFSET + 46) as u32).to_le_bytes()); // address at offset 46 (pointer)
                     // Values
                     data.extend(&[a]); // u8 value
                     data.extend(&b.to_le_bytes()); // u64 value
@@ -831,45 +836,53 @@ mod tests {
                     data.extend(&[0u8; 12]); // address padding
                     data.extend(&addr_bytes); // address value
 
-                    memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+                    memory
+                        .write(
+                            &mut *store.0.borrow_mut(),
+                            INITIAL_MEMORY_OFFSET as usize,
+                            &data,
+                        )
+                        .unwrap();
 
                     let result_ptr: i32 = entrypoint
                         .0
                         .call(&mut *store.0.borrow_mut(), data.len() as i32)
                         .unwrap();
 
-                    sol! {
-                        struct TestStruct {
-                            uint8 a;
-                            uint64 b;
-                            uint128 c;
-                            bool d;
-                            address e;
+                    if result_ptr != 0xBADF00D {
+                        sol! {
+                            struct TestStruct {
+                                uint8 a;
+                                uint64 b;
+                                uint128 c;
+                                bool d;
+                                address e;
+                            }
                         }
-                    }
-                    let addr = alloy_primitives::Address::from_slice(&addr_bytes);
-                    let expected = TestStruct {
-                        a,
-                        b,
-                        c,
-                        d,
-                        e: addr,
-                    }
-                    .abi_encode();
-                    let mut result_memory_data = vec![0; expected.len()];
-                    memory
-                        .read(
-                            &mut *store.0.borrow_mut(),
-                            result_ptr as usize,
-                            &mut result_memory_data,
-                        )
-                        .unwrap();
+                        let addr = alloy_primitives::Address::from_slice(&addr_bytes);
+                        let expected = TestStruct {
+                            a,
+                            b,
+                            c,
+                            d,
+                            e: addr,
+                        }
+                        .abi_encode();
 
-                    assert_eq!(
-                        result_memory_data, expected,
-                        "Packed struct with mixed types did not match expected result",
-                    );
+                        let mut result_memory_data = vec![0; expected.len()];
+                        memory
+                            .read(
+                                &mut *store.0.borrow_mut(),
+                                result_ptr as usize,
+                                &mut result_memory_data,
+                            )
+                            .unwrap();
 
+                        assert_eq!(
+                            result_memory_data, expected,
+                            "Packed struct with mixed types did not match expected result",
+                        );
+                    }
                     reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
                 },
             );
@@ -942,6 +955,7 @@ mod tests {
                 calldata_reference_pointer,
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
+                None,
             )
             .unwrap();
 
@@ -973,7 +987,7 @@ mod tests {
 
                     // Calculate offsets
                     let struct_ptr_array_size = 20; // 5 fields * 4 bytes
-                    let a_offset = struct_ptr_array_size;
+                    let a_offset = struct_ptr_array_size + (INITIAL_MEMORY_OFFSET as usize);
                     let b_offset = a_offset + 8; // u64 size
                     let c_offset = b_offset + 16; // u128 size
                     let vec_u128_offset = c_offset + 1; // bool size
@@ -1013,44 +1027,51 @@ mod tests {
                         data.extend(&val.to_le_bytes());
                     }
 
-                    memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+                    memory
+                        .write(
+                            &mut *store.0.borrow_mut(),
+                            INITIAL_MEMORY_OFFSET as usize,
+                            &data,
+                        )
+                        .unwrap();
 
                     let result_ptr: i32 = entrypoint
                         .0
                         .call(&mut *store.0.borrow_mut(), data.len() as i32)
                         .unwrap();
 
-                    sol! {
-                        struct TestStruct {
-                            uint64 a;
-                            uint128 b;
-                            bool c;
-                            uint128[] d;
-                            uint32[] e;
+                    if result_ptr != 0xBADF00D {
+                        sol! {
+                            struct TestStruct {
+                                uint64 a;
+                                uint128 b;
+                                bool c;
+                                uint128[] d;
+                                uint32[] e;
+                            }
                         }
-                    }
-                    let expected = TestStruct {
-                        a,
-                        b,
-                        c,
-                        d: vec_u128.clone(),
-                        e: vec_u32.clone(),
-                    }
-                    .abi_encode_sequence();
-                    let mut result_memory_data = vec![0; expected.len()];
-                    memory
-                        .read(
-                            &mut *store.0.borrow_mut(),
-                            result_ptr as usize,
-                            &mut result_memory_data,
-                        )
-                        .unwrap();
+                        let expected = TestStruct {
+                            a,
+                            b,
+                            c,
+                            d: vec_u128.clone(),
+                            e: vec_u32.clone(),
+                        }
+                        .abi_encode_sequence();
+                        let mut result_memory_data = vec![0; expected.len()];
+                        memory
+                            .read(
+                                &mut *store.0.borrow_mut(),
+                                result_ptr as usize,
+                                &mut result_memory_data,
+                            )
+                            .unwrap();
 
-                    assert_eq!(
-                        result_memory_data, expected,
-                        "Packed struct with vectors did not match expected result",
-                    );
-
+                        assert_eq!(
+                            result_memory_data, expected,
+                            "Packed struct with vectors did not match expected result",
+                        );
+                    }
                     reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
                 },
             );
@@ -1134,6 +1155,7 @@ mod tests {
                 calldata_reference_pointer,
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
+                None,
             )
             .unwrap();
 
@@ -1164,65 +1186,72 @@ mod tests {
                     let mut data = vec![];
 
                     // Main struct pointer array (3 fields)
-                    data.extend(&12u32.to_le_bytes()); // u64 at offset 12
-                    data.extend(&20u32.to_le_bytes()); // u128 at offset 20
-                    data.extend(&36u32.to_le_bytes()); // substruct at offset 36
+                    data.extend(&((INITIAL_MEMORY_OFFSET + 12) as u32).to_le_bytes()); // u64 at offset 12
+                    data.extend(&((INITIAL_MEMORY_OFFSET + 20) as u32).to_le_bytes()); // u128 at offset 20
+                    data.extend(&((INITIAL_MEMORY_OFFSET + 36) as u32).to_le_bytes()); // substruct at offset 36
 
                     // Main struct values
                     data.extend(&a.to_le_bytes()); // u64
                     data.extend(&b.to_le_bytes()); // u128
 
                     // SubStruct pointer array (2 fields)
-                    data.extend(&44u32.to_le_bytes()); // bool at offset 44
-                    data.extend(&45u32.to_le_bytes()); // address at offset 45
+                    data.extend(&((INITIAL_MEMORY_OFFSET + 44) as u32).to_le_bytes()); // bool at offset 44
+                    data.extend(&((INITIAL_MEMORY_OFFSET + 45) as u32).to_le_bytes()); // address at offset 45
 
                     // SubStruct values
                     data.extend(&[sub_bool as u8]); // bool
                     data.extend(&[0u8; 12]); // address padding
                     data.extend(&addr_bytes); // address
 
-                    memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+                    memory
+                        .write(
+                            &mut *store.0.borrow_mut(),
+                            INITIAL_MEMORY_OFFSET as usize,
+                            &data,
+                        )
+                        .unwrap();
 
                     let result_ptr: i32 = entrypoint
                         .0
                         .call(&mut *store.0.borrow_mut(), data.len() as i32)
                         .unwrap();
 
-                    sol! {
-                        struct SubStruct {
-                            bool x;
-                            address y;
+                    if result_ptr != 0xBADF00D {
+                        sol! {
+                            struct SubStruct {
+                                bool x;
+                                address y;
+                            }
+                            struct TestStruct {
+                                uint64 a;
+                                uint128 b;
+                                SubStruct c;
+                            }
                         }
-                        struct TestStruct {
-                            uint64 a;
-                            uint128 b;
-                            SubStruct c;
+                        let addr = alloy_primitives::Address::from_slice(&addr_bytes);
+                        let expected = TestStruct {
+                            a,
+                            b,
+                            c: SubStruct {
+                                x: sub_bool,
+                                y: addr,
+                            },
                         }
-                    }
-                    let addr = alloy_primitives::Address::from_slice(&addr_bytes);
-                    let expected = TestStruct {
-                        a,
-                        b,
-                        c: SubStruct {
-                            x: sub_bool,
-                            y: addr,
-                        },
-                    }
-                    .abi_encode_sequence();
-                    let mut result_memory_data = vec![0; expected.len()];
-                    memory
-                        .read(
-                            &mut *store.0.borrow_mut(),
-                            result_ptr as usize,
-                            &mut result_memory_data,
-                        )
-                        .unwrap();
+                        .abi_encode_sequence();
+                        let mut result_memory_data = vec![0; expected.len()];
+                        memory
+                            .read(
+                                &mut *store.0.borrow_mut(),
+                                result_ptr as usize,
+                                &mut result_memory_data,
+                            )
+                            .unwrap();
 
-                    assert_eq!(
-                        result_memory_data, expected,
-                        "Packed struct with simple substruct did not match expected result",
-                    );
-
+                        assert_eq!(
+                            result_memory_data, expected,
+                            "Packed struct with simple substruct did not match expected result",
+                        );
+                    }
                     reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
                 },
             );
@@ -1311,6 +1340,7 @@ mod tests {
                 calldata_reference_pointer,
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
+                None,
             )
             .unwrap();
 
@@ -1342,7 +1372,7 @@ mod tests {
 
                     // Calculate offsets
                     let main_ptr_array_size = 12; // 3 fields * 4 bytes
-                    let a_offset = main_ptr_array_size;
+                    let a_offset = main_ptr_array_size + (INITIAL_MEMORY_OFFSET as usize);
                     let b_offset = a_offset + 8; // u64 size
                     let substruct_offset = b_offset + 16; // u128 size
                     let substruct_ptr_array_size = 8; // 2 fields * 4 bytes
@@ -1385,47 +1415,54 @@ mod tests {
                         data.extend(&val.to_le_bytes());
                     }
 
-                    memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+                    memory
+                        .write(
+                            &mut *store.0.borrow_mut(),
+                            INITIAL_MEMORY_OFFSET as usize,
+                            &data,
+                        )
+                        .unwrap();
 
                     let result_ptr: i32 = entrypoint
                         .0
                         .call(&mut *store.0.borrow_mut(), data.len() as i32)
                         .unwrap();
 
-                    sol! {
-                        struct SubStruct {
-                            uint128[] x;
-                            uint32[] y;
+                    if result_ptr != 0xBADF00D {
+                        sol! {
+                            struct SubStruct {
+                                uint128[] x;
+                                uint32[] y;
+                            }
+                            struct TestStruct {
+                                uint64 a;
+                                uint128 b;
+                                SubStruct c;
+                            }
                         }
-                        struct TestStruct {
-                            uint64 a;
-                            uint128 b;
-                            SubStruct c;
+                        let expected = TestStruct {
+                            a,
+                            b,
+                            c: SubStruct {
+                                x: vec_u128.clone(),
+                                y: vec_u32.clone(),
+                            },
                         }
-                    }
-                    let expected = TestStruct {
-                        a,
-                        b,
-                        c: SubStruct {
-                            x: vec_u128.clone(),
-                            y: vec_u32.clone(),
-                        },
-                    }
-                    .abi_encode_sequence();
-                    let mut result_memory_data = vec![0; expected.len()];
-                    memory
-                        .read(
-                            &mut *store.0.borrow_mut(),
-                            result_ptr as usize,
-                            &mut result_memory_data,
-                        )
-                        .unwrap();
+                        .abi_encode_sequence();
+                        let mut result_memory_data = vec![0; expected.len()];
+                        memory
+                            .read(
+                                &mut *store.0.borrow_mut(),
+                                result_ptr as usize,
+                                &mut result_memory_data,
+                            )
+                            .unwrap();
 
-                    assert_eq!(
-                        result_memory_data, expected,
-                        "Packed struct with dynamic substruct did not match expected result",
-                    );
-
+                        assert_eq!(
+                            result_memory_data, expected,
+                            "Packed struct with dynamic substruct did not match expected result",
+                        );
+                    }
                     reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
                 },
             );

@@ -90,6 +90,7 @@ pub fn add_transfer_object_fn(
         block.return_error(
             module,
             compilation_ctx,
+            None,
             runtime_error_data,
             RuntimeError::SharedObjectsCannotBeTransferred,
         );
@@ -109,6 +110,7 @@ pub fn add_transfer_object_fn(
         block.return_error(
             module,
             compilation_ctx,
+            None,
             runtime_error_data,
             RuntimeError::FrozenObjectsCannotBeTransferred,
         );
@@ -245,6 +247,7 @@ pub fn add_share_object_fn(
                     then.return_error(
                         module,
                         compilation_ctx,
+                        None,
                         runtime_error_data,
                         RuntimeError::FrozenObjectsCannotBeShared,
                     );
@@ -385,6 +388,7 @@ pub fn add_freeze_object_fn(
                     then.return_error(
                         module,
                         compilation_ctx,
+                        None,
                         runtime_error_data,
                         RuntimeError::SharedObjectsCannotBeFrozen,
                     );

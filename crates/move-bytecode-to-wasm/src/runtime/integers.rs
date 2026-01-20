@@ -10,7 +10,11 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, UnaryOp},
 };
 
-use crate::{CompilationContext, translation::intermediate_types::simple_integers::IU32};
+use crate::{
+    CompilationContext, data::RuntimeErrorData, error::RuntimeError,
+    translation::intermediate_types::simple_integers::IU32,
+    wasm_builder_extensions::WasmBuilderExtension,
+};
 
 use super::RuntimeFunction;
 
@@ -24,7 +28,11 @@ use super::RuntimeFunction;
 ///
 /// # WASM Function Returns
 /// * the numeber passed as argument
-pub fn check_overflow_u8_u16(module: &mut Module) -> FunctionId {
+pub fn check_overflow_u8_u16(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
+) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32],
@@ -44,7 +52,13 @@ pub fn check_overflow_u8_u16(module: &mut Module) -> FunctionId {
         .if_else(
             Some(ValType::I32),
             |then| {
-                then.unreachable();
+                then.return_error(
+                    module,
+                    compilation_ctx,
+                    Some(ValType::I32),
+                    runtime_error_data,
+                    RuntimeError::Overflow,
+                );
             },
             |else_| {
                 else_.local_get(n);
@@ -63,7 +77,11 @@ pub fn check_overflow_u8_u16(module: &mut Module) -> FunctionId {
 ///
 /// # WASM Function Returns
 /// * u64 number casted as u32
-pub fn downcast_u64_to_u32(module: &mut walrus::Module) -> FunctionId {
+pub fn downcast_u64_to_u32(
+    module: &mut walrus::Module,
+    compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
+) -> FunctionId {
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I64], &[ValType::I32]);
     let mut builder = function
         .name(RuntimeFunction::DowncastU64ToU32.name().to_owned())
@@ -78,7 +96,13 @@ pub fn downcast_u64_to_u32(module: &mut walrus::Module) -> FunctionId {
         .if_else(
             Some(ValType::I32),
             |then| {
-                then.unreachable();
+                then.return_error(
+                    module,
+                    compilation_ctx,
+                    Some(ValType::I32),
+                    runtime_error_data,
+                    RuntimeError::OutOfBounds,
+                );
             },
             |else_| {
                 else_.local_get(n).unop(UnaryOp::I32WrapI64);
@@ -101,6 +125,7 @@ pub fn downcast_u64_to_u32(module: &mut walrus::Module) -> FunctionId {
 pub fn downcast_u128_u256_to_u32(
     module: &mut walrus::Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
 ) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,
@@ -166,7 +191,13 @@ pub fn downcast_u128_u256_to_u32(
                             .br(loop_id);
                     },
                     |else_| {
-                        else_.unreachable();
+                        else_.return_error(
+                            module,
+                            compilation_ctx,
+                            Some(ValType::I32),
+                            runtime_error_data,
+                            RuntimeError::OutOfBounds,
+                        );
                     },
                 );
         });
@@ -188,6 +219,7 @@ pub fn downcast_u128_u256_to_u32(
 pub fn downcast_u128_u256_to_u64(
     module: &mut walrus::Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
 ) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,
@@ -253,7 +285,13 @@ pub fn downcast_u128_u256_to_u64(
                             .br(loop_id);
                     },
                     |else_| {
-                        else_.unreachable();
+                        else_.return_error(
+                            module,
+                            compilation_ctx,
+                            Some(ValType::I64),
+                            runtime_error_data,
+                            RuntimeError::OutOfBounds,
+                        );
                     },
                 );
         });
@@ -396,7 +434,7 @@ pub fn check_if_a_less_than_b(
 #[cfg(test)]
 mod tests {
     use crate::test_compilation_context;
-    use crate::test_tools::{build_module, setup_wasmtime_module};
+    use crate::test_tools::{INITIAL_MEMORY_OFFSET, build_module, setup_wasmtime_module};
     use alloy_primitives::U256;
     use rstest::rstest;
     use walrus::{FunctionBuilder, ValType};
@@ -439,8 +477,8 @@ mod tests {
 
         // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
         func_body
-            .i32_const(0)
-            .i32_const(TYPE_HEAP_SIZE)
+            .i32_const(INITIAL_MEMORY_OFFSET)
+            .i32_const(INITIAL_MEMORY_OFFSET + TYPE_HEAP_SIZE)
             .i32_const(TYPE_HEAP_SIZE);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);
@@ -559,8 +597,8 @@ mod tests {
 
         // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
         func_body
-            .i32_const(0)
-            .i32_const(TYPE_HEAP_SIZE)
+            .i32_const(INITIAL_MEMORY_OFFSET)
+            .i32_const(INITIAL_MEMORY_OFFSET + TYPE_HEAP_SIZE)
             .i32_const(TYPE_HEAP_SIZE);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func, ctx_globals);

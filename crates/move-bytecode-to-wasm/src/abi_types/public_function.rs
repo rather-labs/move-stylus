@@ -12,6 +12,7 @@ use crate::{
         intermediate_types::{ISignature, IntermediateType},
     },
     vm_handled_types::{VmHandledType, signer::Signer},
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 
 use super::{
@@ -159,6 +160,9 @@ impl<'a> PublicFunction<'a> {
         // Call the function
         block.call(self.function_id);
 
+        // Check if the callee has thrown an error
+        block.add_propagate_error_instructions(compilation_ctx, Some(return_block_id));
+
         // Unpack function multi-value returns
         add_unpack_function_return_values_instructions(
             block,
@@ -174,11 +178,13 @@ impl<'a> PublicFunction<'a> {
             // Pack return values and push the result pointer and length directly
             let (data_ptr, data_len) = build_pack_instructions(
                 block,
+                Some(return_block_id),
                 &self.signature.returns,
                 module,
                 compilation_ctx,
                 runtime_error_data,
             )?;
+
             block.local_get(data_ptr).local_get(data_len);
         }
 

@@ -547,7 +547,6 @@ mod tests {
     }
 
     #[test]
-    // #[should_panic(expected = "unreachable")]
     fn test_build_entrypoint_router_no_data() {
         let (mut raw_module, allocator_func, memory_id, compilation_context_globals) =
             build_module(None);

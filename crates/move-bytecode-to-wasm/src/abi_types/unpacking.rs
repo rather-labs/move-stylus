@@ -152,8 +152,14 @@ impl Unpackable for IntermediateType {
 
                 builder
                     .local_get(reader_pointer)
-                    .local_get(calldata_base_pointer)
-                    .call(unpack_vector_fn);
+                    .local_get(calldata_base_pointer);
+
+                builder.call_runtime_function_conditional_return(
+                    compilation_ctx,
+                    unpack_vector_fn,
+                    &RuntimeFunction::UnpackVector,
+                    return_block_id,
+                );
             }
             // The signer must not be unpacked here, since it can't be part of the calldata. It is
             // injected directly by the VM into the stack
@@ -191,8 +197,7 @@ impl Unpackable for IntermediateType {
                             .local_get(reader_pointer)
                             .local_get(calldata_base_pointer);
 
-                        call_unpack_or_runtime_function(
-                            builder,
+                        builder.call_runtime_function_conditional_return(
                             compilation_ctx,
                             unpack_reference_function,
                             &RuntimeFunction::UnpackReference,
@@ -210,8 +215,11 @@ impl Unpackable for IntermediateType {
             IntermediateType::IStruct {
                 module_id, index, ..
             } if String_::is_vm_type(module_id, *index, compilation_ctx)? => {
-                let unpack_string_function =
-                    RuntimeFunction::UnpackString.get(module, Some(compilation_ctx), None)?;
+                let unpack_string_function = RuntimeFunction::UnpackString.get(
+                    module,
+                    Some(compilation_ctx),
+                    runtime_error_data,
+                )?;
                 builder
                     .local_get(reader_pointer)
                     .local_get(calldata_base_pointer)
@@ -250,8 +258,7 @@ impl Unpackable for IntermediateType {
                         .get_generic(module, compilation_ctx, runtime_error_data, &[self])?;
 
                     // Unpack the storage struct
-                    call_unpack_or_runtime_function(
-                        builder,
+                    builder.call_runtime_function_conditional_return(
                         compilation_ctx,
                         unpack_storage_struct_function,
                         &RuntimeFunction::UnpackStorageStruct,
@@ -269,8 +276,7 @@ impl Unpackable for IntermediateType {
                         .local_get(reader_pointer)
                         .local_get(calldata_base_pointer);
 
-                    call_unpack_or_runtime_function(
-                        builder,
+                    builder.call_runtime_function_conditional_return(
                         compilation_ctx,
                         unpack_struct_function,
                         &RuntimeFunction::UnpackStruct,
@@ -285,7 +291,11 @@ impl Unpackable for IntermediateType {
                     runtime_error_data,
                     &[self],
                 )?;
-                builder.local_get(reader_pointer).call(unpack_enum_function);
+                builder.local_get(reader_pointer).call_runtime_function(
+                    compilation_ctx,
+                    unpack_enum_function,
+                    &RuntimeFunction::UnpackEnum,
+                );
             }
             IntermediateType::ITypeParameter(_) => {
                 return Err(AbiError::Unpack(
@@ -345,7 +355,12 @@ fn load_struct_storage_id(
             )
             .map_err(AbiError::NativeFunction)?;
 
-            function_builder.call(compute_named_id_fn);
+            function_builder.call_native_function(
+                compilation_ctx,
+                NativeFunction::NATIVE_COMPUTE_NAMED_ID,
+                &ModuleId::new(STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT),
+                compute_named_id_fn,
+            );
         }
         _ => {
             Err(AbiError::Unpack(AbiOperationError::StorageObjectHasNoId(
@@ -356,21 +371,6 @@ fn load_struct_storage_id(
     Ok(())
 }
 
-/// Helper function to conditionally call either `call_unpack_function` or `call_runtime_function`
-/// based on whether a return block ID is provided.
-fn call_unpack_or_runtime_function(
-    builder: &mut InstrSeqBuilder,
-    compilation_ctx: &CompilationContext,
-    function_id: walrus::FunctionId,
-    runtime_fn: &RuntimeFunction,
-    return_block_id: Option<InstrSeqId>,
-) {
-    if let Some(return_block_id) = return_block_id {
-        builder.call_unpack_function(compilation_ctx, function_id, runtime_fn, return_block_id);
-    } else {
-        builder.call_runtime_function(compilation_ctx, function_id, runtime_fn);
-    }
-}
 #[cfg(test)]
 mod tests {
     use alloy_sol_types::{SolType, sol};
@@ -379,7 +379,7 @@ mod tests {
 
     use crate::{
         test_compilation_context,
-        test_tools::{build_module, setup_wasmtime_module},
+        test_tools::{INITIAL_MEMORY_OFFSET, build_module, setup_wasmtime_module},
         utils::display_module,
     };
 
@@ -452,7 +452,9 @@ mod tests {
             Some(linker),
         );
 
-        entrypoint.call(&mut store, (0, data_len)).unwrap();
+        entrypoint
+            .call(&mut store, (INITIAL_MEMORY_OFFSET, data_len))
+            .unwrap();
     }
 
     #[test]
@@ -521,7 +523,9 @@ mod tests {
             "test_function",
             Some(linker),
         );
-        entrypoint.call(&mut store, (0, data_len)).unwrap();
+        entrypoint
+            .call(&mut store, (INITIAL_MEMORY_OFFSET, data_len))
+            .unwrap();
     }
 
     #[test]
@@ -571,7 +575,6 @@ mod tests {
             <sol!((bool, uint16, uint64))>::abi_encode_params(&(true, 1234, 123456789012345));
         // Offset data by 10 bytes
         data = [vec![0; 10], data].concat();
-        println!("data: {data:?}");
         let data_len = data.len() as i32;
 
         // Define validator function
@@ -584,6 +587,8 @@ mod tests {
             "test_function",
             Some(linker),
         );
-        entrypoint.call(&mut store, (10, data_len - 10)).unwrap();
+        entrypoint
+            .call(&mut store, (INITIAL_MEMORY_OFFSET + 10, data_len - 10))
+            .unwrap();
     }
 }

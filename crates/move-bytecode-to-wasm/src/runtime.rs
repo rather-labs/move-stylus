@@ -242,25 +242,47 @@ impl RuntimeFunction {
         } else {
             let function_id = match (self, compilation_ctx, runtime_error_data) {
                 // Integers
-                (Self::HeapIntSum, Some(ctx), _) => integers::add::heap_integers_add(module, ctx),
-                (Self::HeapIntSub, Some(ctx), _) => integers::sub::heap_integers_sub(module, ctx),
-                (Self::AddU32, _, _) => integers::add::add_u32(module),
-                (Self::AddU64, _, _) => integers::add::add_u64(module),
-                (Self::SubU32, _, _) => integers::sub::sub_u32(module),
-                (Self::SubU64, _, _) => integers::sub::sub_u64(module),
-                (Self::CheckOverflowU8U16, _, _) => integers::check_overflow_u8_u16(module),
-                (Self::DowncastU64ToU32, _, _) => integers::downcast_u64_to_u32(module),
-                (Self::DowncastU128U256ToU32, Some(ctx), _) => {
-                    integers::downcast_u128_u256_to_u32(module, ctx)
+                (Self::HeapIntSum, Some(ctx), Some(runtime_error_data)) => {
+                    integers::add::heap_integers_add(module, ctx, runtime_error_data)
                 }
-                (Self::DowncastU128U256ToU64, Some(ctx), _) => {
-                    integers::downcast_u128_u256_to_u64(module, ctx)
+                (Self::HeapIntSub, Some(ctx), Some(runtime_error_data)) => {
+                    integers::sub::heap_integers_sub(module, ctx, runtime_error_data)
                 }
-                (Self::MulU32, _, _) => integers::mul::mul_u32(module),
-                (Self::MulU64, _, _) => integers::mul::mul_u64(module),
-                (Self::HeapIntMul, Some(ctx), _) => integers::mul::heap_integers_mul(module, ctx),
-                (Self::HeapIntDivMod, Some(ctx), _) => {
-                    integers::div::heap_integers_div_mod(module, ctx)?
+                (Self::AddU32, Some(ctx), Some(runtime_error_data)) => {
+                    integers::add::add_u32(module, ctx, runtime_error_data)
+                }
+                (Self::AddU64, Some(ctx), Some(runtime_error_data)) => {
+                    integers::add::add_u64(module, ctx, runtime_error_data)
+                }
+                (Self::SubU32, Some(ctx), Some(runtime_error_data)) => {
+                    integers::sub::sub_u32(module, ctx, runtime_error_data)
+                }
+                (Self::SubU64, Some(ctx), Some(runtime_error_data)) => {
+                    integers::sub::sub_u64(module, ctx, runtime_error_data)
+                }
+                (Self::CheckOverflowU8U16, Some(compilation_ctx), Some(runtime_error_data)) => {
+                    integers::check_overflow_u8_u16(module, compilation_ctx, runtime_error_data)
+                }
+                (Self::DowncastU64ToU32, Some(ctx), Some(runtime_error_data)) => {
+                    integers::downcast_u64_to_u32(module, ctx, runtime_error_data)
+                }
+                (Self::DowncastU128U256ToU32, Some(ctx), Some(runtime_error_data)) => {
+                    integers::downcast_u128_u256_to_u32(module, ctx, runtime_error_data)
+                }
+                (Self::DowncastU128U256ToU64, Some(ctx), Some(runtime_error_data)) => {
+                    integers::downcast_u128_u256_to_u64(module, ctx, runtime_error_data)
+                }
+                (Self::MulU32, Some(ctx), Some(runtime_error_data)) => {
+                    integers::mul::mul_u32(module, ctx, runtime_error_data)
+                }
+                (Self::MulU64, Some(ctx), Some(runtime_error_data)) => {
+                    integers::mul::mul_u64(module, ctx, runtime_error_data)
+                }
+                (Self::HeapIntMul, Some(ctx), Some(runtime_error_data)) => {
+                    integers::mul::heap_integers_mul(module, ctx, runtime_error_data)
+                }
+                (Self::HeapIntDivMod, Some(ctx), Some(runtime_error_data)) => {
+                    integers::div::heap_integers_div_mod(module, ctx, runtime_error_data)?
                 }
                 (Self::LessThan, Some(ctx), _) => integers::check_if_a_less_than_b(module, ctx),
                 // Swap
@@ -280,11 +302,11 @@ impl RuntimeFunction {
                     Self::SwapI256Bytes.name().to_owned(),
                 )?,
                 // Bitwise
-                (Self::HeapIntShiftLeft, Some(ctx), _) => {
-                    integers::bitwise::heap_int_shift_left(module, ctx)?
+                (Self::HeapIntShiftLeft, Some(ctx), Some(runtime_error_data)) => {
+                    integers::bitwise::heap_int_shift_left(module, ctx, runtime_error_data)?
                 }
-                (Self::HeapIntShiftRight, Some(ctx), _) => {
-                    integers::bitwise::heap_int_shift_right(module, ctx)?
+                (Self::HeapIntShiftRight, Some(ctx), Some(runtime_error_data)) => {
+                    integers::bitwise::heap_int_shift_right(module, ctx, runtime_error_data)?
                 }
                 // Copy
                 (Self::CopyU128, Some(ctx), _) => copy::copy_heap_int_function::<
@@ -319,14 +341,14 @@ impl RuntimeFunction {
                     vector::allocate_vector_with_header_function(module, ctx)
                 }
                 // Storage
-                (Self::StorageNextSlot, Some(ctx), _) => {
-                    storage::storage_next_slot_function(module, ctx)?
+                (Self::StorageNextSlot, Some(ctx), Some(runtime_error_data)) => {
+                    storage::storage_next_slot_function(module, ctx, runtime_error_data)?
                 }
                 (Self::DeriveMappingSlot, Some(ctx), _) => {
                     storage::derive_mapping_slot(module, ctx)
                 }
-                (Self::DeriveDynArraySlot, Some(ctx), _) => {
-                    storage::derive_dyn_array_slot(module, ctx)?
+                (Self::DeriveDynArraySlot, Some(ctx), Some(runtime_error_data)) => {
+                    storage::derive_dyn_array_slot(module, ctx, runtime_error_data)?
                 }
                 (Self::WriteObjectSlot, Some(ctx), _) => storage::write_object_slot(module, ctx)?,
                 (Self::LocateStorageData, Some(ctx), Some(runtime_error_data)) => {
@@ -344,22 +366,22 @@ impl RuntimeFunction {
                 (Self::LocateStructSlot, Some(ctx), _) => storage::locate_struct_slot(module, ctx)?,
                 (Self::GetIdBytesPtr, Some(ctx), _) => storage::get_id_bytes_ptr(module, ctx),
                 (Self::GetStructOwner, None, _) => storage::get_struct_owner_fn(module),
-                (Self::AccumulateOrAdvanceSlotDelete, Some(ctx), _) => {
-                    storage::accumulate_or_advance_slot_delete(module, ctx)?
+                (Self::AccumulateOrAdvanceSlotDelete, Some(ctx), Some(runtime_error_data)) => {
+                    storage::accumulate_or_advance_slot_delete(module, ctx, runtime_error_data)?
                 }
-                (Self::AccumulateOrAdvanceSlotRead, Some(ctx), _) => {
-                    storage::accumulate_or_advance_slot_read(module, ctx)?
+                (Self::AccumulateOrAdvanceSlotRead, Some(ctx), Some(runtime_error_data)) => {
+                    storage::accumulate_or_advance_slot_read(module, ctx, runtime_error_data)?
                 }
-                (Self::AccumulateOrAdvanceSlotWrite, Some(ctx), _) => {
-                    storage::accumulate_or_advance_slot_write(module, ctx)?
+                (Self::AccumulateOrAdvanceSlotWrite, Some(ctx), Some(runtime_error_data)) => {
+                    storage::accumulate_or_advance_slot_write(module, ctx, runtime_error_data)?
                 }
                 // ASCII conversion
                 (Self::U64ToAsciiBase10, Some(ctx), _) => {
                     integers::ascii::u64_to_ascii_base_10(module, ctx)
                 }
                 // ABI validation
-                (Self::ValidatePointer32Bit, Some(ctx), _) => {
-                    abi::validate_pointer_32_bit(module, ctx)
+                (Self::ValidatePointer32Bit, Some(ctx), Some(runtime_error_data)) => {
+                    abi::validate_pointer_32_bit(module, ctx, runtime_error_data)
                 }
                 // ABI unpacking
                 (Self::UnpackBytes, Some(ctx), _) => {
@@ -380,8 +402,8 @@ impl RuntimeFunction {
                 (Self::UnpackAddress, Some(ctx), _) => {
                     unpacking::heap_uint::unpack_address_function(module, ctx)?
                 }
-                (Self::UnpackString, Some(ctx), _) => {
-                    unpacking::string::unpack_string_function(module, ctx)?
+                (Self::UnpackString, Some(ctx), Some(runtime_error_data)) => {
+                    unpacking::string::unpack_string_function(module, ctx, runtime_error_data)?
                 }
                 (Self::InjectSigner, Some(ctx), _) => unpacking::signer::inject_signer(module, ctx),
                 // ABI packing
@@ -488,9 +510,9 @@ impl RuntimeFunction {
                     generics[0],
                 )?
             }
-            (Self::VecSwap, _) => {
+            (Self::VecSwap, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
-                vector::vec_swap_function(module, compilation_ctx, generics[0])?
+                vector::vec_swap_function(module, compilation_ctx, runtime_error_data, generics[0])?
             }
             (Self::VecPopBack, _) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
@@ -510,7 +532,7 @@ impl RuntimeFunction {
                 unpacking::vector::unpack_vector_function(
                     module,
                     compilation_ctx,
-                    Some(runtime_error_data),
+                    runtime_error_data,
                     generics[0],
                 )?
             }
@@ -656,10 +678,57 @@ impl RuntimeFunction {
     pub fn can_abort(&self) -> bool {
         matches!(
             self,
-            Self::LocateStorageData
-                | Self::UnpackStorageStruct
+            // Integer operations (non-generic)
+            Self::HeapIntSum
+                | Self::HeapIntSub
+                | Self::AddU32
+                | Self::AddU64
+                | Self::SubU32
+                | Self::SubU64
+                | Self::MulU32
+                | Self::MulU64
+                | Self::HeapIntMul
+                | Self::HeapIntDivMod
+                | Self::HeapIntShiftLeft
+                | Self::HeapIntShiftRight
+                | Self::CheckOverflowU8U16
+                | Self::DowncastU64ToU32
+                | Self::DowncastU128U256ToU32
+                | Self::DowncastU128U256ToU64
+            // Storage operations (non-generic)
+                | Self::StorageNextSlot
+                | Self::DeriveDynArraySlot
+                | Self::LocateStorageData
+                | Self::AccumulateOrAdvanceSlotDelete
+                | Self::AccumulateOrAdvanceSlotRead
+                | Self::AccumulateOrAdvanceSlotWrite
+            // ABI operations (non-generic)
+                | Self::ValidatePointer32Bit
+                | Self::UnpackString
+            // Generic storage operations
+                | Self::EncodeAndSaveInStorage
+                | Self::ReadAndDecodeFromStorage
+                | Self::DeleteFromStorage
+                | Self::CheckAndDeleteStructTtoFields
+                | Self::DeleteTtoObject
+                | Self::CacheStorageObjectChanges
+                | Self::CommitChangesToStorage
+            // Generic enum operations
+                | Self::ComputeEnumStorageTailPosition
+            // Generic vector operations
+                | Self::VecSwap
+                | Self::VecPushBack
+                | Self::VecCopyLocal
+                | Self::VecEquality
+            // Generic ABI unpacking
+                | Self::UnpackVector
                 | Self::UnpackStruct
+                | Self::UnpackStorageStruct
                 | Self::UnpackReference
+            // Generic ABI packing
+                | Self::PackVector
+                | Self::PackStruct
+                | Self::PackReference
         )
     }
 }

@@ -129,7 +129,7 @@ mod tests {
         abi_types::unpacking::Unpackable,
         data::RuntimeErrorData,
         test_compilation_context,
-        test_tools::{build_module, setup_wasmtime_module},
+        test_tools::{INITIAL_MEMORY_OFFSET, build_module, setup_wasmtime_module},
         translation::intermediate_types::IntermediateType,
     };
 
@@ -146,7 +146,7 @@ mod tests {
         let args_pointer = raw_module.locals.add(ValType::I32);
 
         let mut func_body = function_builder.func_body();
-        func_body.i32_const(0);
+        func_body.i32_const(INITIAL_MEMORY_OFFSET);
         func_body.local_set(args_pointer);
 
         int_type
@@ -173,7 +173,7 @@ mod tests {
             .unwrap();
 
         let result: i32 = entrypoint.call(&mut store, ()).unwrap();
-        assert_eq!(result, data.len() as i32);
+        assert_eq!(result, INITIAL_MEMORY_OFFSET + data.len() as i32);
 
         let global_next_free_memory_pointer = global_next_free_memory_pointer
             .get(&mut store)
@@ -181,7 +181,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             global_next_free_memory_pointer,
-            (expected_result_bytes.len() + data.len()) as i32
+            (INITIAL_MEMORY_OFFSET as usize + expected_result_bytes.len() + data.len()) as i32
         );
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();

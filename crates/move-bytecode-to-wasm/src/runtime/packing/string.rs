@@ -150,7 +150,7 @@ mod tests {
     use crate::{
         runtime::RuntimeFunction,
         test_compilation_context,
-        test_tools::{build_module, setup_wasmtime_module},
+        test_tools::{INITIAL_MEMORY_OFFSET, build_module, setup_wasmtime_module},
     };
 
     #[rstest]
@@ -378,7 +378,11 @@ mod tests {
                 vector_data.extend(string_bytes);
 
                 memory
-                    .write(&mut *store.0.borrow_mut(), 0, &vector_data)
+                    .write(
+                        &mut *store.0.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &vector_data,
+                    )
                     .unwrap();
 
                 let result_ptr: i32 = entrypoint

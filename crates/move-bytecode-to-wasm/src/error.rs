@@ -158,7 +158,7 @@ pub enum RuntimeError {
     SharedObjectsCannotBeTransferred,
     StorageObjectNotFound,
     Overflow,
-    Underflow,
+    OutOfBounds,
 }
 
 impl RuntimeError {
@@ -174,7 +174,7 @@ impl RuntimeError {
             }
             RuntimeError::StorageObjectNotFound => b"Object not found",
             RuntimeError::Overflow => b"Overflow",
-            RuntimeError::Underflow => b"Underflow",
+            RuntimeError::OutOfBounds => b"Out of bounds",
         }
     }
 }

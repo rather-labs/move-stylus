@@ -2,6 +2,7 @@ use alloy_sol_types::{SolType, sol_data};
 
 use walrus::{
     InstrSeqBuilder, LocalId, Module, ValType,
+    ir::InstrSeqId,
     ir::{BinaryOp, LoadKind, MemArg},
 };
 
@@ -12,6 +13,7 @@ use crate::{
     runtime::RuntimeFunction,
     translation::intermediate_types::IntermediateType,
     vm_handled_types::{VmHandledType, string::String_},
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 
 pub trait Packable {
@@ -32,6 +34,7 @@ pub trait Packable {
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
         runtime_error_data: Option<&mut RuntimeErrorData>,
+        return_block_id: Option<InstrSeqId>,
     ) -> Result<(), AbiError>;
 
     /// Adds the instructions to pack the value into memory according to Solidity's ABI encoding.
@@ -61,6 +64,7 @@ pub trait Packable {
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
         runtime_error_data: Option<&mut RuntimeErrorData>,
+        return_block_id: Option<InstrSeqId>,
     ) -> Result<(), AbiError>;
 
     /// Adds the instructions to load the value into a local variable.
@@ -101,6 +105,7 @@ pub trait Packable {
 /// Returns a pointer to the memory holding the return data and the length of the encoded data.
 pub fn build_pack_instructions<T: Packable>(
     builder: &mut InstrSeqBuilder,
+    return_block_id: Option<InstrSeqId>,
     function_return_signature: &[T],
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -159,6 +164,7 @@ pub fn build_pack_instructions<T: Packable>(
                 calldata_reference_pointer,
                 compilation_ctx,
                 Some(runtime_error_data),
+                return_block_id,
             )?;
 
             // A dynamic value will only save the offset to where the values are located, so, we
@@ -177,6 +183,7 @@ pub fn build_pack_instructions<T: Packable>(
                 calldata_reference_pointer,
                 compilation_ctx,
                 Some(runtime_error_data),
+                return_block_id,
             )?;
 
             builder
@@ -219,6 +226,7 @@ impl Packable for IntermediateType {
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
         runtime_error_data: Option<&mut RuntimeErrorData>,
+        return_block_id: Option<InstrSeqId>,
     ) -> Result<(), AbiError> {
         match self {
             IntermediateType::IBool
@@ -275,7 +283,11 @@ impl Packable for IntermediateType {
                     .local_get(local)
                     .local_get(writer_pointer)
                     .local_get(calldata_reference_pointer)
-                    .call(pack_vector_function);
+                    .call_runtime_function(
+                        compilation_ctx,
+                        pack_vector_function,
+                        &RuntimeFunction::PackVector,
+                    );
             }
             IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
                 let pack_reference_function = RuntimeFunction::PackReference.get_generic(
@@ -287,8 +299,14 @@ impl Packable for IntermediateType {
                 builder
                     .local_get(local)
                     .local_get(writer_pointer)
-                    .local_get(calldata_reference_pointer)
-                    .call(pack_reference_function);
+                    .local_get(calldata_reference_pointer);
+
+                builder.call_runtime_function_conditional_return(
+                    compilation_ctx,
+                    pack_reference_function,
+                    &RuntimeFunction::PackReference,
+                    return_block_id,
+                );
             }
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
                 let pack_struct_function = RuntimeFunction::PackStruct.get_generic(
@@ -302,8 +320,14 @@ impl Packable for IntermediateType {
                     .local_get(local)
                     .local_get(writer_pointer)
                     .local_get(calldata_reference_pointer)
-                    .i32_const(0) // is_nested = false
-                    .call(pack_struct_function);
+                    .i32_const(0); // is_nested = false
+
+                builder.call_runtime_function_conditional_return(
+                    compilation_ctx,
+                    pack_struct_function,
+                    &RuntimeFunction::PackStruct,
+                    return_block_id,
+                );
             }
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
                 let enum_ = compilation_ctx.get_enum_by_intermediate_type(self)?;
@@ -314,10 +338,14 @@ impl Packable for IntermediateType {
                 }
                 let pack_enum_function =
                     RuntimeFunction::PackEnum.get(module, Some(compilation_ctx), None)?;
-                builder
-                    .local_get(local)
-                    .local_get(writer_pointer)
-                    .call(pack_enum_function);
+                builder.local_get(local).local_get(writer_pointer);
+
+                builder.call_runtime_function_conditional_return(
+                    compilation_ctx,
+                    pack_enum_function,
+                    &RuntimeFunction::PackEnum,
+                    return_block_id,
+                );
             }
             IntermediateType::ISigner => {
                 return Err(AbiError::Pack(AbiOperationError::FoundSignerType))?;
@@ -341,6 +369,7 @@ impl Packable for IntermediateType {
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
         runtime_error_data: Option<&mut RuntimeErrorData>,
+        return_block_id: Option<InstrSeqId>,
     ) -> Result<(), AbiError> {
         match self {
             IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
@@ -366,6 +395,7 @@ impl Packable for IntermediateType {
                     calldata_reference_pointer,
                     compilation_ctx,
                     runtime_error_data,
+                    return_block_id,
                 )?;
             }
             IntermediateType::IStruct {
@@ -391,8 +421,14 @@ impl Packable for IntermediateType {
                     .local_get(local)
                     .local_get(writer_pointer)
                     .local_get(calldata_reference_pointer)
-                    .i32_const(1) // is_nested = true
-                    .call(pack_struct_function);
+                    .i32_const(1); // is_nested = true
+
+                builder.call_runtime_function_conditional_return(
+                    compilation_ctx,
+                    pack_struct_function,
+                    &RuntimeFunction::PackStruct,
+                    return_block_id,
+                );
             }
             _ => self.add_pack_instructions(
                 builder,
@@ -402,6 +438,7 @@ impl Packable for IntermediateType {
                 calldata_reference_pointer,
                 compilation_ctx,
                 runtime_error_data,
+                return_block_id,
             )?,
         }
         Ok(())
@@ -501,7 +538,7 @@ mod tests {
 
     use crate::{
         test_compilation_context,
-        test_tools::{build_module, setup_wasmtime_module},
+        test_tools::{INITIAL_MEMORY_OFFSET, build_module, setup_wasmtime_module},
         utils::display_module,
     };
 
@@ -556,6 +593,7 @@ mod tests {
 
         let (data_start, data_end) = build_pack_instructions(
             &mut func_body,
+            None,
             &[
                 IntermediateType::IBool,
                 IntermediateType::IU16,
@@ -584,7 +622,11 @@ mod tests {
         // Define validator function
         let mut linker = Linker::new(&Engine::default());
         linker
-            .func_wrap("", "validator", get_validator(0, data_len, data))
+            .func_wrap(
+                "",
+                "validator",
+                get_validator(INITIAL_MEMORY_OFFSET as u32, data_len, data),
+            )
             .unwrap();
 
         let (_, _, mut store, entrypoint) = setup_wasmtime_module::<(i32, i32), ()>(
@@ -594,7 +636,9 @@ mod tests {
             Some(linker),
         );
 
-        entrypoint.call(&mut store, (0, data_len)).unwrap();
+        entrypoint
+            .call(&mut store, (INITIAL_MEMORY_OFFSET, data_len))
+            .unwrap();
     }
 
     #[test]
@@ -622,6 +666,7 @@ mod tests {
 
         let (data_start, data_end) = build_pack_instructions(
             &mut func_body,
+            None,
             &[
                 IntermediateType::IBool,
                 IntermediateType::IU16,
@@ -644,13 +689,16 @@ mod tests {
         display_module(&mut raw_module);
 
         let data = <sol!((bool, uint16, uint64))>::abi_encode(&(true, 1234, 123456789012345));
-        println!("data: {data:?}");
         let data_len = data.len() as i32;
 
         // Define validator function
         let mut linker = Linker::new(&Engine::default());
         linker
-            .func_wrap("", "validator", get_validator(100, data_len, data))
+            .func_wrap(
+                "",
+                "validator",
+                get_validator(100 + INITIAL_MEMORY_OFFSET as u32, data_len, data),
+            )
             .unwrap();
 
         let (_, _, mut store, entrypoint) = setup_wasmtime_module::<(i32, i32), ()>(
@@ -660,7 +708,9 @@ mod tests {
             Some(linker),
         );
 
-        entrypoint.call(&mut store, (0, data_len)).unwrap();
+        entrypoint
+            .call(&mut store, (INITIAL_MEMORY_OFFSET, data_len))
+            .unwrap();
     }
 
     #[test]
@@ -668,21 +718,37 @@ mod tests {
         let data = [
             2u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
-            16u32.to_le_bytes().as_slice(),
-            84u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 16) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 84) as u32)
+                .to_le_bytes()
+                .as_slice(),
             3u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
-            36u32.to_le_bytes().as_slice(),
-            52u32.to_le_bytes().as_slice(),
-            68u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 36) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 52) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 68) as u32)
+                .to_le_bytes()
+                .as_slice(),
             1u128.to_le_bytes().as_slice(),
             2u128.to_le_bytes().as_slice(),
             3u128.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
-            104u32.to_le_bytes().as_slice(),
-            120u32.to_le_bytes().as_slice(),
-            136u32.to_le_bytes().as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 104) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 120) as u32)
+                .to_le_bytes()
+                .as_slice(),
+            ((INITIAL_MEMORY_OFFSET + 136) as u32)
+                .to_le_bytes()
+                .as_slice(),
             4u128.to_le_bytes().as_slice(),
             5u128.to_le_bytes().as_slice(),
             6u128.to_le_bytes().as_slice(),
@@ -710,11 +776,12 @@ mod tests {
 
         // Load arguments to stack
         func_body.i32_const(1234);
-        func_body.i32_const(0); // vector pointer
-        func_body.i32_const(152); // u256 pointer
+        func_body.i32_const(INITIAL_MEMORY_OFFSET); // vector pointer
+        func_body.i32_const(INITIAL_MEMORY_OFFSET + 152); // u256 pointer
 
         let (data_start, data_end) = build_pack_instructions(
             &mut func_body,
+            None,
             &[
                 IntermediateType::IU16,
                 IntermediateType::IVector(Arc::new(IntermediateType::IVector(Arc::new(
@@ -752,7 +819,7 @@ mod tests {
                 "",
                 "validator",
                 get_validator(
-                    data_len as u32,
+                    INITIAL_MEMORY_OFFSET as u32 + data_len as u32,
                     expected_data.len() as i32,
                     expected_data.clone(),
                 ),
@@ -766,6 +833,8 @@ mod tests {
             Some(linker),
         );
 
-        entrypoint.call(&mut store, (0, data_len)).unwrap();
+        entrypoint
+            .call(&mut store, (INITIAL_MEMORY_OFFSET, data_len))
+            .unwrap();
     }
 }

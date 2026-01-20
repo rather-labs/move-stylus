@@ -69,7 +69,7 @@ pub fn pack_enum_function(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_tools::build_module;
+    use crate::test_tools::{INITIAL_MEMORY_OFFSET, build_module};
     use crate::{test_compilation_context, test_tools::setup_wasmtime_module};
     use rstest::rstest;
     use std::cell::RefCell;
@@ -221,7 +221,7 @@ mod tests {
             .for_each(|variant: u32| {
                 // Write variant number to memory (little-endian)
                 let data = variant.to_le_bytes();
-                memory.write(&mut *store.0.borrow_mut(), 0, &data).unwrap();
+                memory.write(&mut *store.0.borrow_mut(), INITIAL_MEMORY_OFFSET as usize, &data).unwrap();
 
                 let result: Result<i32, _> = entrypoint.0.call(&mut *store.0.borrow_mut(), ());
 

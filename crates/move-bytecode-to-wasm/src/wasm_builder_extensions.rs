@@ -90,7 +90,7 @@ pub trait WasmBuilderExtension {
     /// Leaves in the stack the current position of the linear memory.
     fn get_memory_curret_position(&mut self, compilation_ctx: &CompilationContext) -> &mut Self;
 
-    /// Calls a function and handles the error.
+    /// Calls a function and propagates the error in case the function aborts.
     fn call_native_function(
         &mut self,
         compilation_ctx: &CompilationContext,
@@ -99,6 +99,7 @@ pub trait WasmBuilderExtension {
         function_id: FunctionId,
     ) -> &mut Self;
 
+    // Calls a runtime function and propagates the error in case the function aborts.
     fn call_runtime_function(
         &mut self,
         compilation_ctx: &CompilationContext,
@@ -106,32 +107,48 @@ pub trait WasmBuilderExtension {
         runtime_fn: &RuntimeFunction,
     ) -> &mut Self;
 
-    fn call_unpack_function(
+    // Call a runtime function conditionally returning or branching to `return_block_id`
+    fn call_runtime_function_conditional_return(
         &mut self,
         compilation_ctx: &CompilationContext,
         function_id: FunctionId,
         runtime_fn: &RuntimeFunction,
-        return_block_id: InstrSeqId,
+        return_block_id: Option<InstrSeqId>,
     ) -> &mut Self;
 
     /// Adds the instructions to store the error message pointer at DATA_ABORT_MESSAGE_PTR_OFFSET and return 1 to indicate an error occurred.
+    ///
+    /// # Arguments
+    /// * `module` - The WASM module
+    /// * `compilation_ctx` - The compilation context
+    /// * `return_type` - The return type of the function (`Some(ValType::I32)`, `Some(ValType::I64)`, or `None` for no return type)
     fn add_handle_error_instructions(
         &mut self,
         module: &mut Module,
         compilation_ctx: &CompilationContext,
+        return_type: Option<ValType>,
     ) -> &mut Self;
 
     /// Adds the instructions to propagate the error by returning if the error message pointer at DATA_ABORT_MESSAGE_PTR_OFFSET is not null.
     fn add_propagate_error_instructions(
         &mut self,
         compilation_ctx: &CompilationContext,
+        return_block_id: Option<InstrSeqId>,
     ) -> &mut Self;
 
     /// Adds the instructions to handle a specific runtime error.
+    ///
+    /// # Arguments
+    /// * `module` - The WASM module
+    /// * `compilation_ctx` - The compilation context
+    /// * `return_type` - The return type of the function (`Some(ValType::I32)`, `Some(ValType::I64)`, or `None` for no return type)
+    /// * `runtime_error_data` - Runtime error data
+    /// * `runtime_error` - The runtime error to return
     fn return_error(
         &mut self,
         module: &mut Module,
         compilation_ctx: &CompilationContext,
+        return_type: Option<ValType>,
         runtime_error_data: &mut RuntimeErrorData,
         runtime_error: RuntimeError,
     ) -> &mut Self;
@@ -252,7 +269,7 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
 
         // If the function may result in a runtime error, we need to handle it
         if NativeFunction::can_abort(function_name, module_id) {
-            self.add_propagate_error_instructions(compilation_ctx);
+            self.add_propagate_error_instructions(compilation_ctx, None);
         }
 
         self
@@ -268,42 +285,61 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
 
         // If the function may result in a runtime error, we need to handle it
         if runtime_fn.can_abort() {
-            self.add_propagate_error_instructions(compilation_ctx);
+            self.add_propagate_error_instructions(compilation_ctx, None);
         }
 
         self
     }
 
-    fn call_unpack_function(
+    fn call_runtime_function_conditional_return(
         &mut self,
         compilation_ctx: &CompilationContext,
         function_id: FunctionId,
         runtime_fn: &RuntimeFunction,
-        return_block_id: InstrSeqId,
+        return_block_id: Option<InstrSeqId>,
     ) -> &mut Self {
         self.call(function_id);
 
         // If the function may result in a runtime error, we need to handle it
         if runtime_fn.can_abort() {
             // If the function aborts, propagate the error
-            self.block(None, |b| {
-                let block_id = b.id();
-                b.i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    )
-                    .i32_const(0)
-                    .binop(BinaryOp::I32Eq)
-                    .br_if(block_id)
-                    .i32_const(1)
-                    .br(return_block_id);
-            });
+            self.add_propagate_error_instructions(compilation_ctx, return_block_id);
         }
+
+        self
+    }
+
+    fn add_propagate_error_instructions(
+        &mut self,
+        compilation_ctx: &CompilationContext,
+        return_block_id: Option<InstrSeqId>,
+    ) -> &mut Self {
+        // If the function aborts, propagate the error
+        self.block(None, |b| {
+            let block_id = b.id();
+            b.i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
+                .i32_const(0)
+                .binop(BinaryOp::I32Eq)
+                .br_if(block_id);
+
+            b.i32_const(0xBADF00D);
+
+            // TODO: could we eventually need a u64 here? For example when propagating the error from within a runtime function
+            // which returns a ValType::I64?
+            if let Some(return_block_id) = return_block_id {
+                b.br(return_block_id);
+            } else {
+                b.return_();
+            }
+        });
 
         self
     }
@@ -312,6 +348,7 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
         &mut self,
         module: &mut Module,
         compilation_ctx: &CompilationContext,
+        return_type: Option<ValType>,
     ) -> &mut Self {
         let encoded_error_ptr = module.locals.add(ValType::I32);
         self.local_set(encoded_error_ptr);
@@ -331,33 +368,18 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
         // Return 0xBADF00D to indicate an error occurred
         // This value serves only to maintain stack balance.
         // It will be ignored if the caller returns nothing.
-        self.i32_const(0xBADF00D).return_();
-
-        self
-    }
-
-    fn add_propagate_error_instructions(
-        &mut self,
-        compilation_ctx: &CompilationContext,
-    ) -> &mut Self {
-        // If the function aborts, propagate the error
-        self.block(None, |b| {
-            let block_id = b.id();
-            b.i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)
-                .load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                )
-                .i32_const(0)
-                .binop(BinaryOp::I32Eq)
-                .br_if(block_id);
-
-            b.i32_const(1).return_();
-        });
+        // Depending on the return type, we push an i32, i64 or nothing to the stack.
+        match return_type {
+            Some(ValType::I32) => {
+                self.i32_const(0xBADF00D).return_();
+            }
+            Some(ValType::I64) => {
+                self.i64_const(0xBADF00D).return_();
+            }
+            Some(_) | None => {
+                self.return_();
+            }
+        }
 
         self
     }
@@ -366,12 +388,13 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
         &mut self,
         module: &mut Module,
         compilation_ctx: &CompilationContext,
+        return_type: Option<ValType>,
         runtime_error_data: &mut RuntimeErrorData,
         runtime_error: RuntimeError,
     ) -> &mut Self {
         self.i32_const(runtime_error_data.get(module, compilation_ctx.memory_id, runtime_error));
 
-        self.add_handle_error_instructions(module, compilation_ctx);
+        self.add_handle_error_instructions(module, compilation_ctx, return_type);
         self
     }
 }

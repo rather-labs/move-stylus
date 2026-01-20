@@ -634,6 +634,7 @@ impl RuntimeSandbox {
                     let mut result = vec![0; len as usize];
                     memory.read(&caller, ptr as usize, &mut result).unwrap();
                     println!("Data {result:?}");
+                    println!("Pointer {ptr}");
 
                     println!("In chunks of 32 bytes:");
                     for chunk in result.chunks(32) {
