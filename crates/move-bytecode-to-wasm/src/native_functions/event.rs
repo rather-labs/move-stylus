@@ -354,6 +354,7 @@ pub fn add_emit_log_fn(
                     calldata_reference_pointer,
                     compilation_ctx,
                     Some(runtime_error_data),
+                    None,
                 )?;
             }
             IntermediateType::IVector(_)

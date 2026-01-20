@@ -881,8 +881,8 @@ fn test_pushing_alpha_into_delta(
     assert_eq!(
         runtime.get_storage_at_slot(alpha_2_shared_slot.0),
         [
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 102, 198, 1, 192,
-            204, 10, 101, 122, 43
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 102, 12, 67, 224,
+            99, 51, 149, 27, 53
         ],
         "Slot should not be empty"
     );
@@ -916,8 +916,8 @@ fn test_pushing_alpha_into_delta(
     assert_eq!(
         runtime.get_storage_at_slot(alpha_1_shared_slot.0),
         [
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 101, 198, 1, 192,
-            204, 10, 101, 122, 43
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 101, 12, 67, 224,
+            99, 51, 149, 27, 53
         ],
         "Slot should not be empty"
     );

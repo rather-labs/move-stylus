@@ -664,6 +664,7 @@ pub fn add_external_contract_call_fn(
             let block_id = block.id();
 
             let uid_ptr = module.locals.add(ValType::I32);
+            let owner_ptr = module.locals.add(ValType::I32);
             let original_struct_ptr = module.locals.add(ValType::I32);
             let new_struct_ptr = module.locals.add(ValType::I32);
 
@@ -715,7 +716,8 @@ pub fn add_external_contract_call_fn(
                         compilation_ctx,
                         locate_storage_data_fn,
                         &RuntimeFunction::LocateStorageData,
-                    );
+                    )
+                    .local_set(owner_ptr);
 
                 // The slot for this struct written in DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET
                 let read_and_decode_from_storage_fn = RuntimeFunction::ReadAndDecodeFromStorage
@@ -734,6 +736,7 @@ pub fn add_external_contract_call_fn(
                         block
                             .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
                             .local_get(uid_ptr)
+                            .local_get(owner_ptr)
                             .call_runtime_function(
                                 compilation_ctx,
                                 read_and_decode_from_storage_fn,
