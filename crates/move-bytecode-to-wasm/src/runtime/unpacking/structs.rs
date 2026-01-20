@@ -124,6 +124,7 @@ pub fn unpack_struct_function(
             compilation_ctx,
             validate_pointer_fn,
             &RuntimeFunction::ValidatePointer32Bit,
+            Some(ValType::I32),
         );
 
         builder
@@ -166,6 +167,7 @@ pub fn unpack_struct_function(
             &mut builder,
             module,
             None,
+            Some(ValType::I32),
             data_reader_pointer,
             calldata_ptr,
             compilation_ctx,
@@ -280,6 +282,7 @@ pub fn unpack_storage_struct_function(
             compilation_ctx,
             locate_storage_data_fn,
             &RuntimeFunction::LocateStorageData,
+            Some(ValType::I32),
         )
         .local_set(owner_id_ptr);
 

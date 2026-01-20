@@ -85,6 +85,7 @@ pub fn pack_reference_function(
                 compilation_ctx,
                 Some(runtime_error_data),
                 None,
+                None,
             )?;
         }
         IntermediateType::IBool
@@ -125,6 +126,7 @@ pub fn pack_reference_function(
                 calldata_reference_pointer,
                 compilation_ctx,
                 Some(runtime_error_data),
+                None,
                 None,
             )?;
         }
@@ -365,6 +367,7 @@ mod tests {
                     &compilation_ctx,
                     Some(&mut runtime_error_data),
                     None,
+                    Some(ValType::I32),
                 )
                 .unwrap();
         } else {
@@ -378,6 +381,7 @@ mod tests {
                     &compilation_ctx,
                     Some(&mut runtime_error_data),
                     None,
+                    Some(ValType::I32),
                 )
                 .unwrap();
         };
@@ -442,6 +446,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 
@@ -533,6 +538,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 
@@ -631,6 +637,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 
@@ -729,6 +736,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 
@@ -827,6 +835,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 
@@ -926,6 +935,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 
@@ -1026,6 +1036,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 
@@ -1132,6 +1143,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 
@@ -1260,6 +1272,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 
@@ -1386,6 +1399,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 
@@ -1512,6 +1526,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 
@@ -1647,6 +1662,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 
@@ -1801,6 +1817,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 

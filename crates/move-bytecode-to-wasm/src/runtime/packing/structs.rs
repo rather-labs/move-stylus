@@ -190,6 +190,7 @@ pub fn pack_struct_function(
                         compilation_ctx,
                         Some(runtime_error_data),
                         None,
+                        None,
                     )?;
                     Ok(32)
                 } else {
@@ -201,6 +202,7 @@ pub fn pack_struct_function(
                         inner_data_reference,
                         compilation_ctx,
                         Some(runtime_error_data),
+                        None,
                         None,
                     )?;
                     Ok(field.encoded_size(compilation_ctx)?)
@@ -215,6 +217,7 @@ pub fn pack_struct_function(
                     inner_data_reference,
                     compilation_ctx,
                     Some(runtime_error_data),
+                    None,
                     None,
                 )?;
                 Ok(32)
@@ -712,6 +715,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 
@@ -794,6 +798,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 
@@ -955,6 +960,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 
@@ -1154,6 +1160,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 
@@ -1338,6 +1345,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 

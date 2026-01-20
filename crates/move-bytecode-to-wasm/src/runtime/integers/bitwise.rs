@@ -57,6 +57,7 @@ pub fn heap_int_shift_left(
             compilation_ctx,
             check_overflow_f,
             &RuntimeFunction::CheckOverflowU8U16,
+            Some(ValType::I32),
         )
         .drop();
 
@@ -316,6 +317,7 @@ pub fn heap_int_shift_right(
             compilation_ctx,
             check_overflow_f,
             &RuntimeFunction::CheckOverflowU8U16,
+            Some(ValType::I32),
         )
         .drop();
 

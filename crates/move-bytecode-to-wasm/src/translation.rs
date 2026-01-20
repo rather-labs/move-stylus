@@ -540,6 +540,12 @@ fn translate_instruction(
     let control_targets = &translate_flow_ctx.control_targets;
     let jump_table = &mut translate_flow_ctx.jump_table;
     let dynamic_fields_global_variables = &mut translate_flow_ctx.dynamic_fields_global_variables;
+    let return_type = translate_flow_ctx
+        .function_information
+        .signature
+        .get_return_wasm_types()
+        .first()
+        .copied();
 
     match instruction {
         // Load a fixed constant
@@ -671,6 +677,7 @@ fn translate_instruction(
                     compilation_ctx,
                     delete_fn,
                     &RuntimeFunction::DeleteFromStorage,
+                    return_type,
                 );
             } else {
                 let type_instantiations = function_id
@@ -788,6 +795,7 @@ fn translate_instruction(
                         &function_id.identifier,
                         &function_id.module_id,
                         native_function_id,
+                        return_type,
                     );
                 } else {
                     let table_id = function_table.get_table_id();
@@ -810,6 +818,7 @@ fn translate_instruction(
                         builder,
                         module,
                         compilation_ctx,
+                        return_type,
                     )?;
 
                     // Every time `dynamic_fields::borrow_mut` or
@@ -845,6 +854,7 @@ fn translate_instruction(
                                 compilation_ctx,
                                 update_mut_ref_fn,
                                 &RuntimeFunction::VecUpdateMutRef,
+                                return_type,
                             );
                         }
                     }
@@ -932,6 +942,7 @@ fn translate_instruction(
                     compilation_ctx,
                     delete_fn,
                     &RuntimeFunction::DeleteFromStorage,
+                    return_type,
                 );
             } else {
                 let (argument_types, mut_ref_vec_locals) = prepare_function_arguments(
@@ -978,6 +989,7 @@ fn translate_instruction(
                                 runtime_error_data,
                                 &mapped_function.signature.arguments,
                                 function_locals,
+                                return_type,
                             )?;
                             let (flush_cache_fn, _) = storage_flush_cache(module);
                             builder.i32_const(1).call(flush_cache_fn);
@@ -1032,6 +1044,7 @@ fn translate_instruction(
                         &function_information.function_id.identifier,
                         &function_information.function_id.module_id,
                         native_function_id,
+                        return_type,
                     );
                 } else {
                     let table_id = function_table.get_table_id();
@@ -1054,6 +1067,7 @@ fn translate_instruction(
                         builder,
                         module,
                         compilation_ctx,
+                        return_type,
                     )?;
                 };
 
@@ -1070,6 +1084,7 @@ fn translate_instruction(
                             compilation_ctx,
                             update_mut_ref_fn,
                             &RuntimeFunction::VecUpdateMutRef,
+                            return_type,
                         );
                     }
                 }
@@ -1661,6 +1676,7 @@ fn translate_instruction(
                         compilation_ctx,
                         pop_back_f,
                         &RuntimeFunction::VecPopBack,
+                        return_type,
                     );
                 }
                 IntermediateType::ITypeParameter(_)
@@ -1720,6 +1736,7 @@ fn translate_instruction(
                 compilation_ctx,
                 push_back_f,
                 &RuntimeFunction::VecPushBack,
+                return_type,
             );
         }
         Bytecode::VecSwap(signature_index) => {
@@ -1758,7 +1775,12 @@ fn translate_instruction(
                 Some(runtime_error_data),
                 &[&*vec_inner],
             )?;
-            builder.call_runtime_function(compilation_ctx, swap_f, &RuntimeFunction::VecSwap);
+            builder.call_runtime_function(
+                compilation_ctx,
+                swap_f,
+                &RuntimeFunction::VecSwap,
+                return_type,
+            );
         }
         Bytecode::VecLen(signature_index) => {
             let elem_ir_type =
@@ -1861,6 +1883,7 @@ fn translate_instruction(
                     runtime_error_data,
                     &mapped_function.signature.arguments,
                     function_locals,
+                    return_type,
                 )?;
             }
 
@@ -1889,6 +1912,7 @@ fn translate_instruction(
                 original_type,
                 compilation_ctx,
                 runtime_error_data,
+                return_type,
             )?;
             types_stack.push(IntermediateType::IU8);
         }
@@ -1900,6 +1924,7 @@ fn translate_instruction(
                 original_type,
                 compilation_ctx,
                 runtime_error_data,
+                return_type,
             )?;
             types_stack.push(IntermediateType::IU16);
         }
@@ -1911,6 +1936,7 @@ fn translate_instruction(
                 original_type,
                 compilation_ctx,
                 runtime_error_data,
+                return_type,
             )?;
             types_stack.push(IntermediateType::IU32);
         }
@@ -1922,6 +1948,7 @@ fn translate_instruction(
                 original_type,
                 compilation_ctx,
                 runtime_error_data,
+                return_type,
             )?;
             types_stack.push(IntermediateType::IU64);
         }
@@ -1952,24 +1979,48 @@ fn translate_instruction(
             }
 
             match t1 {
-                IntermediateType::IU8 => {
-                    IU8::add(builder, module, compilation_ctx, runtime_error_data)?
-                }
-                IntermediateType::IU16 => {
-                    IU16::add(builder, module, compilation_ctx, runtime_error_data)?
-                }
-                IntermediateType::IU32 => {
-                    IU32::add(builder, module, compilation_ctx, runtime_error_data)?
-                }
-                IntermediateType::IU64 => {
-                    IU64::add(builder, module, compilation_ctx, runtime_error_data)?
-                }
-                IntermediateType::IU128 => {
-                    IU128::add(builder, module, compilation_ctx, runtime_error_data)?
-                }
-                IntermediateType::IU256 => {
-                    IU256::add(builder, module, compilation_ctx, runtime_error_data)?
-                }
+                IntermediateType::IU8 => IU8::add(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
+                IntermediateType::IU16 => IU16::add(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
+                IntermediateType::IU32 => IU32::add(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
+                IntermediateType::IU64 => IU64::add(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
+                IntermediateType::IU128 => IU128::add(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
+                IntermediateType::IU256 => IU256::add(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
                 _ => Err(TranslationError::InvalidBinaryOperation {
                     operation: Bytecode::Add,
                     operands_types: t1,
@@ -1989,24 +2040,48 @@ fn translate_instruction(
             }
 
             match t1 {
-                IntermediateType::IU8 => {
-                    IU8::sub(builder, module, compilation_ctx, runtime_error_data)?
-                }
-                IntermediateType::IU16 => {
-                    IU16::sub(builder, module, compilation_ctx, runtime_error_data)?
-                }
-                IntermediateType::IU32 => {
-                    IU32::sub(builder, module, compilation_ctx, runtime_error_data)?
-                }
-                IntermediateType::IU64 => {
-                    IU64::sub(builder, module, compilation_ctx, runtime_error_data)?
-                }
-                IntermediateType::IU128 => {
-                    IU128::sub(builder, module, compilation_ctx, runtime_error_data)?
-                }
-                IntermediateType::IU256 => {
-                    IU256::sub(builder, module, compilation_ctx, runtime_error_data)?
-                }
+                IntermediateType::IU8 => IU8::sub(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
+                IntermediateType::IU16 => IU16::sub(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
+                IntermediateType::IU32 => IU32::sub(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
+                IntermediateType::IU64 => IU64::sub(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
+                IntermediateType::IU128 => IU128::sub(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
+                IntermediateType::IU256 => IU256::sub(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
                 _ => Err(TranslationError::InvalidBinaryOperation {
                     operation: Bytecode::Sub,
                     operands_types: t1,
@@ -2026,24 +2101,48 @@ fn translate_instruction(
             }
 
             match t1 {
-                IntermediateType::IU8 => {
-                    IU8::mul(builder, module, compilation_ctx, runtime_error_data)?
-                }
-                IntermediateType::IU16 => {
-                    IU16::mul(builder, module, compilation_ctx, runtime_error_data)?
-                }
-                IntermediateType::IU32 => {
-                    IU32::mul(builder, module, compilation_ctx, runtime_error_data)?
-                }
-                IntermediateType::IU64 => {
-                    IU64::mul(builder, module, compilation_ctx, runtime_error_data)?
-                }
-                IntermediateType::IU128 => {
-                    IU128::mul(builder, module, compilation_ctx, runtime_error_data)?
-                }
-                IntermediateType::IU256 => {
-                    IU256::mul(builder, module, compilation_ctx, runtime_error_data)?
-                }
+                IntermediateType::IU8 => IU8::mul(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
+                IntermediateType::IU16 => IU16::mul(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
+                IntermediateType::IU32 => IU32::mul(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
+                IntermediateType::IU64 => IU64::mul(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
+                IntermediateType::IU128 => IU128::mul(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
+                IntermediateType::IU256 => IU256::mul(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
                 _ => Err(TranslationError::InvalidBinaryOperation {
                     operation: Bytecode::Mul,
                     operands_types: t1,
@@ -2067,12 +2166,20 @@ fn translate_instruction(
                 IntermediateType::IU16 => IU16::div(builder),
                 IntermediateType::IU32 => IU32::div(builder),
                 IntermediateType::IU64 => IU64::div(builder),
-                IntermediateType::IU128 => {
-                    IU128::div(builder, module, compilation_ctx, runtime_error_data)?
-                }
-                IntermediateType::IU256 => {
-                    IU256::div(builder, module, compilation_ctx, runtime_error_data)?
-                }
+                IntermediateType::IU128 => IU128::div(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
+                IntermediateType::IU256 => IU256::div(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
                 _ => Err(TranslationError::InvalidBinaryOperation {
                     operation: Bytecode::Div,
                     operands_types: t1,
@@ -2106,6 +2213,7 @@ fn translate_instruction(
                         compilation_ctx,
                         less_than_f,
                         &RuntimeFunction::LessThan,
+                        return_type,
                     );
                 }
                 IntermediateType::IU256 => {
@@ -2116,6 +2224,7 @@ fn translate_instruction(
                         compilation_ctx,
                         less_than_f,
                         &RuntimeFunction::LessThan,
+                        return_type,
                     );
                 }
                 _ => Err(TranslationError::InvalidBinaryOperation {
@@ -2160,6 +2269,7 @@ fn translate_instruction(
                             compilation_ctx,
                             less_than_f,
                             &RuntimeFunction::LessThan,
+                            return_type,
                         )
                         .negate();
                 }
@@ -2178,6 +2288,7 @@ fn translate_instruction(
                             compilation_ctx,
                             less_than_f,
                             &RuntimeFunction::LessThan,
+                            return_type,
                         )
                         .negate();
                 }
@@ -2222,6 +2333,7 @@ fn translate_instruction(
                             compilation_ctx,
                             less_than_f,
                             &RuntimeFunction::LessThan,
+                            return_type,
                         );
                 }
                 IntermediateType::IU256 => {
@@ -2238,6 +2350,7 @@ fn translate_instruction(
                             compilation_ctx,
                             less_than_f,
                             &RuntimeFunction::LessThan,
+                            return_type,
                         );
                 }
                 _ => Err(TranslationError::InvalidBinaryOperation {
@@ -2278,6 +2391,7 @@ fn translate_instruction(
                             compilation_ctx,
                             less_than_f,
                             &RuntimeFunction::LessThan,
+                            return_type,
                         )
                         .negate();
                 }
@@ -2291,6 +2405,7 @@ fn translate_instruction(
                             compilation_ctx,
                             less_than_f,
                             &RuntimeFunction::LessThan,
+                            return_type,
                         )
                         .negate();
                 }
@@ -2317,12 +2432,20 @@ fn translate_instruction(
                 IntermediateType::IU16 => IU16::remainder(builder),
                 IntermediateType::IU32 => IU32::remainder(builder),
                 IntermediateType::IU64 => IU64::remainder(builder),
-                IntermediateType::IU128 => {
-                    IU128::remainder(builder, module, compilation_ctx, runtime_error_data)?
-                }
-                IntermediateType::IU256 => {
-                    IU256::remainder(builder, module, compilation_ctx, runtime_error_data)?
-                }
+                IntermediateType::IU128 => IU128::remainder(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
+                IntermediateType::IU256 => IU256::remainder(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
                 _ => Err(TranslationError::InvalidBinaryOperation {
                     operation: Bytecode::Mod,
                     operands_types: t1,
@@ -2501,24 +2624,48 @@ fn translate_instruction(
             types_stack.pop_expecting(&IntermediateType::IU8)?;
             let t = types_stack.pop()?;
             match t {
-                IntermediateType::IU8 => {
-                    IU8::bit_shift_left(builder, module, compilation_ctx, runtime_error_data)?
-                }
-                IntermediateType::IU16 => {
-                    IU16::bit_shift_left(builder, module, compilation_ctx, runtime_error_data)?
-                }
-                IntermediateType::IU32 => {
-                    IU32::bit_shift_left(builder, module, compilation_ctx, runtime_error_data)?
-                }
-                IntermediateType::IU64 => {
-                    IU64::bit_shift_left(builder, module, compilation_ctx, runtime_error_data)?
-                }
-                IntermediateType::IU128 => {
-                    IU128::bit_shift_left(builder, module, compilation_ctx, runtime_error_data)?
-                }
-                IntermediateType::IU256 => {
-                    IU256::bit_shift_left(builder, module, compilation_ctx, runtime_error_data)?
-                }
+                IntermediateType::IU8 => IU8::bit_shift_left(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
+                IntermediateType::IU16 => IU16::bit_shift_left(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
+                IntermediateType::IU32 => IU32::bit_shift_left(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
+                IntermediateType::IU64 => IU64::bit_shift_left(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
+                IntermediateType::IU128 => IU128::bit_shift_left(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
+                IntermediateType::IU256 => IU256::bit_shift_left(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
                 _ => Err(TranslationError::InvalidOperation {
                     operation: Bytecode::Shl,
                     operand_type: t.clone(),
@@ -2530,24 +2677,48 @@ fn translate_instruction(
             types_stack.pop_expecting(&IntermediateType::IU8)?;
             let t = types_stack.pop()?;
             match t {
-                IntermediateType::IU8 => {
-                    IU8::bit_shift_right(builder, module, compilation_ctx, runtime_error_data)?
-                }
-                IntermediateType::IU16 => {
-                    IU16::bit_shift_right(builder, module, compilation_ctx, runtime_error_data)?
-                }
-                IntermediateType::IU32 => {
-                    IU32::bit_shift_right(builder, module, compilation_ctx, runtime_error_data)?
-                }
-                IntermediateType::IU64 => {
-                    IU64::bit_shift_right(builder, module, compilation_ctx, runtime_error_data)?
-                }
-                IntermediateType::IU128 => {
-                    IU128::bit_shift_right(builder, module, compilation_ctx, runtime_error_data)?
-                }
-                IntermediateType::IU256 => {
-                    IU256::bit_shift_right(builder, module, compilation_ctx, runtime_error_data)?
-                }
+                IntermediateType::IU8 => IU8::bit_shift_right(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
+                IntermediateType::IU16 => IU16::bit_shift_right(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
+                IntermediateType::IU32 => IU32::bit_shift_right(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
+                IntermediateType::IU64 => IU64::bit_shift_right(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
+                IntermediateType::IU128 => IU128::bit_shift_right(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
+                IntermediateType::IU256 => IU256::bit_shift_right(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    return_type,
+                )?,
                 _ => Err(TranslationError::InvalidOperation {
                     operation: Bytecode::Shr,
                     operand_type: t.clone(),
@@ -3034,12 +3205,13 @@ fn call_indirect(
     builder: &mut InstrSeqBuilder,
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    caller_return_type: Option<ValType>,
 ) -> Result<(), TranslationError> {
     builder
         .i32_const(function_entry.index)
         .call_indirect(function_entry.type_id, wasm_table_id);
 
-    builder.add_propagate_error_instructions(compilation_ctx, None);
+    builder.add_propagate_error_instructions(compilation_ctx, None, caller_return_type);
 
     add_unpack_function_return_values_instructions(
         builder,
@@ -3145,6 +3317,7 @@ fn add_cache_storage_object_instructions(
     runtime_error_data: &mut RuntimeErrorData,
     function_argumets: &[IntermediateType],
     function_locals: &[LocalId],
+    function_return_type: Option<ValType>,
 ) -> Result<(), TranslationError> {
     let object_to_cache = function_argumets
         .iter()
@@ -3177,6 +3350,7 @@ fn add_cache_storage_object_instructions(
             compilation_ctx,
             cache_storage_object_changes_fn,
             &RuntimeFunction::CacheStorageObjectChanges,
+            function_return_type,
         );
     }
 

@@ -7,6 +7,7 @@ use crate::{
     CompilationContext,
     data::RuntimeErrorData,
     runtime::{RuntimeFunction, error::RuntimeFunctionError},
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 
 // Auxiliary function names
@@ -192,7 +193,12 @@ pub fn heap_integers_div_mod(
                 .local_get(divisor_ptr)
                 .local_get(remainder_ptr)
                 .local_get(n_bytes)
-                .call(sub_f)
+                .call_runtime_function(
+                    compilation_ctx,
+                    sub_f,
+                    &RuntimeFunction::HeapIntSub,
+                    Some(ValType::I32),
+                )
                 .drop();
 
             // Q(i) := 1

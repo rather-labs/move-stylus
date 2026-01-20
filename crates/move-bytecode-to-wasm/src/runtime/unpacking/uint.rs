@@ -129,6 +129,7 @@ mod tests {
                 &mut func_body,
                 &mut raw_module,
                 None,
+                Some(result_type),
                 args_pointer,
                 args_pointer,
                 &compilation_ctx,

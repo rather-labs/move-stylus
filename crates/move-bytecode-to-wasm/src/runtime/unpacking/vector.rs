@@ -67,6 +67,7 @@ pub fn unpack_vector_function(
         compilation_ctx,
         validate_pointer_fn,
         &RuntimeFunction::ValidatePointer32Bit,
+        Some(ValType::I32),
     );
 
     // Load the pointer to the data, swap it to little-endian and add that to the calldata reader pointer.
@@ -100,6 +101,7 @@ pub fn unpack_vector_function(
             compilation_ctx,
             validate_pointer_fn,
             &RuntimeFunction::ValidatePointer32Bit,
+            Some(ValType::I32),
         );
 
     // Vector length: current number of elements in the vector
@@ -168,6 +170,7 @@ pub fn unpack_vector_function(
                 loop_block,
                 module,
                 None,
+                Some(ValType::I32),
                 data_reader_pointer,
                 calldata_base_pointer_,
                 compilation_ctx,
@@ -259,6 +262,7 @@ mod tests {
                 &mut func_body,
                 &mut raw_module,
                 Some(func_body_id),
+                Some(ValType::I32),
                 args_pointer,
                 calldata_reader_pointer,
                 &compilation_ctx,

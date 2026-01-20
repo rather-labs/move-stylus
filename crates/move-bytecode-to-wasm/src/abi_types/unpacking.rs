@@ -36,6 +36,7 @@ pub trait Unpackable {
         function_builder: &mut InstrSeqBuilder,
         module: &mut Module,
         return_block_id: Option<InstrSeqId>,
+        caller_return_type: Option<ValType>,
         reader_pointer: LocalId,
         calldata_base_pointer: LocalId,
         compilation_ctx: &CompilationContext,
@@ -77,6 +78,7 @@ pub fn build_unpack_instructions<T: Unpackable>(
             function_builder,
             module,
             Some(return_block_id),
+            Some(ValType::I32),
             reader_pointer,
             calldata_base_pointer,
             compilation_ctx,
@@ -94,6 +96,7 @@ impl Unpackable for IntermediateType {
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
         return_block_id: Option<InstrSeqId>,
+        caller_return_type: Option<ValType>,
         reader_pointer: LocalId,
         calldata_base_pointer: LocalId,
         compilation_ctx: &CompilationContext,
@@ -159,6 +162,7 @@ impl Unpackable for IntermediateType {
                     unpack_vector_fn,
                     &RuntimeFunction::UnpackVector,
                     return_block_id,
+                    caller_return_type,
                 );
             }
             // The signer must not be unpacked here, since it can't be part of the calldata. It is
@@ -181,6 +185,7 @@ impl Unpackable for IntermediateType {
                             builder,
                             module,
                             return_block_id,
+                            caller_return_type,
                             reader_pointer,
                             calldata_base_pointer,
                             compilation_ctx,
@@ -202,6 +207,7 @@ impl Unpackable for IntermediateType {
                             unpack_reference_function,
                             &RuntimeFunction::UnpackReference,
                             return_block_id,
+                            caller_return_type,
                         );
                     }
                 }
@@ -244,6 +250,7 @@ impl Unpackable for IntermediateType {
                         reader_pointer,
                         compilation_ctx,
                         &struct_,
+                        caller_return_type,
                     )?;
 
                     // If the inner type is a storage struct, we need to pass the flag unpack_frozen.
@@ -263,6 +270,7 @@ impl Unpackable for IntermediateType {
                         unpack_storage_struct_function,
                         &RuntimeFunction::UnpackStorageStruct,
                         return_block_id,
+                        caller_return_type,
                     );
                 } else {
                     let unpack_struct_function = RuntimeFunction::UnpackStruct.get_generic(
@@ -281,6 +289,7 @@ impl Unpackable for IntermediateType {
                         unpack_struct_function,
                         &RuntimeFunction::UnpackStruct,
                         return_block_id,
+                        caller_return_type,
                     );
                 }
             }
@@ -295,6 +304,7 @@ impl Unpackable for IntermediateType {
                     compilation_ctx,
                     unpack_enum_function,
                     &RuntimeFunction::UnpackEnum,
+                    caller_return_type,
                 );
             }
             IntermediateType::ITypeParameter(_) => {
@@ -324,6 +334,7 @@ fn load_struct_storage_id(
     reader_pointer: LocalId,
     compilation_ctx: &CompilationContext,
     struct_: &IStruct,
+    caller_return_type: Option<ValType>,
 ) -> Result<(), AbiError> {
     match struct_.fields.first() {
         Some(IntermediateType::IStruct {
@@ -360,6 +371,7 @@ fn load_struct_storage_id(
                 NativeFunction::NATIVE_COMPUTE_NAMED_ID,
                 &ModuleId::new(STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT),
                 compute_named_id_fn,
+                caller_return_type,
             );
         }
         _ => {

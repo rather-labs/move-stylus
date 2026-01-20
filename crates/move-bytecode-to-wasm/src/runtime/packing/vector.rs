@@ -148,6 +148,7 @@ pub fn pack_vector_function(
                         compilation_ctx,
                         Some(runtime_error_data),
                         None,
+                        None,
                     )?;
                 } else {
                     inner.add_pack_instructions(
@@ -158,6 +159,7 @@ pub fn pack_vector_function(
                         inner_data_reference,
                         compilation_ctx,
                         Some(runtime_error_data),
+                        None,
                         None,
                     )?;
                 }
@@ -423,6 +425,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 
@@ -484,6 +487,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 
@@ -590,6 +594,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 
@@ -694,6 +699,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 
@@ -798,6 +804,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 
@@ -902,6 +909,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 
@@ -1013,6 +1021,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 
@@ -1129,6 +1138,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 
@@ -1249,6 +1259,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 
@@ -1368,6 +1379,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 
