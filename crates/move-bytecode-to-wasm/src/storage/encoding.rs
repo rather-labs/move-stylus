@@ -529,7 +529,12 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                 .local_get(len)
                 .local_get(elem_size_local)
                 .local_get(elem_slot_ptr)
-                .call(derive_dyn_array_slot_fn);
+                .call_runtime_function(
+                    compilation_ctx,
+                    derive_dyn_array_slot_fn,
+                    &RuntimeFunction::DeriveDynArraySlot,
+                    Some(ValType::I32),
+                );
 
             inner_block.loop_(None, |loop_| {
                 let loop_id = loop_.id();

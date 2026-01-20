@@ -702,7 +702,13 @@ pub fn derive_dyn_array_slot(
         .if_else(
             None,
             |then| {
-                then.unreachable();
+                then.return_error(
+                    module,
+                    compilation_ctx,
+                    Some(ValType::I32),
+                    runtime_error_data,
+                    RuntimeError::InvalidElementSize,
+                );
             },
             |_else| {},
         );

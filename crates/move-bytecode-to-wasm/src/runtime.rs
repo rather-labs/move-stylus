@@ -409,7 +409,9 @@ impl RuntimeFunction {
                 }
                 (Self::InjectSigner, Some(ctx), _) => unpacking::signer::inject_signer(module, ctx),
                 // ABI packing
-                (Self::PackEnum, Some(ctx), _) => packing::enums::pack_enum_function(module, ctx)?,
+                (Self::PackEnum, Some(ctx), Some(runtime_error_data)) => {
+                    packing::enums::pack_enum_function(module, ctx, runtime_error_data)?
+                }
                 (Self::PackU32, Some(ctx), _) => packing::uint::pack_u32_function(module, ctx)?,
                 (Self::PackU64, Some(ctx), _) => packing::uint::pack_u64_function(module, ctx)?,
                 (Self::PackU128, Some(ctx), _) => {
@@ -734,6 +736,7 @@ impl RuntimeFunction {
             | Self::UnpackReference
             | Self::PackVector
             | Self::PackStruct
+            | Self::PackEnum
             | Self::PackReference => true,
 
             // Functions that do not throw a runtime error
@@ -770,7 +773,6 @@ impl RuntimeFunction {
             | Self::UnpackAddress
             | Self::UnpackEnum
             | Self::InjectSigner
-            | Self::PackEnum
             | Self::PackU32
             | Self::PackU64
             | Self::PackU128

@@ -344,8 +344,11 @@ impl Packable for IntermediateType {
                         enum_.identifier,
                     )))?;
                 }
-                let pack_enum_function =
-                    RuntimeFunction::PackEnum.get(module, Some(compilation_ctx), None)?;
+                let pack_enum_function = RuntimeFunction::PackEnum.get(
+                    module,
+                    Some(compilation_ctx),
+                    runtime_error_data,
+                )?;
                 builder.local_get(local).local_get(writer_pointer);
 
                 builder.call_runtime_function_conditional_return(

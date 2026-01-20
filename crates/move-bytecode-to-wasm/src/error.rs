@@ -164,6 +164,8 @@ pub enum RuntimeError {
     Overflow,
     OutOfBounds,
     MemoryAccessOutOfBounds,
+    InvalidElementSize,
+    EnumSizeTooLarge,
 }
 
 impl RuntimeError {
@@ -183,6 +185,8 @@ impl RuntimeError {
             RuntimeError::Overflow => b"Overflow",
             RuntimeError::OutOfBounds => b"Out of bounds",
             RuntimeError::MemoryAccessOutOfBounds => b"Memory access out of bounds",
+            RuntimeError::InvalidElementSize => b"Invalid element size",
+            RuntimeError::EnumSizeTooLarge => b"Enum size too large",
         }
     }
 
