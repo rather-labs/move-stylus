@@ -8,7 +8,7 @@ use crate::{
 };
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg},
+    ir::{BinaryOp, LoadKind, MemArg, UnaryOp},
 };
 
 /// Generates a runtime function that unpacks a vector from ABI-encoded calldata.
@@ -149,62 +149,70 @@ pub fn unpack_vector_function(
         .skip_vec_header(vector_pointer)
         .local_set(writer_pointer);
 
-    // Copy elements
-    let i = module.locals.add(ValType::I32);
-    builder.i32_const(0).local_set(i);
-
-    let calldata_base_pointer_ = module.locals.add(ValType::I32);
-    builder
-        .local_get(data_reader_pointer)
-        .local_set(calldata_base_pointer_);
-
     let mut inner_result: Result<(), AbiError> = Ok(());
-    builder.loop_(None, |loop_block| {
-        inner_result = (|| {
-            let loop_block_id = loop_block.id();
+    builder.block(None, |block| {
+        let block_id = block.id();
+        block
+            .local_get(length)
+            .unop(UnaryOp::I32Eqz)
+            .br_if(block_id);
 
-            loop_block.local_get(writer_pointer);
-            // This will leave in the stack [pointer/value i32/i64, length i32]
-            inner.add_unpack_instructions(
-                None,
-                loop_block,
-                module,
-                None,
-                Some(ValType::I32),
-                data_reader_pointer,
-                calldata_base_pointer_,
-                compilation_ctx,
-                Some(runtime_error_data),
-            )?;
+        // Copy elements
+        let i = module.locals.add(ValType::I32);
+        block.i32_const(0).local_set(i);
 
-            // Store the value
-            loop_block.store(
-                compilation_ctx.memory_id,
-                inner.store_kind()?,
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
+        let calldata_base_pointer_ = module.locals.add(ValType::I32);
+        block
+            .local_get(data_reader_pointer)
+            .local_set(calldata_base_pointer_);
 
-            // increment writer pointer
-            loop_block.local_get(writer_pointer);
-            loop_block.i32_const(data_size);
-            loop_block.binop(BinaryOp::I32Add);
-            loop_block.local_set(writer_pointer);
+        block.loop_(None, |loop_block| {
+            inner_result = (|| {
+                let loop_block_id = loop_block.id();
 
-            // increment i
-            loop_block.local_get(i);
-            loop_block.i32_const(1);
-            loop_block.binop(BinaryOp::I32Add);
-            loop_block.local_tee(i);
+                loop_block.local_get(writer_pointer);
+                // This will leave in the stack [pointer/value i32/i64, length i32]
+                inner.add_unpack_instructions(
+                    None,
+                    loop_block,
+                    module,
+                    None,
+                    Some(ValType::I32),
+                    data_reader_pointer,
+                    calldata_base_pointer_,
+                    compilation_ctx,
+                    Some(runtime_error_data),
+                )?;
 
-            loop_block.local_get(length);
-            loop_block.binop(BinaryOp::I32LtU);
-            loop_block.br_if(loop_block_id);
+                // Store the value
+                loop_block.store(
+                    compilation_ctx.memory_id,
+                    inner.store_kind()?,
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
 
-            Ok(())
-        })();
+                // increment writer pointer
+                loop_block.local_get(writer_pointer);
+                loop_block.i32_const(data_size);
+                loop_block.binop(BinaryOp::I32Add);
+                loop_block.local_set(writer_pointer);
+
+                // increment i
+                loop_block.local_get(i);
+                loop_block.i32_const(1);
+                loop_block.binop(BinaryOp::I32Add);
+                loop_block.local_tee(i);
+
+                loop_block.local_get(length);
+                loop_block.binop(BinaryOp::I32LtU);
+                loop_block.br_if(loop_block_id);
+
+                Ok(())
+            })();
+        });
     });
 
     builder

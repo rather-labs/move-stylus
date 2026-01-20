@@ -88,7 +88,7 @@ pub fn decrement_vec_len_function(
                 then.return_error(
                     module,
                     compilation_ctx,
-                    Some(ValType::I32),
+                    None,
                     runtime_error_data,
                     RuntimeError::OutOfBounds,
                 );

@@ -56,7 +56,7 @@ pub fn validate_pointer_32_bit(
                 compilation_ctx,
                 None,
                 runtime_error_data,
-                RuntimeError::Overflow,
+                RuntimeError::MemoryAccessOutOfBounds,
             );
         });
     }

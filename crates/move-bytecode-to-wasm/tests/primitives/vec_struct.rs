@@ -46,7 +46,9 @@ sol!(
     function vecFromVec(Foo[] x, Foo[] y) external returns (Foo[][]);
     function vecFromVecAndStruct(Foo[] x, Foo y) external returns (Foo [][]);
     function vecLen(Foo[] x) external returns (uint64);
-    function vecPopBack(Foo[] x) external returns (Foo[]);
+    function vecPopBackFoo(Foo[] x) external returns (Foo[]);
+    function vecPopBackBar(Bar[] x) external returns (Bar[]);
+    function vecPopBackBaz(Baz[] x) external returns (Baz[]);
     function vecSwap(Foo[] x, uint64 id1, uint64 id2) external returns (Foo[]);
     function vecPushBack(Foo[] x, Foo y) external returns (Foo[]);
     function vecPushAndPopBack(Foo[] x, Foo y) external returns (Foo[]);
@@ -292,7 +294,7 @@ fn get_new_fooo() -> Foo {
     )]
 #[case(vecLenCall::new((get_foo_vector(),)), (3u64,))]
 #[case(
-        vecPopBackCall::new((get_foo_vector(),)),
+        vecPopBackFooCall::new((get_foo_vector(),)),
         vec![
             Foo {
                 q: address!("0x00000000000000000000000000000001deadbeef"),
@@ -519,7 +521,9 @@ fn test_vec_struct<T: SolCall, V: SolValue>(
 }
 
 #[rstest]
-#[case(vecPopBackCall::new((vec![],)))]
+#[case(vecPopBackFooCall::new((vec![],)))]
+#[case(vecPopBackBarCall::new((vec![],)))]
+#[case(vecPopBackBazCall::new((vec![],)))]
 #[case(vecSwapCall::new((get_foo_vector(), 0u64, 3u64)), )]
 fn test_vec_struct_runtime_error<T: SolCall>(
     #[by_ref] runtime: &RuntimeSandbox,

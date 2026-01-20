@@ -163,6 +163,7 @@ pub enum RuntimeError {
     StorageObjectTypeMismatch,
     Overflow,
     OutOfBounds,
+    MemoryAccessOutOfBounds,
 }
 
 impl RuntimeError {
@@ -181,6 +182,7 @@ impl RuntimeError {
             RuntimeError::StorageObjectTypeMismatch => b"Storage object type mismatch",
             RuntimeError::Overflow => b"Overflow",
             RuntimeError::OutOfBounds => b"Out of bounds",
+            RuntimeError::MemoryAccessOutOfBounds => b"Memory access out of bounds",
         }
     }
 

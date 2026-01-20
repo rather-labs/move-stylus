@@ -58,6 +58,7 @@ fn test_vec_vec_32<T: SolCall, V: SolValue>(
 
 #[rstest]
 #[case(vecPopBackCall::new((vec![],)),)]
+#[case(vecPopBackCall::new((vec![vec![1u32, 2u32, 3u32]],)),)]
 #[case(vecSwapCall::new((vec![vec![1u32, 2u32, 3u32], vec![4u32, 5u32, 6u32], vec![7u32, 8u32, 9u32]], 0u64, 3u64)),)]
 fn test_vec_vec_32_runtime_error<T: SolCall>(
     #[by_ref] runtime: &RuntimeSandbox,
