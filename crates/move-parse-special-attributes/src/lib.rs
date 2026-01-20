@@ -53,6 +53,13 @@ pub struct Struct_ {
     pub has_key: bool,
 }
 
+#[derive(Debug, Clone)]
+pub struct Enum_ {
+    pub name: Symbol,
+    pub variants: Vec<(Symbol, Loc)>,
+    pub loc: Loc,
+}
+
 #[derive(Debug)]
 pub struct TestFunction {
     pub name: Symbol,
@@ -65,6 +72,7 @@ pub struct SpecialAttributes {
     pub events: HashMap<Symbol, Event>,
     pub functions: Vec<Function>,
     pub structs: Vec<Struct_>,
+    pub enums: Vec<Enum_>,
     pub external_calls: HashMap<Symbol, Function>,
     pub external_struct: HashMap<Symbol, ExternalStruct>,
     pub external_call_structs: HashSet<Symbol>,
@@ -79,6 +87,7 @@ impl Default for SpecialAttributes {
             events: HashMap::default(),
             functions: Vec::default(),
             structs: Vec::default(),
+            enums: Vec::default(),
             external_calls: HashMap::default(),
             external_struct: HashMap::default(),
             external_call_structs: HashSet::default(),
@@ -173,7 +182,6 @@ pub fn process_special_attributes(
                                 }
                             }
 
-                            // println!("Struct {} has modifiers: {:?}", struct_name, modifiers);
                             for modifier in modifiers {
                                 match modifier {
                                     StructModifier::ExternalStruct => {
@@ -257,6 +265,20 @@ pub fn process_special_attributes(
                                 }
                             }
                         }
+                    }
+                    ModuleMember::Enum(enum_def) => {
+                        let enum_name = enum_def.name.value();
+                        let variants: Vec<(Symbol, Loc)> = enum_def
+                            .variants
+                            .iter()
+                            .map(|variant| (variant.name.value(), variant.loc))
+                            .collect();
+
+                        result.enums.push(Enum_ {
+                            name: enum_name,
+                            variants,
+                            loc: enum_def.loc,
+                        });
                     }
                     _ => continue,
                 }

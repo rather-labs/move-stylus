@@ -15,6 +15,12 @@ sol!(
     #[sol(rpc)]
     #[allow(missing_docs)]
     contract Example {
+        event NewUID(bytes32 indexed uid);
+
+        #[derive(Debug, PartialEq)]
+        struct AnotherTest {
+            uint8 pos0;
+        }
 
         #[derive(Debug, PartialEq)]
         struct Bar {
@@ -23,7 +29,17 @@ sol!(
         }
 
         #[derive(Debug, PartialEq)]
-        struct Foo {
+        struct BazUint16 {
+            uint16 c;
+            Bar d;
+            address e;
+            bool f;
+            uint64 g;
+            uint256 h;
+        }
+
+        #[derive(Debug, PartialEq)]
+        struct FooUint16 {
             uint16 c;
             Bar d;
             address e;
@@ -34,13 +50,9 @@ sol!(
         }
 
         #[derive(Debug, PartialEq)]
-        struct Baz {
-            uint16 c;
-            Bar d;
-            address e;
-            bool f;
-            uint64 g;
-            uint256 h;
+        struct Test {
+            uint8 pos0;
+            AnotherTest pos1;
         }
 
         #[derive(Debug, PartialEq)]
@@ -49,34 +61,23 @@ sol!(
             SecondVariant,
         }
 
-        #[derive(Debug)]
-        struct AnotherTest {
-            uint8 pos0;
-        }
-
-        #[derive(Debug)]
-        struct Test {
-            uint8 pos0;
-            AnotherTest pos1;
-        }
-
-        function createFooU16(uint16 x, uint16 y) external view returns (Foo);
-        function createFoo2U16(uint16 x, uint16 y) external view returns (Foo,Foo);
-        function createBazU16(uint16 x, uint16 y) external view returns (Baz);
-        function createBaz2U16(uint16 x, uint16 y) external view returns (Baz,Baz);
-        function multiValues1() external view returns (uint32[], uint128[], bool, uint64);
-        function multiValues2() external view returns (uint8, bool, uint64);
-        function echoVariant(TestEnum v) external view returns (TestEnum);
-        function testValues(Test test) external view returns (uint8, uint8);
-        function echo(uint128 x) external view returns (uint128);
-        function getCopiedLocal() external view returns (uint128);
-        function getConstant() external view returns (uint128);
-        function getConstantLocal() external view returns (uint128);
-        function getLocal(uint128 x) external view returns (uint128);
-        function echoSignerWithInt(uint8 y) public view returns (uint8, address);
-        function txContextProperties() public view returns (address, uint256, uint64, uint256, uint64, uint64, uint64, uint256);
-        function fibonacci(uint64 n) external view returns (uint64);
-        function sumSpecial(uint64 n) external view returns (uint64);
+        function createBaz2U16(uint16 a, uint16 _b) external returns (BazUint16, BazUint16);
+        function createBazU16(uint16 a, uint16 _b) external returns (BazUint16);
+        function createFoo2U16(uint16 a, uint16 b) external returns (FooUint16, FooUint16);
+        function createFooU16(uint16 a, uint16 b) external returns (FooUint16);
+        function echo(uint128 x) external returns (uint128);
+        function echo2(uint128 x, uint128 y) external returns (uint128);
+        function echoVariant(TestEnum x) external returns (TestEnum);
+        function fibonacci(uint64 n) external returns (uint64);
+        function getConstant() external returns (uint128);
+        function getConstantLocal() external returns (uint128);
+        function getCopiedLocal() external returns (uint128);
+        function getLocal(uint128 _z) external returns (uint128);
+        function multiValues1() external returns (uint32[], uint128[], bool, uint64);
+        function multiValues2() external returns (uint8, bool, uint64);
+        function sumSpecial(uint64 n) external returns (uint64);
+        function testValues(Test test) external returns (uint8, uint8);
+        function txContextProperties() external returns (address, uint256, uint64, uint256, uint64, uint64, uint64, uint256);
     }
 );
 
@@ -173,7 +174,7 @@ async fn main() -> eyre::Result<()> {
     let expected_bar = Example::Bar { a: 42, b: 4242 };
     let expected_addr = address!("0000000000000000000000000000000000007357");
 
-    let expected_foo = Example::Foo {
+    let expected_foo = Example::FooUint16 {
         c: 66,
         d: expected_bar.clone(),
         e: expected_addr,
@@ -183,7 +184,7 @@ async fn main() -> eyre::Result<()> {
         i: vec![0xFFFFFFFF],
     };
 
-    let expected_baz = Example::Baz {
+    let expected_baz = Example::BazUint16 {
         c: 55,
         d: expected_bar.clone(),
         e: expected_addr,

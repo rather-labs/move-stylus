@@ -12,10 +12,10 @@ sol!(
     #[sol(rpc)]
     #[allow(missing_docs)]
     contract Example {
-        function create() public view;
-        function read() public view returns (uint64);
-        function increment() public view;
-        function setValue(uint64 value) public view;
+        function create() external;
+        function increment() external;
+        function read() external returns (uint64);
+        function setValue(uint64 value) external;
     }
 );
 

@@ -10,10 +10,11 @@ sol!(
     #[sol(rpc)]
     #[allow(missing_docs)]
     contract Example {
-        function balanceOfErc20(address contract, address token_owner) public view returns (uint256);
-        function totalSupply(address contract) public view returns (uint256);
+
+        function balanceOfErc20(address erc20_address, address balance_address) external returns (uint256);
+        function totalSupply(address erc20_address) external returns (uint256);
         function transferFromErc20(
-            address contract,
+            address erc20_address,
             address sender,
             address recipient,
             uint256 amount
@@ -25,18 +26,17 @@ sol!(
     #[sol(rpc)]
     #[allow(missing_docs)]
     contract Erc20{
-        function constructor() public view;
-        function mint(address to, uint256 amount) external view;
-        function burn(address from, uint256 amount) external view;
-        function balanceOf(address account) public view returns (uint256);
-        function totalSupply() external view returns (uint256);
-        function transfer(address recipient, uint256 amount) external returns (bool);
-        function allowance(address owner, address spender) external view returns (uint256);
+        function allowance(address owner, address spender) external returns (uint256);
         function approve(address spender, uint256 amount) external returns (bool);
+        function balanceOf(address account) external returns (uint256);
+        function burn(address from, uint256 amount) external;
+        function decimals() external returns (uint8);
+        function mint(address to, uint256 amount) external;
+        function name() external returns (string);
+        function symbol() external returns (string);
+        function totalSupply() external returns (uint256);
+        function transfer(address recipient, uint256 amount) external returns (bool);
         function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
-        function name() external view returns (string);
-        function symbol() external view returns (string);
-        function decimals() external view returns (uint8);
     }
 );
 

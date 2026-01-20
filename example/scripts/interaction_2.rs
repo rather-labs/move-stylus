@@ -17,20 +17,18 @@ sol!(
     #[sol(rpc)]
     #[allow(missing_docs)]
     contract Example {
-        #[derive(Debug)]
+        #[derive(Debug, PartialEq)]
         event NewUID(bytes32 indexed uid);
-
         #[derive(Debug, PartialEq)]
-        event TestEvent1 (
-            uint32 indexed n,
-        );
-
+        event ReceiveEvent(address indexed sender, uint32 data_length, uint8[] data);
         #[derive(Debug, PartialEq)]
-        event TestEvent2 (
-            uint32 indexed a,
-            uint8[] indexed b,
-            uint128 c,
-        );
+        event TestEvent1(uint32 indexed n);
+        #[derive(Debug, PartialEq)]
+        event TestEvent2(uint32 indexed a, uint8[] indexed b, uint128 c);
+        #[derive(Debug, PartialEq)]
+        event TestEvent3(NestedStruct1 indexed a, NestedStruct2 b);
+        #[derive(Debug, PartialEq)]
+        event TestEvent4(uint32 indexed a, uint16[] b, uint8[] c, uint32[] d);
 
         #[derive(Debug, PartialEq)]
         struct NestedStruct1 {
@@ -45,45 +43,26 @@ sol!(
         }
 
         #[derive(Debug, PartialEq)]
-        event TestEvent3 (
-            NestedStruct1 indexed a,
-            NestedStruct2 b,
-        );
-
-        #[derive(Debug, PartialEq)]
-        event TestEvent4 (
-            uint32 indexed a,
-            uint16[] b,
-            uint8[] c,
-            uint32[] d,
-        );
-
-        #[derive(Debug, PartialEq)]
-        struct Stack {
+        struct StackUint32 {
             uint32[] pos0;
         }
 
-        #[derive(Debug, PartialEq)]
-        event ReceiveEvent (
-            address indexed sender,
-            uint32 data_length,
-            uint8[] data,
-        );
-
-        function emitTestEvent1(uint32 n) public view;
-        function emitTestEvent2(uint32 a, uint8[] b, uint128 c) public view;
-        function emitTestEvent3(uint32 n, uint32 a, uint8[] b, uint128 c) public view;
-        function emitTestEvent4(uint32 a, uint16[] b, uint8[] c, uint32[] d) public view;
-        function echoWithGenericFunctionU16(uint16 x) external view returns (uint16);
-        function echoWithGenericFunctionVec32(uint32[] x) external view returns (uint32[]);
-        function echoWithGenericFunctionU16Vec32(uint16 x, uint32[] y) external view returns (uint16, uint32[]);
-        function echoWithGenericFunctionAddressVec128(address x, uint128[] y) external view returns (address, uint128[]);
-        function getUniqueIds() external view returns (bytes32, bytes32, bytes32);
-        function getUniqueId() external view returns (bytes32);
-        function getFreshObjectAddress() external view returns (address);
-        function testStack1() external view returns (Stack, uint64);
-        function testStack2() external view returns (Stack, uint64);
-        function testStack3() external view returns (Stack, uint64);
+        function echoWithGenericFunctionAddressVec128(address x, uint128[] y) external returns (address, uint128[]);
+        function echoWithGenericFunctionU16(uint16 x) public external returns (uint16);
+        function echoWithGenericFunctionU16Vec32(uint16 x, uint32[] y) external returns (uint16, uint32[]);
+        function echoWithGenericFunctionVec32(uint32[] x) public external returns (uint32[]);
+        function emitTestEvent1(uint32 n) external;
+        function emitTestEvent2(uint32 a, uint8[] b, uint128 c) external;
+        function emitTestEvent3(uint32 n, uint32 a, uint8[] b, uint128 c) external;
+        function emitTestEvent4(uint32 a, uint16[] b, uint8[] c, uint32[] d) external;
+        fallback() payable external;
+        function getFreshObjectAddress() external returns (address);
+        function getUniqueId() external returns (bytes32);
+        function getUniqueIds() external returns (bytes32, bytes32, bytes32);
+        receive() payable external;
+        function testStack1() external returns (StackUint32, uint64);
+        function testStack2() external returns (StackUint32, uint64);
+        function testStack3() external returns (StackUint32, uint64);
     }
 );
 

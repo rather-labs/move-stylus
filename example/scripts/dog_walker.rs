@@ -13,8 +13,13 @@ sol!(
     #[sol(rpc)]
     #[allow(missing_docs)]
     contract Example {
-        function create() public view;
-        function walkTheDog(bytes32 capability) public view;
+
+        event IWalkTheDog();
+        event NewUID(bytes32 indexed uid);
+
+        function create() external;
+        function walkTheDog(bytes32) external;
+
     }
 );
 

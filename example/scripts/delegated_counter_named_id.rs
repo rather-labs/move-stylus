@@ -14,15 +14,15 @@ sol!(
     #[sol(rpc)]
     #[allow(missing_docs)]
     contract Example {
-        function create(address contract_logic) public view;
-        function read() public view returns (uint64);
-        function logicAddress() public view returns (address);
-        function changeLogic(address logic_address) public view;
-        function incrementModifyBefore() public view;
-        function incrementModifyAfter() public view;
-        function incrementModifyBeforeAfter() public view;
-        function increment() public view;
-        function setValue(uint64 value) public view;
+        function changeLogic(address logic_address) external;
+        function create(address contract_logic) external;
+        function increment() external;
+        function incrementModifyAfter() external;
+        function incrementModifyBefore() external;
+        function incrementModifyBeforeAfter() external;
+        function logicAddress() external returns (address);
+        function read() external returns (uint64);
+        function setValue(uint64 value) external;
     }
 );
 
