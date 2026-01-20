@@ -1,6 +1,5 @@
 use crate::common::runtime;
-use alloy_primitives::keccak256;
-use alloy_sol_types::{SolCall, SolType, sol};
+use alloy_sol_types::{SolCall, sol};
 use move_bytecode_to_wasm::error::RuntimeError;
 use move_test_runner::wasm_runner::RuntimeSandbox;
 use rstest::rstest;
@@ -103,13 +102,8 @@ fn test_peep(#[with("peep", "tests/framework/move_sources/peep.move")] runtime: 
     let call_data = peepFooCall::new((owner_address.into(), [0; 32].into())).abi_encode();
     let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(1, result);
-    let error_message = String::from_utf8_lossy(RuntimeError::StorageObjectNotFound.as_bytes());
-    let expected_data = [
-        keccak256(b"Error(string)")[..4].to_vec(),
-        <sol!((string,))>::abi_encode_params(&(error_message,)),
-    ]
-    .concat();
-    assert_eq!(expected_data, return_data);
+    let expected_data = RuntimeError::StorageObjectNotFound.encode_abi();
+    assert_eq!(return_data, expected_data);
 
     // call_peep_foo
     let call_data = callIndirectPeepFooCall::new((owner_address.into(), foo_id)).abi_encode();
@@ -126,13 +120,8 @@ fn test_peep(#[with("peep", "tests/framework/move_sources/peep.move")] runtime: 
         callIndirectPeepFooCall::new((owner_address.into(), [0; 32].into())).abi_encode();
     let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(1, result);
-    let error_message = String::from_utf8_lossy(RuntimeError::StorageObjectNotFound.as_bytes());
-    let expected_data = [
-        keccak256(b"Error(string)")[..4].to_vec(),
-        <sol!((string,))>::abi_encode_params(&(error_message,)),
-    ]
-    .concat();
-    assert_eq!(expected_data, return_data);
+    let expected_data = RuntimeError::StorageObjectNotFound.encode_abi();
+    assert_eq!(return_data, expected_data);
 
     // Here we should expect no new uid event currently available
     let err = runtime.obtain_uid().unwrap_err();

@@ -326,12 +326,14 @@ impl RuntimeFunction {
                 }
                 (Self::IsZero, Some(ctx), _) => equality::is_zero(module, ctx),
                 // Vector
-                (Self::VecBorrow, Some(ctx), _) => vector::vec_borrow_function(module, ctx),
+                (Self::VecBorrow, Some(ctx), Some(runtime_error_data)) => {
+                    vector::vec_borrow_function(module, ctx, runtime_error_data)
+                }
                 (Self::VecIncrementLen, Some(ctx), _) => {
                     vector::increment_vec_len_function(module, ctx)
                 }
-                (Self::VecDecrementLen, Some(ctx), _) => {
-                    vector::decrement_vec_len_function(module, ctx)
+                (Self::VecDecrementLen, Some(ctx), Some(runtime_error_data)) => {
+                    vector::decrement_vec_len_function(module, ctx, runtime_error_data)
                 }
                 (Self::VecUpdateMutRef, Some(ctx), _) => {
                     vector::vec_update_mut_ref_function(module, ctx)
@@ -514,9 +516,14 @@ impl RuntimeFunction {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
                 vector::vec_swap_function(module, compilation_ctx, runtime_error_data, generics[0])?
             }
-            (Self::VecPopBack, _) => {
+            (Self::VecPopBack, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
-                vector::vec_pop_back_function(module, compilation_ctx, generics[0])?
+                vector::vec_pop_back_function(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    generics[0],
+                )?
             }
             (Self::VecPushBack, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
@@ -703,6 +710,8 @@ impl RuntimeFunction {
             | Self::VecPushBack
             | Self::VecCopyLocal
             | Self::VecEquality
+            | Self::VecPopBack
+            | Self::VecBorrow
             | Self::StorageNextSlot
             | Self::DeriveDynArraySlot
             | Self::LocateStorageData
@@ -738,8 +747,6 @@ impl RuntimeFunction {
             | Self::HeapTypeEquality
             | Self::VecEqualityHeapType
             | Self::IsZero
-            | Self::VecPopBack
-            | Self::VecBorrow
             | Self::VecIncrementLen
             | Self::VecDecrementLen
             | Self::VecUpdateMutRef

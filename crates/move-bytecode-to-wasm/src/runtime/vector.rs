@@ -7,6 +7,7 @@ use super::{RuntimeFunction, error::RuntimeFunctionError};
 use crate::{
     CompilationContext,
     data::{DEAD_BEEF, RuntimeErrorData},
+    error::RuntimeError,
     translation::intermediate_types::{
         IntermediateType, error::IntermediateTypeError, heap_integers::IU128,
     },
@@ -60,6 +61,7 @@ pub fn increment_vec_len_function(
 pub fn decrement_vec_len_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
 ) -> FunctionId {
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
     let mut builder = function
@@ -83,7 +85,13 @@ pub fn decrement_vec_len_function(
         .if_else(
             None,
             |then| {
-                then.unreachable(); // cannot pop from empty vector
+                then.return_error(
+                    module,
+                    compilation_ctx,
+                    Some(ValType::I32),
+                    runtime_error_data,
+                    RuntimeError::OutOfBounds,
+                );
             },
             |else_| {
                 else_
@@ -203,22 +211,28 @@ pub fn vec_swap_function(
             .binop(BinaryOp::I64Eq)
             .br_if(block_id);
 
-        // Helper: emit trap if idx >= len
-        let trap_if_idx_oob = |b: &mut InstrSeqBuilder, idx: LocalId| {
+        // Helper: throw a runtime error if idx >= len
+        let mut check_idx_oob = |b: &mut InstrSeqBuilder, idx: LocalId| {
             b.local_get(idx)
                 .local_get(len)
                 .binop(BinaryOp::I32GeU)
                 .if_else(
                     None,
                     |then_| {
-                        then_.unreachable();
+                        then_.return_error(
+                            module,
+                            compilation_ctx,
+                            None,
+                            runtime_error_data,
+                            RuntimeError::OutOfBounds,
+                        );
                     },
                     |_| {},
                 );
         };
 
-        trap_if_idx_oob(block, idx1);
-        trap_if_idx_oob(block, idx2);
+        check_idx_oob(block, idx1);
+        check_idx_oob(block, idx2);
 
         // Swap elements
         let aux = module.locals.add(elem_val_type);
@@ -296,6 +310,7 @@ pub fn vec_swap_function(
 pub fn vec_pop_back_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     inner_type: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let element_size = inner_type.wasm_memory_data_size()?;
@@ -308,8 +323,11 @@ pub fn vec_pop_back_function(
         return Ok(function);
     }
 
-    let decrement_vec_len_function =
-        RuntimeFunction::VecDecrementLen.get(module, Some(compilation_ctx), None)?;
+    let decrement_vec_len_function = RuntimeFunction::VecDecrementLen.get(
+        module,
+        Some(compilation_ctx),
+        Some(runtime_error_data),
+    )?;
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[return_type]);
     let mut builder = function.name(name).func_body();
@@ -339,9 +357,12 @@ pub fn vec_pop_back_function(
         .local_set(len);
 
     // Decrement vector length
-    builder
-        .local_get(vector_ref)
-        .call(decrement_vec_len_function);
+    builder.local_get(vector_ref).call_runtime_function(
+        compilation_ctx,
+        decrement_vec_len_function,
+        &RuntimeFunction::VecDecrementLen,
+        Some(return_type),
+    );
 
     // Update vector length
     builder
@@ -533,6 +554,7 @@ pub fn vec_push_back_function(
 pub fn vec_borrow_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
 ) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,
@@ -563,7 +585,7 @@ pub fn vec_borrow_function(
         )
         .local_set(vec_ptr);
 
-    // Trap if index >= length
+    // Throw a runtime error if index >= length
     builder.block(None, |block| {
         block
             .local_get(vec_ptr)
@@ -578,7 +600,13 @@ pub fn vec_borrow_function(
             .local_get(index)
             .binop(BinaryOp::I32GtU);
         block.br_if(block.id());
-        block.unreachable();
+        block.return_error(
+            module,
+            compilation_ctx,
+            Some(ValType::I32),
+            runtime_error_data,
+            RuntimeError::OutOfBounds,
+        );
     });
 
     // If the element is stored on the heap, we directly return vec_elem_ptr, as it is already a reference (pointer to a pointer).

@@ -4,8 +4,6 @@ use crate::{
     compilation_context::globals::CompilationContextGlobals, data::DATA_ABORT_MESSAGE_PTR_OFFSET,
     error::RuntimeError, memory::setup_module_memory,
 };
-use alloy_primitives::keccak256;
-use alloy_sol_types::{SolType, sol};
 use walrus::{FunctionId, MemoryId, Module, ModuleConfig, ValType};
 use wasmtime::{Caller, Engine, Instance, Linker, Module as WasmModule, Store, TypedFunc};
 
@@ -270,12 +268,7 @@ pub fn assert_runtime_error(
         .read(&mut *store, (error_ptr + 4) as usize, &mut result_data)
         .unwrap();
 
-    let error_message = String::from_utf8_lossy(error.as_bytes());
-    let expected = [
-        keccak256(b"Error(string)")[..4].to_vec(),
-        <sol!((string,))>::abi_encode_params(&(error_message,)),
-    ]
-    .concat();
+    let expected = error.encode_abi();
     assert_eq!(result_data, expected);
 }
 

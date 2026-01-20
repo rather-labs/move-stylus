@@ -1,5 +1,7 @@
 use std::{backtrace::Backtrace, fmt::Display};
 
+use alloy_primitives::keccak256;
+use alloy_sol_types::{SolType, sol};
 use move_compiler::{diagnostics::Diagnostic, shared::files::MappedFiles};
 use move_parse_special_attributes::SpecialAttributeError;
 
@@ -180,5 +182,13 @@ impl RuntimeError {
             RuntimeError::Overflow => b"Overflow",
             RuntimeError::OutOfBounds => b"Out of bounds",
         }
+    }
+
+    pub fn encode_abi(&self) -> Vec<u8> {
+        [
+            keccak256(b"Error(string)")[..4].to_vec(),
+            <sol!((string,))>::abi_encode_params(&(String::from_utf8_lossy(self.as_bytes()),)),
+        ]
+        .concat()
     }
 }

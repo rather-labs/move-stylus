@@ -1535,6 +1535,7 @@ fn translate_instruction(
                 builder,
                 compilation_ctx,
                 runtime_error_data,
+                return_type,
             )?;
 
             types_stack.push(IntermediateType::IRef(vec_inner.clone()));
@@ -1574,6 +1575,7 @@ fn translate_instruction(
                 builder,
                 compilation_ctx,
                 runtime_error_data,
+                return_type,
             )?;
 
             types_stack.push(IntermediateType::IMutRef(vec_inner.clone()));
