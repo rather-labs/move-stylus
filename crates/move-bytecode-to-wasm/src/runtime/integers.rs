@@ -171,8 +171,7 @@ pub fn downcast_u128_u256_to_u32(
                         offset: 0,
                     },
                 )
-                .i32_const(0)
-                .binop(BinaryOp::I32Eq)
+                .unop(UnaryOp::I32Eqz)
                 .if_else(
                     None,
                     |then| {
@@ -266,8 +265,7 @@ pub fn downcast_u128_u256_to_u64(
                         offset: 0,
                     },
                 )
-                .i64_const(0)
-                .binop(BinaryOp::I64Eq)
+                .unop(UnaryOp::I64Eqz)
                 .if_else(
                     None,
                     |then| {

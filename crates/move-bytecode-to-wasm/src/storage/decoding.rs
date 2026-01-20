@@ -3,7 +3,7 @@
 //! The decoding layout mirrors Solidity's storage layout.
 use walrus::{
     InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{BinaryOp, ExtendedLoad, LoadKind, MemArg, StoreKind},
+    ir::{BinaryOp, ExtendedLoad, LoadKind, MemArg, StoreKind, UnaryOp},
 };
 
 use crate::{
@@ -487,11 +487,7 @@ pub fn add_read_and_decode_storage_vector_instructions(
         let block_id = block.id();
 
         // Check if length == 0, if so skip the rest of the instructions.
-        block
-            .local_get(len)
-            .i32_const(0)
-            .binop(BinaryOp::I32Eq)
-            .br_if(block_id);
+        block.local_get(len).unop(UnaryOp::I32Eqz).br_if(block_id);
 
         // Calculate the slot of the first element
         block

@@ -21,7 +21,7 @@ use crate::{
 };
 use walrus::{
     FunctionBuilder, FunctionId, GlobalId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
 };
 
 /// Looks for an struct inside the objects mappings. The objects mappings follows the solidity notation:
@@ -149,8 +149,7 @@ pub fn locate_storage_data(
             let exit_frozen_block = frozen_block.id();
             frozen_block
                 .local_get(search_frozen)
-                .i32_const(0)
-                .binop(BinaryOp::I32Eq)
+                .unop(UnaryOp::I32Eqz)
                 .br_if(exit_frozen_block);
 
             frozen_block
@@ -1162,8 +1161,7 @@ pub fn add_check_and_delete_struct_tto_fields_fn(
                     // Check if length == 0
                     outer_block
                         .local_get(len)
-                        .i32_const(0)
-                        .binop(BinaryOp::I32Eq)
+                        .unop(UnaryOp::I32Eqz)
                         .br_if(outer_block_id);
 
                     outer_block.block(None, |inner_block| {
