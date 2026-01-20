@@ -268,7 +268,7 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
         self.call(function_id);
 
         // If the function may result in a runtime error, we need to handle it
-        if NativeFunction::can_abort(function_name, module_id) {
+        if NativeFunction::is_fallible(function_name, module_id) {
             self.add_propagate_error_instructions(compilation_ctx, None);
         }
 
@@ -284,7 +284,7 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
         self.call(function_id);
 
         // If the function may result in a runtime error, we need to handle it
-        if runtime_fn.can_abort() {
+        if runtime_fn.is_fallible() {
             self.add_propagate_error_instructions(compilation_ctx, None);
         }
 
@@ -301,7 +301,7 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
         self.call(function_id);
 
         // If the function may result in a runtime error, we need to handle it
-        if runtime_fn.can_abort() {
+        if runtime_fn.is_fallible() {
             // If the function aborts, propagate the error
             self.add_propagate_error_instructions(compilation_ctx, return_block_id);
         }

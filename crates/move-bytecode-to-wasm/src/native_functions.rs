@@ -783,7 +783,7 @@ impl NativeFunction {
         Ok(format!("___{name}_{hash}_{:x}", module_id.hash()))
     }
 
-    pub fn can_abort(name: &str, module_id: &ModuleId) -> bool {
+    pub fn is_fallible(name: &str, module_id: &ModuleId) -> bool {
         let ModuleId {
             address,
             module_name,
