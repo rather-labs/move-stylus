@@ -1,5 +1,7 @@
 use std::{backtrace::Backtrace, fmt::Display};
 
+use alloy_primitives::keccak256;
+use alloy_sol_types::{SolType, sol};
 use move_compiler::{diagnostics::Diagnostic, shared::files::MappedFiles};
 use move_parse_special_attributes::SpecialAttributeError;
 
@@ -152,13 +154,28 @@ impl From<&CodeError> for Diagnostic {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RuntimeError {
+    /// Attempted to share an object that is frozen.
     FrozenObjectsCannotBeShared,
+    /// Attempted to freeze an object that is already shared.
     SharedObjectsCannotBeFrozen,
+    /// Attempted to transfer ownership of an object that is frozen.
     FrozenObjectsCannotBeTransferred,
+    /// Attempted to transfer ownership of an object that is shared.
     SharedObjectsCannotBeTransferred,
+    /// The requested storage object was not found.
     StorageObjectNotFound,
+    /// Attempted to delete an object that is frozen.
+    FrozenObjectsCannotBeDeleted,
+    /// The type of a storage object does not match the expected type.
+    StorageObjectTypeMismatch,
+    /// Arithmetic overflow occurred.
     Overflow,
+    /// Access was out of bounds (e.g., array index out of range).
     OutOfBounds,
+    /// Attempted an out-of-bounds memory access.
+    MemoryAccessOutOfBounds,
+    /// The size of an enum is too large to handle.
+    EnumSizeTooLarge,
 }
 
 impl RuntimeError {
@@ -173,8 +190,20 @@ impl RuntimeError {
                 b"Shared objects cannot be transferred"
             }
             RuntimeError::StorageObjectNotFound => b"Object not found",
+            RuntimeError::FrozenObjectsCannotBeDeleted => b"Frozen objects cannot be deleted",
+            RuntimeError::StorageObjectTypeMismatch => b"Storage object type mismatch",
             RuntimeError::Overflow => b"Overflow",
             RuntimeError::OutOfBounds => b"Out of bounds",
+            RuntimeError::MemoryAccessOutOfBounds => b"Memory access out of bounds",
+            RuntimeError::EnumSizeTooLarge => b"Enum size too large",
         }
+    }
+
+    pub fn encode_abi(&self) -> Vec<u8> {
+        [
+            keccak256(b"Error(string)")[..4].to_vec(),
+            <sol!((string,))>::abi_encode_params(&(String::from_utf8_lossy(self.as_bytes()),)),
+        ]
+        .concat()
     }
 }

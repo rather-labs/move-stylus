@@ -1,6 +1,7 @@
 use crate::common::run_test;
 use crate::declare_fixture;
 use alloy_sol_types::{SolCall, SolType, SolValue, abi::TokenSeq, sol};
+use move_bytecode_to_wasm::error::RuntimeError;
 use move_test_runner::wasm_runner::RuntimeSandbox;
 use rstest::{fixture, rstest};
 
@@ -42,10 +43,6 @@ sol!(
 #[case(vecFromVecAndIntCall::new((vec![1u32, 2u32, 3u32], 4u32)), vec![vec![1, 2, 3], vec![4, 4]])]
 #[case(vecLenCall::new((vec![1u32, 2u32, 3u32],)), (3u64,))]
 #[case(vecPopBackCall::new((vec![1u32, 2u32, 3u32],)), vec![1])]
-#[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
-#[case(vecPopBackCall::new((vec![],)), ((),))]
-#[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
-#[case(vecSwapCall::new((vec![1u32, 2u32, 3u32], 0u64, 3u64)), ((),))]
 #[case(vecSwapCall::new((vec![1u32, 2u32, 3u32], 0u64, 1u64)), vec![2, 1, 3])]
 #[case(vecSwapCall::new((vec![1u32, 2u32, 3u32], 0u64, 2u64)), vec![3, 2, 1])]
 #[case(vecPushBackCall::new((vec![1u32, 2u32, 3u32], 4u32)), vec![1, 2, 3, 4])]
@@ -72,4 +69,15 @@ fn test_vec_32<T: SolCall, V: SolValue>(
         expected_result.abi_encode(),
     )
     .unwrap();
+}
+
+#[rstest]
+#[case(vecSwapCall::new((vec![1u32, 2u32, 3u32], 0u64, 3u64)))]
+#[case(vecPopBackCall::new((vec![],)))]
+fn test_vec_32_runtime_error<T: SolCall>(#[by_ref] runtime: &RuntimeSandbox, #[case] call_data: T) {
+    let (result, return_data) = runtime.call_entrypoint(call_data.abi_encode()).unwrap();
+    assert_eq!(result, 1);
+
+    let expected_data = RuntimeError::OutOfBounds.encode_abi();
+    assert_eq!(return_data, expected_data);
 }

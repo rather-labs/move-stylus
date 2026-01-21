@@ -1,8 +1,11 @@
 use crate::{
     CompilationContext,
     abi_types::error::{AbiError, AbiOperationError},
+    data::RuntimeErrorData,
+    error::RuntimeError,
     runtime::{RuntimeFunction, RuntimeFunctionError},
     translation::intermediate_types::IntermediateType,
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 use alloy_sol_types::{SolType, sol_data};
 use walrus::{
@@ -13,6 +16,7 @@ use walrus::{
 pub fn unpack_enum_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
     itype: &IntermediateType,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let name = RuntimeFunction::UnpackEnum.get_generic_function_name(compilation_ctx, &[itype])?;
@@ -45,14 +49,20 @@ pub fn unpack_enum_function(
         .call(unpack_u32_function)
         .local_tee(variant_number);
 
-    // Trap if the variant number is higher that the quantity of variants the enum contains
+    // Return error if the variant number is higher than the quantity of variants the enum contains
     builder
         .i32_const(enum_.variants.len() as i32 - 1)
         .binop(BinaryOp::I32GtU)
         .if_else(
             None,
             |then| {
-                then.unreachable();
+                then.return_error(
+                    module,
+                    compilation_ctx,
+                    Some(ValType::I32),
+                    runtime_error_data,
+                    RuntimeError::OutOfBounds,
+                );
             },
             |_| {},
         );

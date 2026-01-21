@@ -155,6 +155,7 @@ mod tests {
                 &mut func_body,
                 &mut raw_module,
                 None,
+                Some(ValType::I32),
                 args_pointer,
                 args_pointer,
                 &compilation_ctx,

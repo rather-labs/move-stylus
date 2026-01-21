@@ -472,12 +472,7 @@ fn test_signer_owner_mismatch(
     // This should hit an unreachable due to the signer differing from the owner!
     let call_data = readValueCall::new(()).abi_encode();
     let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
-    let error_message = String::from_utf8_lossy(RuntimeError::StorageObjectNotFound.as_bytes());
-    let expected_data = [
-        keccak256(b"Error(string)")[..4].to_vec(),
-        <sol!((string,))>::abi_encode_params(&(error_message,)),
-    ]
-    .concat();
+    let expected_data = RuntimeError::StorageObjectNotFound.encode_abi();
     assert_eq!(1, result);
     assert_eq!(expected_data, return_data);
 }
@@ -519,13 +514,7 @@ fn test_freeze_shared_object(
 
     // Freeze the object. Only possible if the object is owned by the signer!
     let call_data = freezeObjCall::new(()).abi_encode();
-    let error_message =
-        String::from_utf8_lossy(RuntimeError::SharedObjectsCannotBeFrozen.as_bytes());
-    let expected_data = [
-        keccak256(b"Error(string)")[..4].to_vec(),
-        <sol!((string,))>::abi_encode_params(&(error_message,)),
-    ]
-    .concat();
+    let expected_data = RuntimeError::SharedObjectsCannotBeFrozen.encode_abi();
     let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(1, result);
     assert_eq!(expected_data, return_data);
@@ -561,12 +550,7 @@ fn test_share_or_transfer_frozen(
     };
 
     let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
-    let error_message = String::from_utf8_lossy(RuntimeError::StorageObjectNotFound.as_bytes());
-    let expected_data = [
-        keccak256(b"Error(string)")[..4].to_vec(),
-        <sol!((string,))>::abi_encode_params(&(error_message,)),
-    ]
-    .concat();
+    let expected_data = RuntimeError::StorageObjectNotFound.encode_abi();
     assert_eq!(1, result);
     assert_eq!(expected_data, return_data);
 }
@@ -593,12 +577,7 @@ fn test_delete_frozen_object(
     // Try to delete the object
     let call_data = deleteObjCall::new(()).abi_encode();
     let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
-    let error_message = String::from_utf8_lossy(RuntimeError::StorageObjectNotFound.as_bytes());
-    let expected_data = [
-        keccak256(b"Error(string)")[..4].to_vec(),
-        <sol!((string,))>::abi_encode_params(&(error_message,)),
-    ]
-    .concat();
+    let expected_data = RuntimeError::StorageObjectNotFound.encode_abi();
     assert_eq!(1, result);
     assert_eq!(expected_data, return_data);
 }

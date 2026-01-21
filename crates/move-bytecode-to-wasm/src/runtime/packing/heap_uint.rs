@@ -278,6 +278,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 
@@ -335,6 +336,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 
@@ -426,6 +428,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 
@@ -522,6 +525,7 @@ mod tests {
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
                 None,
+                Some(ValType::I32),
             )
             .unwrap();
 

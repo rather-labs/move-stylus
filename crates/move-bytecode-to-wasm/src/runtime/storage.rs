@@ -694,7 +694,7 @@ pub fn derive_dyn_array_slot(
     let add_u256_fn =
         RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
 
-    // Guard: check elem_size is greater than 0
+    // Guard: check elem_size is greater than 0, else trap.
     builder
         .local_get(elem_size)
         .i32_const(0)
@@ -957,56 +957,57 @@ pub fn add_delete_struct_from_storage_fn(
 
     let struct_ptr = module.locals.add(ValType::I32);
 
-    // Verify if the object is frozen; if not, continue.
+    // If the object is frozen, return an error: frozen objects cannot be deleted
+    builder.block(None, |block| {
+        let block_id = block.id();
+        block
+            .local_get(struct_ptr)
+            .call(get_struct_owner_fn)
+            .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
+            .i32_const(32)
+            .call(equality_fn)
+            .unop(UnaryOp::I32Eqz)
+            .br_if(block_id)
+            .return_error(
+                module,
+                compilation_ctx,
+                None,
+                runtime_error_data,
+                RuntimeError::FrozenObjectsCannotBeDeleted,
+            );
+    });
+
+    // Wipe the slot data placeholder. We will use it to erase the slots in the storage
+    builder
+        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+        .i32_const(0)
+        .i32_const(32)
+        .memory_fill(compilation_ctx.memory_id);
+
+    // Locals
+    let slot_ptr = module.locals.add(ValType::I32);
+
+    // Calculate the object slot in storage
     builder
         .local_get(struct_ptr)
-        .call(get_struct_owner_fn)
-        .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
-        .i32_const(32)
-        .call(equality_fn);
+        .call(locate_struct_slot_fn)
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .local_set(slot_ptr);
 
-    let mut inner_result = Ok(());
-    builder.if_else(
-        None,
-        |then| {
-            // Emit an unreachable if the object is frozen
-            then.unreachable();
-        },
-        |else_| {
-            // Wipe the slot data placeholder. We will use it to erase the slots in the storage
-            else_
-                .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                .i32_const(0)
-                .i32_const(32)
-                .memory_fill(compilation_ctx.memory_id);
+    // Initialize the number of bytes used in the slot to 8, to reflect the 8-byte type hash
+    let slot_offset = module.locals.add(ValType::I32);
+    builder.i32_const(8).local_set(slot_offset);
 
-            // Locals
-            let slot_ptr = module.locals.add(ValType::I32);
-
-            // Calculate the object slot in storage
-            else_
-                .local_get(struct_ptr)
-                .call(locate_struct_slot_fn)
-                .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                .local_set(slot_ptr);
-
-            // Initialize the number of bytes used in the slot to 8, to reflect the 8-byte type hash
-            let slot_offset = module.locals.add(ValType::I32);
-            else_.i32_const(8).local_set(slot_offset);
-
-            // Delete the struct from storage
-            inner_result = add_delete_storage_struct_instructions(
-                module,
-                else_,
-                compilation_ctx,
-                runtime_error_data,
-                slot_ptr,
-                slot_offset,
-                &struct_,
-            );
-        },
-    );
-    inner_result?;
+    // Delete the struct from storage
+    add_delete_storage_struct_instructions(
+        module,
+        &mut builder,
+        compilation_ctx,
+        runtime_error_data,
+        slot_ptr,
+        slot_offset,
+        &struct_,
+    )?;
 
     // Wipe out the owner
     builder

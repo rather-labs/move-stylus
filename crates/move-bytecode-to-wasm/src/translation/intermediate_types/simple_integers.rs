@@ -1,5 +1,5 @@
 use walrus::{
-    InstrSeqBuilder,
+    InstrSeqBuilder, ValType,
     ir::{BinaryOp, UnaryOp},
 };
 
@@ -40,6 +40,7 @@ impl IU8 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(
             module,
@@ -53,6 +54,7 @@ impl IU8 {
                 compilation_ctx,
                 check_overflow_f,
                 &RuntimeFunction::CheckOverflowU8U16,
+                return_type,
             );
 
         Ok(())
@@ -66,10 +68,16 @@ impl IU8 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         let sub_u32_f =
             RuntimeFunction::SubU32.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
-        builder.call_runtime_function(compilation_ctx, sub_u32_f, &RuntimeFunction::SubU32);
+        builder.call_runtime_function(
+            compilation_ctx,
+            sub_u32_f,
+            &RuntimeFunction::SubU32,
+            return_type,
+        );
         Ok(())
     }
 
@@ -97,6 +105,7 @@ impl IU8 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(
             module,
@@ -110,6 +119,7 @@ impl IU8 {
                 compilation_ctx,
                 check_overflow_f,
                 &RuntimeFunction::CheckOverflowU8U16,
+                return_type,
             );
 
         Ok(())
@@ -121,6 +131,7 @@ impl IU8 {
         original_type: IntermediateType,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         match original_type {
             IntermediateType::IU8 => {}
@@ -139,6 +150,7 @@ impl IU8 {
                     compilation_ctx,
                     downcast_u128_u256_to_u32_f,
                     &RuntimeFunction::DowncastU128U256ToU32,
+                    return_type,
                 );
             }
             IntermediateType::IU256 => {
@@ -151,6 +163,7 @@ impl IU8 {
                     compilation_ctx,
                     downcast_u128_u256_to_u32_f,
                     &RuntimeFunction::DowncastU128U256ToU32,
+                    return_type,
                 );
             }
             t => return Err(IntermediateTypeError::InvalidCast(t.clone())),
@@ -165,6 +178,7 @@ impl IU8 {
             compilation_ctx,
             check_overflow_f,
             &RuntimeFunction::CheckOverflowU8U16,
+            return_type,
         );
 
         Ok(())
@@ -175,6 +189,7 @@ impl IU8 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         // This operation aborts if the shift amount is greater or equal than 8
         let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(
@@ -186,6 +201,7 @@ impl IU8 {
             compilation_ctx,
             check_overflow_f,
             &RuntimeFunction::CheckOverflowU8U16,
+            return_type,
         );
 
         builder.binop(BinaryOp::I32Shl);
@@ -200,6 +216,7 @@ impl IU8 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         // This operation aborts if the shift amount is greater or equal than 8
         let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(
@@ -211,6 +228,7 @@ impl IU8 {
             compilation_ctx,
             check_overflow_f,
             &RuntimeFunction::CheckOverflowU8U16,
+            return_type,
         );
 
         builder.binop(BinaryOp::I32ShrU);
@@ -245,6 +263,7 @@ impl IU16 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(
             module,
@@ -258,6 +277,7 @@ impl IU16 {
                 compilation_ctx,
                 check_overflow_f,
                 &RuntimeFunction::CheckOverflowU8U16,
+                return_type,
             );
 
         Ok(())
@@ -271,10 +291,16 @@ impl IU16 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         let sub_u32_f =
             RuntimeFunction::SubU32.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
-        builder.call_runtime_function(compilation_ctx, sub_u32_f, &RuntimeFunction::SubU32);
+        builder.call_runtime_function(
+            compilation_ctx,
+            sub_u32_f,
+            &RuntimeFunction::SubU32,
+            return_type,
+        );
 
         Ok(())
     }
@@ -303,6 +329,7 @@ impl IU16 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(
             module,
@@ -316,6 +343,7 @@ impl IU16 {
                 compilation_ctx,
                 check_overflow_f,
                 &RuntimeFunction::CheckOverflowU8U16,
+                return_type,
             );
 
         Ok(())
@@ -327,6 +355,7 @@ impl IU16 {
         original_type: IntermediateType,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         match original_type {
             IntermediateType::IU8 | IntermediateType::IU16 => {
@@ -347,6 +376,7 @@ impl IU16 {
                     compilation_ctx,
                     downcast_u128_u256_to_u32_f,
                     &RuntimeFunction::DowncastU128U256ToU32,
+                    return_type,
                 );
             }
             IntermediateType::IU256 => {
@@ -359,6 +389,7 @@ impl IU16 {
                     compilation_ctx,
                     downcast_u128_u256_to_u32_f,
                     &RuntimeFunction::DowncastU128U256ToU32,
+                    return_type,
                 );
             }
             t => return Err(IntermediateTypeError::InvalidCast(t.clone())),
@@ -373,6 +404,7 @@ impl IU16 {
             compilation_ctx,
             check_overflow_f,
             &RuntimeFunction::CheckOverflowU8U16,
+            return_type,
         );
 
         Ok(())
@@ -383,6 +415,7 @@ impl IU16 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         // This operation aborts if the shift amount is greater or equal than 16
         let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(
@@ -394,6 +427,7 @@ impl IU16 {
             compilation_ctx,
             check_overflow_f,
             &RuntimeFunction::CheckOverflowU8U16,
+            return_type,
         );
 
         builder.binop(BinaryOp::I32Shl);
@@ -408,6 +442,7 @@ impl IU16 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         // This operation aborts if the shift amount is greater or equal than 16
         let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(
@@ -419,6 +454,7 @@ impl IU16 {
             compilation_ctx,
             check_overflow_f,
             &RuntimeFunction::CheckOverflowU8U16,
+            return_type,
         );
 
         builder.binop(BinaryOp::I32ShrU);
@@ -448,10 +484,16 @@ impl IU32 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         let add_function_id =
             RuntimeFunction::AddU32.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
-        builder.call_runtime_function(compilation_ctx, add_function_id, &RuntimeFunction::AddU32);
+        builder.call_runtime_function(
+            compilation_ctx,
+            add_function_id,
+            &RuntimeFunction::AddU32,
+            return_type,
+        );
         Ok(())
     }
 
@@ -463,10 +505,16 @@ impl IU32 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         let sub_u32_f =
             RuntimeFunction::SubU32.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
-        builder.call_runtime_function(compilation_ctx, sub_u32_f, &RuntimeFunction::SubU32);
+        builder.call_runtime_function(
+            compilation_ctx,
+            sub_u32_f,
+            &RuntimeFunction::SubU32,
+            return_type,
+        );
         Ok(())
     }
 
@@ -494,10 +542,16 @@ impl IU32 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         let mul_f =
             RuntimeFunction::MulU32.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
-        builder.call_runtime_function(compilation_ctx, mul_f, &RuntimeFunction::MulU32);
+        builder.call_runtime_function(
+            compilation_ctx,
+            mul_f,
+            &RuntimeFunction::MulU32,
+            return_type,
+        );
         Ok(())
     }
 
@@ -507,6 +561,7 @@ impl IU32 {
         original_type: IntermediateType,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         match original_type {
             IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {}
@@ -520,6 +575,7 @@ impl IU32 {
                     compilation_ctx,
                     downcast_u64_to_u32_f,
                     &RuntimeFunction::DowncastU64ToU32,
+                    return_type,
                 );
             }
             IntermediateType::IU128 => {
@@ -532,6 +588,7 @@ impl IU32 {
                     compilation_ctx,
                     downcast_u128_u256_to_u32_f,
                     &RuntimeFunction::DowncastU128U256ToU32,
+                    return_type,
                 );
             }
             IntermediateType::IU256 => {
@@ -544,6 +601,7 @@ impl IU32 {
                     compilation_ctx,
                     downcast_u128_u256_to_u32_f,
                     &RuntimeFunction::DowncastU128U256ToU32,
+                    return_type,
                 );
             }
             t => return Err(IntermediateTypeError::InvalidCast(t.clone())),
@@ -557,6 +615,7 @@ impl IU32 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         // This operation aborts if the shift amount is greater or equal than 32
         let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(
@@ -568,6 +627,7 @@ impl IU32 {
             compilation_ctx,
             check_overflow_f,
             &RuntimeFunction::CheckOverflowU8U16,
+            return_type,
         );
 
         builder.binop(BinaryOp::I32Shl);
@@ -580,6 +640,7 @@ impl IU32 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         // This operation aborts if the shift amount is greater or equal than 32
         let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(
@@ -591,6 +652,7 @@ impl IU32 {
             compilation_ctx,
             check_overflow_f,
             &RuntimeFunction::CheckOverflowU8U16,
+            return_type,
         );
 
         builder.binop(BinaryOp::I32ShrU);
@@ -618,10 +680,16 @@ impl IU64 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         let add_function_id =
             RuntimeFunction::AddU64.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
-        builder.call_runtime_function(compilation_ctx, add_function_id, &RuntimeFunction::AddU64);
+        builder.call_runtime_function(
+            compilation_ctx,
+            add_function_id,
+            &RuntimeFunction::AddU64,
+            return_type,
+        );
         Ok(())
     }
 
@@ -633,10 +701,16 @@ impl IU64 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         let sub_u64_f =
             RuntimeFunction::SubU64.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
-        builder.call_runtime_function(compilation_ctx, sub_u64_f, &RuntimeFunction::SubU64);
+        builder.call_runtime_function(
+            compilation_ctx,
+            sub_u64_f,
+            &RuntimeFunction::SubU64,
+            return_type,
+        );
         Ok(())
     }
 
@@ -664,10 +738,16 @@ impl IU64 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         let mul_f =
             RuntimeFunction::MulU64.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
-        builder.call_runtime_function(compilation_ctx, mul_f, &RuntimeFunction::MulU64);
+        builder.call_runtime_function(
+            compilation_ctx,
+            mul_f,
+            &RuntimeFunction::MulU64,
+            return_type,
+        );
         Ok(())
     }
 
@@ -677,6 +757,7 @@ impl IU64 {
         original_type: IntermediateType,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         match original_type {
             IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {
@@ -693,6 +774,7 @@ impl IU64 {
                     compilation_ctx,
                     downcast_u128_u256_to_u64_f,
                     &RuntimeFunction::DowncastU128U256ToU64,
+                    return_type,
                 );
             }
             IntermediateType::IU256 => {
@@ -705,6 +787,7 @@ impl IU64 {
                     compilation_ctx,
                     downcast_u128_u256_to_u64_f,
                     &RuntimeFunction::DowncastU128U256ToU64,
+                    return_type,
                 );
             }
             t => return Err(IntermediateTypeError::InvalidCast(t.clone())),
@@ -717,6 +800,7 @@ impl IU64 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         // This operation aborts if the shift amount is greater or equal than 64
         let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(
@@ -728,6 +812,7 @@ impl IU64 {
             compilation_ctx,
             check_overflow_f,
             &RuntimeFunction::CheckOverflowU8U16,
+            return_type,
         );
 
         builder.unop(UnaryOp::I64ExtendUI32);
@@ -740,6 +825,7 @@ impl IU64 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         // This operation aborts if the shift amount is greater or equal than 64
         let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(
@@ -751,6 +837,7 @@ impl IU64 {
             compilation_ctx,
             check_overflow_f,
             &RuntimeFunction::CheckOverflowU8U16,
+            return_type,
         );
 
         builder.unop(UnaryOp::I64ExtendUI32);

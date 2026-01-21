@@ -1,5 +1,6 @@
 use crate::common::runtime;
 use alloy_sol_types::{SolCall, SolValue, sol};
+use move_bytecode_to_wasm::error::RuntimeError;
 use move_test_runner::constants::MSG_SENDER_ADDRESS;
 use move_test_runner::wasm_runner::RuntimeSandbox;
 use rstest::rstest;
@@ -1331,8 +1332,10 @@ fn test_popping_from_empty_zeta(
 
     // Popback again, even though the vector is empty
     let call_data = popAlphaFromZetaCall::new((zeta_id,)).abi_encode();
-    let result = runtime.call_entrypoint(call_data);
-    assert!(result.is_err());
+    let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+    assert_eq!(result, 1);
+    let expected_data = RuntimeError::OutOfBounds.encode_abi();
+    assert_eq!(return_data, expected_data);
 }
 
 #[rstest]

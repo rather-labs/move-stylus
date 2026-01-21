@@ -1,6 +1,9 @@
 use crate::{
     CompilationContext,
+    data::RuntimeErrorData,
+    error::RuntimeError,
     runtime::{RuntimeFunction, RuntimeFunctionError},
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
@@ -10,6 +13,7 @@ use walrus::{
 pub fn pack_enum_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    runtime_error_data: &mut RuntimeErrorData,
 ) -> Result<FunctionId, RuntimeFunctionError> {
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
     let mut builder = function
@@ -44,7 +48,13 @@ pub fn pack_enum_function(
     builder.i32_const(255).binop(BinaryOp::I32GtU).if_else(
         None,
         |then| {
-            then.unreachable();
+            then.return_error(
+                module,
+                compilation_ctx,
+                Some(ValType::I32),
+                runtime_error_data,
+                RuntimeError::EnumSizeTooLarge,
+            );
         },
         |_| {},
     );
@@ -70,7 +80,10 @@ pub fn pack_enum_function(
 mod tests {
     use super::*;
     use crate::test_tools::{INITIAL_MEMORY_OFFSET, build_module};
-    use crate::{test_compilation_context, test_tools::setup_wasmtime_module};
+    use crate::{
+        test_compilation_context,
+        test_tools::{assert_runtime_error, setup_wasmtime_module},
+    };
     use rstest::rstest;
     use std::cell::RefCell;
     use std::panic::AssertUnwindSafe;
@@ -85,25 +98,6 @@ mod tests {
     #[case(
         1,
         &[0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
-    ]
-    #[case(
-        255,
-        &[0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255])
-    ]
-    #[should_panic]
-    #[case(
-        256,
-        &[0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0])
-    ]
-    #[should_panic]
-    #[case(
-        u16::MAX as u32,
-        &[0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0])
-    ]
-    #[should_panic]
-    #[case(
-        u32::MAX,
-        &[0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0])
     ]
     fn test_pack_enum_variant(#[case] variant_number: u32, #[case] expected_calldata_bytes: &[u8]) {
         let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
@@ -134,8 +128,18 @@ mod tests {
         func_body.local_get(enum_ptr);
         func_body.local_get(writer_pointer);
 
-        let pack_enum_func = pack_enum_function(&mut raw_module, &compilation_ctx).unwrap();
-        func_body.call(pack_enum_func);
+        let pack_enum_func = pack_enum_function(
+            &mut raw_module,
+            &compilation_ctx,
+            &mut RuntimeErrorData::new(),
+        )
+        .unwrap();
+        func_body.call_runtime_function(
+            &compilation_ctx,
+            pack_enum_func,
+            &RuntimeFunction::PackEnum,
+            Some(ValType::I32),
+        );
 
         // Return the writer pointer for reading the calldata back
         func_body.local_get(writer_pointer);
@@ -161,6 +165,73 @@ mod tests {
             result_memory_data, expected_calldata_bytes,
             "Packed enum calldata did not match expected result"
         );
+    }
+
+    #[rstest]
+    #[case(256)]
+    #[case(u16::MAX as u32)]
+    #[case(u32::MAX)]
+    fn test_pack_enum_variant_too_large(
+        #[case] variant_number: u32,
+    ) -> Result<(), RuntimeFunctionError> {
+        let (mut raw_module, allocator, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
+
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator, calldata_reader_pointer_global);
+
+        let enum_ptr = raw_module.locals.add(ValType::I32);
+        let writer_pointer = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        // Allocate memory for the enum variant number (4 bytes)
+        func_body.i32_const(4);
+        func_body.call(allocator);
+        func_body.local_set(enum_ptr);
+
+        // Allocate memory for the packed output (32 bytes for ABI encoding)
+        func_body.i32_const(32);
+        func_body.call(allocator);
+        func_body.local_set(writer_pointer);
+
+        // Call pack_enum_function
+        func_body.local_get(enum_ptr);
+        func_body.local_get(writer_pointer);
+
+        let pack_enum_func = pack_enum_function(
+            &mut raw_module,
+            &compilation_ctx,
+            &mut RuntimeErrorData::new(),
+        )
+        .unwrap();
+        func_body.call_runtime_function(
+            &compilation_ctx,
+            pack_enum_func,
+            &RuntimeFunction::PackEnum,
+            Some(ValType::I32),
+        );
+
+        // Return the writer pointer for reading the calldata back
+        func_body.local_get(writer_pointer);
+
+        let function = function_builder.finish(vec![], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        // Prepare initial memory with the variant number (little-endian)
+        let data = variant_number.to_le_bytes().to_vec();
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, data, "test_function", None);
+
+        let _: i32 = entrypoint.call(&mut store, ()).unwrap();
+
+        assert_runtime_error(&mut store, &instance, RuntimeError::EnumSizeTooLarge);
+
+        Ok(())
     }
 
     #[test]
@@ -193,7 +264,12 @@ mod tests {
         func_body.local_get(enum_ptr);
         func_body.local_get(writer_pointer);
 
-        let pack_enum_func = pack_enum_function(&mut raw_module, &compilation_ctx).unwrap();
+        let pack_enum_func = pack_enum_function(
+            &mut raw_module,
+            &compilation_ctx,
+            &mut RuntimeErrorData::new(),
+        )
+        .unwrap();
         func_body.call(pack_enum_func);
 
         // Return the writer pointer for reading the calldata back
@@ -223,7 +299,8 @@ mod tests {
                 let data = variant.to_le_bytes();
                 memory.write(&mut *store.0.borrow_mut(), INITIAL_MEMORY_OFFSET as usize, &data).unwrap();
 
-                let result: Result<i32, _> = entrypoint.0.call(&mut *store.0.borrow_mut(), ());
+                let mut store = store.0.borrow_mut();
+                let result: Result<i32, _> = entrypoint.0.call(&mut *store, ());
 
                 if variant <= 255 {
                     // Should succeed for values <= 255
@@ -232,7 +309,7 @@ mod tests {
                             let mut result_memory_data = vec![0; 32];
                             memory
                                 .read(
-                                    &mut *store.0.borrow_mut(),
+                                    &mut *store,
                                     result_ptr as usize,
                                     &mut result_memory_data,
                                 )
@@ -253,13 +330,10 @@ mod tests {
                     }
                 } else {
                     // Should trap for values > 255
-                    assert!(
-                        result.is_err(),
-                        "Expected error for variant {variant} but got success",
-                    );
+                    assert_runtime_error(&mut store, &instance, RuntimeError::EnumSizeTooLarge);
                 }
 
-                reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+                reset_memory.0.call(&mut *store, ()).unwrap();
             });
     }
 }

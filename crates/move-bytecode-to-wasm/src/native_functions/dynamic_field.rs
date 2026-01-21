@@ -85,6 +85,7 @@ pub fn add_child_object_fn(
             compilation_ctx,
             save_struct_into_storage_fn,
             &RuntimeFunction::EncodeAndSaveInStorage,
+            None,
         );
 
     Ok(function.finish(vec![parent_address, child_ptr], &mut module.funcs))
@@ -182,6 +183,7 @@ pub fn add_borrow_object_fn(
             compilation_ctx,
             read_and_decode_from_storage_fn,
             &RuntimeFunction::ReadAndDecodeFromStorage,
+            Some(ValType::I32),
         )
         .local_set(result_struct);
 

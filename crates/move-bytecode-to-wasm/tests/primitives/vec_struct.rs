@@ -1,6 +1,6 @@
 use crate::common::run_test;
 use crate::declare_fixture;
-use alloy_primitives::{U256, address, keccak256};
+use alloy_primitives::{U256, address};
 use alloy_sol_types::{SolCall, SolType, SolValue, abi::TokenSeq, sol};
 use move_bytecode_to_wasm::error::RuntimeError;
 use move_test_runner::wasm_runner::RuntimeSandbox;
@@ -46,7 +46,9 @@ sol!(
     function vecFromVec(Foo[] x, Foo[] y) external returns (Foo[][]);
     function vecFromVecAndStruct(Foo[] x, Foo y) external returns (Foo [][]);
     function vecLen(Foo[] x) external returns (uint64);
-    function vecPopBack(Foo[] x) external returns (Foo[]);
+    function vecPopBackFoo(Foo[] x) external returns (Foo[]);
+    function vecPopBackBar(Bar[] x) external returns (Bar[]);
+    function vecPopBackBaz(Baz[] x) external returns (Baz[]);
     function vecSwap(Foo[] x, uint64 id1, uint64 id2) external returns (Foo[]);
     function vecPushBack(Foo[] x, Foo y) external returns (Foo[]);
     function vecPushAndPopBack(Foo[] x, Foo y) external returns (Foo[]);
@@ -292,7 +294,7 @@ fn get_new_fooo() -> Foo {
     )]
 #[case(vecLenCall::new((get_foo_vector(),)), (3u64,))]
 #[case(
-        vecPopBackCall::new((get_foo_vector(),)),
+        vecPopBackFooCall::new((get_foo_vector(),)),
         vec![
             Foo {
                 q: address!("0x00000000000000000000000000000001deadbeef"),
@@ -313,8 +315,6 @@ fn get_new_fooo() -> Foo {
             }
         ]
     )]
-#[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
-#[case(vecSwapCall::new((get_foo_vector(), 0u64, 3u64)), ((),))]
 #[case(
         vecSwapCall::new((get_foo_vector(), 0u64, 1u64)),
         vec![
@@ -521,19 +521,16 @@ fn test_vec_struct<T: SolCall, V: SolValue>(
 }
 
 #[rstest]
-#[case(vecPopBackCall::new((vec![],)))]
-fn test_vec_struct_runtime_error(
+#[case(vecPopBackFooCall::new((vec![],)))]
+#[case(vecPopBackBarCall::new((vec![],)))]
+#[case(vecPopBackBazCall::new((vec![],)))]
+#[case(vecSwapCall::new((get_foo_vector(), 0u64, 3u64)), )]
+fn test_vec_struct_runtime_error<T: SolCall>(
     #[by_ref] runtime: &RuntimeSandbox,
-    #[case] call_data: vecPopBackCall,
+    #[case] call_data: T,
 ) {
     let (result, return_data) = runtime.call_entrypoint(call_data.abi_encode()).unwrap();
     assert_eq!(result, 1);
-
-    let error_message = String::from_utf8_lossy(RuntimeError::Overflow.as_bytes());
-    let expected_data = [
-        keccak256(b"Error(string)")[..4].to_vec(),
-        <sol!((string,))>::abi_encode_params(&(error_message,)),
-    ]
-    .concat();
+    let expected_data = RuntimeError::OutOfBounds.encode_abi();
     assert_eq!(return_data, expected_data);
 }

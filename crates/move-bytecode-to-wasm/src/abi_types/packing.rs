@@ -35,6 +35,7 @@ pub trait Packable {
         compilation_ctx: &CompilationContext,
         runtime_error_data: Option<&mut RuntimeErrorData>,
         return_block_id: Option<InstrSeqId>,
+        caller_return_type: Option<ValType>,
     ) -> Result<(), AbiError>;
 
     /// Adds the instructions to pack the value into memory according to Solidity's ABI encoding.
@@ -65,6 +66,7 @@ pub trait Packable {
         compilation_ctx: &CompilationContext,
         runtime_error_data: Option<&mut RuntimeErrorData>,
         return_block_id: Option<InstrSeqId>,
+        caller_return_type: Option<ValType>,
     ) -> Result<(), AbiError>;
 
     /// Adds the instructions to load the value into a local variable.
@@ -165,6 +167,7 @@ pub fn build_pack_instructions<T: Packable>(
                 compilation_ctx,
                 Some(runtime_error_data),
                 return_block_id,
+                Some(ValType::I32),
             )?;
 
             // A dynamic value will only save the offset to where the values are located, so, we
@@ -184,6 +187,7 @@ pub fn build_pack_instructions<T: Packable>(
                 compilation_ctx,
                 Some(runtime_error_data),
                 return_block_id,
+                Some(ValType::I32),
             )?;
 
             builder
@@ -227,6 +231,7 @@ impl Packable for IntermediateType {
         compilation_ctx: &CompilationContext,
         runtime_error_data: Option<&mut RuntimeErrorData>,
         return_block_id: Option<InstrSeqId>,
+        caller_return_type: Option<ValType>,
     ) -> Result<(), AbiError> {
         match self {
             IntermediateType::IBool
@@ -287,6 +292,7 @@ impl Packable for IntermediateType {
                         compilation_ctx,
                         pack_vector_function,
                         &RuntimeFunction::PackVector,
+                        caller_return_type,
                     );
             }
             IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
@@ -306,6 +312,7 @@ impl Packable for IntermediateType {
                     pack_reference_function,
                     &RuntimeFunction::PackReference,
                     return_block_id,
+                    caller_return_type,
                 );
             }
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
@@ -327,6 +334,7 @@ impl Packable for IntermediateType {
                     pack_struct_function,
                     &RuntimeFunction::PackStruct,
                     return_block_id,
+                    caller_return_type,
                 );
             }
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
@@ -336,8 +344,11 @@ impl Packable for IntermediateType {
                         enum_.identifier,
                     )))?;
                 }
-                let pack_enum_function =
-                    RuntimeFunction::PackEnum.get(module, Some(compilation_ctx), None)?;
+                let pack_enum_function = RuntimeFunction::PackEnum.get(
+                    module,
+                    Some(compilation_ctx),
+                    runtime_error_data,
+                )?;
                 builder.local_get(local).local_get(writer_pointer);
 
                 builder.call_runtime_function_conditional_return(
@@ -345,6 +356,7 @@ impl Packable for IntermediateType {
                     pack_enum_function,
                     &RuntimeFunction::PackEnum,
                     return_block_id,
+                    caller_return_type,
                 );
             }
             IntermediateType::ISigner => {
@@ -370,6 +382,7 @@ impl Packable for IntermediateType {
         compilation_ctx: &CompilationContext,
         runtime_error_data: Option<&mut RuntimeErrorData>,
         return_block_id: Option<InstrSeqId>,
+        caller_return_type: Option<ValType>,
     ) -> Result<(), AbiError> {
         match self {
             IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
@@ -396,6 +409,7 @@ impl Packable for IntermediateType {
                     compilation_ctx,
                     runtime_error_data,
                     return_block_id,
+                    caller_return_type,
                 )?;
             }
             IntermediateType::IStruct {
@@ -428,6 +442,7 @@ impl Packable for IntermediateType {
                     pack_struct_function,
                     &RuntimeFunction::PackStruct,
                     return_block_id,
+                    caller_return_type,
                 );
             }
             _ => self.add_pack_instructions(
@@ -439,6 +454,7 @@ impl Packable for IntermediateType {
                 compilation_ctx,
                 runtime_error_data,
                 return_block_id,
+                caller_return_type,
             )?,
         }
         Ok(())

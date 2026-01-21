@@ -218,6 +218,7 @@ impl IVector {
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        caller_return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         let downcast_f = RuntimeFunction::DowncastU64ToU32.get(
             module,
@@ -235,7 +236,12 @@ impl IVector {
             | IntermediateType::IU16
             | IntermediateType::IU32
             | IntermediateType::IU64 => {
-                builder.call(downcast_f);
+                builder.call_runtime_function(
+                    compilation_ctx,
+                    downcast_f,
+                    &RuntimeFunction::DowncastU64ToU32,
+                    caller_return_type,
+                );
                 builder.i32_const(0);
             }
 
@@ -248,7 +254,12 @@ impl IVector {
             | IntermediateType::IGenericStructInstance { .. }
             | IntermediateType::IEnum { .. }
             | IntermediateType::IGenericEnumInstance { .. } => {
-                builder.call(downcast_f);
+                builder.call_runtime_function(
+                    compilation_ctx,
+                    downcast_f,
+                    &RuntimeFunction::DowncastU64ToU32,
+                    caller_return_type,
+                );
                 builder.i32_const(1);
             }
             IntermediateType::ITypeParameter(_) => {
@@ -258,8 +269,17 @@ impl IVector {
 
         builder.i32_const(inner.wasm_memory_data_size()?);
 
-        let borrow_f = RuntimeFunction::VecBorrow.get(module, Some(compilation_ctx), None)?;
-        builder.call(borrow_f);
+        let borrow_f = RuntimeFunction::VecBorrow.get(
+            module,
+            Some(compilation_ctx),
+            Some(runtime_error_data),
+        )?;
+        builder.call_runtime_function(
+            compilation_ctx,
+            borrow_f,
+            &RuntimeFunction::VecBorrow,
+            caller_return_type,
+        );
 
         Ok(())
     }
@@ -467,7 +487,12 @@ mod tests {
                 &[&inner_type],
             )
             .unwrap();
-        builder.call(pop_back_f);
+        builder.call_runtime_function(
+            &compilation_ctx,
+            pop_back_f,
+            &RuntimeFunction::VecPopBack,
+            Some(ValType::I32),
+        );
 
         if inner_type == IntermediateType::IU64 {
             builder.unop(UnaryOp::I32WrapI64);
@@ -661,7 +686,12 @@ mod tests {
                 &[&inner_type],
             )
             .unwrap();
-        builder.call(swap_f);
+        builder.call_runtime_function(
+            &compilation_ctx,
+            swap_f,
+            &RuntimeFunction::VecSwap,
+            Some(ValType::I32),
+        );
 
         builder.i32_const(0);
 

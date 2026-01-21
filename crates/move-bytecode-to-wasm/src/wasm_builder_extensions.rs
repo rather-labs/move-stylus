@@ -6,7 +6,7 @@ use walrus::{
 use crate::{
     CompilationContext,
     compilation_context::ModuleId,
-    data::{DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_SLOT_DATA_PTR_OFFSET, RuntimeErrorData},
+    data::{BAD_F00D, DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_SLOT_DATA_PTR_OFFSET, RuntimeErrorData},
     error::RuntimeError,
     native_functions::NativeFunction,
     runtime::RuntimeFunction,
@@ -97,6 +97,7 @@ pub trait WasmBuilderExtension {
         function_name: &str,
         module_id: &ModuleId,
         function_id: FunctionId,
+        caller_return_type: Option<ValType>,
     ) -> &mut Self;
 
     // Calls a runtime function and propagates the error in case the function aborts.
@@ -105,6 +106,7 @@ pub trait WasmBuilderExtension {
         compilation_ctx: &CompilationContext,
         function_id: FunctionId,
         runtime_fn: &RuntimeFunction,
+        caller_return_type: Option<ValType>,
     ) -> &mut Self;
 
     // Call a runtime function conditionally returning or branching to `return_block_id`
@@ -114,6 +116,7 @@ pub trait WasmBuilderExtension {
         function_id: FunctionId,
         runtime_fn: &RuntimeFunction,
         return_block_id: Option<InstrSeqId>,
+        caller_return_type: Option<ValType>,
     ) -> &mut Self;
 
     /// Adds the instructions to store the error message pointer at DATA_ABORT_MESSAGE_PTR_OFFSET and return 1 to indicate an error occurred.
@@ -134,6 +137,7 @@ pub trait WasmBuilderExtension {
         &mut self,
         compilation_ctx: &CompilationContext,
         return_block_id: Option<InstrSeqId>,
+        caller_return_type: Option<ValType>,
     ) -> &mut Self;
 
     /// Adds the instructions to handle a specific runtime error.
@@ -191,7 +195,7 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
     }
 
     fn slot_data_ptr_plus_offset(&mut self, slot_offset: LocalId) -> &mut Self {
-        // Check if 0 < offset <= 32
+        // Check if 0 < offset <= 32, else trap.
         self.local_get(slot_offset).unop(UnaryOp::I32Eqz).if_else(
             None,
             |then| {
@@ -263,13 +267,14 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
         function_name: &str,
         module_id: &ModuleId,
         function_id: FunctionId,
+        caller_return_type: Option<ValType>,
     ) -> &mut Self {
         // Call the function
         self.call(function_id);
 
         // If the function may result in a runtime error, we need to handle it
-        if NativeFunction::can_abort(function_name, module_id) {
-            self.add_propagate_error_instructions(compilation_ctx, None);
+        if NativeFunction::is_fallible(function_name, module_id) {
+            self.add_propagate_error_instructions(compilation_ctx, None, caller_return_type);
         }
 
         self
@@ -280,12 +285,13 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
         compilation_ctx: &CompilationContext,
         function_id: FunctionId,
         runtime_fn: &RuntimeFunction,
+        caller_return_type: Option<ValType>,
     ) -> &mut Self {
         self.call(function_id);
 
         // If the function may result in a runtime error, we need to handle it
-        if runtime_fn.can_abort() {
-            self.add_propagate_error_instructions(compilation_ctx, None);
+        if runtime_fn.is_fallible() {
+            self.add_propagate_error_instructions(compilation_ctx, None, caller_return_type);
         }
 
         self
@@ -297,13 +303,18 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
         function_id: FunctionId,
         runtime_fn: &RuntimeFunction,
         return_block_id: Option<InstrSeqId>,
+        caller_return_type: Option<ValType>,
     ) -> &mut Self {
         self.call(function_id);
 
         // If the function may result in a runtime error, we need to handle it
-        if runtime_fn.can_abort() {
+        if runtime_fn.is_fallible() {
             // If the function aborts, propagate the error
-            self.add_propagate_error_instructions(compilation_ctx, return_block_id);
+            self.add_propagate_error_instructions(
+                compilation_ctx,
+                return_block_id,
+                caller_return_type,
+            );
         }
 
         self
@@ -313,6 +324,7 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
         &mut self,
         compilation_ctx: &CompilationContext,
         return_block_id: Option<InstrSeqId>,
+        caller_return_type: Option<ValType>,
     ) -> &mut Self {
         // If the function aborts, propagate the error
         self.block(None, |b| {
@@ -330,7 +342,17 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
                 .binop(BinaryOp::I32Eq)
                 .br_if(block_id);
 
-            b.i32_const(0xBADF00D);
+            if let Some(caller_return_type) = caller_return_type {
+                match caller_return_type {
+                    ValType::I32 => {
+                        b.i32_const(BAD_F00D);
+                    }
+                    ValType::I64 => {
+                        b.i64_const(BAD_F00D as i64);
+                    }
+                    _ => {}
+                }
+            }
 
             // TODO: could we eventually need a u64 here? For example when propagating the error from within a runtime function
             // which returns a ValType::I64?
@@ -371,10 +393,10 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
         // Depending on the return type, we push an i32, i64 or nothing to the stack.
         match return_type {
             Some(ValType::I32) => {
-                self.i32_const(0xBADF00D).return_();
+                self.i32_const(BAD_F00D).return_();
             }
             Some(ValType::I64) => {
-                self.i64_const(0xBADF00D).return_();
+                self.i64_const(BAD_F00D as i64).return_();
             }
             Some(_) | None => {
                 self.return_();

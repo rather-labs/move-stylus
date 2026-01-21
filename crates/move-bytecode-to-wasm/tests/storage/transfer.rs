@@ -1,6 +1,6 @@
 use super::*;
 use crate::common::runtime;
-use alloy_primitives::{FixedBytes, U256, address, hex, keccak256};
+use alloy_primitives::{FixedBytes, U256, address, hex};
 use alloy_sol_types::{SolCall, SolType, sol};
 use move_bytecode_to_wasm::error::RuntimeError;
 use move_test_runner::constants::SIGNER_ADDRESS;
@@ -492,12 +492,7 @@ fn test_signer_owner_mismatch(
     // This should hit an unreachable due to the signer differing from the owner!
     let call_data = readValueCall::new((object_id,)).abi_encode();
     let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
-    let error_message = String::from_utf8_lossy(RuntimeError::StorageObjectNotFound.as_bytes());
-    let expected_data = [
-        keccak256(b"Error(string)")[..4].to_vec(),
-        <sol!((string,))>::abi_encode_params(&(error_message,)),
-    ]
-    .concat();
+    let expected_data = RuntimeError::StorageObjectNotFound.encode_abi();
 
     assert_eq!(1, result);
     assert_eq!(expected_data, return_data);
@@ -520,12 +515,7 @@ fn test_freeze_not_owned_object(
     // Freeze the object. Only possible if the object is owned by the signer!
     let call_data = freezeObjCall::new((object_id,)).abi_encode();
     let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
-    let error_message = String::from_utf8_lossy(RuntimeError::StorageObjectNotFound.as_bytes());
-    let expected_data = [
-        keccak256(b"Error(string)")[..4].to_vec(),
-        <sol!((string,))>::abi_encode_params(&(error_message,)),
-    ]
-    .concat();
+    let expected_data = RuntimeError::StorageObjectNotFound.encode_abi();
 
     assert_eq!(1, result);
     assert_eq!(expected_data, return_data);
@@ -548,14 +538,7 @@ fn test_freeze_shared_object(
     let call_data = freezeObjCall::new((object_id,)).abi_encode();
     let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
 
-    let error_message =
-        String::from_utf8_lossy(RuntimeError::SharedObjectsCannotBeFrozen.as_bytes());
-    // let error_message = "shared objects cannot be frozen";
-    let expected_data = [
-        keccak256(b"Error(string)")[..4].to_vec(),
-        <sol!((string,))>::abi_encode_params(&(error_message,)),
-    ]
-    .concat();
+    let expected_data = RuntimeError::SharedObjectsCannotBeFrozen.encode_abi();
 
     assert_eq!(1, result);
     assert_eq!(expected_data, return_data);
@@ -597,12 +580,7 @@ fn test_share_or_transfer_frozen(
 
     let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
     // The error stems from the unpacking, since we only look for frozen objs on the storage when behind an immutable reference
-    let error_message = String::from_utf8_lossy(RuntimeError::StorageObjectNotFound.as_bytes());
-    let expected_data = [
-        keccak256(b"Error(string)")[..4].to_vec(),
-        <sol!((string,))>::abi_encode_params(&(error_message,)),
-    ]
-    .concat();
+    let expected_data = RuntimeError::StorageObjectNotFound.encode_abi();
 
     assert_eq!(1, result);
     assert_eq!(expected_data, return_data);
@@ -628,12 +606,7 @@ fn test_delete_frozen_object(
     // Try to delete the object
     let call_data = deleteObjCall::new((object_id,)).abi_encode();
     let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
-    let error_message = String::from_utf8_lossy(RuntimeError::StorageObjectNotFound.as_bytes());
-    let expected_data = [
-        keccak256(b"Error(string)")[..4].to_vec(),
-        <sol!((string,))>::abi_encode_params(&(error_message,)),
-    ]
-    .concat();
+    let expected_data = RuntimeError::StorageObjectNotFound.encode_abi();
 
     assert_eq!(1, result);
     assert_eq!(expected_data, return_data);
