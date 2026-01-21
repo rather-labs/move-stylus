@@ -11,11 +11,13 @@ use std::sync::Arc;
 sol!(
     #[sol(rpc)]
     #[allow(missing_docs)]
-    contract Example {
-        function create() public view;
-        function read(bytes32 id) public view returns (uint64);
-        function increment(bytes32 id) public view;
-        function setValue(bytes32 id, uint64 value) public view;
+    contract Counter {
+
+        function create() external;
+        function increment(bytes32 counter) external;
+        function read(bytes32 counter) view external returns (uint64);
+        function setValue(bytes32 counter, uint64 value) external;
+
     }
 );
 
@@ -37,7 +39,7 @@ async fn main() -> eyre::Result<()> {
             .connect_http(Url::from_str(&rpc_url).unwrap()),
     );
     let address = Address::from_str(&contract_address)?;
-    let example = Example::new(address, provider.clone());
+    let example = Counter::new(address, provider.clone());
 
     println!("==============================================================================");
     println!(" Creating a new counter");
@@ -95,7 +97,7 @@ async fn main() -> eyre::Result<()> {
             .with_chain_id(412346)
             .connect_http(Url::from_str(&rpc_url).unwrap()),
     );
-    let example_2 = Example::new(address, provider_2.clone());
+    let example_2 = Counter::new(address, provider_2.clone());
 
     println!("Funding {sender_2} with 1 ETH to pay for gas");
     let tx = TransactionRequest::default()

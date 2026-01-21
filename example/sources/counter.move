@@ -29,6 +29,7 @@ entry fun increment(counter: &mut Counter) {
 
 
 /// Read counter.
+#[ext(abi(view))]
 entry fun read(counter: &Counter): u64 {
     counter.value
 }

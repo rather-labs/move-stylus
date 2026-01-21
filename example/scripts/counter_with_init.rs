@@ -1,4 +1,6 @@
-use alloy::primitives::FixedBytes;
+use alloy::primitives::{Bytes, FixedBytes, keccak256};
+use alloy::providers::Provider;
+use alloy::rpc::types::TransactionRequest;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::{primitives::Address, providers::ProviderBuilder, sol, transports::http::reqwest::Url};
 use dotenv::dotenv;
@@ -10,10 +12,11 @@ sol!(
     #[sol(rpc)]
     #[allow(missing_docs)]
     contract Example {
-        function constructor() public view;
-        function read(bytes32 id) public view returns (uint64);
-        function increment(bytes32 id) public view;
-        function setValue(bytes32 id, uint64 value) public view;
+
+        function increment(bytes32 counter) external;
+        function read(bytes32 counter) external returns (uint64);
+        function setValue(bytes32 counter, uint64 value) external;
+
     }
 );
 
@@ -26,6 +29,7 @@ async fn main() -> eyre::Result<()> {
         .map_err(|_| eyre!("No {} env var set", "CONTRACT_ADDRESS_COUNTER_WITH_INIT"))?;
 
     let signer = PrivateKeySigner::from_str(&priv_key)?;
+    let sender = signer.address();
 
     let provider = Arc::new(
         ProviderBuilder::new()
@@ -36,12 +40,19 @@ async fn main() -> eyre::Result<()> {
     let address = Address::from_str(&contract_address)?;
     let example = Example::new(address, provider.clone());
 
+    // Compute the constructor selector: keccak256("constructor()")[0..4]
+    let constructor_selector = &keccak256("constructor()")[0..4];
+
     println!("==============================================================================");
     println!(" Calling constructor to create a new counter");
     println!("==============================================================================");
     // Call the constructor
     // The idea is that the constructor will be called upon deployment of the contract
-    let pending_tx = example.constructor().send().await?;
+    let tx = TransactionRequest::default()
+        .from(sender)
+        .to(address)
+        .input(Bytes::copy_from_slice(constructor_selector).into());
+    let pending_tx = provider.send_transaction(tx).await?;
     let receipt = pending_tx.get_receipt().await?;
 
     let counter_id =
@@ -69,7 +80,11 @@ async fn main() -> eyre::Result<()> {
     println!(" Testing constructor idempotency: calling constructor again");
     println!("==============================================================================");
     // Call it a second time to make sure the constructor is not called again
-    let pending_tx = example.constructor().send().await?;
+    let tx = TransactionRequest::default()
+        .from(sender)
+        .to(address)
+        .input(Bytes::copy_from_slice(constructor_selector).into());
+    let pending_tx = provider.send_transaction(tx).await?;
     let receipt = pending_tx.get_receipt().await?;
 
     // Check no log is emitted, meaning the constructor logic is not executed again

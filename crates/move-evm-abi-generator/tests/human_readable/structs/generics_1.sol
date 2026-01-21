@@ -18,6 +18,6 @@ interface Generics1 {
         uint64 b;
     }
 
-    function testGenericStructs(uint32 a1, uint64 a2, uint128 b1, uint256 b2) external (GenericStructUint32Uint64, GenericStructUint128Uint256);
+    function testGenericStructs(uint32 a1, uint64 a2, uint128 b1, uint256 b2) external returns (GenericStructUint32Uint64, GenericStructUint128Uint256);
 
 }

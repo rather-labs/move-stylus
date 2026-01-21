@@ -178,7 +178,7 @@ deploy-revert-errors:
 		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_REVERT_ERRORS
 
 setup-stylus:
-	RUSTFLAGS="-C link-args=-rdynamic" cargo install --force cargo-stylus
+	RUSTFLAGS="-C link-args=-rdynamic" cargo install --force --version 0.6.3 cargo-stylus
 
 install-wasm-tools:
 	cargo install --locked wasm-tools
