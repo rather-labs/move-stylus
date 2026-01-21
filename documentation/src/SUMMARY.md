@@ -8,4 +8,5 @@
     - [Address Type](./move_basics/address_type.md)
     - [Expressions](./move_basics/expressions.md)
     - [Structs](./move_basics/structs.md)
+    - [Abilities introduction](./move_basics/abilities_introduction.md)
 

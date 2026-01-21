@@ -97,13 +97,19 @@ let unit_val = log_value(10);   // unit_val = ()
 [Control flow](./move_basics/control_flow.md) expressions determine how execution proceeds within a program. In Move, they are also **expressions**, meaning they evaluate to a value. The value returned depends on the branch or path taken.
 
 ```move
-// if is an expression, so it returns a value; if there are 2 branches,
-// the types of the branches must match.
+// if is an expression, so it returns a value.
+// If there are 2 branches, the types of the branches must match.
 if (bool_expr) expr1 else expr2;
 
 // while is an expression, but it returns `()`.
 while (bool_expr) { expr; };
 
-// loop is an expression, but returns `()` as well.
+// loop is an expression, but returns `()`.
 loop { expr; break };
+
+// Example with break returning a value
+let val = loop {
+    let x = 5;
+    break x * 2; // loop returns 10
+};
 ```
