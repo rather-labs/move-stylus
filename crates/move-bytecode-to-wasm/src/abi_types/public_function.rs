@@ -161,7 +161,7 @@ impl<'a> PublicFunction<'a> {
         block.call(self.function_id);
 
         // Check if the callee has thrown an error
-        block.add_propagate_error_instructions(compilation_ctx, Some(return_block_id));
+        block.add_propagate_error_instructions(compilation_ctx, Some(return_block_id), None);
 
         // Unpack function multi-value returns
         add_unpack_function_return_values_instructions(

@@ -253,6 +253,7 @@ pub fn add_external_contract_call_fn(
                     compilation_ctx,
                     Some(runtime_error_data),
                     None,
+                    Some(ValType::I32),
                 )?;
 
                 builder
@@ -270,6 +271,7 @@ pub fn add_external_contract_call_fn(
                     compilation_ctx,
                     Some(runtime_error_data),
                     None,
+                    Some(ValType::I32),
                 )?;
 
                 builder
@@ -471,6 +473,7 @@ pub fn add_external_contract_call_fn(
                             block,
                             module,
                             None,
+                            Some(ValType::I32),
                             return_data_abi_encoded_ptr,
                             calldata_reader_pointer,
                             compilation_ctx,
@@ -716,6 +719,7 @@ pub fn add_external_contract_call_fn(
                         compilation_ctx,
                         locate_storage_data_fn,
                         &RuntimeFunction::LocateStorageData,
+                        Some(ValType::I32),
                     )
                     .local_set(owner_ptr);
 
@@ -741,6 +745,7 @@ pub fn add_external_contract_call_fn(
                                 compilation_ctx,
                                 read_and_decode_from_storage_fn,
                                 &RuntimeFunction::ReadAndDecodeFromStorage,
+                                Some(ValType::I32),
                             )
                             .local_set(new_struct_ptr);
 

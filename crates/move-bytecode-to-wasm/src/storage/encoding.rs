@@ -98,6 +98,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
     } else if let Some(owner_ptr) = owner_ptr {
         builder.local_get(owner_ptr).local_set(field_owner_ptr);
     } else {
+        // This should never happen, as for structs without key the owner should be passed as argument.
         builder.unreachable();
     }
 
@@ -219,157 +220,164 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
 
     // Match on the variant and encode its fields.
     let mut inner_result = Ok(());
-    enum_.match_on_variant(builder, variant_index, |variant, block| {
-        // Update the slot_offset to account for the variant index size.
-        block
-            .local_get(slot_ptr)
-            .local_get(slot_offset)
-            .i32_const(1)
-            .call(accumulate_or_advance_slot_write_fn)
-            .local_set(slot_offset);
-
-        // Write the variant index in the slot data.
-        block
-            .slot_data_ptr_plus_offset(slot_offset)
-            .local_get(variant_index)
-            .store(
-                compilation_ctx.memory_id,
-                StoreKind::I32_8 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
-
-        for (index, field) in variant.fields.iter().enumerate() {
-            let field_size = field_size(field, compilation_ctx);
-
-            let field_size = match field_size {
-                Ok(fs) => fs as i32,
-                Err(e) => {
-                    inner_result = Err(e);
-                    break;
-                }
-            };
-            // Update the slot_offset to include the field size.
-            // If we've filled the current slot, cache its data and move to the next slot.
+    enum_.match_on_variant(
+        builder,
+        module,
+        compilation_ctx,
+        runtime_error_data,
+        variant_index,
+        |variant, block, mod_ref, err_ref| {
+            // Update the slot_offset to account for the variant index size.
             block
                 .local_get(slot_ptr)
                 .local_get(slot_offset)
-                .i32_const(field_size)
+                .i32_const(1)
                 .call(accumulate_or_advance_slot_write_fn)
                 .local_set(slot_offset);
 
-            // Load field's intermediate pointer
-            block.local_get(enum_ptr).load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 4 + 4 * index as u32,
-                },
-            );
+            // Write the variant index in the slot data.
+            block
+                .slot_data_ptr_plus_offset(slot_offset)
+                .local_get(variant_index)
+                .store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32_8 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
 
-            // Encode the field
-            inner_result = add_encode_intermediate_type_instructions(
-                module,
-                block,
-                compilation_ctx,
-                runtime_error_data,
-                slot_ptr,
-                slot_offset,
-                owner_ptr,
-                field,
-                true,
-            );
+            for (index, field) in variant.fields.iter().enumerate() {
+                let field_size = field_size(field, compilation_ctx);
 
-            if inner_result.is_err() {
-                break;
+                let field_size = match field_size {
+                    Ok(fs) => fs as i32,
+                    Err(e) => {
+                        inner_result = Err(e);
+                        break;
+                    }
+                };
+                // Update the slot_offset to include the field size.
+                // If we've filled the current slot, cache its data and move to the next slot.
+                block
+                    .local_get(slot_ptr)
+                    .local_get(slot_offset)
+                    .i32_const(field_size)
+                    .call(accumulate_or_advance_slot_write_fn)
+                    .local_set(slot_offset);
+
+                // Load field's intermediate pointer
+                block.local_get(enum_ptr).load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 4 + 4 * index as u32,
+                    },
+                );
+
+                // Encode the field
+                inner_result = add_encode_intermediate_type_instructions(
+                    mod_ref,
+                    block,
+                    compilation_ctx,
+                    err_ref,
+                    slot_ptr,
+                    slot_offset,
+                    owner_ptr,
+                    field,
+                    true,
+                );
+
+                if inner_result.is_err() {
+                    break;
+                }
             }
-        }
 
-        // Handle leftover storage from large enum variants.
-        // Each enum reserves space for its largest variant, so writing a smaller variant
-        // may leave extra slots containing old data. We need to clear these slots
-        // to avoid storing stale bytes.
-        // If we're not at the tail slot (slot_ptr != tail_slot_ptr):
-        //   - Save the current slot data, wipe the slot data and advance to the next slot.
-        //   - If the next slot is not the tail slot, wipe it and advance to the next slot. Repeat.
-        block
-            .local_get(slot_ptr)
-            .local_get(tail_slot_ptr)
-            .i32_const(32)
-            .call(equality_fn)
-            .if_else(
-                None,
-                |_| {
-                    // slot_ptr == tail_slot_ptr, do nothing
-                    // the slot data is going to be cached by the caller of this function
-                },
-                |else_| {
-                    // slot_ptr != tail_slot_ptr - first iteration
-                    // Cache the current slot's data at DATA_SLOT_DATA_PTR_OFFSET
-                    else_
-                        .local_get(slot_ptr)
-                        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                        .call(storage_cache);
-
-                    // Wipe DATA_SLOT_DATA_PTR_OFFSET (set to zero)
-                    else_
-                        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                        .i32_const(DATA_ZERO_OFFSET)
-                        .i32_const(32)
-                        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-
-                    // Advance to the next slot
-                    else_
-                        .local_get(slot_ptr)
-                        .call(next_slot_fn)
-                        .local_set(slot_ptr);
-
-                    // Cache the now-empty (wiped) DATA_SLOT_DATA_PTR_OFFSET at the new slot_ptr
-                    else_
-                        .local_get(slot_ptr)
-                        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                        .call(storage_cache);
-
-                    // Loop: continue advancing and caching zero data until slot_ptr == tail_slot_ptr
-                    else_.loop_(None, |loop_| {
-                        let loop_id = loop_.id();
-
-                        // Check if slot_ptr == tail_slot_ptr
-                        loop_
+            // Handle leftover storage from large enum variants.
+            // Each enum reserves space for its largest variant, so writing a smaller variant
+            // may leave extra slots containing old data. We need to clear these slots
+            // to avoid storing stale bytes.
+            // If we're not at the tail slot (slot_ptr != tail_slot_ptr):
+            //   - Save the current slot data, wipe the slot data and advance to the next slot.
+            //   - If the next slot is not the tail slot, wipe it and advance to the next slot. Repeat.
+            block
+                .local_get(slot_ptr)
+                .local_get(tail_slot_ptr)
+                .i32_const(32)
+                .call(equality_fn)
+                .if_else(
+                    None,
+                    |_| {
+                        // slot_ptr == tail_slot_ptr, do nothing
+                        // the slot data is going to be cached by the caller of this function
+                    },
+                    |else_| {
+                        // slot_ptr != tail_slot_ptr - first iteration
+                        // Cache the current slot's data at DATA_SLOT_DATA_PTR_OFFSET
+                        else_
                             .local_get(slot_ptr)
-                            .local_get(tail_slot_ptr)
+                            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                            .call(storage_cache);
+
+                        // Wipe DATA_SLOT_DATA_PTR_OFFSET (set to zero)
+                        else_
+                            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                            .i32_const(DATA_ZERO_OFFSET)
                             .i32_const(32)
-                            .call(equality_fn)
-                            .if_else(
-                                None,
-                                |_| {
-                                    // slot_ptr == tail_slot_ptr, exit the loop
-                                },
-                                |inner_else| {
-                                    // slot_ptr != tail_slot_ptr
-                                    // Advance to the next slot
-                                    inner_else
-                                        .local_get(slot_ptr)
-                                        .call(next_slot_fn)
-                                        .local_set(slot_ptr);
+                            .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
-                                    // Cache DATA_ZERO_OFFSET directly to the new slot_ptr
-                                    inner_else
-                                        .local_get(slot_ptr)
-                                        .i32_const(DATA_ZERO_OFFSET)
-                                        .call(storage_cache);
+                        // Advance to the next slot
+                        else_
+                            .local_get(slot_ptr)
+                            .call(next_slot_fn)
+                            .local_set(slot_ptr);
 
-                                    // Continue the loop
-                                    inner_else.br(loop_id);
-                                },
-                            );
-                    });
-                },
-            );
-    });
+                        // Cache the now-empty (wiped) DATA_SLOT_DATA_PTR_OFFSET at the new slot_ptr
+                        else_
+                            .local_get(slot_ptr)
+                            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                            .call(storage_cache);
+
+                        // Loop: continue advancing and caching zero data until slot_ptr == tail_slot_ptr
+                        else_.loop_(None, |loop_| {
+                            let loop_id = loop_.id();
+
+                            // Check if slot_ptr == tail_slot_ptr
+                            loop_
+                                .local_get(slot_ptr)
+                                .local_get(tail_slot_ptr)
+                                .i32_const(32)
+                                .call(equality_fn)
+                                .if_else(
+                                    None,
+                                    |_| {
+                                        // slot_ptr == tail_slot_ptr, exit the loop
+                                    },
+                                    |inner_else| {
+                                        // slot_ptr != tail_slot_ptr
+                                        // Advance to the next slot
+                                        inner_else
+                                            .local_get(slot_ptr)
+                                            .call(next_slot_fn)
+                                            .local_set(slot_ptr);
+
+                                        // Cache DATA_ZERO_OFFSET directly to the new slot_ptr
+                                        inner_else
+                                            .local_get(slot_ptr)
+                                            .i32_const(DATA_ZERO_OFFSET)
+                                            .call(storage_cache);
+
+                                        // Continue the loop
+                                        inner_else.br(loop_id);
+                                    },
+                                );
+                        });
+                    },
+                );
+        },
+    );
 
     inner_result?;
 
@@ -522,7 +530,12 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                 .local_get(len)
                 .local_get(elem_size_local)
                 .local_get(elem_slot_ptr)
-                .call(derive_dyn_array_slot_fn);
+                .call_runtime_function(
+                    compilation_ctx,
+                    derive_dyn_array_slot_fn,
+                    &RuntimeFunction::DeriveDynArraySlot,
+                    Some(ValType::I32),
+                );
 
             inner_block.loop_(None, |loop_| {
                 let loop_id = loop_.id();

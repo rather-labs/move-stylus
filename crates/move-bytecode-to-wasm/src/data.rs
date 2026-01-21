@@ -6,6 +6,14 @@ use alloy_primitives::U256;
 use std::collections::HashMap;
 use walrus::{ConstExpr, DataKind, MemoryId, Module, ir::Value};
 
+// Magical number constants
+
+// This constant is returned when we encounter a runtime error.
+pub const BAD_F00D: i32 = 0xBADF00D;
+
+// This constant is used to mark a vector as relocated.
+pub const DEAD_BEEF: i32 = 0xDEADBEEF_u32 as i32;
+
 /// Reserved empty memory
 pub const DATA_ZERO_OFFSET: i32 = 0;
 

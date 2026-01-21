@@ -279,6 +279,7 @@ impl IU128 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         let add_function_id = RuntimeFunction::HeapIntSum.get(
             module,
@@ -293,6 +294,7 @@ impl IU128 {
             compilation_ctx,
             add_function_id,
             &RuntimeFunction::HeapIntSum,
+            return_type,
         );
 
         Ok(())
@@ -303,6 +305,7 @@ impl IU128 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         let shift_left_function_id = RuntimeFunction::HeapIntShiftLeft.get(
             module,
@@ -313,6 +316,7 @@ impl IU128 {
             compilation_ctx,
             shift_left_function_id,
             &RuntimeFunction::HeapIntShiftLeft,
+            return_type,
         );
 
         Ok(())
@@ -323,6 +327,7 @@ impl IU128 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         let shift_right_function_id = RuntimeFunction::HeapIntShiftRight.get(
             module,
@@ -333,6 +338,7 @@ impl IU128 {
             compilation_ctx,
             shift_right_function_id,
             &RuntimeFunction::HeapIntShiftRight,
+            return_type,
         );
 
         Ok(())
@@ -343,6 +349,7 @@ impl IU128 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         let sub_function_id = RuntimeFunction::HeapIntSub.get(
             module,
@@ -357,6 +364,7 @@ impl IU128 {
             compilation_ctx,
             sub_function_id,
             &RuntimeFunction::HeapIntSub,
+            return_type,
         );
 
         Ok(())
@@ -367,6 +375,7 @@ impl IU128 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         let mul_function_id = RuntimeFunction::HeapIntMul.get(
             module,
@@ -378,6 +387,7 @@ impl IU128 {
             compilation_ctx,
             mul_function_id,
             &RuntimeFunction::HeapIntMul,
+            return_type,
         );
 
         Ok(())
@@ -388,6 +398,7 @@ impl IU128 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         let div_mod_function_id = RuntimeFunction::HeapIntDivMod.get(
             module,
@@ -399,6 +410,7 @@ impl IU128 {
             compilation_ctx,
             div_mod_function_id,
             &RuntimeFunction::HeapIntDivMod,
+            return_type,
         );
 
         Ok(())
@@ -409,6 +421,7 @@ impl IU128 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         let div_mod_function_id = RuntimeFunction::HeapIntDivMod.get(
             module,
@@ -420,6 +433,7 @@ impl IU128 {
             compilation_ctx,
             div_mod_function_id,
             &RuntimeFunction::HeapIntDivMod,
+            return_type,
         );
 
         Ok(())
@@ -432,7 +446,13 @@ impl IU128 {
     ) -> Result<(), IntermediateTypeError> {
         let equality_f_id =
             RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx), None)?;
-        builder.i32_const(Self::HEAP_SIZE).call(equality_f_id);
+        builder.i32_const(Self::HEAP_SIZE).call_runtime_function(
+            compilation_ctx,
+            equality_f_id,
+            &RuntimeFunction::HeapTypeEquality,
+            None,
+        );
+
         Ok(())
     }
 }
@@ -623,6 +643,7 @@ impl IU256 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         let add_function_id = RuntimeFunction::HeapIntSum.get(
             module,
@@ -636,6 +657,7 @@ impl IU256 {
             compilation_ctx,
             add_function_id,
             &RuntimeFunction::HeapIntSum,
+            return_type,
         );
 
         Ok(())
@@ -646,6 +668,7 @@ impl IU256 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         let shift_left_function_id = RuntimeFunction::HeapIntShiftLeft.get(
             module,
@@ -656,6 +679,7 @@ impl IU256 {
             compilation_ctx,
             shift_left_function_id,
             &RuntimeFunction::HeapIntShiftLeft,
+            return_type,
         );
 
         Ok(())
@@ -666,6 +690,7 @@ impl IU256 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         let shift_right_function_id = RuntimeFunction::HeapIntShiftRight.get(
             module,
@@ -676,6 +701,7 @@ impl IU256 {
             compilation_ctx,
             shift_right_function_id,
             &RuntimeFunction::HeapIntShiftRight,
+            return_type,
         );
 
         Ok(())
@@ -686,6 +712,7 @@ impl IU256 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         let sub_function_id = RuntimeFunction::HeapIntSub.get(
             module,
@@ -700,6 +727,7 @@ impl IU256 {
             compilation_ctx,
             sub_function_id,
             &RuntimeFunction::HeapIntSub,
+            return_type,
         );
 
         Ok(())
@@ -710,6 +738,7 @@ impl IU256 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         let mul_function_id = RuntimeFunction::HeapIntMul.get(
             module,
@@ -720,6 +749,7 @@ impl IU256 {
             compilation_ctx,
             mul_function_id,
             &RuntimeFunction::HeapIntMul,
+            return_type,
         );
         Ok(())
     }
@@ -729,6 +759,7 @@ impl IU256 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         let div_mod_function_id = RuntimeFunction::HeapIntDivMod.get(
             module,
@@ -736,10 +767,12 @@ impl IU256 {
             Some(runtime_error_data),
         )?;
 
-        builder
-            .i32_const(256)
-            .i32_const(1)
-            .call(div_mod_function_id);
+        builder.i32_const(256).i32_const(1).call_runtime_function(
+            compilation_ctx,
+            div_mod_function_id,
+            &RuntimeFunction::HeapIntDivMod,
+            return_type,
+        );
 
         Ok(())
     }
@@ -749,6 +782,7 @@ impl IU256 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
         runtime_error_data: &mut RuntimeErrorData,
+        return_type: Option<ValType>,
     ) -> Result<(), IntermediateTypeError> {
         let div_mod_function_id = RuntimeFunction::HeapIntDivMod.get(
             module,
@@ -756,10 +790,12 @@ impl IU256 {
             Some(runtime_error_data),
         )?;
 
-        builder
-            .i32_const(256)
-            .i32_const(0)
-            .call(div_mod_function_id);
+        builder.i32_const(256).i32_const(0).call_runtime_function(
+            compilation_ctx,
+            div_mod_function_id,
+            &RuntimeFunction::HeapIntDivMod,
+            return_type,
+        );
 
         Ok(())
     }

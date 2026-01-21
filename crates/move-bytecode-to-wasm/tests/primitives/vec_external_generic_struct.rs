@@ -1,6 +1,6 @@
 use crate::common::run_test;
 use crate::declare_fixture;
-use alloy_primitives::{U256, address, keccak256};
+use alloy_primitives::{U256, address};
 use alloy_sol_types::{SolCall, SolType, SolValue, abi::TokenSeq, sol};
 use move_bytecode_to_wasm::error::RuntimeError;
 use move_test_runner::wasm_runner::RuntimeSandbox;
@@ -393,8 +393,6 @@ fn get_new_fooo() -> Foo {
             }
         ]
     )]
-#[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
-#[case(vecSwapCall::new((get_foo_vector(), 0u64, 3u64)), ((),))]
 #[case(
         vecSwapCall::new((get_foo_vector(), 0u64, 1u64)),
         vec![
@@ -655,18 +653,14 @@ fn test_vec_external_struct<T: SolCall, V: SolValue>(
 
 #[rstest]
 #[case(vecPopBackCall::new((vec![],)), )]
-fn test_vec_external_struct_runtime_error(
+#[case(vecSwapCall::new((get_foo_vector(), 0u64, 3u64)),)]
+fn test_vec_external_struct_runtime_error<T: SolCall>(
     #[by_ref] runtime: &RuntimeSandbox,
-    #[case] call_data: vecPopBackCall,
+    #[case] call_data: T,
 ) {
     let (result, return_data) = runtime.call_entrypoint(call_data.abi_encode()).unwrap();
     assert_eq!(result, 1);
 
-    let error_message = String::from_utf8_lossy(RuntimeError::Overflow.as_bytes());
-    let expected_data = [
-        keccak256(b"Error(string)")[..4].to_vec(),
-        <sol!((string,))>::abi_encode_params(&(error_message,)),
-    ]
-    .concat();
+    let expected_data = RuntimeError::OutOfBounds.encode_abi();
     assert_eq!(return_data, expected_data);
 }

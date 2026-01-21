@@ -44,6 +44,7 @@ pub fn unpack_string_function(
         compilation_ctx,
         validate_pointer_fn,
         &RuntimeFunction::ValidatePointer32Bit,
+        Some(ValType::I32),
     );
 
     builder
@@ -76,6 +77,7 @@ pub fn unpack_string_function(
             compilation_ctx,
             validate_pointer_fn,
             &RuntimeFunction::ValidatePointer32Bit,
+            Some(ValType::I32),
         );
 
     // Vector length: current number of elements in the vector

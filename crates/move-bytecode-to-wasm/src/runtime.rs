@@ -326,12 +326,14 @@ impl RuntimeFunction {
                 }
                 (Self::IsZero, Some(ctx), _) => equality::is_zero(module, ctx),
                 // Vector
-                (Self::VecBorrow, Some(ctx), _) => vector::vec_borrow_function(module, ctx),
+                (Self::VecBorrow, Some(ctx), Some(runtime_error_data)) => {
+                    vector::vec_borrow_function(module, ctx, runtime_error_data)
+                }
                 (Self::VecIncrementLen, Some(ctx), _) => {
                     vector::increment_vec_len_function(module, ctx)
                 }
-                (Self::VecDecrementLen, Some(ctx), _) => {
-                    vector::decrement_vec_len_function(module, ctx)
+                (Self::VecDecrementLen, Some(ctx), Some(runtime_error_data)) => {
+                    vector::decrement_vec_len_function(module, ctx, runtime_error_data)
                 }
                 (Self::VecUpdateMutRef, Some(ctx), _) => {
                     vector::vec_update_mut_ref_function(module, ctx)
@@ -407,7 +409,9 @@ impl RuntimeFunction {
                 }
                 (Self::InjectSigner, Some(ctx), _) => unpacking::signer::inject_signer(module, ctx),
                 // ABI packing
-                (Self::PackEnum, Some(ctx), _) => packing::enums::pack_enum_function(module, ctx)?,
+                (Self::PackEnum, Some(ctx), Some(runtime_error_data)) => {
+                    packing::enums::pack_enum_function(module, ctx, runtime_error_data)?
+                }
                 (Self::PackU32, Some(ctx), _) => packing::uint::pack_u32_function(module, ctx)?,
                 (Self::PackU64, Some(ctx), _) => packing::uint::pack_u64_function(module, ctx)?,
                 (Self::PackU128, Some(ctx), _) => {
@@ -514,9 +518,14 @@ impl RuntimeFunction {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
                 vector::vec_swap_function(module, compilation_ctx, runtime_error_data, generics[0])?
             }
-            (Self::VecPopBack, _) => {
+            (Self::VecPopBack, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
-                vector::vec_pop_back_function(module, compilation_ctx, generics[0])?
+                vector::vec_pop_back_function(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    generics[0],
+                )?
             }
             (Self::VecPushBack, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
@@ -536,9 +545,14 @@ impl RuntimeFunction {
                     generics[0],
                 )?
             }
-            (Self::UnpackEnum, _) => {
+            (Self::UnpackEnum, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
-                unpacking::enums::unpack_enum_function(module, compilation_ctx, generics[0])?
+                unpacking::enums::unpack_enum_function(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    generics[0],
+                )?
             }
             (Self::UnpackStruct, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
@@ -675,60 +689,96 @@ impl RuntimeFunction {
         Ok(format!("runtime_{}_{hash}", self.name()))
     }
 
-    pub fn can_abort(&self) -> bool {
-        matches!(
-            self,
-            // Integer operations (non-generic)
+    pub fn is_fallible(&self) -> bool {
+        match self {
+            // Functions that may throw a runtime error
             Self::HeapIntSum
-                | Self::HeapIntSub
-                | Self::AddU32
-                | Self::AddU64
-                | Self::SubU32
-                | Self::SubU64
-                | Self::MulU32
-                | Self::MulU64
-                | Self::HeapIntMul
-                | Self::HeapIntDivMod
-                | Self::HeapIntShiftLeft
-                | Self::HeapIntShiftRight
-                | Self::CheckOverflowU8U16
-                | Self::DowncastU64ToU32
-                | Self::DowncastU128U256ToU32
-                | Self::DowncastU128U256ToU64
-            // Storage operations (non-generic)
-                | Self::StorageNextSlot
-                | Self::DeriveDynArraySlot
-                | Self::LocateStorageData
-                | Self::AccumulateOrAdvanceSlotDelete
-                | Self::AccumulateOrAdvanceSlotRead
-                | Self::AccumulateOrAdvanceSlotWrite
-            // ABI operations (non-generic)
-                | Self::ValidatePointer32Bit
-                | Self::UnpackString
-            // Generic storage operations
-                | Self::EncodeAndSaveInStorage
-                | Self::ReadAndDecodeFromStorage
-                | Self::DeleteFromStorage
-                | Self::CheckAndDeleteStructTtoFields
-                | Self::DeleteTtoObject
-                | Self::CacheStorageObjectChanges
-                | Self::CommitChangesToStorage
-            // Generic enum operations
-                | Self::ComputeEnumStorageTailPosition
-            // Generic vector operations
-                | Self::VecSwap
-                | Self::VecPushBack
-                | Self::VecCopyLocal
-                | Self::VecEquality
-            // Generic ABI unpacking
-                | Self::UnpackVector
-                | Self::UnpackStruct
-                | Self::UnpackStorageStruct
-                | Self::UnpackReference
-            // Generic ABI packing
-                | Self::PackVector
-                | Self::PackStruct
-                | Self::PackReference
-        )
+            | Self::HeapIntShiftLeft
+            | Self::HeapIntShiftRight
+            | Self::AddU32
+            | Self::AddU64
+            | Self::CheckOverflowU8U16
+            | Self::DowncastU64ToU32
+            | Self::DowncastU128U256ToU32
+            | Self::DowncastU128U256ToU64
+            | Self::SubU32
+            | Self::SubU64
+            | Self::HeapIntSub
+            | Self::HeapIntDivMod
+            | Self::MulU32
+            | Self::MulU64
+            | Self::HeapIntMul
+            | Self::VecSwap
+            | Self::VecPushBack
+            | Self::VecCopyLocal
+            | Self::VecEquality
+            | Self::VecPopBack
+            | Self::VecBorrow
+            | Self::StorageNextSlot
+            | Self::DeriveDynArraySlot
+            | Self::LocateStorageData
+            | Self::EncodeAndSaveInStorage
+            | Self::ReadAndDecodeFromStorage
+            | Self::DeleteFromStorage
+            | Self::CheckAndDeleteStructTtoFields
+            | Self::DeleteTtoObject
+            | Self::CommitChangesToStorage
+            | Self::AccumulateOrAdvanceSlotDelete
+            | Self::AccumulateOrAdvanceSlotRead
+            | Self::AccumulateOrAdvanceSlotWrite
+            | Self::CacheStorageObjectChanges
+            | Self::ComputeEnumStorageTailPosition
+            | Self::ValidatePointer32Bit
+            | Self::UnpackVector
+            | Self::UnpackString
+            | Self::UnpackStruct
+            | Self::UnpackStorageStruct
+            | Self::UnpackReference
+            | Self::PackVector
+            | Self::PackStruct
+            | Self::PackEnum
+            | Self::PackReference => true,
+
+            // Functions that do not throw a runtime error
+            Self::LessThan
+            | Self::SwapI32Bytes
+            | Self::SwapI64Bytes
+            | Self::SwapI128Bytes
+            | Self::SwapI256Bytes
+            | Self::CopyU128
+            | Self::CopyU256
+            | Self::HeapTypeEquality
+            | Self::VecEqualityHeapType
+            | Self::IsZero
+            | Self::VecIncrementLen
+            | Self::VecDecrementLen
+            | Self::VecUpdateMutRef
+            | Self::BytesToVec
+            | Self::AllocateVectorWithHeader
+            | Self::DeriveMappingSlot
+            | Self::WriteObjectSlot
+            | Self::LocateStorageOwnedData
+            | Self::LocateStorageSharedData
+            | Self::LocateStorageFrozenData
+            | Self::LocateStructSlot
+            | Self::GetIdBytesPtr
+            | Self::GetStructOwner
+            | Self::GetStorageSizeByOffset
+            | Self::U64ToAsciiBase10
+            | Self::UnpackBytes
+            | Self::UnpackU32
+            | Self::UnpackU64
+            | Self::UnpackU128
+            | Self::UnpackU256
+            | Self::UnpackAddress
+            | Self::UnpackEnum
+            | Self::InjectSigner
+            | Self::PackU32
+            | Self::PackU64
+            | Self::PackU128
+            | Self::PackU256
+            | Self::PackAddress
+            | Self::PackString => false,
+        }
     }
 }

@@ -149,7 +149,21 @@ entry fun vec_len(x: vector<Foo>): u64 {
   x.length()
 }
 
-entry fun vec_pop_back(x: vector<Foo>): vector<Foo> {
+entry fun vec_pop_back_foo(x: vector<Foo>): vector<Foo> {
+  let mut y = x;
+  y.pop_back();
+  y.pop_back();
+  y
+}
+
+entry fun vec_pop_back_bar(x: vector<Bar>): vector<Bar> {
+  let mut y = x;
+  y.pop_back();
+  y.pop_back();
+  y
+}
+
+entry fun vec_pop_back_baz(x: vector<Baz>): vector<Baz> {
   let mut y = x;
   y.pop_back();
   y.pop_back();
