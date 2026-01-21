@@ -195,7 +195,7 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
     }
 
     fn slot_data_ptr_plus_offset(&mut self, slot_offset: LocalId) -> &mut Self {
-        // Check if 0 < offset <= 32
+        // Check if 0 < offset <= 32, else trap.
         self.local_get(slot_offset).unop(UnaryOp::I32Eqz).if_else(
             None,
             |then| {

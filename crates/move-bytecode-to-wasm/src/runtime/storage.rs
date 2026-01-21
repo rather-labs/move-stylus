@@ -694,7 +694,7 @@ pub fn derive_dyn_array_slot(
     let add_u256_fn =
         RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
 
-    // Guard: check elem_size is greater than 0
+    // Guard: check elem_size is greater than 0, else trap.
     builder
         .local_get(elem_size)
         .i32_const(0)
@@ -702,13 +702,7 @@ pub fn derive_dyn_array_slot(
         .if_else(
             None,
             |then| {
-                then.return_error(
-                    module,
-                    compilation_ctx,
-                    Some(ValType::I32),
-                    runtime_error_data,
-                    RuntimeError::InvalidElementSize,
-                );
+                then.unreachable();
             },
             |_else| {},
         );

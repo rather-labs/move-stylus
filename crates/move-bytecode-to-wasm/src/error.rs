@@ -154,17 +154,27 @@ impl From<&CodeError> for Diagnostic {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RuntimeError {
+    /// Attempted to share an object that is frozen.
     FrozenObjectsCannotBeShared,
+    /// Attempted to freeze an object that is already shared.
     SharedObjectsCannotBeFrozen,
+    /// Attempted to transfer ownership of an object that is frozen.
     FrozenObjectsCannotBeTransferred,
+    /// Attempted to transfer ownership of an object that is shared.
     SharedObjectsCannotBeTransferred,
+    /// The requested storage object was not found.
     StorageObjectNotFound,
+    /// Attempted to delete an object that is frozen.
     FrozenObjectsCannotBeDeleted,
+    /// The type of a storage object does not match the expected type.
     StorageObjectTypeMismatch,
+    /// Arithmetic overflow occurred.
     Overflow,
+    /// Access was out of bounds (e.g., array index out of range).
     OutOfBounds,
+    /// Attempted an out-of-bounds memory access.
     MemoryAccessOutOfBounds,
-    InvalidElementSize,
+    /// The size of an enum is too large to handle.
     EnumSizeTooLarge,
 }
 
@@ -185,7 +195,6 @@ impl RuntimeError {
             RuntimeError::Overflow => b"Overflow",
             RuntimeError::OutOfBounds => b"Out of bounds",
             RuntimeError::MemoryAccessOutOfBounds => b"Memory access out of bounds",
-            RuntimeError::InvalidElementSize => b"Invalid element size",
             RuntimeError::EnumSizeTooLarge => b"Enum size too large",
         }
     }

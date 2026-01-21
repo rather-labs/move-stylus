@@ -120,6 +120,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
         if let Some(struct_id_ptr) = struct_id_ptr {
             builder.local_get(struct_id_ptr).local_set(field_owner_ptr);
         } else {
+            // This should never happen, as for wrapped objects the owner (wrapper object) should be passed as argument.
             builder.unreachable();
         }
     } else {

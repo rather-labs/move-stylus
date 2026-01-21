@@ -469,6 +469,8 @@ fn translate_flow(
                     builder.block(ty, |trap| {
                         trap.br_table(targets.into_boxed_slice(), trap.id());
                     });
+
+                    // If no case matches, trap.
                     builder.unreachable();
                     return Ok(());
                 }

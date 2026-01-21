@@ -98,6 +98,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
     } else if let Some(owner_ptr) = owner_ptr {
         builder.local_get(owner_ptr).local_set(field_owner_ptr);
     } else {
+        // This should never happen, as for structs without key the owner should be passed as argument.
         builder.unreachable();
     }
 

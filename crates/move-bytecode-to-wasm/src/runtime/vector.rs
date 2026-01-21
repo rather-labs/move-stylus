@@ -773,6 +773,7 @@ pub fn allocate_vector_with_header_function(
                 .local_set(pointer);
         },
         |else_| {
+            // If the length of the vector is greater than the capacity, we trap. This should never happen.
             // This is a failsafe to prevent UB if static checks failed
             else_
                 .local_get(len)
