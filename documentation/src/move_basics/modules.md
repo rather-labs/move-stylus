@@ -21,28 +21,37 @@ module <package_address>::<module_name> {
 Typically, each file in the `sources/` directory defines a single module. The file name must correspond to the module name; for instance, a `counter` module should reside in a file named `counter.move`.
 
 
-For example:
+[Structs](./move_basics/structs.md), [Functions](./move_basics/functions.md), [Constants](./move_basics/constants.md) and [Imports](./move_basics/imports) are all declared within the module body.
+
+
+## Module Members
+
+Module members are defined within the body of a module. They can include data structures, functions, and constants. The example below demonstrates a simple module that declares a `struct`, a `function`, and a `const` value:
 
 ```move
 module book::counter;
+
+const INITIAL_COUNT: u64 = 0;
 
 public struct Counter has drop {
     value: u64
 }
 
+fun create(): Counter {
+    Counter { value: INITIAL_COUNT }
+}
+
 /// Increment a counter by 1.
-entry fun increment(counter: &mut Counter) {
+fun increment(counter: &mut Counter) {
     counter.value = counter.value + 1;
 }
 
 
 /// Read counter.
-entry fun read(counter: &Counter): u64 {
+fun read(counter: &Counter): u64 {
     counter.value
 }
 ```
-
-[Structs](./move_basics/structs.md), [Functions](./move_basics/functions.md), [Constants](./move_basics/constants.md) and [Imports](./move_basics/imports) are all declared within the module body.
 
 ## Address and Named Address
 
