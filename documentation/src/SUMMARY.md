@@ -13,4 +13,7 @@
     - [Address Type](./move_basics/address_type.md)
     - [Expressions](./move_basics/expressions.md)
     - [Structs](./move_basics/structs.md)
+    - [Abilities introduction](./move_basics/abilities_introduction.md)
+    - [Ability drop](./move_basics/ability_drop.md)
+    - [Importing Modules](./move_basics/importing_modules.md)
 
