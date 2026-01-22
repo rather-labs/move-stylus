@@ -22,4 +22,5 @@
     - [String](./move_basics/string.md)
     - [Control Flow](./move_basics/control_flow.md)
     - [Enums and Match](./move_basics/enums_and_match.md)
+    - [Constants](./move_basics/constants.md)
 
