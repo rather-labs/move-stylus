@@ -16,4 +16,11 @@
     - [Abilities introduction](./move_basics/abilities_introduction.md)
     - [Ability drop](./move_basics/ability_drop.md)
     - [Importing Modules](./move_basics/importing_modules.md)
+    - [Struct Methods](./move_basics/struct_methods.md)
+    - [Visibility Modifiers](./move_basics/visibility_modifiers.md)
+    - [Ownership and Scope](./move_basics/ownership_and_scope.md)
+    - [Ability Copy](./move_basics/ability_copy.md)
+    - [References](./move_basics/references.md)
+    - [Generics](./move_basics/generics.md)
+    - [Testing](./move_basics/testing.md)
 
