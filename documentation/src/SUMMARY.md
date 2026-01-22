@@ -19,4 +19,5 @@
     - [Standard Library](./move_basics/standard_library.md)
     - [Vector](./move_basics/vector.md)
     - [Option](./move_basics/option.md)
+    - [String](./move_basics/string.md)
 
