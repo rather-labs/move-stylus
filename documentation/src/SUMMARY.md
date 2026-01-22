@@ -20,4 +20,5 @@
     - [Vector](./move_basics/vector.md)
     - [Option](./move_basics/option.md)
     - [String](./move_basics/string.md)
+    - [Control Flow](./move_basics/control_flow.md)
 
