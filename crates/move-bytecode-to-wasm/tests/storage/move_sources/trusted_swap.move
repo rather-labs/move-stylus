@@ -6,10 +6,11 @@
 /// the ability to modify those objects.
 module test::trusted_swap;
 
-use stylus::tx_context::TxContext;
-use stylus::object as object;
-use stylus::object::UID;
-use stylus::transfer as transfer;
+use stylus::{
+    tx_context::TxContext, 
+    object::{Self, UID}, 
+    transfer::{Self}
+};
 
 public struct Object has key, store {
     id: UID,

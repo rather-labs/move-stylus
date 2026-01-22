@@ -16,4 +16,11 @@
     - [Abilities introduction](./move_basics/abilities_introduction.md)
     - [Ability drop](./move_basics/ability_drop.md)
     - [Importing Modules](./move_basics/importing_modules.md)
+    - [Standard Library](./move_basics/standard_library.md)
+    - [Vector](./move_basics/vector.md)
+    - [Option](./move_basics/option.md)
+    - [String](./move_basics/string.md)
+    - [Control Flow](./move_basics/control_flow.md)
+    - [Enums and Match](./move_basics/enums_and_match.md)
+    - [Constants](./move_basics/constants.md)
 

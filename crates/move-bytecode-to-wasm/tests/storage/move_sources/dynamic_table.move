@@ -1,13 +1,7 @@
 module test::dynamic_table;
 
-use stylus::object as object;
-use stylus::tx_context::TxContext;
-use stylus::transfer as transfer;
-use stylus::dynamic_field as field;
-use std::ascii as ascii;
-use std::ascii::String;
-use stylus::table::Table;
-use stylus::table as table;
+use stylus::{object::{Self}, tx_context::TxContext, transfer::{Self}, dynamic_field as field, table::{Self, Table}};
+use std::ascii::{Self, String};
 
 public struct Foo has key {
     id: object::UID,

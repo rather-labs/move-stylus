@@ -1,7 +1,9 @@
 module stylus::object;
 
-use stylus::tx_context::TxContext;
-use stylus::event::emit;
+use stylus::{
+    tx_context::TxContext, 
+    event::emit
+};
 
 /// Allows calling `.to_address` on a `UID` to get an `address`.
 public use fun uid_to_address as UID.to_address;

@@ -18,10 +18,11 @@
 /// ```
 module stylus::table;
 
-use stylus::dynamic_field as field;
-use stylus::object as object;
-use stylus::object::UID;
-use stylus::tx_context::TxContext;
+use stylus::{
+    dynamic_field as field, 
+    object::{Self, UID}, 
+    tx_context::TxContext
+};
 
 // Attempted to destroy a non-empty table
 const ETableNotEmpty: u64 = 0;

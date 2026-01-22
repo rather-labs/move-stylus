@@ -4,9 +4,10 @@
 #[allow(unused_const)]
 module stylus::dynamic_field_named_id;
 
-use stylus::object::{UID, NamedId};
-use stylus::object as object;
-use stylus::dynamic_field as dynamic_field;
+use stylus::{
+    object::{Self, UID, NamedId}, 
+    dynamic_field as dynamic_field
+};
 
 
 public fun add<NId: key, Name: copy + drop + store, Value: store>(
