@@ -1,6 +1,11 @@
 # Summary
 
 - [Introduction](./introduction.md)
+- [Concepts](./concepts/README.md)
+    - [Packages](./concepts/packages.md)
+    - [Manifest](./concepts/manifest.md)
+    - [Address](./concepts/address.md)
+    - [Account](./concepts/account.md)
 - [Move Basics](./move_basics/README.md)
     - [Modules](./move_basics/modules.md)
     - [Comments](./move_basics/comments.md)
