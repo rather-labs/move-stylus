@@ -30,7 +30,7 @@ fun simple_test() {
 
 ## Running Tests
 
-To run tests, you can use the `move test` command from the *moving stylus cli*. This command will first build the package in _test mode_ and then run all tests found in the package. In test mode, modules from both `sources/` and `tests/` directories are processed and their tests executed.
+To run tests, you can use the `move test` command from the *move-stylus cli*. This command will first build the package in _test mode_ and then run all tests found in the package. In test mode, modules from both `sources/` and `tests/` directories are processed and their tests executed.
 
 ```move
 x@y-MacBook-Pro example % move test
