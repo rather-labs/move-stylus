@@ -1,9 +1,8 @@
 module hello_world::counter_named_id;
 
 use stylus::tx_context::TxContext;
-use stylus::object as object;
-use stylus::object::NamedId;
-use stylus::transfer as transfer;
+use stylus::object::{Self, NamedId};
+use stylus::transfer::{Self};
 
 public struct COUNTER_ has key {}
 

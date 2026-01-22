@@ -1,9 +1,8 @@
 module hello_world::counter_with_init;
 
 use stylus::tx_context::TxContext;
-use stylus::object as object;
-use stylus::object::UID;
-use stylus::transfer as transfer;
+use stylus::object::{Self, UID};
+use stylus::transfer::{Self};
 use stylus::types as types;
 
 public struct Counter has key {

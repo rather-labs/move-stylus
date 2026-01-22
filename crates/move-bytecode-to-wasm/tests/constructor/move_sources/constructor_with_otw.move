@@ -1,9 +1,9 @@
 module test::constructor_with_otw;
 
 use stylus::tx_context::TxContext;
-use stylus::object as object;
+use stylus::object::{Self};
 use stylus::object::UID;
-use stylus::transfer as transfer;
+use stylus::transfer::{Self};
 use stylus::types as types;
 
 public struct Foo has key {

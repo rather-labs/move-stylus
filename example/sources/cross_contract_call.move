@@ -1,6 +1,6 @@
 module hello_world::cross_contract_call;
 
-use erc20call::erc20call as erc20call;
+use erc20call::erc20call::{Self};
 use stylus::contract_calls as ccc;
 
 entry fun balance_of_erc20(erc20_address: address, balance_address: address): u256 {

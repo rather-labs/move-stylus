@@ -1,7 +1,7 @@
 module test::misc;
 
 use stylus::tx_context::TxContext;
-use stylus::object as object;
+use stylus::object::{Self};
 use stylus::object::{UID, NamedId};
 use test::misc_external::{ExternalKeyStruct, new_external_key_struct};
 use test::misc_external_2::{ExternalKeyStruct as ExternalKeyStruct2, new_external_key_struct as new_external_key_struct2};

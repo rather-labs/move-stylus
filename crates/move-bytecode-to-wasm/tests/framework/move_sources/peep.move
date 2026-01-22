@@ -2,7 +2,7 @@ module test::peep;
 
 use stylus::peep as stylus_peep;
 use stylus::object::UID;
-use stylus::object as object;
+use stylus::object::{Self};
 use stylus::tx_context::TxContext;
 use stylus::transfer::transfer;
 

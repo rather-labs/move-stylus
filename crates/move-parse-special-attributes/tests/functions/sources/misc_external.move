@@ -1,7 +1,7 @@
 module test::misc_external;
 
 use stylus::tx_context::TxContext;
-use stylus::object as object;
+use stylus::object::{Self};
 use stylus::object::UID;
 
 public struct ExternalKeyStruct has key {

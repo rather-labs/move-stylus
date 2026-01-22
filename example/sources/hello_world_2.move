@@ -1,7 +1,7 @@
 module hello_world::hello_world_2;
 
 use stylus::tx_context::TxContext;
-use stylus::object as object;
+use stylus::object::{Self};
 use stylus::object::UID;
 use stylus::event::emit;
 use hello_world::stack::Stack;

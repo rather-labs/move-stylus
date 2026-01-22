@@ -1,8 +1,8 @@
 module test::transfer_named_id;
 
-use stylus::object as object;
+use stylus::object::{Self};
 use stylus::object::NamedId;
-use stylus::transfer as transfer;
+use stylus::transfer::{Self};
 
 // ============================================================================
 // STRUCT DEFINITIONS

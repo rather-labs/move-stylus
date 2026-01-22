@@ -1,7 +1,7 @@
 module test::struct_validations;
 
 use stylus::tx_context::TxContext;
-use stylus::object as object;
+use stylus::object::{Self};
 use stylus::object::{UID, NamedId};
 
 public struct StructWithKeyNoUid has key {

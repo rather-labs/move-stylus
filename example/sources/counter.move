@@ -1,9 +1,8 @@
 module hello_world::counter;
 
 use stylus::tx_context::TxContext;
-use stylus::object as object;
-use stylus::object::UID;
-use stylus::transfer as transfer;
+use stylus::object::{Self, UID};
+use stylus::transfer::{Self};
 
 #[test_only]
 use stylus::test_scenario;

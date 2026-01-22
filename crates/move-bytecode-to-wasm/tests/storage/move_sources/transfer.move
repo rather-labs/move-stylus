@@ -1,9 +1,9 @@
 module test::transfer;
 
 use stylus::tx_context::TxContext;
-use stylus::object as object;
+use stylus::object::{Self};
 use stylus::object::UID;
-use stylus::transfer as transfer;
+use stylus::transfer::{Self};
 
 // ============================================================================
 // STRUCT DEFINITIONS

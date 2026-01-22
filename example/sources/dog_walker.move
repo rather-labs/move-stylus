@@ -4,11 +4,11 @@
 module hello_world::dog_walker;
 
 use stylus::event::emit;
-use stylus::transfer as transfer;
-use stylus::object as object;
+use stylus::transfer::{Self};
+use stylus::object::{Self};
 use stylus::object::UID;
 use stylus::tx_context::TxContext;
-use stylus::tx_context as tx_context;
+use stylus::tx_context::{Self};
 
 #[ext(event)]
 public struct IWalkTheDog has copy, drop { }

@@ -19,7 +19,7 @@
 module stylus::table;
 
 use stylus::dynamic_field as field;
-use stylus::object as object;
+use stylus::object::{Self};
 use stylus::object::UID;
 use stylus::tx_context::TxContext;
 

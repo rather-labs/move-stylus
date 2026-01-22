@@ -1,8 +1,8 @@
 module test::dynamic_fields_named_id;
 
-use stylus::object as object;
+use stylus::object::{Self};
 use stylus::tx_context::TxContext;
-use stylus::transfer as transfer;
+use stylus::transfer::{Self};
 use stylus::dynamic_field_named_id as dynamic_field;
 use std::ascii::String;
 

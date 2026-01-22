@@ -2,7 +2,7 @@ module test::cross_contract_calls;
 
 use test::callee_contract_interface as cci;
 use test::callee_contract_interface::{Foo, Bar};
-use stylus::contract_calls as contract_calls;
+use stylus::contract_calls::{Self};
 
 // ==============================================
 // Common cross contract calls with empty result
