@@ -18,4 +18,5 @@
     - [Importing Modules](./move_basics/importing_modules.md)
     - [Standard Library](./move_basics/standard_library.md)
     - [Vector](./move_basics/vector.md)
+    - [Option](./move_basics/option.md)
 
