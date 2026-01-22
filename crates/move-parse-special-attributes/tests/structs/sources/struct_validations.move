@@ -1,8 +1,9 @@
 module test::struct_validations;
 
-use stylus::tx_context::TxContext;
-use stylus::object::{Self};
-use stylus::object::{UID, NamedId};
+use stylus::{
+    tx_context::TxContext, 
+    object::{Self, UID, NamedId}
+};
 
 public struct StructWithKeyNoUid has key {
     owner: address,

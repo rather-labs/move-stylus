@@ -1,15 +1,14 @@
 module test::erc20;
 
-use stylus::event::emit;
-use std::ascii::String;
-use std::ascii::{Self};
-use stylus::tx_context::TxContext;
-use stylus::transfer::{Self};
-use stylus::object::{Self};
-use stylus::object::NamedId;
-use stylus::dynamic_field_named_id as field;
-use stylus::table::Table;
-use stylus::table::{Self};
+use stylus::{
+    event::emit, 
+    tx_context::TxContext, 
+    transfer::{Self}, 
+    object::{Self, NamedId}, 
+    dynamic_field_named_id as field, 
+    table::{Self, Table}
+};
+use std::ascii::{Self, String};
 
 const EInssuficientFunds: u64 = 1;
 const ENotAllowed: u64 = 2;

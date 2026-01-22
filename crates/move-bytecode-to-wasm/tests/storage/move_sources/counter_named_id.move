@@ -1,9 +1,10 @@
 module test::counter_named_id;
 
-use stylus::tx_context::TxContext;
-use stylus::object::{Self};
-use stylus::object::NamedId;
-use stylus::transfer::{Self};
+use stylus::{
+    tx_context::TxContext, 
+    object::{Self, NamedId}, 
+    transfer::{Self}
+};
 
 public struct COUNTER_ has key {}
 

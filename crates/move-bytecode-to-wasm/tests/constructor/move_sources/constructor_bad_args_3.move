@@ -1,9 +1,10 @@
 module test::constructor_bad_args_3;
 
-use stylus::tx_context::TxContext;
-use stylus::object::{Self};
-use stylus::object::UID;
-use stylus::transfer::{Self};
+use stylus::{
+    tx_context::TxContext, 
+    object::{Self, UID}, 
+    transfer::{Self}
+};
 
 public struct Foo has key {
     id: UID,

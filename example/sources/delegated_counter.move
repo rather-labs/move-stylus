@@ -1,10 +1,11 @@
 module hello_world::delegated_counter;
 
-use stylus::tx_context::TxContext;
-use stylus::object::{Self};
-use stylus::object::UID;
-use stylus::transfer::{Self};
-use stylus::contract_calls::{Self};
+use stylus::{
+    tx_context::TxContext, 
+    object::{Self, UID}, 
+    transfer::{Self}, 
+    contract_calls::{Self}
+};
 use hello_world::delegated_counter_interface as dci;
 
 public struct Counter has key {

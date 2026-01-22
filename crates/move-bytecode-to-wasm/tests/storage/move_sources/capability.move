@@ -1,11 +1,7 @@
 //! This module tests the capability pattern.
 module test::capability;
 
-use stylus::transfer::{Self};
-use stylus::object::{Self};
-use stylus::object::UID;
-use stylus::tx_context::TxContext;
-use stylus::tx_context::{Self};
+use stylus::{transfer::{Self}, object::{Self, UID}, tx_context::{Self, TxContext}};
 
 public struct AdminCap has key { id: UID }
 

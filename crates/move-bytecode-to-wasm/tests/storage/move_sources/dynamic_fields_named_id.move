@@ -1,9 +1,6 @@
 module test::dynamic_fields_named_id;
 
-use stylus::object::{Self};
-use stylus::tx_context::TxContext;
-use stylus::transfer::{Self};
-use stylus::dynamic_field_named_id as dynamic_field;
+use stylus::{object::{Self}, tx_context::TxContext, transfer::{Self}, dynamic_field_named_id as dynamic_field};
 use std::ascii::String;
 
 public struct FOO_ has key {}

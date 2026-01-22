@@ -1,6 +1,5 @@
 module 0x00::stars;
-use std::ascii::String;
-use std::ascii::{Self};
+use std::ascii::{Self, String};
 
 const E_SUPERNOVA: u64 = 1;
 

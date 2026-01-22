@@ -1,7 +1,9 @@
 module hello_world::delegated_counter_named_id_logic_1;
 
-use stylus::tx_context::TxContext;
-use stylus::object::NamedId;
+use stylus::{
+    tx_context::TxContext, 
+    object::NamedId
+};
 
 public struct COUNTER_ has key {}
 

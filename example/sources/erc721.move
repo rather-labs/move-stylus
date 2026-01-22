@@ -1,15 +1,15 @@
 module hello_world::erc721;
 
-use stylus::event::emit;
-use stylus::tx_context::TxContext;
-use stylus::transfer::{Self};
-use stylus::object::{Self};
-use stylus::object::NamedId;
-use stylus::dynamic_field_named_id as field;
+use stylus::{
+    event::emit, 
+    tx_context::TxContext, 
+    transfer::{Self}, 
+    object::{Self, NamedId}, 
+    dynamic_field_named_id as field, 
+    sol_types::Bytes4
+};
 use erc721Utils::utils as erc721_utils;
-use std::ascii::{Self};
-use std::ascii::String;
-use stylus::sol_types::Bytes4;
+use std::ascii::{Self, String};
 
 public struct COLLECTION_INFO has key {}
 public struct TOTAL_SUPPLY has key {}
