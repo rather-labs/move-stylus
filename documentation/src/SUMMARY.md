@@ -23,4 +23,5 @@
     - [Control Flow](./move_basics/control_flow.md)
     - [Enums and Match](./move_basics/enums_and_match.md)
     - [Constants](./move_basics/constants.md)
-
+    - [Aborting Execution](./move_basics/aborting_execution.md)
+    - [Functions](./move_basics/functions.md)
