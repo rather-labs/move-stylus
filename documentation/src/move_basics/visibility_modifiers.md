@@ -20,9 +20,9 @@ fun call_internal() {
 
 The following code will not compile:
 
+``` move
 module book::try_calling_internal;
 
-``` move
 use book::internal_visibility;
 
 // Different module -> can't call internal()
