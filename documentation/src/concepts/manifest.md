@@ -1,8 +1,8 @@
-# Package Manifest 
+# Package Manifest
 
 The `Move.toml` is a manifest file that describes the [package](./packages.md) and its dependencies. It is written in TOML format and contains multiple sections, the most important of which are `[package]`, `[dependencies]` and `[addresses]`.
 
-```
+```toml
 [package]
 name = "my_project"
 version = "0.0.0"
@@ -20,7 +20,7 @@ alice = "0xB0B"
 
 ## Sections
 
-### Package 
+### Package
 The `[package]` section is used to describe the package. None of the fields in this section are published on chain, but they are used in tooling and release management.
 
 * `name` - the name of the package when it is imported;
@@ -40,9 +40,9 @@ StylusFramework = { local = "../stylus-framework/" }
 Packages also import addresses from other packages. For example, the Sui dependency adds the std and sui addresses to the project. These addresses can be used in the code as aliases for the addresses. (TODO: is this true in our case?)
 
 ### Dev-dependencies
-<!-- 
+<!--
 
-TODO: try if this is supported 
+TODO: try if this is supported
 -->
 
 ### Resolving Version Conflicts with Override
@@ -59,7 +59,7 @@ Example = { override = true, git = "https://github.com/example/example.git", sub
 The `[addresses]` section is used to add aliases for the addresses. Any address can be specified in this section, and then used in the code as an alias. For example, if you add `alice = "0xA11CE"` to this section, you can use alice as `0xA11CE` in the code.
 
 ### Dev-addresses
-<!-- 
+<!--
 
-TODO: try if this is supported 
+TODO: try if this is supported
 -->
