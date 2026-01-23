@@ -50,7 +50,7 @@ fun test_increment() {
     let uid = object::new(&mut ctx);
     let mut c = Counter { id: uid, owner: @0x1, value: 0 };
 
-    increment(&mut c);
+    c.increment();
     assert!(c.value == 1);
 
     test_scenario::drop_storage_object(c);
@@ -62,7 +62,7 @@ fun test_read() {
     let uid = object::new(&mut ctx);
     let c = Counter { id: uid, owner: @0x2, value: 42 };
 
-    let v = read(&c);
+    let v = c.read();
     assert!(v == 42);
 
     test_scenario::drop_storage_object(c);
@@ -79,7 +79,7 @@ fun test_set_value_by_owner() {
         value: 5
     };
 
-    set_value(&mut c, 99, &ctx);
+    c.set_value(99, &ctx);
 
     assert!(c.value == 99);
 
@@ -94,7 +94,7 @@ fun test_set_value_wrong_owner_should_fail() {
     let mut c = Counter { id: uid, owner: @0x4, value: 5 };
 
 
-    set_value(&mut c, 99, &ctx);
+    c.set_value(99, &ctx);
 
     assert!(c.value == 99);
 
