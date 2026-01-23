@@ -1,4 +1,4 @@
-##Generics
+# Generics
 
 Generics are a way to define a type or function that can work with any type. This is useful when you want to write a function which can be used with different types, or when you want to define a type that can hold any other type. Generics are the foundation of many advanced features in Move including collections, abstract implementations, and more.
 
