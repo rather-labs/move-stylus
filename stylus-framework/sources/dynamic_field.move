@@ -10,8 +10,7 @@
 /// building block for core collection types
 module stylus::dynamic_field;
 
-use stylus::object::UID;
-use stylus::object as object;
+use stylus::object::{Self, UID};
 
 /// The object already has a dynamic field with this name (with the value and type specified)
 const EFieldAlreadyExists: u64 = 0;

@@ -7,9 +7,10 @@
 
 module test::storage_encoding;
 
-use stylus::object::UID;
-use stylus::tx_context::TxContext;
-use stylus::object;
+use stylus::{
+    object::{Self, UID}, 
+    tx_context::TxContext
+};
 
 // ============================================================================
 // Native Functions

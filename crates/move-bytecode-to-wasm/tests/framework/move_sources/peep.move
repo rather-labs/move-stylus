@@ -1,10 +1,11 @@
 module test::peep;
 
-use stylus::peep as stylus_peep;
-use stylus::object::UID;
-use stylus::object as object;
-use stylus::tx_context::TxContext;
-use stylus::transfer::transfer;
+use stylus::{
+    peep as stylus_peep, 
+    object::{Self, UID}, 
+    tx_context::TxContext, 
+    transfer::transfer
+};
 
 public struct Foo has key, store {
     id: UID,

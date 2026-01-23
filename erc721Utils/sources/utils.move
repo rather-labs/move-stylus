@@ -1,9 +1,10 @@
 module erc721Utils::utils;
 
-use stylus::account as account;
-use stylus::contract_calls as ccc;
-use stylus::contract_calls::CrossContractCall;
-use stylus::contract_calls::ContractCallResult;
+use stylus::{
+    account as account, 
+    contract_calls as ccc, 
+    contract_calls::{CrossContractCall, ContractCallResult}
+};
 
 const EInvalidReceiver: u64 = 1;
 
