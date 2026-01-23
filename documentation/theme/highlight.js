@@ -309,16 +309,16 @@ var hljs = (function () {
     /**
       Currently this is all private API, but this is the minimal API necessary
       that an Emitter must implement to fully support the parser.
-  
+
       Minimal interface:
-  
+
       - addText(text)
       - __addSublanguage(emitter, subLanguageName)
       - startScope(scope)
       - endScope()
       - finalize()
       - toHTML()
-  
+
     */
 
     /**
@@ -967,10 +967,10 @@ var hljs = (function () {
     }
 
     /*
-  
+
     For the reasoning behind this please see:
     https://github.com/highlightjs/highlight.js/issues/2880#issuecomment-747275419
-  
+
     */
 
     /**
@@ -1103,12 +1103,12 @@ var hljs = (function () {
     /**
      * this exists only to allow `scope: {}` to be used beside `match:`
      * Otherwise `beginScope` would necessary and that would look weird
-  
+
       {
         match: [ /def/, /\w+/ ]
         scope: { 1: "keyword" , 2: "title" }
       }
-  
+
      * @param {CompiledMode} mode
      */
     function scopeSugar(mode) {
@@ -1177,7 +1177,7 @@ var hljs = (function () {
           and joined by `|` - using match groups to track position.  When a match is
           found checking which position in the array has content allows us to figure
           out which of the original regexes / match groups triggered the match.
-    
+
           The match object itself (the result of `Regex.exec`) is returned but also
           enhanced by merging in any meta-data that was registered with the regex.
           This is how we keep track of which mode matched, and what type of rule
@@ -1237,28 +1237,28 @@ var hljs = (function () {
           ignored.  An example: if we matched say the 3rd regex in a large group but
           decided to ignore it - we'd need to started testing again at the 4th
           regex... but MultiRegex itself gives us no real way to do that.
-    
+
           So what this class creates MultiRegexs on the fly for whatever search
           position they are needed.
-    
+
           NOTE: These additional MultiRegex objects are created dynamically.  For most
           grammars most of the time we will never actually need anything more than the
           first MultiRegex - so this shouldn't have too much overhead.
-    
+
           Say this is our search group, and we match regex3, but wish to ignore it.
-    
+
             regex1 | regex2 | regex3 | regex4 | regex5    ' ie, startAt = 0
-    
+
           What we need is a new MultiRegex that only includes the remaining
           possibilities:
-    
+
             regex4 | regex5                               ' ie, startAt = 3
-    
+
           This class wraps all that complexity up in a simple API... `startAt` decides
           where in the array of expressions to start doing the matching. It
           auto-increments, so if a match is found at position 2, then startAt will be
           set to 3.  If the end is reached startAt will return to 0.
-    
+
           MOST of the time the parser will be setting startAt manually to 0.
         */
         class ResumableMultiRegex {
@@ -2102,7 +2102,7 @@ var hljs = (function () {
                 Why might be find ourselves here?  An potential end match that was
                 triggered but could not be completed.  IE, `doEndMatch` returned NO_MATCH.
                 (this could be because a callback requests the match be ignored, etc)
-        
+
                 This causes no real harm other than stopping a few times too many.
                 */
 
@@ -2224,13 +2224,13 @@ var hljs = (function () {
         /**
         Highlighting with language detection. Accepts a string with the code to
         highlight. Returns an object with the following properties:
-    
+
         - language (detected language)
         - relevance (int)
         - value (an HTML string with highlighting markup)
         - secondBest (object with the same structure for second-best heuristically
           detected language, may be absent)
-    
+
           @param {string} code
           @param {Array<string>} [languageSubset]
           @returns {AutoHighlightResult}
