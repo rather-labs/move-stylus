@@ -1,6 +1,6 @@
 # Account
 
-The stylus::account module allows you to inspect account metadata, such as the amount of ETH held or whether an address contains smart contract code. This functions are direct wrappers to the account [stylus host functions](https://github.com/OffchainLabs/stylus-sdk-rs/blob/main/stylus-sdk/src/hostio.rs).
+The `stylus::account` module allows you to inspect account data, such as the amount of ETH held or whether an address contains smart contract code. This functions are direct wrappers to the account [stylus host functions](https://github.com/OffchainLabs/stylus-sdk-rs/blob/main/stylus-sdk/src/hostio.rs).
 
 ```move
 module stylus::account;

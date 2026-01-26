@@ -1,6 +1,6 @@
 # Peep
 
-The `peep` function enables "cross-account" storage reads. It allows you to inspect the fields of an object owned by a specific address, provided you know the object's unique identifier.
+The `peep` function enables cross-account storage reads. It allows you to inspect the fields of an object owned by a specific address, provided you know the object's unique identifier.
 
 ```move
 module stylus::peep;
