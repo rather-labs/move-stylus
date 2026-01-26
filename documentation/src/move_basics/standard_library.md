@@ -11,14 +11,14 @@ The Standard Library is exported at address `0x1`. It can also be used via the a
 
 The Stylus Framework includes the following modules:
 
-| Module| Description| Chapter|
-| -| -| -|
-| `std::string`| Provides basic string operations| [String](./string) |
-| `std::ascii`| Provides basic ASCII operations | [String](./string) |
-| `std::option`| Implements `Option<T>`| [Option](./option)|
-| `std::vector` | Native operations on the vector type| [Vector](./vector)|
-| `std::bit_vector`| Provides operations on bit vectors | - |
-| `std::fixed_point32` | Provides the `FixedPoint32` type| -                                    |
+| Module                | Description                              | Chapter                |
+| --------------------- | ---------------------------------------- | ---------------------- |
+| `std::string`         | Provides basic string operations         | [String](./string)     |
+| `std::ascii`          | Provides basic ASCII operations          | [String](./string)     |
+| `std::option`         | Implements `Option<T>`                   | [Option](./option)     |
+| `std::vector`         | Native operations on the vector type     | [Vector](./vector)     |
+| `std::bit_vector`     | Provides operations on bit vectors       | -                      |
+| `std::fixed_point32`  | Provides the `FixedPoint32` type         | -                      |
 <!-- | `std::type_name`| Allows runtime _type reflection_| [Type Reflection](./type-reflection) | -->
 
 ### Integers
@@ -31,12 +31,12 @@ The Move Standard Library provides a set of functions associated with integer ty
 
 | Module                                                         | Description                   |
 | -------------------------------------------------------------- | ----------------------------- |
-| `std::u8`     | Functions for the `u8` type   |
-| `std::u16`   | Functions for the `u16` type  |
-| `std::u32`   | Functions for the `u32` type  |
-| `std::u64`   | Functions for the `u64` type  |
-| `std::u128` | Functions for the `u128` type |
-| `std::u256` | Functions for the `u256` type |
+| `std::u8`                                                      | Functions for the `u8` type   |
+| `std::u16`                                                     | Functions for the `u16` type  |
+| `std::u32`                                                     | Functions for the `u32` type  |
+| `std::u64`                                                     | Functions for the `u64` type  |
+| `std::u128`                                                    | Functions for the `u128` type |
+| `std::u256`                                                    | Functions for the `u256` type |
 
 
 ## Source Code

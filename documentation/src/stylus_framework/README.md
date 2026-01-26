@@ -10,19 +10,19 @@ The Stylus Framework is exported at address `0x2`. It can also be used via the a
 
 The Stylus Framework includes the following modules:
 
-| Moldule                     | Description                                                  | Section |
-|----------------------------|--------------------------------------------------------------|---------|
-|`stylus::account`| Provides functionalities for managing Stylus accounts | - |
-|`stylus::contract_calls`| Implements functionalities to perform cross-contract calls. | [Cross contract calls](../evm_specifics/cross_contract_calls.md) |
-| `stylus::dynamic_fields` | Implements dynamic fields for flexible data storage. | [Dynamic Fields](./dynamic_fields.md) |
-| `stylus::dynamic_fields_named_id` | Implements dynamic fields for flexible data storage for NamedIds. | [Dynamic Fields](../advanced_programmability/dynamic_fields.md) |
-| `stylus::error` | Provides error handling functionalities specific to EVM. | [Errors](../evm_specifics/errors.md) |
-| `stylus::events` | Provides functionalities for emitting. | [Events](../evm_specifics/events.md) |
-| `stylus::object` | Provides utilities for working with Stylus objects model. | [Object Model](../object_model/README.md) |
-| `stylus::peep` | Allows to read objects owned by other accountes. | [Peep API](./peep_api.md) |
-| `stylus::sol_types` | Contains types that map to Solidity types. | [Solidity Types](./solidity_types.md) |
-| `stylus::table` | Provides a table data structure for key-value storage. | [Dynamic Fields](./dynamic_fields.md#Tables) |
-| `stylus::tx_context` | Provides access to transaction context information. | [Transaction Context](../evm_specifics/transaction_context.md) |
+| Module                            | Description                                                                  | Section                                                                      |
+| --------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `stylus::account`                 | Provides functionalities for managing Stylus accounts                        | -                                                                            |
+| `stylus::contract_calls`          | Implements functionalities to perform cross-contract calls.                  | [Cross contract calls](../evm_specifics/cross_contract_calls.md)             |
+| `stylus::dynamic_fields`          | Implements dynamic fields for flexible data storage.                         | [Dynamic Fields](./dynamic_fields.md)                                        |
+| `stylus::dynamic_fields_named_id` | Implements dynamic fields for flexible data storage for NamedIds.            | [Dynamic Fields](../advanced_programmability/dynamic_fields.md)              |
+| `stylus::error`                   | Provides error handling functionalities specific to EVM.                     | [Errors](../evm_specifics/errors.md)                                         |
+| `stylus::events`                  | Provides functionalities for emitting.                                       | [Events](../evm_specifics/events.md)                                         |
+| `stylus::object`                  | Provides utilities for working with Stylus objects model.                    | [Object Model](../object_model/README.md)                                    |
+| `stylus::peep`                    | Allows to read objects owned by other accountes.                             | [Peep API](./peep_api.md)                                                    |
+| `stylus::sol_types`               | Contains types that map to Solidity types.                                   | [Solidity Types](./solidity_types.md)                                        |
+| `stylus::table`                   | Provides a table data structure for key-value storage.                       | [Dynamic Fields](./dynamic_fields.md#Tables)                                 |
+| `stylus::tx_context`              | Provides access to transaction context information.                          | [Transaction Context](../evm_specifics/transaction_context.md)               |
 
 <!--
 
