@@ -38,5 +38,28 @@ An anonymous event does not include the event signature as the first topic in th
 > If an event struct has more indexed fields than allowed (maximum of 4 for anonymous events, maximum of 3 for non-anonymous events), the Move compiler will raise a compilation error.
 
 
+## Emitting Events
+
+To emit an event, use the `stylus::event::emit` function followed by an instance of the event struct.
+
+```move
+use stylus::event::{Self};
+
+public fun emit_event_example() {
+    let event_instance = Event {
+        a: 42,
+        b: @0x1,
+        c: 1000,
+        d: vec![1, 2, 3, 4, 5],
+    };
+
+    stylus::event::emit(event_instance);
+}
+```
+
+In the example above, the `emit_event_example` function creates an instance of the `Event` struct and emits it using the `stylus::event::emit` function. The emitted event will be recorded on the blockchain with the specified indexed topics and data.
+
+
 > [!WARNING]
 > If an event struct is not annotated with the `#[ext(event(..)]` attribute, it will not be recognized as an event, and attempting to emit it will result in a compilation error.
+
