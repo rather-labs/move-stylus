@@ -57,4 +57,8 @@
     - [Constructor](./evm_specifics/constructor.md)
 - [Stylus Framework](./stylus_framework/README.md)
     - [Peep](./stylus_framework/peep.md)
+    - [Dynamic Fields](./advanced_programmability/dynamic_fields.md)
     - [Account](./stylus_framework/account.md)
+- [Advanced Programmability](./advanced_programmability/README.md)
+    - [Pattern: Hot Potato](./advanced_programmability/hot_potato.md)
+    - [Pattern: Capability](./advanced_programmability/capability.md)
