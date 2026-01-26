@@ -62,3 +62,4 @@
 - [Advanced Programmability](./advanced_programmability/README.md)
     - [Pattern: Hot Potato](./advanced_programmability/hot_potato.md)
     - [Pattern: Capability](./advanced_programmability/capability.md)
+    - [Pattern: Wrapper Type](./advanced_programmability/wrapper_type.md)
