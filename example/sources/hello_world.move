@@ -89,7 +89,7 @@ fun identity_2(_x: u128, y: u128): u128 {
 entry fun tx_context_properties(ctx: &TxContext): (address, u256, u64, u256, u64, u64, u64, u256) {
     (
         ctx.sender(),
-        ctx.msg_value(),
+        ctx.value(),
         ctx.block_number(),
         ctx.block_basefee(),
         ctx.block_gas_limit(),

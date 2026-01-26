@@ -13,7 +13,7 @@ public fun sender(_self: &TxContext): address {
 native fun native_sender(): address;
 
 /// Return the number of wei sent with the message
-public fun msg_value(_self: &TxContext): u256 {
+public fun value(_self: &TxContext): u256 {
     native_msg_value()
 }
 native fun native_msg_value(): u256;
@@ -57,7 +57,7 @@ native fun native_gas_price(): u256;
 /// Create an `address` that has not been used. As it is an object address, it will never
 /// occur as the address for a user.
 /// In other words, the generated address is a globally unique object ID.
-public fun fresh_object_address(_ctx: &mut TxContext): address {
+public(package) fun fresh_object_address(_ctx: &mut TxContext): address {
     fresh_id()
 }
 native fun fresh_id(): address;
