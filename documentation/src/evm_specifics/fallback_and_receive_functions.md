@@ -38,7 +38,7 @@ In the Stylus framework, implementing a `fallback` function requires adhering to
 1. **Naming**: The function name must be exactly `fallback`.
 2. **Visibility**: It must be marked as an `entry` function.
 3. **State Mutability**: It may optionally be annotated with `#[ext(abi(payable))]` if it needs to accept Ether.
-4. **Signature**: It takes no arguments, except optionally a reference to the `stylus::TxContext`, and _can_ return a `vector<u8>` representing some raw output bytes **without abi-encoding**.
+4. **Signature**: It takes no arguments, except optionally a reference to the [`TxContext`](./transaction_context.md), and _can_ return a `vector<u8>` representing some raw output bytes **without abi-encoding**.
 
 For instance, both of these are valid `fallback` declarations:
 

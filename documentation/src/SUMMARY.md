@@ -54,4 +54,7 @@
     - [Fallback and Receive Functions](./evm_specifics/fallback_and_receive_functions.md)
     - [Errors](./evm_specifics/errors.md)
     - [Cross contract calls](./evm_specifics/cross_contract_calls.md)
+    - [Constructor](./evm_specifics/constructor.md)
 - [Stylus Framework](./stylus_framework/README.md)
+    - [Peep](./stylus_framework/peep.md)
+    - [Account](./stylus_framework/account.md)
