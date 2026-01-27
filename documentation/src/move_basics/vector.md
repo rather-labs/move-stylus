@@ -4,7 +4,7 @@ Vectors are the built-in mechanism for storing collections of elements in Move. 
 
 ## Syntax
 
-The `vector` type is declared using the `vector` keyword followed by the element type in angle brackets. Elements can be any valid Move type, including nested vectors.
+The `vector` type is declared using the `vector` keyword followed by the element type in angle brackets. Elements can be any valid Move type, including other vectors.
 
 Move also provides a vector literal syntax: you can construct vectors with the `vector` keyword followed by square brackets containing the elements, or leave the brackets empty to create an empty vector.
 
@@ -48,7 +48,7 @@ assert_eq!(last_element, 20);
 
 ## Destroying a Vector of non-droppable types
 
-A vector containing non-droppable types cannot be discarded. If you create a vector of types that lack the drop ability, the value must be handled explicitly. When such a vector is empty, the compiler enforces an explicit call to the destroy_empty function.
+A vector containing non-droppable types cannot be discarded. If you create a vector of types that lack the drop ability, the value must be handled explicitly. When such a vector is empty, the compiler enforces an explicit call to the `destroy_empty` function.
 
 ```move
 struct NonDroppable { }

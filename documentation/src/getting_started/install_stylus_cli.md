@@ -2,11 +2,11 @@
 
 ## Prerequisites
 
-To install the Move-Stylus CLI, you need to have [Rust](https://doc.rust-lang.org/cargo/getting-started/installation.html) installed on your machine, [git](https://git-scm.com/).
+To install the Move-Stylus CLI, you need to have [Rust](https://doc.rust-lang.org/cargo/getting-started/installation.html) and [git](https://git-scm.com/) installed on your machine.
 
 ## Installation
 
-At the moment, the only way to install the Stylus CLI is by building it from source. You can do this by cloning the Stylus repository and using Cargo to build and install the CLI.
+For the moment, the only way to install the Stylus CLI is by building it from source. You can do this by cloning the Stylus repository and using Cargo to build and install the CLI.
 
 #### Install `cargo-stylus`
 

@@ -1,6 +1,6 @@
 # Create a New Project
 
-To create a new Stylus project, you can use the Stylus CLI tool that you installed in the previous step. Open your terminal and run the following command:
+To create a new Stylus project, you can use the `move-stylus` CLI tool that you installed in the previous step. Open your terminal and run the following command:
 
 ```bash
 move-stylus new counter

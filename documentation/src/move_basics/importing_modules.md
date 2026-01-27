@@ -44,6 +44,7 @@ Another module defined in the same package can import and use the `counter` modu
 // File: sources/main.move
 
 module book::main;
+
 // Importing the counter module from the book package
 use book::counter;
 
@@ -61,7 +62,8 @@ fun main() {
 
 In this example, we import the `counter` module from the `book` package. We then use the functions defined in the `counter` module to create, increment, and read a counter.
 
-> **Note**: To import an item (struct, function, constant, etc.) from another module, it must be declared with the `public` keyword (or `public(package)`—see [visibility modifiers](./visibility_modifiers.md)). For instance, the `Counter` struct and the `create` function in `counter` module are marked `public`, allowing them to be accessed in `main`.
+> [!NOTE]
+> To import an item (struct, function, constant, etc.) from another module, it must be declared with the `public` keyword (or `public(package)`—see [visibility modifiers](./visibility_modifiers.md)). For instance, the `Counter` struct and the `create` function in `counter` module are marked `public`, allowing them to be accessed in `main`.
 
 ## Importing members
 
@@ -98,9 +100,10 @@ use book::counter::read;
 use book::counter::Counter;
 ```
 
-> **Note**: Importing individual function names in Move is uncommon, as overlapping names can lead to ambiguity. A better practice is to import the full module and call functions using the module path. Types, however, have unique identifiers and are best imported separately.
+> [!NOTE]
+> Importing individual function names in Move is uncommon, as overlapping names can lead to ambiguity. A better practice is to import the full module and call functions using the module path. Types, however, have unique identifiers and are best imported separately.
 
-You can use the Self keyword in a group import to bring in both the module itself and its members. Self refers to the module as a whole, allowing you to import the module alongside its contents.
+You can use the `Self` keyword in a group import to bring in both the module itself and its members. `Self` refers to the module as a whole, allowing you to import the module alongside its contents.
 
 ```move
 // File: sources/main.move
@@ -148,11 +151,12 @@ Remote = { git = "https://github.com/example/example-stylus.git", rev = "main", 
 Local = { local = "../local_packages/local" }
 ```
 
-The `[dependencies]` section lists each package dependency. The entry key is the package name (e.g., `Remote` or `Local`), and the value is either a Git import table or a local path. A Git import specifies the package URL, the subdirectory containing the package, and the revision, while a local path points to the relative directory of the package.
+The `[dependencies]` section lists each package dependency. The entry key is the package name (e.g., `Remote` or `Local`), and the value is either a Git import or a local path. A Git import specifies the package URL, the subdirectory containing the package, and the revision, while a local path points to the relative directory of the package.
 
-When you add a dependency, all of its own dependencies are also made available to your package. If a dependency is declared in the Move.toml file, the compiler will automatically fetch (and refetch) it during the build process.
+When you add a dependency, all of its own dependencies are also made available to your package. If a dependency is declared in the `Move.toml` file, the compiler will automatically fetch (and refetch) it during the build process.
 
-> **Note**: The standard library and the Stylus framework are automatically included as dependencies.
+> [!NOTE]
+> The standard library and the Stylus framework are automatically included as dependencies.
 
 # Importing Modules from Another Package
 
@@ -160,4 +164,5 @@ To import modules from another package, you first need to declare the dependency
 
 Typically, packages specify their addresses in the `[addresses]` section. Instead of writing full addresses, you can use aliases. For instance, the `std` alias is defined in the Standard Library package and serves as a shorthand for `0x1` when accessing standard library modules.
 
-> **Note**: Module address names are defined in the `[addresses]` section of the `Move.toml` manifest, not taken from the names listed in `[dependencies]`.
+> [!NOTE]
+> Module address names are defined in the `[addresses]` section of the `Move.toml` manifest, not taken from the names listed in `[dependencies]`.

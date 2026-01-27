@@ -4,7 +4,7 @@ Every variable in Move has a scope and an owner. The scope is the range of code 
 
 ## Ownership
 
-A variable defined in a function scope is owned by this scope. The Move runtime goes through the function scope and executes every expression and statement. After the function scope ends, the variables defined in it are dropped or deallocated.
+A variable defined in a function scope is owned by this scope. The Move runtime goes through the function scope and executes every expression and statement. After the function scope ends, the variables defined in it are dropped (preventing future code to access those variables).
 
 ``` move
 module book::ownership;

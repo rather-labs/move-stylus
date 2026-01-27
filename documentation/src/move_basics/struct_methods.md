@@ -1,6 +1,6 @@
 # Struct Methods
 
-Move Compiler supports receiver syntax `instance.method()`, which allows defining methods which can be called on instances of a struct. The term "receiver" specifically refers to the instance that receives the method call. This is like the method syntax in other programming languages. It is a convenient way to define functions that operate on the fields of a struct, providing direct access to the struct's fields and creating cleaner, more intuitive code than passing the struct as a parameter.
+Move Compiler supports receiver syntax `instance.method()`, which allows defining methods that can be called on instances of a struct. The term "receiver" specifically refers to the instance that receives the method call. This is like the method syntax in other programming languages. It is a convenient way to define functions that operate on the fields of a struct, providing direct access to the struct's fields and creating cleaner, more intuitive code than passing the struct as a parameter.
 
 ## Method syntax
 
@@ -52,7 +52,7 @@ Method aliases help avoid name conflicts when modules define multiple structs al
 
 Here's the syntax:
 
-``` move
+```
 // for local method association
 use fun function_path as Type.method_name;
 
@@ -111,5 +111,5 @@ In the test function, the health method is called directly on the Hero and Villa
 
 > [!NOTE]
 > In the test function, `hero.health()` is calling the aliased method, not directly accessing the private health field. While the `Hero` and
-> `Villain` structs are public, their fields remain private to the module. The method call `hero.health()` uses the public alias defined by 
+> `Villain` structs are public, their fields remain private to the module. The method call `hero.health()` uses the public alias defined by
 > `public use fun hero_health as Hero.health`, which provides controlled access to the private field.

@@ -1,6 +1,6 @@
 # Ability: drop
 
-The `drop` ability allows instances of a struct to be *discarded* without being used. This means that when a value of a struct type with the `drop` ability goes out of scope, it can be safely ignored and removed from memory without any special handling. This is a safety feature in Move language that ensures that all assets are properly managed. Ignoring a value with the `drop` ability results in a compilation error, preventing accidental loss of resources.
+The `drop` ability allows instances of a struct to be *discarded* without being used. This means that when a value of a struct type with the `drop` ability goes out of scope, it can be safely ignored without any special handling. This is a safety feature in Move language that ensures that all assets are properly managed. Ignoring a value with the `drop` ability results in a compilation error, preventing accidental loss of resources.
 
 ```move
 module book::drop_ability;

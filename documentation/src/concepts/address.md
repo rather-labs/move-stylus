@@ -8,14 +8,14 @@
 
 The address above is an example of a valid address. It is 64 characters long (32 bytes) and prefixed with `0x`.
 
-Sui also has reserved addresses that are used to identify standard packages and objects. Reserved addresses are typically simple values that are easy to remember and type. For example, the address of the Standard Library is `0x1`. Addresses, shorter than 32 bytes, are padded with zeros to the left.
+Move also has reserved addresses that are used to identify standard packages and objects. Reserved addresses are typically simple values that are easy to remember and type. For example, the address of the Standard Library is `0x1`. Addresses, shorter than 32 bytes, are padded with zeros to the left.
 
 Here are some examples of reserved addresses:
 
-* 0x1 - address of the Sui Standard Library (alias std)
-* 0x2 - address of the Stylus Framework (alias stylus)
+* `0x1` - address of the Sui Standard Library (alias `std`)
+* `0x2` - address of the Stylus Framework (alias `stylus`)
 
-### Note: Comparison with Solidity (EVM)
+## Comparison with Solidity (EVM)
 
 If you are coming from an Ethereum background, it is important to note two key differences:
 

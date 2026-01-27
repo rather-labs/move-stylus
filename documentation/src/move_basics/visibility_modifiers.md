@@ -1,6 +1,6 @@
 # Visibility Modifiers
 
-Every module member has a visibility. By default, all module members are *private* - meaning they are only accessible within the module they are defined in. However, you can add a visibility modifier to make a module member *public* - visible outside the module, or *public(package)* - visible in the modules within the same package, or *entry* - can be called from a transaction but can't be called from other modules.
+Every module member has a visibility. By default, all module members are *private* - meaning they are only accessible within the module they are defined in. However, you can add a visibility modifier to make a module member `public` - visible outside the module, or `public(package)` - visible in the modules within the same package, or `entry` - can be called from a transaction but can't be called from other modules.
 
 ## Internal Visibility
 
@@ -35,7 +35,7 @@ Note that just because a struct field is not visible from Move does not mean tha
 
 ## Public Visibility
 
-A struct or a function can be made *public* by adding the `public` keyword before the `fun` or `struct` keyword.
+A function can be made *public* by adding the `public` keyword before the `fun` keyword.
 
 ``` move
 module book::public_visibility;
@@ -57,8 +57,8 @@ fun try_calling_public() {
 }
 ```
 
-
-Unlike some languages, **struct fields cannot be made public**.
+> [!NOTE]
+> `struct` must always be declared with `public` visibility. By default the only thing you can do is just importing it. To access or modify the fields of a struct, you need to define public functions (getters and setters) within the module where the struct is defined.
 
 ## Package Visibility
 

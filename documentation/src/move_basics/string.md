@@ -33,7 +33,7 @@ let another_utf8_str = b"Hello".to_string();
 
 ### Common Operations
 
-UTF8 strings in Move provide several methods for working with text. The most common operations include concatenation, slicing, and retrieving the length. For custom operations, the `bytes()` method can be used to access the underlying byte vector.
+UTF-8 strings in Move provide several methods for working with text. The most common operations include concatenation, slicing, and retrieving the length. For custom operations, the `bytes()` method can be used to access the underlying byte vector.
 
 ```move
 let mut str = b"Hello,".to_string();
@@ -65,7 +65,8 @@ The default `utf8` method may abort if the provided bytes are not valid UTF-8. I
 - `Some(String)` if the bytes form a valid UTF-8 string.
 - `None` if the bytes are invalid.
 
-> **Note:** Functions with names starting with `try_*` typically return an `Option`. If the operation succeeds, the result is wrapped in `Some`. If it fails, the function returns `None`.
+> [!NOTE]
+> Functions with names starting with `try_*` typically return an `Option`. If the operation succeeds, the result is wrapped in `Some`. If it fails, the function returns `None`.
 
 
 ### UTF-8 Limitations
@@ -79,12 +80,12 @@ However, methods such as `sub_string` and `insert` validate character boundaries
 
 ## Working with ASCII Strings
 
-The `ASCIIString` type in the `std::ascii` module is defined as follows:
+The `String` type in the `std::ascii` module is defined as follows:
 
 ```move
 module std::ascii;
 
-/// An `ASCIIString` holds a sequence of bytes which are guaranteed to be valid ASCII characters.
+/// A `String` holds a sequence of bytes which are guaranteed to be valid ASCII characters.
 public struct String has copy, drop, store {
     bytes: vector<u8>,
 }

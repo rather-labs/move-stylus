@@ -4,7 +4,7 @@ A module is the fundamental unit of code organization in Move. It provides a mec
 
 ## Module Declaration
 
-Modules in Move are declared using the module keyword, followed by the package address, the module name, a semicolon, and the module body. Module names must follow the snake_case convention—lowercase letters with underscores separating words—and must be unique within the package.
+Modules in Move are declared using the `module` keyword, followed by the package address, the module name, a semicolon, and the module body. Module names must follow the snake_case convention—lowercase letters with underscores separating words—and must be unique within the package.
 
 ```move
 module <package_address>::<module_name>;
@@ -21,7 +21,7 @@ module <package_address>::<module_name> {
 Typically, each file in the `sources/` directory defines a single module. The file name must correspond to the module name; for instance, a `counter` module should reside in a file named `counter.move`.
 
 
-[Structs](./move_basics/structs.md), [Functions](./move_basics/functions.md), [Constants](./move_basics/constants.md) and [Imports](./move_basics/imports) are all declared within the module body.
+[Structs](./structs.md), [Functions](./functions.md), [Constants](./constants.md) and [Imports](./importing_modules.md) are all declared within the module body.
 
 
 ## Module Members
@@ -66,7 +66,7 @@ A module address in Move can be specified in two ways:
     module book::my_module;
     ```
 
-For example, both forms below resolve to the same value because the `Move.toml` includes the entry:
+For example, both representations above resolve to the same value because the `Move.toml` includes the entry:
 
 ```toml
 [addresses]

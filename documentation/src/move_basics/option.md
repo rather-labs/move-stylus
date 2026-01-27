@@ -1,6 +1,6 @@
 # Option
 
-The `Option` type in Move is a powerful way to represent values that may or may not be present. It is similar to the concept of nullable types in other programming languages but provides a more explicit and type-safe way to handle optional values. `Option` is defined in the `std::option` module of the [Standard Library](./standard_library.md). as follows:
+The `Option` type in Move is a powerful way to represent values that may or may not be present. It is similar to the concept of nullable types in other programming languages but provides a more explicit and type-safe way to handle optional values. `Option` is defined in the `std::option` module of the [Standard Library](./standard_library.md) as follows:
 
 ```move
 module std::option;
@@ -11,11 +11,13 @@ public struct Option<Element> has copy, drop, store {
 }
 ```
 
-> **Note**: The 'std::option' module is implicitly imported in every module, so you don't need to add an explicit import.
+> [!NOTE]
+> The `std::option` module is implicitly imported in every module, so you don't need to add an explicit import.
 
 The `Option` type is a generic type parameterized by `Element`. It defines a single field, `vec`, which is a vector of `Element`. This vector can have a length of 0 or 1, representing the absence or presence of a value.
 
-> **Note:** Although `Option` is implemented as a struct containing a vector rather than an enum, this design exists for historical reasons—`Option` was introduced before Move supported enums.
+> [!NOTE]
+> Although `Option` is implemented as a struct containing a vector rather than an enum, this design exists for historical reasons—`Option` was introduced before Move supported enums.
 
 The `Option` type has two variants:
 - **Some**: holds a value.

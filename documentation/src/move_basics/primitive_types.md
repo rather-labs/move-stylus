@@ -4,7 +4,7 @@ Move provides a set of built-in primitive types for representing simple values. 
 
 - [**Booleans**](#booleans)
 - [**Unsigned integers**](#unsigned-integers)
-- **Addresses** (covered in the next section)
+- [**Addresses**](./address_type.md) (covered in the next section)
 
 Before exploring each primitive type in detail, it is useful to understand how variables are declared and assigned in Move.
 

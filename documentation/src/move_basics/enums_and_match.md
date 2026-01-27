@@ -1,6 +1,9 @@
 # Enums and Match
 
-An `enum` in Move is a user-defined type that can represent one of several variants. Each variant can optionally hold associated data. Enums are useful for modeling data that can take on different forms. Recursive enums, where a variant can contain another instance of the same enum type, are **not** supported.
+An `enum` in Move is a user-defined type that can represent one of several variants. Each variant can optionally hold associated data. Enums are useful for modeling data that can take on different forms.
+
+> [!NOTE]
+> Recursive enums, where a variant can contain another instance of the same enum type, are **not** supported.
 
 ## Definition
 

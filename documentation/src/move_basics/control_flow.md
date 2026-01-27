@@ -1,7 +1,5 @@
 # Control Flow
 
-## Control Flow Statements
-
 Control flow statements determine how a program executes by directing its path. They allow you to make decisions, repeat sections of code, or exit early from a block or function.
 
 Move includes the following control flow statements:
@@ -13,13 +11,13 @@ Move includes the following control flow statements:
 
 ## Conditional Statements
 
-The `if` expression allows you to execute a block of code only if a specified condition is true. You can also use `else` to provide an alternative block of code if the condition is false.
+The `if` expression allows you to execute a block of code only if a specified condition is `true`. You can also use `else` to provide an alternative block of code if the condition is `false`.
 
 The syntax for an `if` expression is as follows:
 
 ```
-if (<bool_expression) <expression>;
-if (<bool_expression) <expression> else <expression>;
+if (<bool_expression>) <expression>;
+if (<bool_expression>) <expression> else <expression>;
 ```
 
 The `else` keyword is optional. If the condition evaluates to true, the first expression is executed; otherwise, the second expression (if provided) is executed. If the `else` clause is used, both branches must return values of the same type.
@@ -28,6 +26,7 @@ Like any other expression, `if` requires a semicolon at the end if there are oth
 
 
 Here are some examples of using `if` and `if-else` statements in Move:
+
 
 ```move
 // Example of an if statement
@@ -50,13 +49,16 @@ let max = if (a > b) {
 
 Conditional expressions are among the most important control flow statements in Move.  They evaluate user-provided input or stored data to make decisions. One key use case is the [`assert!`](./TODO.md) macro, which verifies that a condition is true and aborts execution if it is not.
 
+> [!NOTE]
+> You can abort the execution in any of the branches using the `abort` statement regarding of the return type of the other branch.
+
 ## Repeating Code with Loops
 
-Loops allow you to repeat a block of code multiple times based on a condition. Move supports two types of loops: `loop` and `while`. In many cases, you can use either type of loop to achieve the same result, but usuallly `while` loops are more concise when the number of iterations is determined by a condition while `loop` is more flexible for infinite loops or when the exit condition is complex.
+Loops allow you to repeat a block of code multiple times based on a condition. Move supports two types of loops: `loop` and `while`. In many cases, you can use either type of loop to achieve the same result, but usuallly `while` loops are more concise when the number of iterations is determined by a condition whereas `loop` is more flexible for infinite loops or when the exit condition is complex.
 
 ### The `while` Loop
 
-The `while` loop repeatedly executes a block of code as long as a specified condition evaluates to true.  The boolean expression is evaluated before each iteration, and if it evaluates to false, the loop terminates.
+The `while` loop repeatedly executes a block of code as long as a specified condition evaluates to `true`.  The boolean expression is evaluated before each iteration, and if it evaluates to `false`, the loop terminates.
 
 The syntax for a `while` loop is as follows:
 
@@ -102,7 +104,7 @@ loop {
 assert_eq!(count, 5);
 ```
 
-If the if expression was not used inside the loop, the loop would run indefinitely, causing the program to hang or crash.
+If the `if` expression was not used inside the loop, the loop would run indefinitely, causing the program to hang or crash.
 
 ### Exiting Loops Early
 

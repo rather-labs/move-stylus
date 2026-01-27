@@ -28,7 +28,7 @@ const USES: u8 = 3;
 public struct Card { uses: u8 }
 
 /// Purchase a metro pass card.
-public fun purchase(/* pass a Coin */): Card {
+public fun purchase(): Card {
     Card { uses: USES }
 }
 ```
@@ -46,7 +46,7 @@ public fun is_valid(card: &Card): bool {
 }
 ```
 
-Because the function does not take ownership of the `Card`, it can _read_ its data but cannot _write_ to it, meaning it cannot modify the number of rides. Additionally, the function signature ensures that it cannot be called without a `Card` instance. This is an important property that allows the **Capability Pattern**, which we will cover in the next chapters.
+Because the function does not take ownership of the `Card`, it can _read_ its data but cannot _write_ to it, meaning it cannot modify the number of rides. Additionally, the function signature ensures that it cannot be called without a `Card` instance. This is an important property that allows the [**Capability Pattern**](./../advanced_programmability/capability.md), which we will cover in the next chapters.
 
 Creating a reference to a value is often referred to as "borrowing" the value. For example, the method to get a reference to the value wrapped by an `Option` is called `borrow`.
 

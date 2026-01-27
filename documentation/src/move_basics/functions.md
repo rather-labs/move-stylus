@@ -30,7 +30,8 @@ fun function_name(param1: Type1, param2: Type2): ReturnType {
 }
 ```
 
-> **Note:**: In Move, functions are typically named using snake_case, where words are separated by underscores (e.g., `my_function_name`).
+> [!NOTE]
+> In Move, functions are typically named using `snake_case`, where words are separated by underscores (e.g., `my_function_name`).
 
 ## Accesing functions
 
@@ -61,6 +62,11 @@ entry fun perform_addition(a: u64, b: u64) {
     // Perform some state change
 }
 ```
+
+> [!NOTE]
+> You must change the function name to `camelCase` when calling an entry function from a transaction. For example, the `perform_addition` function would be called as `performAddition` in a transaction.
+>
+> This is to follow Solidity's naming conventions.
 
 ## Multiple return values
 
