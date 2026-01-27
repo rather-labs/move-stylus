@@ -1,6 +1,6 @@
 # Stylus Framework
 
-Stylus Framework provides EVM/Stylus specific feature such as cross-contract calls, events, storage functions, as well as high-level abstractions like the Peep API and Account module to facilitate smart contract development on the Stylus platform.
+Stylus Framework provides EVM/Stylus specific feature such as cross-contract calls, events, storage functions, as well as high-level abstractions like the [Peep API](./peep.md) and [Account module](./account.md) to facilitate smart contract development on the Stylus platform.
 
 ## Exported address
 

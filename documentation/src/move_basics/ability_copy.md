@@ -23,8 +23,8 @@ let Copyable {} = c;
 In the example above, `a` is copied to `b` implicitly, and then explicitly copied to `c` using the dereference operator. If `Copyable` did not have the _copy_ ability, the code would not compile, and the Move compiler would raise an error.
 
 >[!Note]
-In Move, destructuring with empty brackets is often used to consume unused variables, especially for types without the drop ability. 
-This prevents compiler errors from values going out of scope without explicit use. Also, Move requires the type name in destructuring (e.g., `Copyable in let Copyable {} = a;`) because it enforces strict typing and ownership rules.
+In Move, destructuring with empty brackets is often used to consume unused variables, especially for types without the drop ability.
+This prevents compiler errors from values going out of scope without explicit use. Also, Move requires the type name in destructuring (e.g., `Copyable` in `let Copyable {} = a;`) because it enforces strict typing and ownership rules.
 
 ## Copying and Drop
 

@@ -14,7 +14,7 @@ public native fun peep<T: key>(owner_address: address, id: &UID): &T;
 
 * **Type Safety**: The function is generic over type `T`. The caller must specify the exact struct type expected in storage. If the data at that location does not match the layout of `T`, we will get a runtime error.
 
-## Implementation Example 
+## Implementation Example
 
 The following example demonstrates how one user can inspect another user's storage.
 
@@ -25,9 +25,9 @@ The following example demonstrates how one user can inspect another user's stora
 module test::peep;
 
 use stylus::{
-    peep as stylus_peep, 
-    object::{Self, UID}, 
-    tx_context::TxContext, 
+    peep as stylus_peep,
+    object::{Self, UID},
+    tx_context::TxContext,
     transfer::transfer
 };
 
@@ -46,9 +46,12 @@ entry fun create_foo(ctx: &mut TxContext) {
     transfer(foo, ctx.sender());
 }
 
-/// Bob (or anyone) calls this to read a Foo object 
+/// Bob (or anyone) calls this to read a Foo object
 /// owned by a Alice.
 entry fun peep_foo(owner: address, foo_id: &UID): &Foo {
     stylus_peep::peep<Foo>(owner, foo_id)
 }
 ```
+
+> [!Important]
+> The Peep API is designed to explictly allow reading data from other accounts. When using it inside a contract, the programmer is responsible for ensuring that such cross-account reads are appropriate and do not violate any privacy or security considerations.

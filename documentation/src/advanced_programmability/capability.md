@@ -11,7 +11,11 @@ In the example below, we define an `AdminCap`. Upon deployment, the `init` funct
 ```move
 module test::capability;
 
-use stylus::{transfer::{Self}, object::{Self, UID}, tx_context::{Self, TxContext}};
+use stylus::{
+    transfer::{Self},
+    object::{Self, UID},
+    tx_context::{Self, TxContext}
+};
 
 public struct AdminCap has key { id: UID }
 
@@ -33,8 +37,8 @@ Utilizing objects as capabilities is a relatively new concept in blockchain prog
 Using capabilities has several advantages over the address check:
 
 * Migration of admin rights is easier with capabilities due to them being objects. In case of address, if the admin address changes, all the functions that check the address need to be updated - hence, require a package upgrade.
-* Function signatures are more descriptive with capabilities. 
+* Function signatures are more descriptive with capabilities.
 * Object Capabilities don't require extra checks in the function body, and hence, decrease the chance of a developer mistake.
-* An owned Capability also serves in discovery. The owner of the `AdminCap` can see the object in their account (via a Wallet or Explorer), and know that they have the admin rights. This is less transparent with the address check.
+* An owned Capability also serves in discovery.
 
 However, the address approach has its own advantages. For example, if an address is multisig, and transaction building gets more complex, it might be easier to check the address. Also, if there's a central object of the application that is used in every function, it can store the admin address, and this would simplify migration. The central object approach is also valuable for revocable capabilities, where the admin can revoke the capability from the user.

@@ -1,6 +1,6 @@
 # Deploy and Interact
 
-In this section, we will guide you through the process of deploying your Move smart contract to the [Arbitrum's Nitro devnode]() network using the Move-Stylus CLI and interacting with it using foundry's `cast` command.
+In this section, we will guide you through the process of deploying your Move smart contract to the [Arbitrum's Nitro devnode]() using the `move-stylus` CLI and interacting with it using foundry's `cast` command.
 
 ## Prerequisites
 
@@ -9,7 +9,15 @@ In this section, we will guide you through the process of deploying your Move sm
 
 ## Deploying the Contract
 
-To deploy the counter contract, make sure you are running the Arbitrum Nitro devnode. Open a terminal, navigate to the root directory of your project (`counter`), and run the following command:
+To deploy the counter contract, make sure you are running the Arbitrum Nitro devnode. Open a terminal, navigate to the root directory of your project (`counter`).
+
+First build the project:
+
+```bash
+move-stylus build
+```
+
+And then run the following command:
 
 ```bash
 move-stylus deploy --contract-name counter --private-key 0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659
@@ -78,7 +86,7 @@ timeboosted          false
 ```
 
 From this output, it's important to extract the counter ID from the logs. In this example, the counter ID is `0x70a9a5599349d999ce7abadd4bb09639e9f1a364000543ad6458b8befbcdba4e` which is the second topic in the logs array.
-We will explain what this ID is in [UID and ID](../object_model/uid_and_id.md) section. For now, you just should know that this ID uniquely identifies the counter you just created.
+We will explain what this ID is in [UID and ID](../object_model/uid_and_id.md) section. For now, you only need to know that this ID uniquely identifies the counter you've just created.
 
 You can save the counter ID in an environment variable for easier access:
 

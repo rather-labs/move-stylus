@@ -116,7 +116,7 @@ There are a lot of new concepts in this code that we will cover in future sectio
 
 ## Building the Project
 
-Now that we have our contract code in place, we can build the project using the Stylus CLI. Open a terminal, navigate to the root directory of your project (`counter`), and run the following command:
+Now that we have our contract code in place, we can build the project using the `move-stylus` CLI. Open a terminal, navigate to the root directory of your project (`counter`), and run the following command:
 
 ```bash
 move-stylus build

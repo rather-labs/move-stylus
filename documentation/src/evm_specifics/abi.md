@@ -1,6 +1,6 @@
 # Abi
 
-The ABI (Application Binary Interface) defined for Move modules compiled for stylus follow the same specification as the one used in Solidity. This allows for seamless interaction between Move contracts and other EVM-compatible contracts and tools. It also means that existing tools that understand Solidity's ABI can be used to interact with Move contracts compiled for Stylus.
+The ABI (Application Binary Interface) defined for Move modules compiled for Stylus follow the same specification as the one used in Solidity. This allows for seamless interaction between Move contracts and other EVM-compatible contracts and tools. It also means that existing tools that understand Solidity's ABI can be used to interact with Move contracts compiled for Stylus.
 
 ## Function modifiers
 
@@ -24,7 +24,7 @@ Supported modifiers include:
 
 ## Exporting the ABI
 
-To export the ABI of a module, you can use the Move-Stylus CLI tool. You can run the following command to generate the ABI file:
+To export the ABI of a module, you can use the `move-stylus` CLI tool. You can run the following command to generate the ABI file:
 
 ```bash
 move-stylus export-abi

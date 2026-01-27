@@ -1,7 +1,7 @@
 # Constants
 
 
-Constants are immutable values defined at the module level. They provide a convenient way to assign meaningful names to static values that are reused across a module. For example, a default product price can be represented as a constant rather than hardcoding the value multiple times. Constants are embedded in the module’s bytecode, and each reference to a constant results in the value being copied.
+Constants are immutable values defined at the module level. They provide a convenient way to assign meaningful names to static values that are reused across a module. For example, a default product price can be represented as a constant rather than hardcoding the value multiple times. Constants are embedded in the module's compiled code, and each reference to a constant results in the value being copied.
 
 ```move
 const DEFAULT_PRODUCT_PRICE: u64 = 100;
@@ -45,9 +45,7 @@ public fun change_max_connections() {
 }
 ```
 
-## Using Config Pattern
-
-### Shared Constants
+## Config Pattern
 
 A typical application often requires a set of constants that are reused across the codebase. Since constants are private to the module in which they are defined, they cannot be accessed directly from other modules. A common solution is to create a dedicated **`config` module** that exposes these constants publicly, ensuring they can be referenced wherever needed while maintaining a centralized definition.
 
@@ -71,9 +69,4 @@ public fun max_cart_items(): u64 {
 }
 ```
 
-
-
-
-
 By exposing constants through a dedicated `config` module, other modules can import and reference them directly. This approach simplifies maintenance: if a constant value needs to be updated, only the `config` module must be modified during a package upgrade. As a result, updates are centralized, reducing duplication and ensuring consistency across the codebase.
-

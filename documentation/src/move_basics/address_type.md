@@ -19,13 +19,13 @@ let other = @stylus;
 An address literal begins with the `@` symbol followed by either a hexadecimal number or an identifier:
 
 - The hexadecimal number is interpreted as a 32-byte value.
-- The identifier is resolved in the Move.toml file and replaced with the corresponding address by the compiler.
+- The identifier is resolved in the `Move.toml` file and replaced with the corresponding address by the compiler.
 
-If the identifier is not found in Move.toml, the compiler will throw an error.
+If the identifier is not found in `Move.toml`, the compiler will throw an error.
 
 ## Address Length
 
-In EVM, the blockchain addresses are typically 20 bytes long. However, Move's `address` type is 32 bytes long to aensure compatibility.
+In EVM, the blockchain addresses are typically 20 bytes long. However, Move's `address` type is 32 bytes long to ensure compatibility.
 
 When working with EVM addresses in Move, it is common to use the lower 20 bytes of the 32-byte `address` type. The higher 12 bytes are usually set to zero.
 
@@ -47,6 +47,6 @@ public struct UID has store {
 Since addresses are 32 bytes long, the `UID` type can represent any object ID in the Move storage system.
 
 > [!WARNING]
-> When interacting with EVM contracts, it is important to ensure that the addresses are correctly formatted and that only the lower 20 bytes are.
+> When interacting with EVM contracts, it is important to ensure that the addresses are correctly formatted and that only the lower 20 bytes are present.
 >
 > i.e: ``` let address: address = @0x1234567890abcdef1234567890abcdef12345678; ```

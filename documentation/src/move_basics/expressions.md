@@ -1,6 +1,8 @@
 # Expressions
 
-In programming languages, an *expression* is a unit of code that evaluates to a value. In Move, almost everything is an expression, with the sole exception of the `let` statement, which is a declaration rather than an expression.Expressions are sequenced using semicolons (`;`). If no expression follows a semicolon, the compiler automatically inserts the unit value `()`, which represents an empty expression.
+In programming languages, an *expression* is a unit of code that evaluates to a value. In Move, almost everything is an expression, with the sole exception of the `let` statement, which is a declaration rather than an expression.
+
+Expressions are sequenced using semicolons (`;`). If no expression follows a semicolon, the compiler automatically inserts the unit value `()`, which represents an empty expression.
 
 ## Literals
 
@@ -53,6 +55,7 @@ let is_true = (true && false);    // same expression with parentheses
 
 A block in Move is a sequence of statements and expressions enclosed in curly braces `{}`. The block itself is an **expression**, and its value is determined by the last expression inside the block.
 
+> [!NOTE]
 > The final expression must **not** end with a semicolon, otherwise the block evaluates to the unit value `()`.
 
 #### Example
@@ -74,7 +77,7 @@ let y = {
 
 ## Function Calls
 
-A [function](./move_basics/functions.md) call is an **expression**. When invoked, it executes the function body and returns the value of the last expression in that body, provided the final expression does **not** end with a semicolon. If the last expression ends with a semicolon, the function returns the unit value `()`.
+A [function](./functions.md) call is an **expression**. When invoked, it executes the function body and returns the value of the last expression in that body, provided the final expression does **not** end with a semicolon. If the last expression ends with a semicolon, the function returns the unit value `()`.
 
 #### Example
 
@@ -94,7 +97,7 @@ let unit_val = log_value(10);   // unit_val = ()
 
 ## Control Flow Expressions
 
-[Control flow](./move_basics/control_flow.md) expressions determine how execution proceeds within a program. In Move, they are also **expressions**, meaning they evaluate to a value. The value returned depends on the branch or path taken.
+[Control flow](./control_flow.md) expressions determine how execution proceeds within a program. In Move, they are also **expressions**, meaning they evaluate to a value. The value returned depends on the branch or path taken.
 
 ```move
 // if is an expression, so it returns a value.

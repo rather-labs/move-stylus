@@ -2,20 +2,18 @@
 
 We already covered two out of four abilities: [Drop](../move_basics/ability_drop.md) and [Copy](../move_basics/ability_copy.md). They affect the behavior of a value in a scope and are not directly related to storage. Now it is time to cover the `key` ability, which allows a struct to be _stored_.
 
-Historically, the `key` ability was created to mark a type as a _key in storage_. A type with the `key` ability could be stored at the top level in global storage and could be owned by an account or address. With the introduction of the [Object Model](README.md), the `key` ability became the defining ability for _objects_.
-
 ## Defining an Object
 
 For a struct to be considered an object and used with storage functions, it must fulfill three strict requirements:
 
 1.  **The `key` Ability**: The struct must be declared with `has key`.
-2.  **The `id` Field**: The very first field in the struct **must** be named `id` and have the type [UID](./uid_and_id.md). This is enforced by the bytecode verifier to ensure every object has a unique on-chain identity.
+2.  **The `id` Field**: The very first field in the struct **must** be named `id` and have the type [`UID`](./uid_and_id.md) or [`NamedId`](./named_ids.md).
 3.  **The `store` Requirement**: All other fields within the struct must have the `store` ability.
 
 ```move
 /// `User` object definition.
 public struct User has key {
-    id: UID, // required by Sui Bytecode Verifier
+    id: UID,
     name: String, // field types must have `store`
 }
 
@@ -34,7 +32,7 @@ public fun new(name: String, ctx: &mut TxContext): User {
 
 ## Types with the key Ability
 
-Due to the `UID` requirement for types with `key`, none of the native types in Move can have the `key` ability, nor can any of the types in the Standard Library. The `key` ability is present only in some Stylus Framework types and in custom types.
+Due to the `UID` or `NamedId` requirement for types with `key`, none of the native types in Move can have the `key` ability, nor can any of the types in the [Standard Library](./../move_basics/standard_library.md). The `key` ability is present only in some [Stylus Framework](./../stylus_framework) types and in custom types.
 
 ## Summary
 

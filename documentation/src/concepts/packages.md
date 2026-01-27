@@ -4,6 +4,7 @@ In Move, smart contracts are organized into Packages. A contract is the primary 
 
 A package acts as a container for modules (i.e. contracts), which serve as distinct namespaces for defining types (structs) and logic (functions).
 
+
 ```
 package 0x...
     module a
@@ -15,7 +16,7 @@ package 0x...
 ```
 ## Package Structure
 
-Locally, a package is a directory with a `Move.toml` file and a sources directory. The `Move.toml` file - called the "package manifest" - contains metadata about the package, and the sources directory contains the source code for the modules. Package usually looks like this:
+Locally, a package is a directory with a `Move.toml` file and a `sources` directory. The `Move.toml` file - called the "package manifest" - contains metadata about the package, and the sources directory contains the source code for the modules. Package usually looks like this:
 
 ```
 sources/

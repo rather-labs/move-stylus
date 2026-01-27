@@ -2,9 +2,9 @@
 
 Testing is a crucial aspect of software development, especially in blockchain applications where security and correctness are paramount. In this section, we will cover the fundamentals of testing in Move, including how to write and organize tests effectively.
 
-## The #[test] Attribute
+## The `#[test]` Attribute
 
-Tests in Move are functions marked with the `#[test]` attribute. This attribute tells the compiler that the function is a test function and should be run when tests are executed. Test functions are regular functions, but they must take no arguments and have no return value. They are excluded from the bytecode and are never published.
+Tests in Move are functions marked with the `#[test]` attribute. This attribute tells the compiler that the function is a test function and should be run when tests are executed. Test functions are regular functions, but they must take no arguments and have no return value. They are excluded from the release compiled code and are never published.
 
 ```move
 module book::testing;
@@ -30,10 +30,10 @@ fun simple_test() {
 
 ## Running Tests
 
-To run tests, you can use the `move test` command from the *move-stylus cli*. This command will first build the package in _test mode_ and then run all tests found in the package. In test mode, modules from both `sources/` and `tests/` directories are processed and their tests executed.
+To run tests, you can use the `move-stylus test` command from the *move-stylus cli*. This command will first build the package in _test mode_ and then run all tests found in the package. In test mode, modules from both `sources/` and `tests/` directories are processed and their tests executed.
 
 ```move
-x@y-MacBook-Pro example % move test
+x@y-MacBook-Pro example % move-stylus test
 COMPILING another_mod
 COMPILING other_mod
 COMPILING hello_world
@@ -51,14 +51,14 @@ Total Tests : 6, Passed: 6, Failed: 0.
 ```
 
 
-## Test Fail Cases with #[expected_failure]
+## Test Fail Cases with `#[expected_failure]`
 
 Tests for fail cases can be marked with `#[expected_failure]`. This attribute, when added to a `#[test]` function, tells the compiler that the test is expected to fail. This is useful when you want to test that a function fails when a certain condition is met.
 
->[!Note]
-This attribute can only be added to a `#[test]` function.
+> [!Note]
+> This attribute can only be added to a `#[test]` function.
 
-The attribute can take an argument specifying the expected abort code that should be returned if the test fails. If the test returns an abort code different from the one specified in the argument, it will fail. Likewise, if execution does not result in an abort, the test will also fail.
+If execution does not result in an abort, the test will fail.
 
 ```move
 module book::testing_failure;
@@ -66,19 +66,17 @@ module book::testing_failure;
 const EInvalidArgument: u64 = 1;
 
 #[test]
-#[expected_failure(abort_code = 0)]
+#[expected_failure]
 fun test_fail() {
     abort 0 // aborts with code 0
 }
 
 // attributes can be grouped together
-#[test, expected_failure(abort_code = EInvalidArgument)]
+#[test, expected_failure]
 fun test_fail_1() {
     abort EInvalidArgument // aborts with code EInvalidArgument
 }
 ```
-
-The `abort_code` argument can use constants defined in the tests module as well as imported from other modules. This is the only case where constants can be used and "accessed" in other modules.
 
 ## Utilities with `#[test_only]`
 

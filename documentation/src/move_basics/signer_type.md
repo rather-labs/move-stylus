@@ -19,7 +19,7 @@ let a2 = @0x2;
 // ... and so on for every other possible address
 ```
 
-However, creating a `signer` value is restricted. A Move program cannot arbitrarily create a `signer` for any address. Instead, a `signer` can only be obtained through specific entry functions that are invoked as part of a transaction signed by the corresponding address.
+However, creating a `signer` value is restricted. A Move program cannot arbitrarily create a `signer` for any address. Instead, a `signer` can only be obtained through entry functions that are invoked as part of a transaction signed by the corresponding address.
 
 ```move
 entry fun example(s: signer) {

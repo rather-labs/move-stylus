@@ -4,9 +4,9 @@
 
 ## Receive Function
 
-In the EVM ecosystem, the `receive` function is a dedicated gateway for plain Ether transfers (calls with empty calldata). According to the Solidity specification:
+In the EVM ecosystem, the `receive` function is a dedicated gateway for plain Ether transfers (calls with empty calldata). According to the [Solidity specification](https://docs.soliditylang.org/en/latest/contracts.html#receive-ether-function):
 
->A contract can have at most one receive function, declared using `receive() external payable { ... }` (without the function keyword). This function cannot have arguments, cannot return anything and must have external visibility and payable state mutability. It can be virtual, can override and can have modifiers.
+> A contract can have at most one receive function, declared using `receive() external payable { ... }` (without the function keyword). This function cannot have arguments, cannot return anything and must have external visibility and payable state mutability. It can be virtual, can override and can have modifiers.
 
 To implement this in Move, targeting Arbitrum Stylus, a function must meet the following requirements:
 
@@ -29,7 +29,7 @@ The `receive` function is executed on a call to the contract with **empty callda
 
 ## Fallback Function
 
-The `fallback` function serves as the "catch-all" handler for a contract. According to the Solidity specification:
+The `fallback` function serves as the "catch-all" handler for a contract. According to the [Solidity specification](https://docs.soliditylang.org/en/latest/contracts.html#fallback-function):
 
 > A contract can have at most one fallback function, declared using either `fallback () external [payable]` or `fallback (bytes calldata input) external [payable] returns (bytes memory output)` (both without the function keyword). This function must have external visibility. A fallback function can be virtual, can override and can have modifiers.
 
@@ -44,7 +44,7 @@ For instance, both of these are valid `fallback` declarations:
 
 ```move
 #[ext(abi(payable))]
-entry fun fallback(ctx: &TxContext): vector<u8> { 
+entry fun fallback(ctx: &TxContext): vector<u8> {
     // Do something with the calldata
 }
 

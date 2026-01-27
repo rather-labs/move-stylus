@@ -37,7 +37,7 @@ Example = { git = "https://github.com/example/example.git", subdir = "path/to/pa
 StylusFramework = { local = "../stylus-framework/" }
 ```
 
-Packages also import addresses from other packages. For example, the Sui dependency adds the std and sui addresses to the project. These addresses can be used in the code as aliases for the addresses. (TODO: is this true in our case?)
+Packages also import addresses from other packages. For example, the Sui dependency adds the std and sui addresses to the project. These addresses can be used in the code as aliases for the addresses.
 
 ### Dev-dependencies
 <!--

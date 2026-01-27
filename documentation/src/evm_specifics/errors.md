@@ -1,11 +1,11 @@
 # Errors & Revert
 
-In the Stylus framework, errors are represented as Move structs. To use a struct as a revert reason, it must be annotated with the `#[ext(abi_error)]` attribute.
+In the [Stylus framework](./../stylus_framework/), errors are represented as Move structs. To use a struct as a revert reason, it must be annotated with the `#[ext(abi_error)]` attribute.
 
 ## Revert
 The framework provides a native `revert` function to halt execution and undo all state changes, returning the abi-encoded error to the caller.
 
-```move 
+```move
 module stylus::error;
 
 /// Reverts the current transaction.
@@ -14,7 +14,7 @@ module stylus::error;
 public native fun revert<T: copy + drop>(error: T);
 ```
 
-The `revert` function is generic over the type `T`. For a successful compilation, `T` must be a struct annotated with `#[ext(abi_error)]`. 
+The `revert` function is generic over the type `T`. For a successful compilation, `T` must be a struct annotated with `#[ext(abi_error)]`.
 
 ## Error encoding
 
@@ -22,7 +22,7 @@ The framework ensures that Move errors follow the Solidity ABI specification. Th
 
 The **error selector** is a 4-byte identifier that tells the EVM which specific custom error is being triggered. It is calculated by taking the first 4 bytes of the `Keccak256` hash of the error's signature string. The signature string is composed of the error struct name followed by the field types in parentheses.
 
-```move 
+```move
 #[ext(abi_error)]
 public struct ExampleError {
     message: String,

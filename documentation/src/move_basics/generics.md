@@ -4,7 +4,7 @@ Generics are a way to define a type or function that can work with any type. Thi
 
 ## In the Standard Library
 
-In this chapter we already mentioned the [vector](./vector.md) type, which is a generic type that can hold any other type. Another example of a generic type in the standard library is the [Option](./option) type, which is used to represent a value that may or may not be present.
+In this chapter we already mentioned the [vector](./vector.md) type, which is a generic type that can hold any other type. Another example of a generic type in the standard library is the [Option](./option.md) type, which is used to represent a value that may or may not be present.
 
 ## Generic Syntax
 
@@ -41,6 +41,10 @@ fun test_container() {
 ```
 
 In the test function `test_container`, we demonstrate three equivalent ways to create a new `Container` with a `u8` value. Because numeric constants have ambiguous types, we must specify the type of the number literal somewhere (in the type of the container, the parameter to `new`, or the number literal itself); once we specify one of these the compiler can infer the others.
+
+
+> [!WARNING]
+> A function with generic parameters cannot be `entry`. Entry functions must have concrete types for all parameters. This is because we can't determine the concrete types from the ABI encoding.
 
 ## Multiple Type Parameters
 

@@ -1,10 +1,10 @@
-# Named IDs
+# Named Ids
 
-While standard `UID`s are generated dynamically, the framework also supports **Named IDs**. These are used when the storage location of an object must be deterministic and predictable. This allows the system or other contracts to retrieve an object without requiring the user to manually provide its `UID` during every transaction.
+While standard `UID`s are generated dynamically, the framework also supports `NamedId`s. These are used when the storage location of an object must be deterministic and predictable. This allows the system or other contracts to retrieve an object without requiring the user to manually provide its `UID` during every transaction.
 
 ## Definition
 
-A `NamedId` is a specialized struct managed by the compiler. It utilizes a **phantom** type parameter `T` to derive a unique address. This ensures that a specific type always maps to the same coordinates in storage. To maintain safety and compatibility with the storage model, the generic type `T` must be a struct with the `key` ability.
+A `NamedId` is a specialized struct managed by the compiler. It utilizes a **phantom** type parameter `T` to derive a deterministic address. This ensures that a specific type always maps to the same coordinates in storage. To maintain safety and compatibility with the storage model, the generic type `T` must be a struct with the `key` ability.
 
 ```move
 module stylus::object;
@@ -16,7 +16,7 @@ public struct NamedId<phantom T: key> has store {
 }
 ```
 
-## Deriving a NamedId 
+## Deriving a `NamedId`
 
 The `stylus::object::new_named_id` function is responsible for creating a new `NamedId` for a given generic type `T`. Intenally, the native function `compute_named_id` performs a `Keccak256` hash of the generic struct's fully qualified name.
 
@@ -28,16 +28,16 @@ public fun new_named_id<T: key>(): NamedId<T> {
 }
 ```
 
-### Example 
+### Example
 
-The following snippet demonstrates how to implement a Singleton pattern using `NamedID`s. We define a `COUNTER_` struct to derive the id for our `Counter` object.
+The following snippet demonstrates how to implement a Singleton pattern using `NamedId`s. We define a `COUNTER_` struct to derive the id for our `Counter` object.
 
 ```move
 module example::counter;
 
 use stylus::{
-    tx_context::TxContext, 
-    object::{Self, NamedId}, 
+    tx_context::TxContext,
+    object::{Self, NamedId},
     transfer::{Self}
 };
 
@@ -59,7 +59,7 @@ entry fun create(ctx: &TxContext) {
 }
 ```
 
-## NamedId Lifecycle
+## `NamedId` Lifecycle
 
 In the same fashion we handled the deletion of Objects with `UID`, the framework provides a native function to delete Objects with `NamedId`.
 
@@ -68,3 +68,6 @@ In the same fashion we handled the deletion of Objects with `UID`, the framework
 public native fun remove<T: key>(id: NamedId<T>);
 
 ```
+
+> [!NOTE]
+> `NamedId`s remove function is re-exported as `delete`, so it can be used the way as `UID`'s `delete` function.
