@@ -13,7 +13,7 @@ public struct ID has copy, drop, store {
     bytes: address,
 }
 
-/// Globally unique IDs that define an object's ID in storage. 
+/// Globally unique IDs that define an object's ID in storage.
 /// Any object, that is a struct with the `key` ability, must have `id: UID` as its first field.
 public struct UID has store {
     id: ID,
@@ -29,24 +29,26 @@ The framework provides these conversion methods to "peek" inside the UID and ext
 public fun uid_to_address(uid: &UID): address {
     uid.id.bytes
 }
+public use fun uid_to_address as UID.to_address;
 
 /// Get the raw bytes of a `uid`'s inner `ID`
 public fun uid_to_inner(uid: &UID): ID {
     uid.id
 }
+public use fun uid_to_inner as UID.to_inner;
 ```
 
 ## Creating a new UID
 
-To ensure every object has a unique identity on-chain, the framework generates a new `UID` using a `Keccak256` hash of three specific parameters:
+To ensure every object has a unique identity within the contract's storage, the framework generates a new `UID` using a `Keccak256` hash of three specific parameters:
 
-1. **Block Timestamp (8B)**: Ties the ID to the time of creation.
-2. **Block Number (8B)**: Ties the ID to the specific blockchain height.
-3. **Global Counter (4B)**: Increments with every call to ensure uniqueness for multiple objects created within the same block or transaction.
+1. **Block Timestamp**: Ties the ID to the time of creation.
+2. **Block Number**: Ties the ID to the specific blockchain height.
+3. **Global Counter**: Increments with every call to ensure uniqueness for multiple objects created within the same block or transaction.
 
-By combining these elements, the framework creates a collision-resistant address that is unique across the entire network. 
+By combining these elements, the framework creates a collision-resistant address that is unique across the entire network.
 
-The `object::tx_context` module provides methods to access the required transaction information. Specifically, `tx_context::fresh_object_address` handles the logic for hashing the data and producing the new address. 
+The `object::tx_context` module provides methods to access the required transaction information. Specifically, `tx_context::fresh_object_address` handles the logic for hashing the data and producing the new address.
 
 When `object::new` is called, it wraps this address into a `UID` and emits a `NewUID` event. This allows users and off-chain indexers to identify the exact address of the newly created object.
 
@@ -82,7 +84,7 @@ When deleting an object from storage, we must account for the abilities of its f
 
 The `object::delete` function is designed for this purpose. After an object is "unpacked" (deconstructed), this function consumes the `UID` **by value**, moving it into the `object::delete` scope.
 
-From an implementation standpoint, this function performs a critical role: it triggers the complete removal of the Object's data from the blockchain's storage, wiping the specific slots occupied by the Object to maintain a clean and efficient state.
+From an implementation standpoint, this function performs a critical role: it triggers the complete removal of the Object's data from the contract's storage, wiping the specific slots occupied by the Object.
 
 ```move
 module stylus::object;

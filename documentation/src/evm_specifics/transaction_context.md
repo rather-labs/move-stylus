@@ -1,8 +1,8 @@
 # Transaction Context
 
-In Stylus, the transaction context provides essential information about the current transaction being executed. This context includes details such as the sender's address, the value transferred, gas limit, and other relevant metadata.
+In Stylus, the transaction context provides essential information about the transaction being executed. This context includes details such as the sender's address, the value transferred, gas limit, and other relevant metadata.
 
-To access the transaction context in your Move modules, you can use the `TxContext` struct provided by the Stylus Framework. This struct encapsulates all the information about the executing transaction.
+To access the transaction context in your Move modules, you can use the `TxContext` struct provided by the [Stylus Framework](./../stylus_framework). This struct encapsulates all the information about the executing transaction.
 
 
 > [!NOTE]
@@ -22,7 +22,7 @@ The information is accesed through `TxContext`'s [struct methods](../move_basics
 
 ## Using TxContext
 
-The `TxContext` struct is an special struct handled entirely by the compiler. This means that an instance of the object cannot be created directly. Instead, you can obtain a reference to the current transaction context by declaring it as a parameter in an `entry` function.
+The `TxContext` struct is an special struct handled entirely by the compiler. This means that an instance of the object cannot be created directly. Instead, you can obtain a reference (muttable or immutable) to the current transaction context by declaring it as a parameter in an `entry` function.
 
 ```move
 use stylus::tx_context::{Self};
@@ -38,7 +38,7 @@ In the example above, the `example_function` entry function takes a reference to
 
 ## ABI
 
-Any appearence of the `TxContext` struct in the function signature will be omitted from the generated ABI, as it is an implicit parameter provided by the execution environment. For example, in the `set_value` function from the extracted from the [Build and Test](../getting_started/build_and_test.md) guide:
+Any appearence of the `TxContext` struct in the function signature will be omitted from the generated ABI, as it is an implicit parameter provided by the execution environment. For example, in the `set_value` function extracted from the [Build and Test](../getting_started/build_and_test.md) guide:
 
 ```move
 /// Set value (only runnable by the Counter owner)

@@ -1,6 +1,6 @@
 # Storage Functions
 
-The Stylus framework provides a set of built-in functions within the `transfer` module to define and manage object ownership:
+The [Stylus Framework](./../stylus_framework) provides a set of built-in functions within the `transfer` module to define and manage object ownership:
 
 1. `transfer::transfer`: sends an object to a specific address, placing it in an **address-owned** state.
 2. `transfer::freeze_object`: transitions an object into an immutable state. It becomes a public constant and can never be modified.
@@ -16,7 +16,7 @@ module stylus::transfer;
 // Transfer `obj` to `recipient`.
 public fun transfer<T: key>(obj: T, recipient: address);
 
-``` 
+```
 
 It only accepts a type with the [key ability](./ability_key.md) and the [address](../move_basics/address_type.md) of the recipient. Note that the function is generic over type `T`, which represents the type of the object being transferred. The object is passed into the function _by value_; it is moved into the function's scope and then moved to the recipient's address.
 
@@ -28,9 +28,9 @@ module book::transfer_to_sender;
 /// A struct with `key` is an object. The first field is `id: UID`!
 public struct AdminCap has key { id: UID }
 
-/// `init` function is a special function that is called when the module
-/// is published. It is a good place to do a setup for an application.
-fun init(ctx: &mut TxContext) {
+/// `init` function is a special function that translated as the equivalent
+/// of the constructor function in Solidity
+entry fun init(ctx: &mut TxContext) {
     // Create a new `AdminCap` object, in this scope.
     let admin_cap = AdminCap { id: object::new(ctx) };
 
@@ -45,7 +45,7 @@ public fun transfer_admin_cap(cap: AdminCap, recipient: address) {
 }
 ```
 
-When the module is deployed, the `init` function will get called (the module _constructor_), and the `AdminCap` object which we created in it will be transferred to the transaction sender. The `ctx.sender()` function returns the sender address for the current transaction.
+When the module is deployed, the `init` function must be called (the module [_constructor_](./../evm_specifics/constructor.md)) to initialize the contract. The `AdminCap` object which we created in it will be transferred to the transaction sender. The `ctx.sender()` function returns the sender address for the current transaction.
 
 Once the `AdminCap` has been transferred to the sender, for example, to `0xa11ce`, the sender, and only the sender, will be able to access the object.
 
@@ -60,7 +60,7 @@ module stylus::transfer;
 public fun freeze_object<T: key>(obj: T);
 ```
 
-The function only accepts a generic type `T` with the `key` ability. Just like all other storage functions, it takes the object _by value_. 
+The function only accepts a generic type `T` with the `key` ability. Just like all other storage functions, it takes the object _by value_.
 
 Let's extend the previous example and add a function that allows the admin to create a `Config` object and freeze it:
 
@@ -91,11 +91,14 @@ public fun create_and_freeze(
 public fun message(c: &Config): String { c.message }
 ```
 
-`Config` is an object that has a message field, and the `create_and_freeze` function creates a new `Config` and freezes it. Once the object is frozen, it can be accessed by anyone by immutable reference. The message function is a public function that returns the `message` from the `Config` object. `Config` is now publicly available by its ID, and the message can be read by anyone.
+`Config` is an object that has a message field, and the `create_and_freeze` function creates a new `Config` and freezes it. Once the object is frozen, it can be accessed by anyone by immutable reference. The message function is a public function that returns the `message` from the `Config` object. `Config` is now publicly available by its `ID`, and the message can be read by anyone.
 
 ## Share
 
-The `transfer::share_object` function is used to put an object into a _shared_ state. Once an object is _shared_, it can be accessed by anyone by a mutable reference (hence, immutable too). This means a shared object can no longer be passed _by value_, only behind a reference.
+The `transfer::share_object` function is used to put an object into a _shared_ state. Once an object is _shared_, it can be accessed by anyone by a *mutable* reference (hence, immutable too). The `transfer::share_object` function is used to put an object into a _shared_ state. Once an object is _shared_, it can be accessed by anyone by a *mutable* reference (hence, immutable too).
+
+This means it does not make sense to pass a shared object _by value_, since you can't do anything with it (cannot be transfered, and if you try to unpack its values, the compiler throw an error because the id field is not handled).
+
 The function signature is as follows, only accepts a type with the key ability:
 
 ```move

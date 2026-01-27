@@ -2,7 +2,7 @@
 
 Events enable data to be recorded publicly on the blockchain. Each log entry includes the contract’s address, up to four topics, and binary data of arbitrary length.
 
-In Move, events are compatible with the [EVM event model](https://docs.soliditylang.org/en/develop/abi-spec.html#events), allowing seamless interaction between Move contracts and EVM-based tools and libraries.
+[Stylus Framework](./../stylus_framework) makes events compatible with the [EVM event model](https://docs.soliditylang.org/en/develop/abi-spec.html#events), allowing seamless interaction between Move contracts and EVM-based tools and libraries.
 
 ## Declaring Events
 
@@ -18,7 +18,7 @@ public struct Event has copy, drop {
 }
 ```
 
-Events must have the copy and drop abilities. In the example above, the `Event` struct has four fields: `a`, `b`, `c`, and `d`. The `indexes = 2` parameter specifies that the first two fields (`a` and `b`) will be indexed topics in the event log.
+Events must have the `copy` and `drop` abilities. In the example above, the `Event` struct has four fields: `a`, `b`, `c`, and `d`. The `indexes = 2` parameter specifies that the first two fields (`a` and `b`) will be indexed topics in the event log.
 
 You can also declare events as anonymous by annoating `anonymous` inside the event attribute:
 

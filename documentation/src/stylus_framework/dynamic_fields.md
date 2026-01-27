@@ -1,6 +1,6 @@
 # Dynamic Fields
 
-The Dynamic Fields API makes it possible to attach objects to other objects. Its behavior resembles that of a `Map` in other programming languages. Unlike a `Map` in Move, which is strictly typed (as discussed in the Collections section), dynamic fields allow objects of any type to be attached.
+The Dynamic Fields API makes it possible to attach objects to other objects. Its behavior resembles that of a `Map` in other programming languages. Dynamic fields allow objects of any type to be attached.
 
 There is no restriction on the number of dynamic fields that can be linked to an object.
 
@@ -92,7 +92,7 @@ In this example, we define functions to read, check existence, mutate, and remov
 
 ## Orphaned Dynamic Fields
 
-The `object::delete()` function, which deletes an object with the provided `UID` from storage, does not track dynamic fields and therefore cannot prevent them from becoming orphaned. When the parent is deleted, its dynamic fields are not automatically removed. As a result, these dynamic fields remain stored on the blockchain but can no longer be accessed.
+The `object::delete()` function, which deletes an object with the provided `UID` from storage, does not track dynamic fields and therefore cannot prevent them from becoming orphaned. When the parent is deleted, its dynamic fields are not automatically removed. As a result, these dynamic fields remain stored but can no longer be accessed.
 
 
 ## Custom Type as a Field Name
@@ -109,9 +109,9 @@ public struct MetadataKey has copy, drop, store {}
 
 The two field names defined earlier are `AccessoryKey` and `MetadataKey`. The `AccessoryKey` includes a `String` field, which allows it to be used multiple times with different `name` values. In contrast, the `MetadataKey` is an empty key and can only be attached once.
 
-## Exposing UID
+## Exposing `UID`
 
-Granting mutable access to a `UID` or `NamedId` poses a security risk. Allowing a `UID` or `NamedId` to be exposed as a mutable reference can result in unintended modifications or even the removal of an object’s dynamic fields.  Therefore, it is essential to fully understand the consequences before exposing a UID as mutable.
+Granting mutable access to a `UID` or `NamedId` poses a security risk. Allowing a `UID` or `NamedId` to be exposed as a mutable reference can result in unintended modifications or even the removal of an object’s dynamic fields.  Therefore, it is essential to fully understand the consequences before exposing a `UID` as mutable.
 
 Since dynamic fields are bound to `UID` or `NamedId` their usage in other modules depends on whether the `UID` or `NamedId` is accessible. By default, struct visibility safeguards the `id` field, preventing direct access from other modules. However, if a public accessor method returns a reference to the `UID` or `NamedId`, dynamic fields can be read externally.
 

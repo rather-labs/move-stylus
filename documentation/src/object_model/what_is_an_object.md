@@ -14,3 +14,7 @@ Objects have the following properties:
 
 >[!Warning]
 Ownership does not control the confidentiality of an object — it is always possible to read the contents of an on-chain object from outside of Move. You should never store unencrypted secrets inside of objects.
+
+> [!Note]
+> Certain kind of object have a pre-computed ID called [`NamedId`](./named_ids.md).
+> It is possible to have two distinct objects with the same `NameId`. Those cases should be handled with care.

@@ -4,7 +4,6 @@ In smart contract development, cross contract calls refer to the ability of one 
 
 In Move, to be able to perform cross contract calls, first you need to define a module that contains the functions you want to call from another contract. Let's use the [ERC-20](https://ethereum.org/developers/docs/standards/tokens/erc-20/) token standard as an example.
 
-
 ```move
 module erc20call::erc20call;
 
@@ -36,11 +35,13 @@ public native fun approve(self: &ERC20, spender: address, amount: u256): Contrac
 public native fun transfer_from(self: &ERC20, sender: address, recipient: address, amount: u256): ContractCallResult<bool>;
 ```
 
+In the next sections, we will explore all the components involved in the snippet above.
+
 ## The `CrossContractCall` Struct
 
 The `CrossContractCall` struct is a key component that facilitates cross contract calls. It encapsulates the necessary information and configuration required to perform these calls. When you create an instance of the `ERC20` struct, you pass in a `CrossContractCall` configuration that specifies how to interact with the target contract.
 
-The `ERC20` structs is the one that will be use to perform the cross contract calls to the ERC-20 contract. To be able to do that, it must meet the following requirements:
+The `ERC20` struct is the one that will be used to perform the cross contract calls to the _ERC-20_ contract. To be able to do that, it must meet the following requirements:
 
 - It must be annotated with the `#[ext(external_call)]` attribute.
 
