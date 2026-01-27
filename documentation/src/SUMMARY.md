@@ -16,6 +16,7 @@
     - [Comments](./move_basics/comments.md)
     - [Primitive Types](./move_basics/primitive_types.md)
     - [Address Type](./move_basics/address_type.md)
+    - [Signer Type](./move_basics/signer_type.md)
     - [Expressions](./move_basics/expressions.md)
     - [Structs](./move_basics/structs.md)
     - [Abilities introduction](./move_basics/abilities_introduction.md)
@@ -62,3 +63,4 @@
 - [Advanced Programmability](./advanced_programmability/README.md)
     - [Pattern: Hot Potato](./advanced_programmability/hot_potato.md)
     - [Pattern: Capability](./advanced_programmability/capability.md)
+    - [Pattern: Wrapper Type](./advanced_programmability/wrapper_type.md)
