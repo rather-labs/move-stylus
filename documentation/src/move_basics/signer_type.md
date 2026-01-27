@@ -29,3 +29,6 @@ entry fun example(s: signer) {
 
 > [!WARNING]
 > Only one signer can be passed to an entry function, representing the address that signed the transaction. Attempting to pass multiple signers or create signers for arbitrary addresses will result in a compilation error.
+
+> [!NOTE]
+> In an EVM context, the signer corresponds to the [`tx.origin`](https://docs.soliditylang.org/en/latest/units-and-global-variables.html#block-and-transaction-properties) value.
