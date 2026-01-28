@@ -1,3 +1,7 @@
+/// This module defines the core identity system for the Stylus framework.
+/// It implements unique identifiers (UIDs), deterministic Named IDs, 
+/// and storage lookup structures that manage the lifecycle and addressable 
+/// location of Move objects in global storage.
 module stylus::object;
 
 use stylus::{
@@ -5,53 +9,56 @@ use stylus::{
     event::emit
 };
 
-/// Allows calling `.to_address` on a `UID` to get an `address`.
+/// Method aliases for improved developer ergonomics.
 public use fun uid_to_address as UID.to_address;
 public use fun uid_to_inner as UID.to_inner;
 public use fun remove as NamedId.delete;
 
-/// References a object ID
+/// A wrapper around a 32-byte identifier (address) representing an object's ID.
 public struct ID has copy, drop, store {
     bytes: address,
 }
 
-/// Globally unique IDs that define an object's ID in storage. Any object, that is a struct
-/// with the `key` ability, must have `id: UID` as its first field.
+/// A globally unique identifier that defines an object's identity in storage.
+///
+/// Any struct with the `key` ability MUST have `id: UID` as its first field.
+/// This is a fundamental requirement of the framework's object model.
 public struct UID has store {
     id: ID,
 }
 
+
+
 #[ext(event(indexes = 1))]
+/// Event emitted whenever a new unique identifier is generated.
 public struct NewUID has copy, drop {
     uid: ID,
 }
 
-/// Creates a new `UID`, which must be stored in an object's `id` field.
-/// This is the only way to create `UID`s.
-///
-/// Each time a new `UID` is created, an event is emitted on topic 0.
-/// This allows the transaction caller to capture and persist it for later
-/// reference to the object associated with that `UID`
+/// Creates a new `UID` by requesting a fresh address from the transaction context.
+/// 
+/// Emits a `NewUID` event to allow off-chain indexers and callers to track 
+/// the identity of the newly created object.
 public fun new(ctx: &mut TxContext): UID {
     let res = UID { id: ID { bytes: ctx.fresh_object_address() } };
     emit(NewUID { uid: res.to_inner() });
     res
 }
 
-/// Deletes the object from the storage.
+/// Removes an object identified by the given `UID` from the storage.
 public native fun delete(id: UID);
 
-/// Generate a new UID specifically used for creating a UID from a hash
+/// Internal utility for generating a UID from a specific hash.
 public(package) fun new_uid_from_hash(bytes: address): UID {
     UID { id: ID { bytes } }
 }
 
-/// Get the inner bytes of `id` as an address.
+/// Returns the underlying address representation of the `UID`.
 public fun uid_to_address(uid: &UID): address {
     uid.id.bytes
 }
 
-/// Get the raw bytes of a `uid`'s inner `ID`
+/// Returns the inner `ID` wrapper of the `UID`.
 public fun uid_to_inner(uid: &UID): ID {
     uid.id
 }
@@ -77,20 +84,24 @@ public struct NamedId<phantom T: key> has store {
     id: ID,
 }
 
+/// Deterministically computes the address for a Named ID based on type `T`.
 native fun compute_named_id<T: key>(): address;
 
+/// Generates a new `NamedId` for the specified type marker `T`.
 public fun new_named_id<T: key>(): NamedId<T> {
     NamedId { id: ID { bytes: compute_named_id<T>() } }
 }
 
-/// Deletes the object with a `NamedId` from the storage.
+/// Removes an object identified by a `NamedId` from global storage.
 public native fun remove<T: key>(id: NamedId<T>);
 
+/// Internal cast to treat a NamedId reference as a standard UID.
 public(package) native fun as_uid<T: key>(named_id: &NamedId<T>): &UID;
+
+/// Internal cast to treat a mutable NamedId reference as a mutable UID.
 public(package) native fun as_uid_mut<T: key>(named_id: &mut NamedId<T>): &mut UID;
 
-
-/// Storage lookup structs
+/// Type markers used for specialized storage lookups within the runtime.
 public struct FrozenStorageObject<T: key> {}
 public struct OwnedStorageObject<T: key> {}
 public struct SharedStorageObject<T: key> {}
