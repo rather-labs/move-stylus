@@ -7,7 +7,7 @@ entry fun get_sender(ctx: &TxContext): address {
 }
 
 entry fun get_msg_value(ctx: &TxContext): u256 {
-    ctx.msg_value()
+    ctx.value()
 }
 
 entry fun get_block_number(ctx: &TxContext): u64 {

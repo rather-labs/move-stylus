@@ -1,8 +1,7 @@
 module test::cross_contract_calls_result;
 
-use test::callee_contract_interface as cci;
-use test::callee_contract_interface::{Foo, Bar};
-use stylus::contract_calls as contract_calls;
+use test::callee_contract_interface::{Self as cci, Foo, Bar};
+use stylus::contract_calls::{Self};
 
 // ==============================================
 // Static cross contract calls

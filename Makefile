@@ -190,4 +190,8 @@ install:
 	# $(MAKE) setup-stylus
 	cargo install --locked --path crates/move-cli
 
-.PHONY: test setup-stylus install deploy-*
+serve-documentation:
+	@which mdbook > /dev/null || (echo "Installing mdbook..." && cargo install mdbook)
+	mdbook serve documentation/ -n 0.0.0.0
+
+.PHONY: test setup-stylus install deploy-* serve-documentation
