@@ -49,6 +49,7 @@ impl New {
         create_dir_all(path.join(SourcePackageLayout::Sources.path()))?;
 
         self.write_move_toml(path, deps, addrs, custom)?;
+        self.write_default_source(path)?;
         self.write_gitignore(path)?;
         Ok(())
     }
@@ -145,6 +146,21 @@ edition = "2024.beta" # edition = "legacy" to use legacy (pre-2024) Move
         if !custom.is_empty() {
             writeln!(w, "{custom}")?;
         }
+
+        Ok(())
+    }
+
+    /// create a default `<name>.move` file under `sources/`
+    fn write_default_source(&self, path: &Path) -> anyhow::Result<()> {
+        let sources_dir = path.join(SourcePackageLayout::Sources.path());
+        let source_file_path = sources_dir.join(format!("{}.move", self.name));
+
+        let mut w = std::fs::File::create(source_file_path)?;
+        writeln!(
+            w,
+            "module {name}::{name} {{\n    // TODO: add your module code here\n}}",
+            name = self.name
+        )?;
 
         Ok(())
     }
