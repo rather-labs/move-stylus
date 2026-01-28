@@ -17,7 +17,6 @@ use error::SpecialAttributeErrorKind;
 pub use event::Event;
 use event::EventParseError;
 pub use external_call::error::{ExternalCallFunctionError, ExternalCallStructError};
-use external_call::external_struct::ExternalStructError;
 pub use function_validation::FunctionValidationError;
 use function_validation::check_repeated_storage_object_param;
 use function_validation::check_storage_object_param;
@@ -184,26 +183,18 @@ pub fn process_special_attributes(
 
                             for modifier in modifiers {
                                 match modifier {
-                                    StructModifier::ExternalStruct => {
-                                        match ExternalStruct::try_from(s) {
-                                            Ok(external_struct) => {
-                                                result
-                                                    .external_struct
-                                                    .insert(struct_name, external_struct);
-                                            }
-                                            Err(SpecialAttributeError {
-                                                kind:
-                                                    SpecialAttributeErrorKind::ExternalStruct(
-                                                        ExternalStructError::NotAnExternalStruct,
-                                                    ),
-                                                ..
-                                            }) => {}
-                                            Err(e) => {
-                                                found_error = true;
-                                                module_errors.push(e);
-                                                continue;
-                                            }
-                                        }
+                                    StructModifier::ExternalStruct {
+                                        address,
+                                        module_name,
+                                    } => {
+                                        result.external_struct.insert(
+                                            struct_name,
+                                            ExternalStruct {
+                                                name: struct_name,
+                                                address,
+                                                module_name,
+                                            },
+                                        );
                                     }
                                     StructModifier::ExternalCall => {
                                         match validate_external_call_struct(s) {
@@ -600,6 +591,8 @@ pub fn process_special_attributes(
             continue;
         };
     }
+
+    println!(" External Structs: {:?}", result.external_struct);
 
     if found_error {
         Err((mapped_files, module_errors))
