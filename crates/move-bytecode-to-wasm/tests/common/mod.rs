@@ -27,27 +27,6 @@ static MODULE_CACHE: ModuleCache = LazyLock::new(|| Mutex::new(HashMap::new()));
 static MODULE_DEPENDENCIES_CACHE: ModuleDependenciesCache =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
-    if !dst.exists() {
-        fs::create_dir_all(dst)?;
-    }
-
-    for entry_result in fs::read_dir(src)? {
-        let entry = entry_result?;
-        let file_type = entry.file_type()?;
-        let src_path = entry.path();
-        let dst_path = dst.join(entry.file_name());
-
-        if file_type.is_dir() {
-            copy_dir_recursive(&src_path, &dst_path)?;
-        } else if file_type.is_file() {
-            fs::copy(&src_path, &dst_path)?;
-        }
-    }
-
-    Ok(())
-}
-
 pub fn reroot_path(path: &Path) -> PathBuf {
     // Copy files to temp to avoid file locks
     // Use a more unique identifier to prevent conflicts between concurrent tests
@@ -108,13 +87,7 @@ pub fn reroot_path(path: &Path) -> PathBuf {
     temp_install_directory
 }
 
-fn create_move_toml_with_framework(install_dir: &Path, framework_dir: &str) {
-    copy_dir_recursive(
-        &PathBuf::from(framework_dir),
-        &install_dir.join("stylus-framework"),
-    )
-    .unwrap();
-
+fn create_move_toml(install_dir: &Path) {
     // create Move.toml in dir
     std::fs::write(
         install_dir.join("Move.toml"),
@@ -124,9 +97,6 @@ edition = "2024"
 
 [addresses]
 test = "0x0"
-
-[dependencies]
-StylusFramework = { local = "./stylus-framework/" }
 "#,
     )
     .unwrap();
@@ -169,7 +139,7 @@ pub fn translate_test_package(path: &'static str, module_name: &str) -> Arc<Vec<
     let mut dependencies_cache = MODULE_DEPENDENCIES_CACHE.lock().unwrap();
 
     let rerooted_path = reroot_path(Path::new(path));
-    create_move_toml_with_framework(&rerooted_path, "../../stylus-framework");
+    create_move_toml(&rerooted_path);
 
     let package = match get_build_config().compile_package(&rerooted_path, &mut Vec::new()) {
         Ok(pkg) => pkg,
@@ -227,7 +197,7 @@ pub fn translate_test_package_with_framework_result(
 ) -> Result<Module, move_bytecode_to_wasm::error::CompilationError> {
     let path = Path::new(path);
     let rerooted_path = reroot_path(path);
-    create_move_toml_with_framework(&rerooted_path, "../../stylus-framework");
+    create_move_toml(&rerooted_path);
 
     let mut dependencies_cache = MODULE_DEPENDENCIES_CACHE.lock().unwrap();
 

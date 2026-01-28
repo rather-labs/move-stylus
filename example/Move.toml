@@ -4,7 +4,6 @@ edition = "2024"
 flavor = "core"
 
 [dependencies]
-StylusFramework = { local = "../stylus-framework/" }
 Erc20Call = { local = "../erc20call/" }
 Erc721Utils = { local = "../erc721Utils/" }
 
