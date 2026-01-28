@@ -13,7 +13,7 @@ public fun sender(_self: &TxContext): address {
 native fun native_sender(): address;
 
 /// Return the number of wei sent with the message
-public fun msg_value(_self: &TxContext): u256 {
+public fun value(_self: &TxContext): u256 {
     native_msg_value()
 }
 native fun native_msg_value(): u256;

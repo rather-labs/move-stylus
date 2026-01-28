@@ -1,8 +1,9 @@
 module test::constructor_with_return;
 
-use stylus::tx_context::TxContext;
-use stylus::object as object;
-use stylus::object::UID;
+use stylus::{
+    tx_context::TxContext, 
+    object::{Self, UID}
+};
 
 public struct Foo has key {
     id: UID,

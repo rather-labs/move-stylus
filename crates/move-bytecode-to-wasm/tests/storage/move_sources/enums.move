@@ -1,9 +1,10 @@
 module test::enums;
 
-use stylus::tx_context::TxContext;
-use stylus::object as object;
-use stylus::object::UID;
-use stylus::transfer as transfer;
+use stylus::{
+    tx_context::TxContext, 
+    object::{Self, UID}, 
+    transfer::{Self}
+};
 
 public enum Numbers has drop, store {
     One,

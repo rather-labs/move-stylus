@@ -2,7 +2,7 @@ module hello_world::erc721_receiver;
 
 // Function selector for the on_erc721_received function according to Remix
 // "onERC721Received(address,address,uint256,bytes)": "150b7a02"
-const ON_ERC721_RECEIVED_SELECTOR: vector<u8> = vector<u8>[0x15, 0x0b, 0x7a, 0x02];
+const ON_ERC721_RECEIVED_SELECTOR: vector<u8> = x"150b7a02";
 
 //  Whenever an {IERC721} `token_id` token is transferred to this contract via {IERC721-safeTransferFrom}
 //  by `operator` from `from`, this function is called.

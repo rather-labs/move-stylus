@@ -1,10 +1,11 @@
 module hello_world::delegated_counter_named_id;
 
-use stylus::tx_context::TxContext;
-use stylus::object as object;
-use stylus::object::NamedId;
-use stylus::transfer as transfer;
-use stylus::contract_calls as contract_calls;
+use stylus::{
+    tx_context::TxContext, 
+    object::{Self, NamedId}, 
+    transfer::{Self}, 
+    contract_calls::{Self}
+};
 use hello_world::delegated_counter_named_id_interface as dci;
 
 public struct COUNTER_ has key {}

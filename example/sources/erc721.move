@@ -1,15 +1,15 @@
 module hello_world::erc721;
 
-use stylus::event::emit;
-use stylus::tx_context::TxContext;
-use stylus::transfer as transfer;
-use stylus::object as object;
-use stylus::object::NamedId;
-use stylus::dynamic_field_named_id as field;
+use stylus::{
+    event::emit, 
+    tx_context::TxContext, 
+    transfer::{Self}, 
+    object::{Self, NamedId}, 
+    dynamic_field_named_id as field, 
+    sol_types::Bytes4
+};
 use erc721Utils::utils as erc721_utils;
-use std::ascii as ascii;
-use std::ascii::String;
-use stylus::sol_types::Bytes4;
+use std::ascii::{Self, String};
 
 public struct COLLECTION_INFO has key {}
 public struct TOTAL_SUPPLY has key {}
@@ -18,8 +18,8 @@ public struct BALANCES_ has key {}
 public struct TOKEN_APPROVALS has key {}
 public struct OPERATOR_APPROVALS has key {}
 
-const IERC721_INTERFACE_ID: vector<u8> = vector<u8>[0x80, 0xac, 0x58, 0xcd];
-const IERC721_METADATA_INTERFACE_ID: vector<u8> = vector<u8>[0x01, 0xff, 0xc9, 0xa7];
+const IERC721_INTERFACE_ID: vector<u8> = x"80ac58cd";
+const IERC721_METADATA_INTERFACE_ID: vector<u8> = x"01ffc9a7";
 
 // Structs:
 public struct Info has key {

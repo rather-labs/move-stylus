@@ -1,11 +1,11 @@
 module hello_world::hello_world_2;
 
-use stylus::tx_context::TxContext;
-use stylus::object as object;
-use stylus::object::UID;
-use stylus::event::emit;
-use hello_world::stack::Stack;
-use hello_world::stack;
+use stylus::{
+    tx_context::TxContext, 
+    object::{Self, UID}, 
+    event::emit
+};
+use hello_world::stack::{Self, Stack};
 use hello_world::other_mod::{generic_identity, generic_identity_two_types};
 
 // Usage of generic functions
