@@ -2,7 +2,11 @@
 
 In smart contract development, cross contract calls refer to the ability of one smart contract to invoke functions or methods of another smart contract. This feature is essential for building complex decentralized applications (dApps) that require interaction between multiple contracts.
 
-In Move, to be able to perform cross contract calls, first you need to define a module that contains the functions you want to call from another contract. Let's use the [ERC-20](https://ethereum.org/developers/docs/standards/tokens/erc-20/) token standard as an example.
+To perform a cross-contract call, you must define an Interface—a Move module that describes the target contract's signatures without implementing their logic.
+
+## Defining the Interface
+
+Using the [ERC-20](https://ethereum.org/developers/docs/standards/tokens/erc-20/) standard as an example, we define an interface module. This module acts as a "header file" that tells the compiler how to encode arguments and decode results for the target contract.
 
 ```move
 module erc20call::erc20call;
@@ -35,21 +39,19 @@ public native fun approve(self: &ERC20, spender: address, amount: u256): Contrac
 public native fun transfer_from(self: &ERC20, sender: address, recipient: address, amount: u256): ContractCallResult<bool>;
 ```
 
-In the next sections, we will explore all the components involved in the snippet above.
-
-## The `CrossContractCall` Struct
+### The `CrossContractCall` Struct
 
 The `CrossContractCall` struct is a key component that facilitates cross contract calls. It encapsulates the necessary information and configuration required to perform these calls. When you create an instance of the `ERC20` struct, you pass in a `CrossContractCall` configuration that specifies how to interact with the target contract.
 
-The `ERC20` struct is the one that will be used to perform the cross contract calls to the _ERC-20_ contract. To be able to do that, it must meet the following requirements:
+The struct used to represent the external contract (e.g., `ERC20`) must follow these rules:
 
-- It must be annotated with the `#[ext(external_call)]` attribute.
+- It must be annotated with the `#[ext(external_call)]` attribute. 
 
 - It must be a tuple struct containing *only* a field of type `CrossContractCall`.
 
 - It must have the `drop` ability.
 
-### Creating a New Instance
+#### Creating a New Instance
 
 To create a new instance of the cross contract call struct, you need to provide a `CrossContractCall` configuration. This configuration specifies the address of the target contract and any additional settings required for the cross contract calls.
 
@@ -61,8 +63,6 @@ To create a new instance of the cross contract call struct, you need to provide 
 
 - **`delegate()`**: This function configures the cross contract call to be a delegate call.
 
-#### Example
-
 ```move
 let erc20 = erc20call::new(
     ccc::new(erc20_address)
@@ -71,22 +71,17 @@ let erc20 = erc20call::new(
 );
 ```
 
-## Defining Cross Contract Call Functions
+### Defining the Functions
 
-Each cross contract call function must follow the following requirements:
+Since the actual code lives on another contract, your interface functions are declared as `native`. The compiler automatically generates the underlying WASM code to perform the call based on these signatures. Each cross contract call function must follow the following requirements:
 
-- It must be annotated with the `#[ext(external_call)]` attribute:
-You can also add [function modifiers](./abi.md#function-modifiers) such as `view` or `pure` to indicate that the function does not modify the state. This will hint the compiler to [optimize the call accordingly](https://docs.soliditylang.org/en/latest/contracts.html#view-functions) by using a static call instead of a common one).
+* It must take a reference to your interface struct (e.g., `&ERC20`) as first argument, followed by the actual function arguments.
 
-- It must have a `self` parameter of type `&ERC20` (or the name of the struct you defined to perform the cross contract calls). This is to associate the method to the struct that contains the `CrossContractCall` configuration.
-
-- It must have the same parameters as the target function in the called contract.
-
-- It must be declared as **`native`** since it will be implemented automatically by the compiler.
-
-- It must return one of the following types:
+* It must return one of the following types:
     - `ContractCallResult<T>` where `T` is the return type of the target function in the called contract. This wrapper type is used to handle potential errors that may occur during the cross contract call.
     - `ContractCallEmptyResult` if the target function in the called contract does not return any value.
+
+* It must be annotated with the `#[ext(external_call)]` attribute. You can also add [function modifiers](./abi.md#function-modifiers) such as `view` or `pure` to indicate that the function does not modify the state. This will hint the compiler to [optimize the call accordingly](https://docs.soliditylang.org/en/latest/contracts.html#view-functions) by using a static call instead of a common one.
 
 > [!NOTE]
 > The cross contact calls follow the same ABI rules as the regular functions. i.e: If the target function contains a `ID` parameter, the type for that parameter will be `bytes32`.
@@ -167,7 +162,7 @@ To illustrate how delegated calls work, let's define four moodules:
 
 
 > [!WARNING]
-> Once a `CrossContractCall` object is maked to peform delegate calls, it cannot be undone and **all** the calls will be delegated.
+> Once a `CrossContractCall` object is configure to peform delegate calls, it cannot be undone and **all** the calls will be delegated.
 
 #### Counter Module
 
