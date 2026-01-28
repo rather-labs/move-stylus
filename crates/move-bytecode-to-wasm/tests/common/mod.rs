@@ -191,7 +191,7 @@ pub fn translate_test_package(path: &'static str, module_name: &str) -> Arc<Vec<
 
 #[allow(dead_code)]
 /// Translates a single test module and returns Result for error checking
-pub fn translate_test_package_with_framework_result(
+pub fn translate_test_package_result(
     path: &str,
     module_name: &str,
 ) -> Result<Module, move_bytecode_to_wasm::error::CompilationError> {
