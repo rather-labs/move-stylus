@@ -1,7 +1,8 @@
-// Copyright (c) Mysten Labs, Inc.
-// SPDX-License-Identifier: Apache-2.0
+/// This module extends the Dynamic Field functionality to work with Named IDs.
+/// It provides a high-level API for adding, borrowing, and removing dynamic fields 
+/// from deterministic singleton objects (NamedId) by internally casting them 
+/// to their underlying UID representation.
 
-#[allow(unused_const)]
 module stylus::dynamic_field_named_id;
 
 use stylus::{
@@ -9,7 +10,10 @@ use stylus::{
     dynamic_field as dynamic_field
 };
 
-
+/// Adds a dynamic field to a deterministic object identified by a `NamedId`.
+/// 
+/// Internally converts the `NamedId` reference to a `UID` to leverage 
+/// the standard dynamic_field logic.
 public fun add<NId: key, Name: copy + drop + store, Value: store>(
     object: &mut NamedId<NId>,
     name: Name,
@@ -19,6 +23,10 @@ public fun add<NId: key, Name: copy + drop + store, Value: store>(
     dynamic_field::add(uid, name, value);
 }
 
+/// Immutably borrows a dynamic field from an object identified by a `NamedId`.
+/// 
+/// @abort EFieldDoesNotExist if the field is not found.
+/// @abort EFieldTypeMismatch if the field exists but the value type is different.
 public fun borrow<NId: key, Name: copy + drop + store, Value: store>(
     object: &NamedId<NId>,
     name: Name
@@ -27,6 +35,7 @@ public fun borrow<NId: key, Name: copy + drop + store, Value: store>(
     dynamic_field::borrow(uid, name)
 }
 
+/// Mutably borrows a dynamic field from an object identified by a `NamedId`.
 public fun borrow_mut<NId: key, Name: copy + drop + store, Value: store>(
     object: &mut NamedId<NId>,
     name: Name,
@@ -35,6 +44,7 @@ public fun borrow_mut<NId: key, Name: copy + drop + store, Value: store>(
     dynamic_field::borrow_mut(uid, name)
 }
 
+/// Removes a dynamic field from a deterministic object and returns its value.
 public fun remove<NId: key, Name: copy + drop + store, Value: store>(
     object: &mut NamedId<NId>,
     name: Name
@@ -43,6 +53,7 @@ public fun remove<NId: key, Name: copy + drop + store, Value: store>(
     dynamic_field::remove(uid, name)
 }
 
+/// Returns true if a dynamic field with the specified name exists on the Named object.
 public fun exists_<NId: key, Name: copy + drop + store>(
     object: &NamedId<NId>,
     name: Name
@@ -51,6 +62,9 @@ public fun exists_<NId: key, Name: copy + drop + store>(
     dynamic_field::exists_(uid, name)
 }
 
+/// Safely removes a dynamic field from a Named object if it exists.
+/// 
+/// Returns `Option::some(Value)` if found and removed, or `Option::none()` otherwise.
 public fun remove_if_exists<NId: key, Name: copy + drop + store, Value: store>(
     object: &mut NamedId<NId>,
     name: Name,
@@ -59,6 +73,7 @@ public fun remove_if_exists<NId: key, Name: copy + drop + store, Value: store>(
     dynamic_field::remove_if_exists(uid, name)
 }
 
+/// Returns true if a dynamic field exists and matches the specified `Value` type.
 public fun exists_with_type<NId: key, Name: copy + drop + store, Value: store>(
     object: &NamedId<NId>,
     name: Name,
