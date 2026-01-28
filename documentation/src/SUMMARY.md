@@ -47,7 +47,7 @@
     - [UID and ID](./object_model/uid_and_id.md)
     - [NamedIDs](./object_model/named_ids.md)
     - [Wrapped objects](./object_model/wrapped_objects.md)
-    <!-- - [Storage Layout](./object_model/storage_layout.md) -->
+    - [Storage Layout](./object_model/storage_layout.md)
 - [EVM Specifics](./evm_specifics/README.md)
     - [Abi](./evm_specifics/abi.md)
     - [Transaction Context](./evm_specifics/transaction_context.md)
