@@ -592,8 +592,6 @@ pub fn process_special_attributes(
         };
     }
 
-    println!(" External Structs: {:?}", result.external_struct);
-
     if found_error {
         Err((mapped_files, module_errors))
     } else {

@@ -20,16 +20,16 @@ public fun new(configuration: CrossContractCall): ERC20 {
     ERC20(configuration)
 }
 
-#[ext(external_call, view)]
+#[ext(external_call(view))]
 public native fun total_supply(self: &ERC20): ContractCallResult<u256>;
 
-#[ext(external_call, view)]
+#[ext(external_call(view))]
 public native fun balance_of(self: &ERC20, account: address): ContractCallResult<u256>;
 
 #[ext(external_call)]
 public native fun transfer(self: &ERC20, account: address, amount: u256): ContractCallResult<bool>;
 
-#[ext(external_call, view)]
+#[ext(external_call(view))]
 public native fun allowance(self: &ERC20, owner: address, spender: address): ContractCallResult<u256>;
 
 #[ext(external_call)]
@@ -45,7 +45,7 @@ The `CrossContractCall` struct is a key component that facilitates cross contrac
 
 The struct used to represent the external contract (e.g., `ERC20`) must follow these rules:
 
-- It must be annotated with the `#[ext(external_call)]` attribute. 
+- It must be annotated with the `#[ext(external_call)]` attribute.
 
 - It must be a tuple struct containing *only* a field of type `CrossContractCall`.
 
@@ -248,7 +248,7 @@ use stylus::{
     object::UID
 };
 
-#[ext(external_struct, module_name = b"delegated_counter", address = @0x0)]
+#[ext(external_struct(module_name = b"delegated_counter", address = @0x0))]
 public struct Counter has key {
     id: UID,
     owner: address,
@@ -272,7 +272,7 @@ use stylus::{
     object::UID
 };
 
-#[ext(external_struct, module_name = b"delegated_counter", address = @0x0)]
+#[ext(external_struct(module_name = b"delegated_counter", address = @0x0))]
 public struct Counter has key {
     id: UID,
     owner: address,
@@ -293,6 +293,6 @@ Later, you can change the logic contract by calling the `change_logic` function,
 > [!WARNING]
 > Since delegated calls execute code in the context of the calling contract, that means that the calling contract's storage is the one that is modified.
 >
-> When interacting with objects from a caller conntrct, you **must** specify the module name and address where the object is defined using the `#[ext(external_struct, module_name = ..., address = ...)]` attribute. That is because objects with the same name can be defined in different modules. Those objects are different by definition and the Move compiler needs to know which one to use.
+> When interacting with objects from a caller conntrct, you **must** specify the module name and address where the object is defined using the `#[ext(external_struct(module_name = ..., address = ...))]` attribute. That is because objects with the same name can be defined in different modules. Those objects are different by definition and the Move compiler needs to know which one to use.
 >
 > If you don't specify the module name and address, the object you are trying to interact will not be found and a runtime error will be thrown.
