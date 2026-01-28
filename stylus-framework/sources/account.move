@@ -6,21 +6,18 @@
 /// https://github.com/OffchainLabs/stylus-sdk-rs/blob/main/stylus-sdk/src/hostio.rs
 module stylus::account;
 
-/// Struct representing an account, to attach methods to it.
-public struct Account has drop {}
-
 /// Returns the size of the smart contract bytecode at the specified address.
 ///
 /// This is commonly used to differentiate between an Externally Owned Account (EOA),
 /// which returns 0, and a Smart Contract.
-public fun get_account_code_size(_self: &Account, account_address: address): u32 {
+public fun get_account_code_size(account_address: address): u32 {
     account_code_size(account_address)
 }
 
 /// Returns the native ETH balance of the specified address, denominated in Wei.
 ///
 /// Note: 1 ETH = 10^18 Wei.
-public fun get_account_balance(_self: &Account, account_address: address): u256 {
+public fun get_account_balance(account_address: address): u256 {
     account_balance(account_address)
 }
 
