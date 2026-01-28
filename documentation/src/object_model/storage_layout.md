@@ -75,8 +75,6 @@ The storage layout for an instance of `MyStruct` would look like this:
 ```
 n [             zzzzyxxwbbatttttttt]
                 └───┬──┘
-                    │
-                    │
                     ▼
                 PackedStruct
 ```
@@ -188,7 +186,7 @@ n [                 BBBBBBbtttttttt]
 Where:
 - `n` is the slot number.
 - `tttttttt` is the 8-byte typehash for `MyStruct`.
-- `b` is the byte representing the discriminant of `ComplexEnum`.
+- `b` is the byte representing the variant of `ComplexEnum`.
 - `BBBBBB` is the space allocated for the largest variant of `ComplexEnum` (in this case, variant `B` which contains a `u16` and a `u32`
 
 ### Dynamic arryas and Strings
@@ -244,3 +242,6 @@ n     [                      catttttttt]
 n + 1 [bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb]
 n + 2 [dddddddddddddddddddddddddddddddd]
 ```
+
+> [!Important]
+> All the things valid for `UID` are also valid for `NamedId` as well.

@@ -8,9 +8,12 @@ mapping(bytes32 => mapping(bytes32 => Object<T>)) public Objects;
 ```
 This nested approach serves two primary purposes:
 
-* **Ownership Partitioning**: The outer mapping is keyed by the _owner identifier_. This can be an **account address** or an object `UID` in the case of [wrapped objects](./wrapped_objects.md).
+* **Ownership Partitioning**: The outer mapping is keyed by the _owner identifier_. This can be an **account address** or an object `UID` (or precomputed `NamedId`) in the case of [wrapped objects](./wrapped_objects.md).
 
-* **Object Retrieval**: The inner mapping is keyed by the unique Object UID, ensuring that data for specific assets can be retrieved effortlessly. 
+* **Object Retrieval**: The inner mapping is keyed by the unique Object `UID` (or precomputed `NamedId`), ensuring that data for specific assets can be retrieved effortlessly.
+
+> [!Important]
+> The data organized this way naturally prevents unauthorized access, as each account or object can only access its own namespace unless explicitly allowed (e.g., via the [Peep API](./peep_api.md)).
 
 >[!Note]
 The mapping itself is stored at a specific slot, the slot 0.
@@ -21,7 +24,7 @@ The framework distinguishes between different object lifecycles by routing them 
 
 | Object State | Owner Key | Purpose |
 | :--- | :--- | :--- |
-| **Owned** | `address` / `UID` | Objects belonging to a specific account or parent object. |
+| **Owned** | `address` / `UID` / `NamedId` | Objects belonging to a specific account or parent object. |
 | **Shared** | `0x1` | Objects made globally accessible for any user to interact with. |
 | **Frozen** | `0x2` | Objects made permanently read-only and immutable. |
 
@@ -29,10 +32,12 @@ By utilizing `0x1` and `0x2` as fixed keys, the framework ensures these states a
 
 ## Type Safety and Validation
 
-To enforce strict type safety across the network, the framework prevents "type-casting" at the storage level. Every object's data blob begins with a **Type Hash** header:
+To enforce strict type safety, the framework prevents "type-casting" at the storage level. Every object's data blob begins with a **Type Hash** header:
 
 * **Offset 0-8**: Stores a 64-bit Type hash derived from the Move struct definition.
 
 * **Offset 8**: Contains the actual serialized fields of the object.
 
 When a contract attempts to [peep](../stylus_framework/peep.md) or load an object, the runtime first verifies that the hash in storage matches the hash of the Move type specified in the code. If they don't match, the transaction reverts.
+
+The [following section](./storage_layout.md) provides a detailed overview of the storage layout, including how different data types are encoded and stored within this framework.
