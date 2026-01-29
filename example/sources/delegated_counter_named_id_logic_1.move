@@ -1,13 +1,13 @@
 module hello_world::delegated_counter_named_id_logic_1;
 
 use stylus::{
-    tx_context::TxContext, 
+    tx_context::TxContext,
     object::NamedId
 };
 
 public struct COUNTER_ has key {}
 
-#[ext(external_struct, module_name = b"delegated_counter_named_id", address = @0x0)]
+#[ext(external_struct(module_name = b"delegated_counter_named_id", address = @0x0))]
 public struct Counter has key {
     id: NamedId<COUNTER_>,
     owner: address,
