@@ -1,68 +1,77 @@
+
+/// This module implements the Transaction Context for the Stylus framework.
+/// It provides access to environmental data of the current transaction and the 
+/// underlying block.
 module stylus::tx_context;
 
 /// Information about the transaction currently being executed.
-/// This cannot be constructed by a transaction--it is a privileged object created by
-/// the VM and passed in to the entrypoint of the transaction as `&mut TxContext`.
+///
+/// This is a privileged object created by the VM and passed to module entry points.
+/// It cannot be manually constructed, ensuring environmental data is authentic.
 public struct TxContext has drop {}
 
-/// Return the address of the user that signed the current
-/// transaction
+
+
+/// Returns the address of the account that signed the current transaction.
+/// Equivalent to Solidity's `msg.sender`.
 public fun sender(_self: &TxContext): address {
     native_sender()
 }
 native fun native_sender(): address;
 
-/// Return the number of wei sent with the message
+/// Returns the amount of ETH (in Wei) sent with the current message.
+/// Equivalent to Solidity's `msg.value`.
 public fun value(_self: &TxContext): u256 {
     native_msg_value()
 }
 native fun native_msg_value(): u256;
 
-/// Return the current block's number.
+/// Returns the height (number) of the current block.
 public fun block_number(_self: &TxContext): u64 {
     native_block_number()
 }
 native fun native_block_number(): u64;
 
-/// Return the current block's base fee (EIP-3198 and EIP-1559)
+/// Returns the base fee of the current block (EIP-1559).
 public fun block_basefee(_self: &TxContext): u256 {
     native_block_basefee()
 }
 native fun native_block_basefee(): u256;
 
-/// Return the current block's gas limit.
+/// Returns the maximum amount of gas allowed in the current block.
 public fun block_gas_limit(_self: &TxContext): u64 {
     native_block_gas_limit()
 }
 native fun native_block_gas_limit(): u64;
 
-/// Return the current block's timestamp as seconds since unix epoch
+/// Returns the block's arrival time as Unix seconds since the epoch.
 public fun block_timestamp(_self: &TxContext): u64 {
     native_block_timestamp()
 }
 native fun native_block_timestamp(): u64;
 
-/// Return the chain ID of the current transaction.
+/// Returns the EIP-155 identifier of the current network chain.
 public fun chain_id(_self: &TxContext): u64 {
     native_chain_id()
 }
 native fun native_chain_id(): u64;
 
-/// Return the gas price of the transaction
+/// Returns the gas price specified by the transaction.
 public fun gas_price(_self: &TxContext): u256 {
     native_gas_price()
 }
 native fun native_gas_price(): u256;
 
-/// Create an `address` that has not been used. As it is an object address, it will never
-/// occur as the address for a user.
-/// In other words, the generated address is a globally unique object ID.
+/// Generates a globally unique address to be used as an Object ID.
+/// 
+/// This address is guaranteed to be distinct from any user-controlled 
+/// Externally Owned Account (EOA).
 public fun fresh_object_address(_ctx: &mut TxContext): address {
     fresh_id()
 }
 native fun fresh_id(): address;
 
-/// Return the calldata of the current transaction as a vector<u8>.
+/// Returns the raw input data (calldata) of the current transaction.
 public fun data(_self: &TxContext): vector<u8> {
     native_data()
 }

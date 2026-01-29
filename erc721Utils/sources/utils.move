@@ -24,7 +24,7 @@ public fun new(configuration: CrossContractCall): ERC721Receiver {
     ERC721Receiver(configuration)
 }
 
-#[ext(external_call, view)]
+#[ext(external_call(view))]
 public native fun on_erc721_received(
     self: &ERC721Receiver,
     operator: address,

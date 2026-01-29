@@ -9,5 +9,5 @@ module stylus::event;
 
 /// Emits an event in the topic 0.
 ///
-/// This function It ensures that an event will be logged in a Solidity ABI-compatible format.
+/// This function ensures that an event will be logged in a Solidity ABI-compatible format.
 public native fun emit<T: copy + drop>(event: T);
