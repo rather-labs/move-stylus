@@ -1,6 +1,16 @@
+/// This module implements Solidity-compatible fixed-size byte types for the Stylus framework.
+/// It provides Move struct representations for 'bytes1' through 'bytes32', enabling
+/// seamless ABI interoperability with Ethereum smart contracts and precise memory layouts.
+
 module stylus::sol_types;
 
+/// Internal native function to cast a fixed-size byte struct into a raw vector.
+/// 'n' specifies the expected byte length (1-32).
 public(package) native fun as_vec_bytes_n<T: copy + drop>(value: &T, n: u8): vector<u8>;
+
+// --- Fixed-size Bytes Definitions ---
+// These structs represent the standard Solidity fixed-size byte arrays.
+// They are primarily used for ABI encoding and matching EVM storage layouts.
 
 public struct Bytes1 has copy, drop {}
 public struct Bytes2 has copy, drop {}

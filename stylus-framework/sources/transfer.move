@@ -1,13 +1,29 @@
+/// This module defines the core 'storage functions' used to manage object ownership 
+/// and accessibility. 
+/// 
+/// All functions are generic over the type `T`, which must possess the `key` 
+/// ability to be recognized as a persistent object in global storage.
 module stylus::transfer;
 
-/// Transfer ownership of `obj` to `recipient`. `obj` must have the `key` attribute,
-/// which (in turn) ensures that `obj` has a globally unique ID.
+/// Transfers the ownership of `obj` to the specified `recipient`.
+///
+/// Once transferred, only the recipient address has the authority to access 
+/// or further manipulate the object.
 public native fun transfer<T: key>(obj: T, recipient: address);
 
-/// Freezes `obj`. After freezing `obj` becomes immutable and can no longer be transferred or
-/// mutated.
+/// Converts `obj` into an immutable "frozen" object.
+///
+/// Frozen objects are read-only and globally accessible. After freezing, 
+/// an object can no longer be transferred, mutated, or deleted. 
+/// Any attempt to perform a state-changing operation on a frozen object 
+/// will result in a runtime error.
 public native fun freeze_object<T: key>(obj: T);
 
-/// Turns the given object into a mutable shared object that everyone can access and mutate.
-/// This is irreversible, i.e. once an object is shared, it will stay shared forever.
+/// Converts `obj` into a mutable shared object that is accessible by any user.
+///
+/// Shared objects serve as global state that multiple participants can 
+/// read and mutate. While a shared object cannot be frozen or transferred 
+/// to a single owner, it remains eligible for deletion if permitted by 
+/// the module logic. Any attempt to transfer or freeze a shared object 
+/// will result in a runtime error.
 public native fun share_object<T: key>(obj: T);
