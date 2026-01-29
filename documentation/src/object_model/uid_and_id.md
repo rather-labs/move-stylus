@@ -91,3 +91,4 @@ module stylus::object;
 
 /// Deletes the UID and removes the associated object from storage.
 public native fun delete(id: UID);
+```
