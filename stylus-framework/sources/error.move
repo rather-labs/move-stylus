@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Rather Labs
+// Copyright (c) 2025 Rather Labs, Inc.
 // SPDX-License-Identifier: BUSL-1.1
 
 /// This module defines the error handling mechanism for the Stylus framework.

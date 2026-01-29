@@ -1,11 +1,12 @@
+// Copyright (c) 2025 Rather Labs, Inc.
+// SPDX-License-Identifier: BUSL-1.1
+
 /// This module provides utilities for querying account state on the network.
 ///
 /// These functions are direct wrappers to account related Stylus host functions.
 ///
 /// For the underlying implementation, see:
 /// https://github.com/OffchainLabs/stylus-sdk-rs/blob/main/stylus-sdk/src/hostio.rs
-// Copyright (c) 2025 Rather Labs
-// SPDX-License-Identifier: BUSL-1.1
 
 module stylus::account;
 
