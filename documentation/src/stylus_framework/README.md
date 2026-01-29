@@ -23,20 +23,3 @@ The Stylus Framework includes the following modules:
 | `stylus::sol_types`               | Contains types that map to Solidity types.                                   | [Solidity Types](./solidity_types.md)                                        |
 | `stylus::table`                   | Provides a table data structure for key-value storage.                       | [Dynamic Fields](./dynamic_fields.md#Tables)                                 |
 | `stylus::tx_context`              | Provides access to transaction context information.                          | [Transaction Context](../evm_specifics/transaction_context.md)               |
-
-<!--
-
-TODO
-
-Implicit Imports
-Just like with Standard Library, some of the modules and types are imported implicitly in the Sui Framework. This is the list of modules and types that are available without explicit use import:
-
-sui::object
-sui::object::ID
-sui::object::UID
-sui::tx_context
-sui::tx_context::TxContext
-sui::transfer
-Source Code
-The source code of the Sui Framework is available in the Sui repository.
--->
