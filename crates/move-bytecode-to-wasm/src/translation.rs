@@ -32,13 +32,15 @@ use move_binary_format::{
     internals::ModuleIndex,
 };
 
+#[cfg(debug_assertions)]
+use crate::hasher::get_hasher;
+
 use crate::{
     CompilationContext,
     abi_types::error_encoding::build_abort_error_message,
     compilation_context::{ModuleData, ModuleId},
     data::{DATA_ABORT_MESSAGE_PTR_OFFSET, RuntimeErrorData},
     generics::{replace_type_parameters, type_contains_generics},
-    hasher::get_hasher,
     hostio::host_functions::storage_flush_cache,
     native_functions::NativeFunction,
     runtime::RuntimeFunction,

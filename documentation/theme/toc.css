@@ -1,0 +1,162 @@
+/* Table of Contents styling for right sidebar */
+.page-toc {
+    position: fixed;
+    right: 0;
+    top: var(--menu-bar-height);
+    bottom: 0;
+    width: 270px;
+    height: calc(100vh - var(--menu-bar-height));
+    overflow-y: auto;
+    padding: 15px;
+    background: var(--sidebar-bg);
+    font-size: 0.9em;
+}
+
+.page-toc h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 1em;
+    color: var(--sidebar-fg);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.page-toc nav ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.page-toc nav li {
+    margin: 0;
+    line-height: 2em;
+}
+
+.page-toc nav a {
+    color: var(--sidebar-fg) !important;
+    text-decoration: none;
+    display: block;
+    padding: 0;
+    transition: color 0.15s ease;
+}
+
+.page-toc nav a:hover {
+    color: var(--sidebar-active);
+    text-decoration: none;
+}
+
+.page-toc nav a:visited {
+    color: var(--sidebar-fg);
+    text-decoration: none;
+}
+
+.page-toc nav a.active {
+    color: var(--sidebar-active);
+    font-weight: bold;
+    text-decoration: none;
+}
+
+/* Indentation for different heading levels */
+.page-toc .toc-h1 {
+    padding-left: 0;
+}
+
+.page-toc .toc-h2 {
+    padding-left: 15px;
+}
+
+.page-toc .toc-h3 {
+    padding-left: 30px;
+}
+
+.page-toc .toc-h4 {
+    padding-left: 45px;
+}
+
+/* Hide sub-subsections (third level and deeper) in left sidebar */
+.sidebar .chapter ol ol {
+    display: none;
+}
+
+/* Hide on smaller screens */
+@media (max-width: 1400px) {
+    .page-toc {
+        display: none;
+    }
+}
+
+/* Adjust content margin to account for TOC */
+@media (min-width: 1400px) {
+    .content {
+        margin-right: 280px;
+    }
+}
+
+/* Hide the old fixed navigation arrows on sides */
+.nav-chapters {
+    display: none !important;
+}
+
+/* Reposition navigation buttons to bottom of content */
+.nav-wrapper {
+    position: static !important;
+    display: block !important;
+    margin-top: 3em;
+    padding-top: 1.5em;
+    width: 100%;
+    text-align: left;
+}
+
+.nav-wrapper a {
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    display: inline-flex !important;
+    align-items: center;
+    gap: 0.5em;
+    background: none !important;
+    padding: 0.5em 0 !important;
+}
+
+.nav-wrapper a.nav-chapters.previous {
+    float: left;
+    margin-left: 10px;
+}
+
+.nav-wrapper a.nav-chapters.next {
+    float: right;
+    margin-right: 10px;
+}
+
+.nav-wrapper::after {
+    content: "";
+    display: table;
+    clear: both;
+}
+
+/* Show chapter names beside navigation arrows */
+.nav-wrapper a {
+    font-size: 0.95em;
+    max-width: 48%;
+}
+
+.nav-wrapper a strong {
+    display: inline;
+}
+
+.nav-wrapper a .chapter-name {
+    display: inline-block;
+    white-space: normal;
+    line-height: 1.4;
+    color: var(--sidebar-fg);
+}
+
+.mobile-nav-chapters {
+    width: fit-content;
+}
+
+.next {
+    margin-right: 20px;
+}
