@@ -35,5 +35,5 @@ wasm-opt = "0.116.1"
 wasmprinter.workspace = true
 
 [[bin]]
-name = "move"
+name = "move-stylus"
 path = "src/main.rs"
