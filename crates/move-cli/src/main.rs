@@ -9,8 +9,8 @@ pub(crate) mod build_config;
 pub(crate) mod error;
 
 use base::{
-    activate::Activate, build::Build, deploy::Deploy, export_abi::ExportAbi, info::Info, new::New,
-    test::Test,
+    activate::Activate, build::Build, deploy::Deploy, docgen::Docgen, export_abi::ExportAbi,
+    info::Info, new::New, test::Test,
 };
 
 #[cfg(debug_assertions)]
@@ -61,6 +61,7 @@ pub enum Command {
     Build(Build),
     #[cfg(debug_assertions)]
     Disassemble(Disassemble),
+    Docgen(Docgen),
     Deploy(Deploy),
     Info(Info),
     New(New),
@@ -90,6 +91,7 @@ pub fn run_cli(move_args: Move, cmd: Command) -> Result<()> {
             move_args.verbose,
         ),
         Command::Info(c) => c.execute(move_args.package_path.as_deref(), build_config),
+        Command::Docgen(c) => c.execute(move_args.package_path.as_deref(), build_config),
         Command::New(c) => c.execute_with_defaults(move_args.package_path.as_deref()),
         Command::Deploy(c) => c.execute(move_args.package_path.as_deref()),
         Command::Test(c) => c.execute(

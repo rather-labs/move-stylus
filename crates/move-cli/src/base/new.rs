@@ -92,7 +92,7 @@ impl New {
             w,
             r#"[package]
 name = "{name}"
-edition = "2024.beta" # edition = "legacy" to use legacy (pre-2024) Move
+edition = "2024"
 # license = ""           # e.g., "MIT", "GPL", "Apache 2.0"
 # authors = ["..."]      # e.g., ["Joe Smith (joesmith@noemail.com)", "John Snow (johnsnow@noemail.com)"]
 
@@ -163,16 +163,16 @@ edition = "2024.beta" # edition = "legacy" to use legacy (pre-2024) Move
         let mut w = std::fs::File::create(source_file_path)?;
         writeln!(
             w,
-            "module {name}::{name};\n\
-\n\
-entry fun hello_world(): vector<u8> {{\n\
-\tb\"hello world\"\n\
-}}\n\
-\n\
-#[test]\n\
-fun test_hello() {{\n\
-\tassert!(hello_world() == b\"hello world\", 1);\n\
-}}",
+            r#"module {name}::{name};
+
+entry fun hello_world(): vector<u8> {{
+    b"hello world"
+}}
+
+#[test]
+fun test_hello() {{
+    assert!(hello_world() == b"hello world", 1);
+}}"#,
             name = self.name
         )?;
 

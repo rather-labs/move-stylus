@@ -6,6 +6,7 @@ pub mod activate;
 pub mod build;
 pub mod deploy;
 pub mod disassemble;
+pub mod docgen;
 pub mod export_abi;
 pub mod info;
 pub mod new;
