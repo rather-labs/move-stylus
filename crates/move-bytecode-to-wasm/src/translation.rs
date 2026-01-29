@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 use bytecodes::dynamic_fields::add_field_borrow_mut_global_var_instructions;
 pub use error::TranslationError;
 

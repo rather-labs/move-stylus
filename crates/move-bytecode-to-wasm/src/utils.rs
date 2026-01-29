@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 use crate::CompilationContext;
 use alloy_primitives::keccak256;
 use walrus::{

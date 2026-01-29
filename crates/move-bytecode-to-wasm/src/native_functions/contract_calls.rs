@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 use move_parse_special_attributes::function_modifiers::SolidityFunctionModifier;
 use walrus::{
     FunctionBuilder, FunctionId, LocalId, Module, ValType,

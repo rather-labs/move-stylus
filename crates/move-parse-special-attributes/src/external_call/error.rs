@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 use move_compiler::diagnostics::codes::{DiagnosticInfo, Severity, custom};
 
 use crate::error::DIAGNOSTIC_CATEGORY;

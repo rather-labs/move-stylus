@@ -1,4 +1,6 @@
-//module hello_world::hello_world;
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 module hello_world::simple_counter;
 
 public struct Counter has drop {

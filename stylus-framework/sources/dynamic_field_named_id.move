@@ -3,6 +3,9 @@
 /// from deterministic singleton objects (NamedId) by internally casting them 
 /// to their underlying UID representation.
 
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 module stylus::dynamic_field_named_id;
 
 use stylus::{

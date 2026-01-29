@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 use std::collections::HashSet;
 
 use move_compiler::parser::ast::{Function, FunctionBody_, NameAccessChain_, Type_};

@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 use crate::compilation_context::{
     ModuleId,
     reserved_modules::{

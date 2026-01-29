@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 module hello_world::delegated_counter_logic_1;
 
 use stylus::{

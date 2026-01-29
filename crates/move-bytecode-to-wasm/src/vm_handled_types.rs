@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 //! This module is in charge of injecting the datatypes that can only be created or are
 //! automatically injected by the VM, such as the primitive type Signer or the TxContext struct
 //! from the stylus framework.

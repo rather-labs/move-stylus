@@ -4,6 +4,9 @@
 ///
 /// For the underlying implementation, see:
 /// https://github.com/OffchainLabs/stylus-sdk-rs/blob/main/stylus-sdk/src/hostio.rs
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 module stylus::account;
 
 /// Returns the size of the smart contract bytecode at the specified address.

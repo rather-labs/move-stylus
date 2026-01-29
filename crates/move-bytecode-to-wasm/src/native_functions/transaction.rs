@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 //! This module contains all the functions retaled to transaction information.
 use super::NativeFunction;
 use crate::runtime::RuntimeFunction;

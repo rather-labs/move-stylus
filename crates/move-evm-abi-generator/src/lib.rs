@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 #![allow(dead_code)]
 //! Parses the AST of a package to extract the ABI
 //!

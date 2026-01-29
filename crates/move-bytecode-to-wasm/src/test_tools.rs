@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 //! This module contains aux functions used in unit tests in this module
 #![allow(dead_code)]
 use crate::{

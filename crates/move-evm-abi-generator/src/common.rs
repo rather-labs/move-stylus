@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 /// Converts the input string to camel case.
 pub fn snake_to_camel(input: &str) -> String {
     let mut result = String::with_capacity(input.len());

@@ -1,6 +1,9 @@
 /// This module implements the Cross-Contract Call (CCC) infrastructure for the Stylus framework. 
 /// It provides a builder-pattern configuration for defining call parameters (gas, value, delegation) 
 /// and generic wrappers for safely handling EVM execution results.
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 module stylus::contract_calls;
 
 /// Error code indicating that a cross-contract call has reverted or failed.

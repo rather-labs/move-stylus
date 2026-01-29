@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 module stylus::types;
 
 /// Checks if the argument type is a one-time witness, that is a type with only one instantiation

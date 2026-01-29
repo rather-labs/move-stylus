@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 /// This module defines the core 'storage functions' used to manage object ownership 
 /// and accessibility. 
 /// 

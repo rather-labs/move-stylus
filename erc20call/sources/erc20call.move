@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 module erc20call::erc20call;
 
 use stylus::contract_calls::{ContractCallResult, CrossContractCall};

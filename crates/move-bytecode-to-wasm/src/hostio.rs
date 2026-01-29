@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 #[cfg(test)]
 pub use entrypoint_router::add_entrypoint;
 use walrus::{FunctionId, MemoryId, Module, ModuleConfig};

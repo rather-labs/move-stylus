@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 module stylus::test_scenario;
 use stylus::tx_context::TxContext;
 

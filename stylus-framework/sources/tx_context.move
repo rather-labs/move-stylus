@@ -1,3 +1,5 @@
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
 
 /// This module implements the Transaction Context for the Stylus framework.
 /// It provides access to environmental data of the current transaction and the 
