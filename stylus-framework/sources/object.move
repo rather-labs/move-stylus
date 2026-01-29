@@ -1,5 +1,6 @@
-// Copyright (c) 2025 Rather Labs
-// SPDX-License-Identifier: BUSL-1.1
+// Copyright (c) The Move Contributors
+// Copyright (c) 2025 Rather Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
 
 /// This module defines the core identity system for the Stylus framework.
 /// It implements unique identifiers (UIDs), deterministic Named IDs, 

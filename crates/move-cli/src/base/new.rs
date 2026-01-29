@@ -1,4 +1,5 @@
 // Copyright (c) The Move Contributors
+// Copyright (c) 2025 Rather Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{self, Context, ensure};

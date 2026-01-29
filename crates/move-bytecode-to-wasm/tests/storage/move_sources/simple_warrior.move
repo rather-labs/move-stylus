@@ -1,4 +1,5 @@
 // Copyright (c) Mysten Labs, Inc.
+// Copyright (c) 2025 Rather Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 /// Demonstrates wrapping objects using the `Option` type.

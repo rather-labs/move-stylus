@@ -1,4 +1,5 @@
 // Copyright (c) Mysten Labs, Inc.
+// Copyright (c) 2025 Rather Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 /// A table is a map-like collection. But unlike a traditional collection, it's keys and values are
