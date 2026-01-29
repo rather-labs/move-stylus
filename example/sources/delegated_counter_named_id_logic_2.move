@@ -7,7 +7,7 @@ use stylus::{
 
 public struct COUNTER_ has key {}
 
-#[ext(external_struct, module_name = b"delegated_counter_named_id", address = @0x0)]
+#[ext(external_struct(module_name = b"delegated_counter_named_id", address = @0x0))]
 public struct Counter has key {
     id: NamedId<COUNTER_>,
     owner: address,
