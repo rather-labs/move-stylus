@@ -34,7 +34,9 @@ use function_modifiers::{Function, FunctionModifier, Visibility};
 use function_validation::validate_function;
 use move_compiler::{
     Compiler, PASS_PARSER,
-    parser::ast::{Ability_, Definition, ModuleMember, ModuleUse, Use},
+    parser::ast::{
+        Ability_, Definition, Exp_, LeadingNameAccess_, ModuleMember, ModuleUse, Use, Value_,
+    },
     shared::{Identifier, NumericalAddress, files::MappedFiles},
 };
 use move_ir_types::location::Loc;
@@ -273,6 +275,28 @@ pub fn process_special_attributes(
                             variants,
                             loc: enum_def.loc,
                         });
+                    }
+                    ModuleMember::Constant(constant) => {
+                        // Check if any constant is an address literal that exceeds 20 bytes
+                        if let Exp_::Value(value) = &constant.value.value {
+                            if let Value_::Address(addr) = &value.value {
+                                if let LeadingNameAccess_::AnonymousAddress(numerical_addr) =
+                                    &addr.value
+                                {
+                                    let addr_bytes: [u8; 32] =
+                                        numerical_addr.into_inner().into_bytes();
+
+                                    // If the first 12 bytes are not all zero, the address is too large for EVM
+                                    if !addr_bytes[0..12].iter().all(|&b| b == 0) {
+                                        module_errors.push(SpecialAttributeError {
+                                            kind: SpecialAttributeErrorKind::AddressTooLarge,
+                                            line_of_code: addr.loc,
+                                        });
+                                        found_error = true;
+                                    }
+                                }
+                            }
+                        }
                     }
                     _ => continue,
                 }
