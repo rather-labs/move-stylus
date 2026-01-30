@@ -84,6 +84,7 @@ impl NativeFunction {
     pub const NATIVE_COMPUTE_NAMED_ID: &str = "compute_named_id";
     pub const NATIVE_AS_UID: &str = "as_uid";
     pub const NATIVE_AS_UID_MUT: &str = "as_uid_mut";
+    pub const NATIVE_BORROW_UID: &str = "borrow_uid";
     // Peep function
     pub const NATIVE_PEEP: &str = "peep";
 
@@ -567,6 +568,10 @@ impl NativeFunction {
                 // the function, just to detect that the function was called correctly
                 Self::assert_generics_length(generics.len(), 1, name, module_id)?;
                 object::add_as_uid_fn(module, compilation_ctx, module_id)
+            }
+            (Self::NATIVE_BORROW_UID, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT, _) => {
+                Self::assert_generics_length(generics.len(), 1, name, module_id)?;
+                object::add_borrow_uid_fn(module, compilation_ctx, &generics[0], module_id)?
             }
 
             //

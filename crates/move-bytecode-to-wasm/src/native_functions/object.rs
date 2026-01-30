@@ -275,3 +275,62 @@ pub fn add_native_fresh_id_fn(
 
     function.finish(vec![], &mut module.funcs)
 }
+
+pub fn add_borrow_uid_fn(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    itype: &IntermediateType,
+    module_id: &ModuleId,
+) -> Result<FunctionId, NativeFunctionError> {
+    let name = NativeFunction::get_generic_function_name(
+        NativeFunction::NATIVE_BORROW_UID,
+        compilation_ctx,
+        &[itype],
+        module_id,
+    )?;
+    if let Some(function) = module.funcs.by_name(&name) {
+        return Ok(function);
+    };
+
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
+
+    let mut builder = function.name(name).func_body();
+
+    // Argument: a pointer to &Obj
+    let obj_ptr = module.locals.add(ValType::I32);
+
+    let uid_ptr = module.locals.add(ValType::I32);
+    // Load the UID, which is the first field of the struct
+    builder
+        .local_get(obj_ptr)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .local_set(uid_ptr);
+
+    let uid_ref = module.locals.add(ValType::I32);
+    // Wrap the UID into a reference
+    builder
+        .i32_const(4)
+        .call(compilation_ctx.allocator)
+        .local_tee(uid_ref)
+        .local_get(uid_ptr)
+        .store(
+            compilation_ctx.memory_id,
+            StoreKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
+
+    // Return &UID
+    builder.local_get(uid_ref);
+
+    Ok(function.finish(vec![obj_ptr], &mut module.funcs))
+}
