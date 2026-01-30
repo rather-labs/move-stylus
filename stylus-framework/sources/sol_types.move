@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs, Inc.
+// SPDX-License-Identifier: BUSL-1.1
+
 /// This module implements Solidity-compatible fixed-size byte types for the Stylus framework.
 /// It provides Move struct representations for 'bytes1' through 'bytes32', enabling
 /// seamless ABI interoperability with Ethereum smart contracts and precise memory layouts.

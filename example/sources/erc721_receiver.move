@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs, Inc.
+// SPDX-License-Identifier: BUSL-1.1
+
 module hello_world::erc721_receiver;
 
 // Function selector for the on_erc721_received function according to Remix

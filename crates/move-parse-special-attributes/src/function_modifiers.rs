@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 use crate::{SpecialAttributeError, error::SpecialAttributeErrorKind, types::Type};
 use move_compiler::{
     parser::ast::{Attribute_, FunctionSignature},

@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 //! This module is in charge if checking all the constraints related to marking a function as an
 //! external call.
 

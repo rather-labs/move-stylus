@@ -1,7 +1,12 @@
+// Copyright (c) The Move Contributors
+// Copyright (c) 2025 Rather Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 /// This module defines the core identity system for the Stylus framework.
 /// It implements unique identifiers (UIDs), deterministic Named IDs, 
 /// and storage lookup structures that manage the lifecycle and addressable 
 /// location of Move objects in global storage.
+
 module stylus::object;
 
 use stylus::{

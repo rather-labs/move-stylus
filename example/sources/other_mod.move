@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs, Inc.
+// SPDX-License-Identifier: BUSL-1.1
+
 module hello_world::other_mod;
 
 use hello_world::another_mod::{AnotherTest, generic_identity_2};

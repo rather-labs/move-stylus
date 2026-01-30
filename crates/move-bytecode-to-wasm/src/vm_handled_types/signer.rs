@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 use super::{VmHandledType, error::VmHandledTypeError};
 use crate::{CompilationContext, compilation_context::ModuleId, runtime::RuntimeFunction};
 use walrus::{InstrSeqBuilder, Module};

@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 //! This module is in charge of processing the move-bytecode-to-wasm errors
 
 use std::{backtrace::BacktraceStatus, error::Error, process::exit};

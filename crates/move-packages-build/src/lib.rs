@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 //! This library is in charge of manage and return the list of implicit dependencies supported by
 //! the Move to WASM compiler.
 use implicit_dependency_info::ImplicitDepenencyInfo;

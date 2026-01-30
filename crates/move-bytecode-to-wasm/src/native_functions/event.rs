@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 use std::{collections::HashMap, sync::Arc};
 
 use move_binary_format::file_format::FieldHandleIndex;
