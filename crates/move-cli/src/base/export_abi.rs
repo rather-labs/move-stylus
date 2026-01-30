@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 use clap::*;
 use move_bytecode_to_wasm::package_module_data;
 use move_compiler::diagnostics::{Diagnostics, report_diagnostics};

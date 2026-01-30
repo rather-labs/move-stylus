@@ -1,3 +1,6 @@
+// Copyright (c) Mysten Labs, Inc.
+// Copyright (c) 2025 Rather Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
 
 /// This module implements the Transaction Context for the Stylus framework.
 /// It provides access to environmental data of the current transaction and the 
@@ -9,8 +12,6 @@ module stylus::tx_context;
 /// This is a privileged object created by the VM and passed to module entry points.
 /// It cannot be manually constructed, ensuring environmental data is authentic.
 public struct TxContext has drop {}
-
-
 
 /// Returns the address of the account that signed the current transaction.
 /// Equivalent to Solidity's `msg.sender`.

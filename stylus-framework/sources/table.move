@@ -1,5 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
+// Copyright (c) 2025 Rather Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
+// Portions of this file were modified by Rather Labs, Inc on 2025-2026.
 
 /// A table is a map-like collection. But unlike a traditional collection, it's keys and values are
 /// not stored within the `Table` value, but instead are stored using Sui's object system. The

@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 //! Initializes the data segment for the module
 
 use crate::abi_types::error_encoding::ERROR_SELECTOR;

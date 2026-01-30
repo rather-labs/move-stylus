@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs, Inc.
+// SPDX-License-Identifier: BUSL-1.1
+
 module hello_world::delegated_counter_named_id_interface;
 
 use stylus::contract_calls::{ContractCallEmptyResult, CrossContractCall};

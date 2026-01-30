@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs, Inc.
+// SPDX-License-Identifier: BUSL-1.1
+
 /// This module extends the Dynamic Field functionality to work with Named IDs.
 /// It provides a high-level API for adding, borrowing, and removing dynamic fields 
 /// from deterministic singleton objects (NamedId) by internally casting them 

@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Rather Labs
+// SPDX-License-Identifier: BUSL-1.1
+
 use std::{collections::HashMap, rc::Rc};
 
 use move_bytecode_to_wasm::compilation_context::{
