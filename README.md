@@ -2,12 +2,17 @@
 
 ## Overview
 
-This repository contains the source code to compile the Move language to WASM, for running it in Arbitrum's Stylus Environment.
+This repository contains the source code to compile the Move language to WASM, for running it in [Arbitrum's Stylus Environment](https://docs.arbitrum.io/stylus/gentle-introduction).
 
 The Move-to-Stylus compiler translates Move bytecode directly into WASM. This approach:
 - Leverages the existing Move compiler for type checks and validations.
 - Avoids modifying the Move compiler.
 - Focuses on generating Stylus-compatible WASM modules.
+
+## Disclaimer
+
+> [!WARNING]
+> The code has not been audited and may contain security vulnerabilities or bugs. Use at your own risk.
 
 ## Move compiler
 The Move compiler, based on the [Sui Move implementation](https://github.com/MystenLabs/sui/tree/main/external-crates/move/crates/move-compiler), passes and validate the move code through several stages and return Move-bytecode.
@@ -114,21 +119,44 @@ make setup-stylus
 make install-wasm-tools
 ```
 
-build the example contract:
+Or install the `move-stylus` CLI tool:
+```bash
+make install
+```
+
+
+## Examples
+
+In the `examples/` folder, several fully functional contracts showcase different aspects of the Move language semantics, including core examples, token standards, advanced patterns, and testing & demonstration contracts.
+
+build the example package:
 ```bash
 make build-example
 ```
 
-test and debug wasm:
+
+deploy to arbitrum dev node (local):
 ```bash
-make test-move-bytecode-to-wasm
-make disassemble
+make deploy-example
+make deploy-example-2
+make deploy-example-primitives
+make deploy-counter
+make deploy-counter-with-init
 ```
 
-check webassembly output at arbitrum public node:
+Check [Makefile](./Makefile) for more contracts.
+
+run test interactions (make sure to setup a `.env` file):
 ```bash
-make check-example
+make example-interaction
+make example-interaction-2
+make example-interaction-primitives
+make example-counter
+make example-counter-with-init
+make example-dog-walker
 ```
+
+Check [Makefile](./Makefile) for more contracts.
 
 ## License
 This project is developed by [Rather Labs](https://ratherlabs.com) and licensed under the Business Source License 1.1
