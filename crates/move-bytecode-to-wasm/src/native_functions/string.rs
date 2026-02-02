@@ -329,6 +329,7 @@ pub fn add_internal_check_utf8(
     Ok(function.finish(vec![vec_ptr], &mut module.funcs))
 }
 
+/// Implementation of `native fun internal_is_char_boundary(v: &vector<u8>, index: u64): bool;`
 pub fn add_internal_is_char_boundary(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -665,7 +666,7 @@ pub fn add_internal_sub_string(
         .local_set(end_idx_i32);
 
     // Index Validation: check start < end < len
-    // TODO: throw runtime error if invalid
+    // TODO: throw runtime error if invalid?
     builder
         .local_get(start_idx_i32)
         .local_get(end_idx_i32)
