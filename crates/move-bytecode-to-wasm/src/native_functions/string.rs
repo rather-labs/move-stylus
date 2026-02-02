@@ -609,6 +609,119 @@ pub fn add_internal_index_of(
     Ok(function.finish(vec![vec_ptr, pattern_ptr], &mut module.funcs))
 }
 
+/// Implementation of `native fun internal_sub_string(v: &vector<u8>, i: u64, j: u64): vector<u8>;`
+pub fn add_internal_sub_string(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    module_id: &ModuleId,
+) -> Result<FunctionId, NativeFunctionError> {
+    // Signature: (vec_ptr: i32, start_index: i64, end_index: i64) -> i32 (new_vec_ptr)
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I64, ValType::I64],
+        &[ValType::I32],
+    );
+    let mut builder = function
+        .name(NativeFunction::get_function_name(
+            NativeFunction::NATIVE_INTERNAL_SUB_STRING,
+            module_id,
+        ))
+        .func_body();
+
+    // Arguments
+    let vec_ptr = module.locals.add(ValType::I32);
+    let start_idx = module.locals.add(ValType::I64);
+    let end_idx = module.locals.add(ValType::I64);
+
+    // Locals
+    let sub_vec_ptr = module.locals.add(ValType::I32);
+    let start_idx_i32 = module.locals.add(ValType::I32);
+    let end_idx_i32 = module.locals.add(ValType::I32);
+    let len = module.locals.add(ValType::I32);
+    let sub_len = module.locals.add(ValType::I32);
+
+    // Load vec length
+    builder
+        .local_get(vec_ptr)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .local_set(len);
+
+    // Cast indices to i32
+    builder
+        .local_get(start_idx)
+        .unop(UnaryOp::I32WrapI64)
+        .local_set(start_idx_i32);
+
+    builder
+        .local_get(end_idx)
+        .unop(UnaryOp::I32WrapI64)
+        .local_set(end_idx_i32);
+
+    // Index Validation: check start < end < len
+    // TODO: throw runtime error if invalid
+    builder
+        .local_get(start_idx_i32)
+        .local_get(end_idx_i32)
+        .binop(BinaryOp::I32GtU)
+        .if_else(
+            None,
+            |then| {
+                // start > end
+                then.unreachable();
+            },
+            |else_| {
+                else_
+                    .local_get(end_idx_i32)
+                    .local_get(len)
+                    .binop(BinaryOp::I32GtU)
+                    .if_else(
+                        None,
+                        |then| {
+                            // end > len
+                            then.unreachable();
+                        },
+                        |_| {},
+                    );
+            },
+        );
+
+    // sub_len = end - start
+    builder
+        .local_get(end_idx_i32)
+        .local_get(start_idx_i32)
+        .binop(BinaryOp::I32Sub)
+        .local_set(sub_len);
+
+    // Allocate Memory for the substring vector
+    let allocate_vector_with_header_fn =
+        RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx), None)?;
+    builder
+        .local_get(sub_len)
+        .local_get(sub_len)
+        .i32_const(1)
+        .call(allocate_vector_with_header_fn)
+        .local_set(sub_vec_ptr);
+
+    // Copy data into the substring vector
+    builder
+        .skip_vec_header(sub_vec_ptr)
+        .vec_elem_ptr(vec_ptr, start_idx_i32, 1)
+        .local_get(sub_len)
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
+    // Return the pointer to the new vector
+    builder.local_get(sub_vec_ptr).return_();
+
+    Ok(function.finish(vec![vec_ptr, start_idx, end_idx], &mut module.funcs))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -619,6 +732,20 @@ mod tests {
     };
     use rstest::rstest;
     use walrus::FunctionBuilder;
+
+    /// Helper function to create vector data in memory format: [len, capacity, data...]
+    /// This is the standard format for vectors in WASM memory:
+    /// - 4 bytes: length (i32, little-endian)
+    /// - 4 bytes: capacity (i32, little-endian)
+    /// - N bytes: actual data
+    fn create_vector_data(data: &[u8]) -> Vec<u8> {
+        let len = data.len() as i32;
+        let mut result = Vec::new();
+        result.extend_from_slice(&len.to_le_bytes());
+        result.extend_from_slice(&len.to_le_bytes());
+        result.extend_from_slice(data);
+        result
+    }
 
     #[rstest]
     #[case::ascii(b"hello world".to_vec(), true)]
@@ -678,24 +805,19 @@ mod tests {
         let function = function_builder.finish(vec![vec_ptr], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
-        // We save length, capacity and the data
-        let data = [
-            &(string.len() as i32).to_le_bytes(),
-            &(string.len() as i32).to_le_bytes(),
-            string.as_slice(),
-        ]
-        .concat();
+        // Prepare vector data: [len, capacity, data...]
+        let vector_data = create_vector_data(&string);
         let linker = get_linker_with_host_debug_functions();
-        let (_, _, mut store, entrypoint) = setup_wasmtime_module(
-            &mut raw_module,
-            data.to_vec(),
-            "test_function",
-            Some(linker),
-        );
+        let (_, _, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, vector_data, "test_function", Some(linker));
 
         let result: i32 = entrypoint.call(&mut store, 0).unwrap();
 
-        assert_eq!(result != 0, expected);
+        assert_eq!(
+            result != 0,
+            expected,
+            "UTF-8 validation failed for string: {string:?}"
+        );
     }
 
     #[rstest]
@@ -754,21 +876,11 @@ mod tests {
         let function = function_builder.finish(vec![vec_ptr, char_index], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
-        // Prepare vector header: [len, capacity, data...]
-        let data = [
-            &(string.len() as i32).to_le_bytes(),
-            &(string.len() as i32).to_le_bytes(),
-            string.as_slice(),
-        ]
-        .concat();
-
+        // Prepare vector data: [len, capacity, data...]
+        let vector_data = create_vector_data(&string);
         let linker = get_linker_with_host_debug_functions();
-        let (_, _, mut store, entrypoint) = setup_wasmtime_module(
-            &mut raw_module,
-            data.to_vec(),
-            "test_function",
-            Some(linker),
-        );
+        let (_, _, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, vector_data, "test_function", Some(linker));
 
         // Call with index as the second argument (the i64)
         // Note: index 0 in .call() is INITIAL_MEMORY_OFFSET, index 1 is the actual 'index'
@@ -777,7 +889,7 @@ mod tests {
         assert_eq!(
             result != 0,
             expected,
-            "Failed for string {string:?} at index {index}"
+            "Character boundary check failed for string {string:?} at index {index}"
         );
     }
 
@@ -819,11 +931,13 @@ mod tests {
 
         let mut func_body = function_builder.func_body();
 
-        // We need to place two vectors in memory.
-        let source_addr = INITIAL_MEMORY_OFFSET;
-        let pattern_addr = INITIAL_MEMORY_OFFSET + 100; // Offset enough for short test strings
+        // Calculate memory layout: place source and pattern vectors sequentially
+        // Source vector size: 8 (header) + source.len()
+        let source_vector_size = 8 + source.len();
+        // Pattern vector starts after source vector with some padding for alignment
+        let pattern_addr = INITIAL_MEMORY_OFFSET + source_vector_size as i32;
 
-        func_body.i32_const(source_addr);
+        func_body.i32_const(INITIAL_MEMORY_OFFSET);
         func_body.i32_const(pattern_addr);
 
         let compilation_ctx =
@@ -839,32 +953,136 @@ mod tests {
         raw_module.exports.add("test_function", function);
 
         // Prepare data block: [Source Vector] ... [Pattern Vector]
-        let mut memory_data = Vec::new();
-
-        // Source: [len, cap, bytes]
-        memory_data.extend_from_slice(&(source.len() as i32).to_le_bytes());
-        memory_data.extend_from_slice(&(source.len() as i32).to_le_bytes());
-        memory_data.extend_from_slice(&source);
+        let mut memory_data = create_vector_data(&source);
 
         // Pad to reach pattern_addr
-        while memory_data.len() < (pattern_addr - INITIAL_MEMORY_OFFSET) as usize {
-            memory_data.push(0);
-        }
+        let padding_needed = (pattern_addr - INITIAL_MEMORY_OFFSET) as usize - memory_data.len();
+        memory_data.extend(vec![0u8; padding_needed]);
 
-        // Pattern: [len, cap, bytes]
-        memory_data.extend_from_slice(&(pattern.len() as i32).to_le_bytes());
-        memory_data.extend_from_slice(&(pattern.len() as i32).to_le_bytes());
-        memory_data.extend_from_slice(&pattern);
+        // Append pattern vector
+        memory_data.extend_from_slice(&create_vector_data(&pattern));
 
         let linker = get_linker_with_host_debug_functions();
         let (_, _, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, memory_data, "test_function", Some(linker));
-            
+
         let result: i64 = entrypoint.call(&mut store, (0, 0)).unwrap();
 
         assert_eq!(
             result as u64, expected,
-            "Failed searching {pattern:?} in {source:?}",
+            "Index search failed: pattern {pattern:?} in source {source:?}"
+        );
+    }
+
+    #[rstest]
+    // --- Basic Slices ---
+    #[case::middle(b"hello world".to_vec(), 0, 5, b"hello".to_vec())]
+    #[case::start(b"rustlang".to_vec(), 0, 4, b"rust".to_vec())]
+    #[case::end(b"move_lang".to_vec(), 5, 9, b"lang".to_vec())]
+    // --- Multi-byte UTF-8 ---
+    #[case::utf8_emoji("👋 hello".as_bytes().to_vec(), 0, 4, "👋".as_bytes().to_vec())]
+    #[case::utf8_mixed("Café".as_bytes().to_vec(), 0, 3, "Caf".as_bytes().to_vec())]
+    #[case::utf8_accent("Café".as_bytes().to_vec(), 3, 5, "é".as_bytes().to_vec())]
+    // --- Edge Cases ---
+    #[case::empty_slice(b"anything".to_vec(), 3, 3, b"".to_vec())]
+    #[case::full_copy(b"copy_me".to_vec(), 0, 7, b"copy_me".to_vec())]
+    fn test_sub_string(
+        #[case] source: Vec<u8>,
+        #[case] start: i64,
+        #[case] end: i64,
+        #[case] expected: Vec<u8>,
+    ) {
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer) =
+            build_module(None);
+        let module_id = ModuleId::default();
+
+        // Signature: (src_ptr: i32, start: i64, end: i64) -> i32
+        let mut function_builder = FunctionBuilder::new(
+            &mut raw_module.types,
+            &[ValType::I32, ValType::I64, ValType::I64],
+            &[ValType::I32],
+        );
+
+        let src_ptr_local = raw_module.locals.add(ValType::I32);
+        let start_local = raw_module.locals.add(ValType::I64);
+        let end_local = raw_module.locals.add(ValType::I64);
+
+        let mut func_body = function_builder.func_body();
+
+        // Prepare call to sub_string - use the src_ptr parameter
+        func_body.local_get(src_ptr_local);
+        func_body.local_get(start_local);
+        func_body.local_get(end_local);
+
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer);
+
+        let sub_string_f =
+            add_internal_sub_string(&mut raw_module, &compilation_ctx, &module_id).unwrap();
+
+        func_body.call(sub_string_f);
+
+        let function = function_builder.finish(
+            vec![src_ptr_local, start_local, end_local],
+            &mut raw_module.funcs,
+        );
+        raw_module.exports.add("test_function", function);
+
+        // Prepare source vector data: [len, capacity, data...]
+        let source_data = create_vector_data(&source);
+
+        let linker = get_linker_with_host_debug_functions();
+        let (_, instance, mut store, entrypoint) = setup_wasmtime_module(
+            &mut raw_module,
+            source_data.clone(),
+            "test_function",
+            Some(linker),
+        );
+
+        // Update the allocator's global pointer to point after the source data
+        // so that allocations don't overwrite the source vector
+        let global_next_free_memory_pointer = instance
+            .get_global(&mut store, "global_next_free_memory_pointer")
+            .unwrap();
+        // Set it to point after the source data
+        global_next_free_memory_pointer
+            .set(
+                &mut store,
+                wasmtime::Val::I32(INITIAL_MEMORY_OFFSET + source_data.len() as i32),
+            )
+            .unwrap();
+
+        // 1. Execute the function to get the pointer to the NEW vector
+        // Pass INITIAL_MEMORY_OFFSET as the source pointer since that's where the data is placed
+        let new_vec_ptr: i32 = entrypoint
+            .call(&mut store, (INITIAL_MEMORY_OFFSET, start, end))
+            .unwrap();
+
+        // 2. Access WASM memory to verify the content of the new vector
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+        let data = memory.data(&store);
+
+        // Read header from the returned pointer
+        let actual_len = i32::from_le_bytes(
+            data[new_vec_ptr as usize..new_vec_ptr as usize + 4]
+                .try_into()
+                .unwrap(),
+        );
+
+        // Read the actual bytes (skipping 8-byte header)
+        let start_byte = (new_vec_ptr + 8) as usize;
+        let end_byte = start_byte + actual_len as usize;
+        let actual_bytes = &data[start_byte..end_byte];
+
+        // Assertions
+        assert_eq!(
+            actual_len as usize,
+            expected.len(),
+            "Substring vector length mismatch"
+        );
+        assert_eq!(
+            actual_bytes, expected,
+            "Substring vector content mismatch for slice {start}..{end}",
         );
     }
 }
