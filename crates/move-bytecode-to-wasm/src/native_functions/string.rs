@@ -3,7 +3,7 @@
 
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
-    ir::{BinaryOp, ExtendedLoad, LoadKind, MemArg},
+    ir::{BinaryOp, ExtendedLoad, LoadKind, MemArg, UnaryOp},
 };
 
 use crate::{
@@ -329,6 +329,107 @@ pub fn add_internal_check_utf8(
     Ok(function.finish(vec![vec_ptr], &mut module.funcs))
 }
 
+pub fn add_internal_is_char_boundary(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    module_id: &ModuleId,
+) -> Result<FunctionId, NativeFunctionError> {
+    // Function declaration: (vec_ptr: i32, char_index: i64) -> i32 (bool)
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I64],
+        &[ValType::I32],
+    );
+    let mut builder = function
+        .name(NativeFunction::get_function_name(
+            NativeFunction::NATIVE_INTERNAL_IS_CHAR_BOUNDARY,
+            module_id,
+        ))
+        .func_body();
+
+    // Arguments
+    let vec_ptr = module.locals.add(ValType::I32);
+    let char_index = module.locals.add(ValType::I64);
+
+    // Locals
+    let length = module.locals.add(ValType::I32);
+    let is_boundary = module.locals.add(ValType::I32);
+    let char_index_i32 = module.locals.add(ValType::I32);
+
+    // Convert char_index to i32 (maybe we need to use downcast runtime fn here?)
+    builder
+        .local_get(char_index)
+        .unop(UnaryOp::I32WrapI64)
+        .local_set(char_index_i32);
+
+    // Initialize is_boundary to 0
+    builder.i32_const(0).local_set(is_boundary);
+
+    // Load vector's length (stored as i32 at the header)
+    builder
+        .local_get(vec_ptr)
+        .load(
+            compilation_ctx.memory_id,
+            walrus::ir::LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .local_set(length);
+
+    // Check if character is boundary
+    builder.local_get(char_index).unop(UnaryOp::I64Eqz).if_else(
+        None,
+        |then| {
+            // First character is always a boundary
+            then.i32_const(1).local_set(is_boundary);
+        },
+        |else_| {
+            // Check if index >= length
+            // Convert char_index to i32 for comparison with length
+            else_
+                .local_get(char_index_i32)
+                .local_get(length)
+                .binop(BinaryOp::I32GeU)
+                .if_else(
+                    None,
+                    |then| {
+                        // index == length ? true : false
+                        then.local_get(char_index_i32)
+                            .local_get(length)
+                            .binop(BinaryOp::I32Eq)
+                            .local_set(is_boundary);
+                    },
+                    |else_| {
+                        // General Case: index is within [1, length-1]
+                        // Get the byte at the index
+                        else_
+                            .vec_elem_ptr(vec_ptr, char_index_i32, 1)
+                            .load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I32_8 {
+                                    kind: ExtendedLoad::SignExtend,
+                                },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            )
+                            // (self as i8) >= -64
+                            .i32_const(-0x40) // -64
+                            .binop(BinaryOp::I32GeS)
+                            .local_set(is_boundary);
+                    },
+                );
+        },
+    );
+
+    builder.local_get(is_boundary).return_();
+
+    Ok(function.finish(vec![vec_ptr, char_index], &mut module.funcs))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -416,5 +517,88 @@ mod tests {
         let result: i32 = entrypoint.call(&mut store, 0).unwrap();
 
         assert_eq!(result != 0, expected);
+    }
+
+    #[rstest]
+    // --- Basic ASCII ---
+    #[case::ascii_start(b"abc".to_vec(), 0, true)]
+    #[case::ascii_middle(b"abc".to_vec(), 1, true)]
+    #[case::ascii_end(b"abc".to_vec(), 3, true)]
+    #[case::ascii_out_of_bounds(b"abc".to_vec(), 4, false)]
+    // --- 2-Byte Character (ñ = \xC3\xB1) ---
+    #[case::utf8_2_start("ñ".as_bytes().to_vec(), 0, true)]
+    #[case::utf8_2_cont("ñ".as_bytes().to_vec(), 1, false)]
+    #[case::utf8_2_end("ñ".as_bytes().to_vec(), 2, true)]
+    // --- 3-Byte Character (界 = \xE7\x95\x8C) ---
+    #[case::utf8_3_start("界".as_bytes().to_vec(), 0, true)]
+    #[case::utf8_3_cont_1("界".as_bytes().to_vec(), 1, false)]
+    #[case::utf8_3_cont_2("界".as_bytes().to_vec(), 2, false)]
+    #[case::utf8_3_end("界".as_bytes().to_vec(), 3, true)]
+    // --- 4-Byte Character (😀 = \xF0\x9F\x98\x80) ---
+    #[case::utf8_4_start("😀".as_bytes().to_vec(), 0, true)]
+    #[case::utf8_4_cont_1("😀".as_bytes().to_vec(), 1, false)]
+    #[case::utf8_4_cont_2("😀".as_bytes().to_vec(), 2, false)]
+    #[case::utf8_4_cont_3("😀".as_bytes().to_vec(), 3, false)]
+    #[case::utf8_4_end("😀".as_bytes().to_vec(), 4, true)]
+    // --- Mixture ---
+    #[case::mixture_boundary("Añ😀".as_bytes().to_vec(), 1, true)] // Start of 'ñ'
+    #[case::mixture_not_boundary("Añ😀".as_bytes().to_vec(), 4, false)] // Middle of '😀'
+    fn test_is_char_boundary(#[case] string: Vec<u8>, #[case] index: i64, #[case] expected: bool) {
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer) =
+            build_module(None);
+        let module_id = ModuleId::default();
+
+        // Input signature matches our builder: (i32, i64) -> i32
+        let mut function_builder = FunctionBuilder::new(
+            &mut raw_module.types,
+            &[ValType::I32, ValType::I64],
+            &[ValType::I32],
+        );
+
+        let vec_ptr = raw_module.locals.add(ValType::I32);
+        let char_index = raw_module.locals.add(ValType::I64);
+
+        let mut func_body = function_builder.func_body();
+
+        // The data is placed at INITIAL_MEMORY_OFFSET
+        func_body.i32_const(INITIAL_MEMORY_OFFSET);
+        func_body.local_get(char_index); // The index to check
+
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer);
+
+        let is_char_boundary_f =
+            add_internal_is_char_boundary(&mut raw_module, &compilation_ctx, &module_id).unwrap();
+
+        func_body.call(is_char_boundary_f);
+
+        let function = function_builder.finish(vec![vec_ptr, char_index], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        // Prepare vector header: [len, capacity, data...]
+        let data = [
+            &(string.len() as i32).to_le_bytes(),
+            &(string.len() as i32).to_le_bytes(),
+            string.as_slice(),
+        ]
+        .concat();
+
+        let linker = get_linker_with_host_debug_functions();
+        let (_, _, mut store, entrypoint) = setup_wasmtime_module(
+            &mut raw_module,
+            data.to_vec(),
+            "test_function",
+            Some(linker),
+        );
+
+        // Call with index as the second argument (the i64)
+        // Note: index 0 in .call() is INITIAL_MEMORY_OFFSET, index 1 is the actual 'index'
+        let result: i32 = entrypoint.call(&mut store, (0, index)).unwrap();
+
+        assert_eq!(
+            result != 0,
+            expected,
+            "Failed for string {string:?} at index {index}"
+        );
     }
 }
