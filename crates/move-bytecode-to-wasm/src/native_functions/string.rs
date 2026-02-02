@@ -430,6 +430,185 @@ pub fn add_internal_is_char_boundary(
     Ok(function.finish(vec![vec_ptr, char_index], &mut module.funcs))
 }
 
+/// Implementation of `native fun internal_index_of(v: &vector<u8>, r: &vector<u8>): u64;`
+pub fn add_internal_index_of(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    module_id: &ModuleId,
+) -> Result<FunctionId, NativeFunctionError> {
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32],
+        &[ValType::I64],
+    );
+    let mut builder = function
+        .name(NativeFunction::get_function_name(
+            NativeFunction::NATIVE_INTERNAL_INDEX_OF,
+            module_id,
+        ))
+        .func_body();
+
+    // Arguments
+    let vec_ptr = module.locals.add(ValType::I32);
+    let pattern_ptr = module.locals.add(ValType::I32);
+
+    // Locals
+    let vec_len = module.locals.add(ValType::I32);
+    let pattern_len = module.locals.add(ValType::I32);
+    let i = module.locals.add(ValType::I32);
+    let j = module.locals.add(ValType::I32);
+    let search_limit = module.locals.add(ValType::I32);
+
+    // 1. Load lengths
+    builder
+        .local_get(vec_ptr)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .local_set(vec_len);
+
+    builder
+        .local_get(pattern_ptr)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .local_set(pattern_len);
+
+    // 2. Base cases
+    // If pattern is empty, return 0
+    builder
+        .local_get(pattern_len)
+        .unop(UnaryOp::I32Eqz)
+        .if_else(
+            None,
+            |then| {
+                then.i64_const(0).return_();
+            },
+            |_| {},
+        );
+
+    // If pattern > source, return source length
+    builder
+        .local_get(pattern_len)
+        .local_get(vec_len)
+        .binop(BinaryOp::I32GtU)
+        .if_else(
+            None,
+            |then| {
+                then.local_get(vec_len)
+                    .unop(UnaryOp::I64ExtendUI32)
+                    .return_();
+            },
+            |_| {},
+        );
+
+    // 3. Pre-calculate search_limit: vec_len - pattern_len
+    // We know vec_len >= pattern_len here because of the check above.
+    builder
+        .local_get(vec_len)
+        .local_get(pattern_len)
+        .binop(BinaryOp::I32Sub)
+        .local_set(search_limit);
+
+    // 4. Outer Loop
+    builder.i32_const(0).local_set(i);
+    builder.loop_(None, |outer_loop| {
+        let outer_id = outer_loop.id();
+
+        // Inner Loop
+        outer_loop.i32_const(0).local_set(j);
+        outer_loop.loop_(None, |inner_loop| {
+            let inner_id = inner_loop.id();
+
+            // Load byte vec[i + j] and pattern[j]
+            inner_loop
+                .vec_elem_ptr(vec_ptr, i, 1)
+                .local_get(j)
+                .binop(BinaryOp::I32Add)
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32_8 {
+                        kind: ExtendedLoad::ZeroExtend,
+                    },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
+                .vec_elem_ptr(pattern_ptr, j, 1)
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32_8 {
+                        kind: ExtendedLoad::ZeroExtend,
+                    },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
+                .binop(BinaryOp::I32Ne); // If mismatch
+
+            inner_loop.if_else(
+                None,
+                |then| {
+                    // Mismatch: increment i
+                    then.local_get(i)
+                        .i32_const(1)
+                        .binop(BinaryOp::I32Add)
+                        .local_set(i);
+                },
+                |else_| {
+                    // Match: increment j
+                    else_
+                        .local_get(j)
+                        .i32_const(1)
+                        .binop(BinaryOp::I32Add)
+                        .local_set(j);
+                    // If j == pattern_len, match found
+                    else_
+                        .local_get(j)
+                        .local_get(pattern_len)
+                        .binop(BinaryOp::I32Eq)
+                        .if_else(
+                            None,
+                            |found| {
+                                found.local_get(i).unop(UnaryOp::I64ExtendUI32).return_();
+                            },
+                            |not_yet| {
+                                not_yet.br(inner_id);
+                            },
+                        );
+                },
+            );
+        });
+
+        // Loop Condition: if i <= search_limit, continue
+        outer_loop
+            .local_get(i)
+            .local_get(search_limit)
+            .binop(BinaryOp::I32LeU)
+            .br_if(outer_id);
+    });
+
+    // 5. Final return if no match found
+    builder
+        .local_get(vec_len)
+        .unop(UnaryOp::I64ExtendUI32)
+        .return_();
+
+    Ok(function.finish(vec![vec_ptr, pattern_ptr], &mut module.funcs))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -599,6 +778,93 @@ mod tests {
             result != 0,
             expected,
             "Failed for string {string:?} at index {index}"
+        );
+    }
+
+    #[rstest]
+    // --- Basic Matches ---
+    #[case::simple_start(b"hello".to_vec(), b"he".to_vec(), 0)]
+    #[case::simple_middle(b"hello".to_vec(), b"el".to_vec(), 1)]
+    #[case::simple_end(b"hello".to_vec(), b"lo".to_vec(), 3)]
+    #[case::full_match(b"hello".to_vec(), b"hello".to_vec(), 0)]
+    // --- Non-Matches (Should return source length) ---
+    #[case::not_found(b"hello".to_vec(), b"world".to_vec(), 5)]
+    #[case::partial_prefix(b"hello".to_vec(), b"hellos".to_vec(), 5)] // Pattern longer than source
+    #[case::case_sensitive(b"Hello".to_vec(), b"h".to_vec(), 5)]
+    // --- Empty Cases ---
+    #[case::empty_pattern(b"hello".to_vec(), b"".to_vec(), 0)]
+    #[case::empty_source(b"".to_vec(), b"a".to_vec(), 0)]
+    #[case::both_empty(b"".to_vec(), b"".to_vec(), 0)]
+    // --- Multi-byte UTF-8 ---
+    #[case::utf8_start("🦀rust".as_bytes().to_vec(), "🦀".as_bytes().to_vec(), 0)]
+    #[case::utf8_middle("hello 界 world".as_bytes().to_vec(), "界".as_bytes().to_vec(), 6)]
+    #[case::utf8_emoji("123😀456".as_bytes().to_vec(), "😀".as_bytes().to_vec(), 3)]
+    // --- Overlapping / Repeating ---
+    #[case::repeat_pattern(b"aaaaa".to_vec(), b"aa".to_vec(), 0)] // Finds first occurrence
+    #[case::late_match(b"mississippi".to_vec(), b"ppi".to_vec(), 8)]
+    fn test_index_of(#[case] source: Vec<u8>, #[case] pattern: Vec<u8>, #[case] expected: u64) {
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer) =
+            build_module(None);
+        let module_id = ModuleId::default();
+
+        // Signature: (source_ptr: i32, pattern_ptr: i32) -> i64
+        let mut function_builder = FunctionBuilder::new(
+            &mut raw_module.types,
+            &[ValType::I32, ValType::I32],
+            &[ValType::I64],
+        );
+
+        let src_ptr_local = raw_module.locals.add(ValType::I32);
+        let pat_ptr_local = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        // We need to place two vectors in memory.
+        let source_addr = INITIAL_MEMORY_OFFSET;
+        let pattern_addr = INITIAL_MEMORY_OFFSET + 100; // Offset enough for short test strings
+
+        func_body.i32_const(source_addr);
+        func_body.i32_const(pattern_addr);
+
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer);
+
+        let index_of_f =
+            add_internal_index_of(&mut raw_module, &compilation_ctx, &module_id).unwrap();
+
+        func_body.call(index_of_f);
+
+        let function =
+            function_builder.finish(vec![src_ptr_local, pat_ptr_local], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        // Prepare data block: [Source Vector] ... [Pattern Vector]
+        let mut memory_data = Vec::new();
+
+        // Source: [len, cap, bytes]
+        memory_data.extend_from_slice(&(source.len() as i32).to_le_bytes());
+        memory_data.extend_from_slice(&(source.len() as i32).to_le_bytes());
+        memory_data.extend_from_slice(&source);
+
+        // Pad to reach pattern_addr
+        while memory_data.len() < (pattern_addr - INITIAL_MEMORY_OFFSET) as usize {
+            memory_data.push(0);
+        }
+
+        // Pattern: [len, cap, bytes]
+        memory_data.extend_from_slice(&(pattern.len() as i32).to_le_bytes());
+        memory_data.extend_from_slice(&(pattern.len() as i32).to_le_bytes());
+        memory_data.extend_from_slice(&pattern);
+
+        let linker = get_linker_with_host_debug_functions();
+        let (_, _, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, memory_data, "test_function", Some(linker));
+            
+        let result: i64 = entrypoint.call(&mut store, (0, 0)).unwrap();
+
+        assert_eq!(
+            result as u64, expected,
+            "Failed searching {pattern:?} in {source:?}",
         );
     }
 }

@@ -107,6 +107,7 @@ impl NativeFunction {
     // String
     const NATIVE_INTERNAL_CHECK_UTF8: &str = "internal_check_utf8";
     const NATIVE_INTERNAL_IS_CHAR_BOUNDARY: &str = "internal_is_char_boundary";
+    const NATIVE_INTERNAL_INDEX_OF: &str = "internal_index_of";
 
     // Tests
     const NATIVE_POISON: &str = "poison";
@@ -354,6 +355,11 @@ impl NativeFunction {
                     STANDARD_LIB_ADDRESS,
                     STDLIB_MODULE_NAME_STRING,
                 ) => string::add_internal_is_char_boundary(module, compilation_ctx, module_id)?,
+                (
+                    Self::NATIVE_INTERNAL_INDEX_OF,
+                    STANDARD_LIB_ADDRESS,
+                    STDLIB_MODULE_NAME_STRING,
+                ) => string::add_internal_index_of(module, compilation_ctx, module_id)?,
                 _ => {
                     return Err(NativeFunctionError::NativeFunctionNotSupported(
                         *module_id,
