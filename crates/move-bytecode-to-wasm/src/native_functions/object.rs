@@ -279,18 +279,12 @@ pub fn add_native_fresh_id_fn(
 pub fn add_borrow_uid_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
-    itype: &IntermediateType,
     module_id: &ModuleId,
-) -> Result<FunctionId, NativeFunctionError> {
-    let name = NativeFunction::get_generic_function_name(
-        NativeFunction::NATIVE_BORROW_UID,
-        compilation_ctx,
-        &[itype],
-        module_id,
-    )?;
+) -> FunctionId {
+    let name = NativeFunction::get_function_name(NativeFunction::NATIVE_BORROW_UID, module_id);
     if let Some(function) = module.funcs.by_name(&name) {
-        return Ok(function);
-    };
+        return function;
+    }
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
 
@@ -332,5 +326,5 @@ pub fn add_borrow_uid_fn(
     // Return &UID
     builder.local_get(uid_ref);
 
-    Ok(function.finish(vec![obj_ptr], &mut module.funcs))
+    function.finish(vec![obj_ptr], &mut module.funcs)
 }

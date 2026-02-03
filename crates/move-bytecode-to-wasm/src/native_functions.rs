@@ -571,9 +571,8 @@ impl NativeFunction {
             }
             (Self::NATIVE_BORROW_UID, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT, _) => {
                 Self::assert_generics_length(generics.len(), 1, name, module_id)?;
-                object::add_borrow_uid_fn(module, compilation_ctx, &generics[0], module_id)?
+                object::add_borrow_uid_fn(module, compilation_ctx, module_id)
             }
-
             //
             // Dynamic field
             //
