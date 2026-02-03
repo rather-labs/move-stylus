@@ -75,7 +75,7 @@ pub enum SpecialAttributeErrorKind {
     #[error("Test function is marked as expected failure but it is not #[test].")]
     ExpectedFailureWithoutTest,
 
-    #[error("Address is too large: first 12 bytes must be zero for EVM compatibility")]
+    #[error("Address is too large. It usually is 20 bytes long.")]
     AddressTooLarge,
 }
 

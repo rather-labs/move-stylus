@@ -44,10 +44,10 @@ pub fn test_address_too_large() {
         panic!("Expected error due to address too large");
     };
 
-    assert_eq!(special_attributes_errors.len(), 3);
+    assert_eq!(special_attributes_errors.len(), 4);
 
     assert_eq!(
-        3,
+        4,
         special_attributes_errors
             .iter()
             .filter(|e| matches!(&e.kind, SpecialAttributeErrorKind::AddressTooLarge))

@@ -17,3 +17,9 @@ const LARGE_ADDRESS_C: address = @0x10000000000000000000000012345678901234567890
 entry fun get_large_address_c(): address {
     LARGE_ADDRESS_C
 }
+
+const LARGE_ADDRESS_D: address = @0x1234567890123456789012340000000000000000000000000000000000000000;
+
+entry fun get_large_address_d(): address {
+    LARGE_ADDRESS_D
+}
