@@ -49,6 +49,7 @@ sol!(
     function revertCustomError2(bool a, uint8 b, uint16 c, uint32 d, uint64 e, uint128 f, uint256 g, address h) external;
     function revertCustomError3(uint32[] a, uint128[] b, uint64[][] c) external;
     function revertCustomError4(string a, string b, uint64 c) external;
+    function abortWithErrorMacro() external;
 );
 
 #[rstest]
@@ -101,6 +102,13 @@ sol!(
                 );
                 <sol!((NestedStruct1, NestedStruct2)) as alloy_sol_types::SolValue>::abi_encode_params(&params)
             },
+        ].concat()
+    )]
+#[case(
+        abortWithErrorMacroCall::new(()),
+        [
+            keccak256(b"Error(string)")[..4].to_vec(),
+            <sol!((string,))>::abi_encode_params(&("Error for testing #[error] macro",)),
         ].concat()
     )]
 fn test_revert<T: SolCall>(

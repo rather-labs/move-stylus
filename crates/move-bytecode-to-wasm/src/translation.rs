@@ -31,7 +31,7 @@ use walrus::{
 use relooper::BranchMode;
 
 use move_binary_format::{
-    file_format::{Bytecode, CodeUnit},
+    file_format::{Bytecode, CodeUnit, StructDefinitionIndex},
     internals::ModuleIndex,
 };
 
@@ -40,7 +40,7 @@ use crate::hasher::get_hasher;
 
 use crate::{
     CompilationContext,
-    abi_types::error_encoding::build_abort_error_message,
+    abi_types::error_encoding::{build_abort_error_message, build_custom_error_message},
     compilation_context::{ModuleData, ModuleId},
     data::{DATA_ABORT_MESSAGE_PTR_OFFSET, RuntimeErrorData},
     generics::{replace_type_parameters, type_contains_generics},
@@ -63,7 +63,7 @@ use intermediate_types::{
     error::IntermediateTypeError,
     heap_integers::{IU128, IU256},
     simple_integers::{IU8, IU16, IU32, IU64},
-    structs::IStruct,
+    structs::{IStruct, IStructType},
     vector::IVector,
 };
 
@@ -186,6 +186,7 @@ struct TranslateFlowContext<'a> {
     dynamic_fields_global_variables: &'a mut Vec<(GlobalId, IntermediateType)>,
     result_block_id: InstrSeqId,
     result_local_id: LocalId,
+    error_constant: Option<u64>,
 }
 
 /// Translates a move function to WASM
@@ -267,6 +268,7 @@ pub fn translate_function(
             dynamic_fields_global_variables,
             result_block_id,
             result_local_id,
+            error_constant: None,
         };
 
         // Translate the flow of the function
@@ -591,6 +593,20 @@ fn translate_instruction(
             types_stack.push(IntermediateType::IU32);
         }
         Bytecode::LdU64(literal) => {
+            // Check if the upper 16 bits are 0x8000
+            // This flags that the u64 might actually be an error constant encoded with `#[error]`
+            if (literal >> 48) == 0x8000 {
+                // Extract the constant index from the lower 16 bits
+                // The format is: [0x8000][..][constant_index: u16]
+                let error_constant_index = (literal & 0xFFFF) as u32;
+
+                // Validate that the constant index is within bounds before setting error_constant
+                // If its not, then its not an error constant
+                if (error_constant_index as usize) < module_data.constants.len() {
+                    // Set the error constant in the translation context
+                    translate_flow_ctx.error_constant = Some(*literal);
+                }
+            }
             builder.i64_const(*literal as i64);
             types_stack.push(IntermediateType::IU64);
         }
@@ -2579,8 +2595,99 @@ fn translate_instruction(
             // Expect a u64 on the Wasm stack and stash it
             types_stack.pop_expecting(&IntermediateType::IU64)?;
 
-            // Returns a ptr to the encoded error message
-            let ptr = build_abort_error_message(builder, module, compilation_ctx)?;
+            // If an error constant is provided, use it to build a custom error message
+            let ptr = if let Some(encoded_error_constant) = translate_flow_ctx.error_constant {
+                translate_flow_ctx.error_constant = None;
+
+                builder.drop(); // Drop the u64 abort code from the stack
+
+                // Extract the constant index from the lower 16 bits of the encoded error constant
+                // The format is: [0x8000][..][constant_index: u16]
+                let error_constant_index = (encoded_error_constant & 0xFFFF) as u32;
+                let error_constant_data = &module_data.constants[error_constant_index as usize];
+
+                // Define the String type from std::ascii module
+                // This is needed because we will encode the error as Error(String).
+                use crate::compilation_context::reserved_modules::{
+                    STANDARD_LIB_ADDRESS, STDLIB_MODULE_NAME_ASCII,
+                };
+                let string_type = IntermediateType::IStruct {
+                    module_id: ModuleId::new(STANDARD_LIB_ADDRESS, STDLIB_MODULE_NAME_ASCII),
+                    index: 0,
+                    vm_handled_struct: VmHandledStruct::None,
+                };
+
+                // Create the Error(String) IStruct to encode the error.
+                // Only the identifier and field types are used for selector calculation
+                let error_struct_def = IStruct::new(
+                    StructDefinitionIndex::new(0),
+                    "Error",
+                    vec![(None, string_type.clone())],
+                    HashMap::new(),
+                    false,
+                    IStructType::AbiError,
+                );
+
+                // Load the error message bytes (vector<u8>) from the constant into memory
+                let mut constant_data_iter = error_constant_data.data.iter();
+                IVector::load_constant_instructions(
+                    &IntermediateType::IU8,
+                    module,
+                    builder,
+                    &mut constant_data_iter,
+                    compilation_ctx,
+                )?;
+
+                // Save the vector pointer to a local variable
+                let error_message_vector_ptr = module.locals.add(ValType::I32);
+                builder.local_set(error_message_vector_ptr);
+
+                // Create a String struct instance that wraps the vector<u8>
+                let string_struct_ptr = module.locals.add(ValType::I32);
+                builder
+                    .i32_const(4) // String struct size: 1 field * 4 bytes
+                    .call(compilation_ctx.allocator)
+                    .local_tee(string_struct_ptr)
+                    .local_get(error_message_vector_ptr)
+                    .store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+
+                // Create the Error(String) struct instance that contains the String
+                let error_struct_ptr = module.locals.add(ValType::I32);
+                builder
+                    .i32_const(4)
+                    .call(compilation_ctx.allocator)
+                    .local_tee(error_struct_ptr)
+                    .local_get(string_struct_ptr)
+                    .store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+
+                // Build the ABI-encoded custom error message
+                // This will compute the selector and pack the String field using PackString
+                build_custom_error_message(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    &error_struct_def,
+                    error_struct_ptr,
+                )?
+            } else {
+                // Returns a ptr to the encoded error message
+                build_abort_error_message(builder, module, compilation_ctx)?
+            };
 
             // Store the ptr at DATA_ABORT_MESSAGE_PTR_OFFSET
             builder

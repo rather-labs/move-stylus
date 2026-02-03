@@ -75,3 +75,10 @@ entry fun revert_custom_error4(a: String, b: String, c: u64) {
     let error = CustomError4 { a: error, b: custom_error };
     revert(error);
 }
+
+#[error]
+const ETest: vector<u8> = b"Error for testing #[error] macro";
+
+entry fun abort_with_error_macro() {
+    abort(ETest)
+}
