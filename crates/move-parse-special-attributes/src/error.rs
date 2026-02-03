@@ -74,6 +74,9 @@ pub enum SpecialAttributeErrorKind {
 
     #[error("Test function is marked as expected failure but it is not #[test].")]
     ExpectedFailureWithoutTest,
+
+    #[error("Address is too large. It usually is 20 bytes long.")]
+    AddressTooLarge,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -155,6 +158,13 @@ impl From<&SpecialAttributeError> for Diagnostic {
                 Severity::BlockingError,
                 3,
                 3,
+                Box::leak(value.to_string().into_boxed_str()),
+            ),
+            SpecialAttributeErrorKind::AddressTooLarge => custom(
+                DIAGNOSTIC_CATEGORY,
+                Severity::Warning,
+                3,
+                4,
                 Box::leak(value.to_string().into_boxed_str()),
             ),
         };
