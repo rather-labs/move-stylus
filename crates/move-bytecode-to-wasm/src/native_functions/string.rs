@@ -666,7 +666,6 @@ pub fn add_internal_sub_string(
         .local_set(end_idx_i32);
 
     // Index Validation: check start < end < len
-    // TODO: throw runtime error if invalid?
     builder
         .local_get(start_idx_i32)
         .local_get(end_idx_i32)
@@ -845,6 +844,8 @@ mod tests {
     // --- Mixture ---
     #[case::mixture_boundary("Añ😀".as_bytes().to_vec(), 1, true)] // Start of 'ñ'
     #[case::mixture_not_boundary("Añ😀".as_bytes().to_vec(), 4, false)] // Middle of '😀'
+    // --- Empty String ---
+    #[case::empty_string(b"".to_vec(), 0, true)]
     fn test_is_char_boundary(#[case] string: Vec<u8>, #[case] index: i64, #[case] expected: bool) {
         let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer) =
             build_module(None);
