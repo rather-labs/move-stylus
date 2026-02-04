@@ -47,7 +47,7 @@ impl TryFrom<&StructDefinition> for AbiError {
     type Error = SpecialAttributeError;
 
     fn try_from(value: &StructDefinition) -> Result<Self, Self::Error> {
-        // Find the attribute we neekd
+        // Find the attribute we need
         for attribute in &value.attributes {
             for att in &attribute.value {
                 let parameterized = match &att.value {

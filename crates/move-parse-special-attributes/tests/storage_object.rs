@@ -34,7 +34,7 @@ pub fn test_storage_objects() {
             ],
         ),
     ]);
-    let file = std::path::Path::new("tests/errors_and_events/sources/storage_objects.move");
+    let file = std::path::Path::new("tests/structs/sources/storage_objects.move");
     let absolute: PathBuf = fs::canonicalize(file).unwrap();
 
     let Err((_, special_attributes_errors)) = process_special_attributes(
