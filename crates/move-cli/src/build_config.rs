@@ -2,6 +2,7 @@ use std::{collections::BTreeMap, path::PathBuf};
 
 use clap::Parser;
 use move_compiler::editions::Flavor;
+use move_core_types::account_address::AccountAddress;
 use move_package::{LintFlag, source_package::parsed_manifest::Dependencies};
 use move_packages_build::implicit_dependencies;
 
@@ -72,7 +73,10 @@ impl From<BuildConfig> for move_package::BuildConfig {
             silence_warnings: value.silence_warnings,
             warnings_are_errors: value.warnings_are_errors,
             json_errors: value.json_errors,
-            additional_named_addresses: BTreeMap::new(),
+            additional_named_addresses: BTreeMap::from([
+                ("std".to_owned(), AccountAddress::ONE),
+                ("stylus".to_owned(), AccountAddress::TWO),
+            ]),
             lint_flag: value.lint_flag,
             implicit_dependencies: implicit_dependencies(),
         }

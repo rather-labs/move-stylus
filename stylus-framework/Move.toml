@@ -1,6 +1,0 @@
-[package]
-name = "StylusFramework"
-edition = "2024"
-
-[addresses]
-stylus = "0x2"

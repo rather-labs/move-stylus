@@ -15,11 +15,18 @@ mod implicit_dependency_info;
 const GIT_BASE_REPOSITORY: &str = "https://github.com/rather-labs/move-stylus-dependencies.git";
 
 /// List of implicit dependencies supported by the compiler
-const DEPENDENCIES: [ImplicitDepenencyInfo; 1] = [ImplicitDepenencyInfo {
-    name: "MoveStdlib",
-    subdir: "move-stdlib",
-    rev: "master",
-}];
+const DEPENDENCIES: [ImplicitDepenencyInfo; 2] = [
+    ImplicitDepenencyInfo {
+        name: "MoveStdlib",
+        subdir: "move-stdlib",
+        rev: "tidy_up",
+    },
+    ImplicitDepenencyInfo {
+        name: "StylusFramework",
+        subdir: "stylus-framework",
+        rev: "tidy_up",
+    },
+];
 
 /// Process the `DEPENDENCIES` table and return them ready to be injected
 pub fn implicit_dependencies() -> Dependencies {

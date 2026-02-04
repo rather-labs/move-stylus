@@ -1,8 +1,0 @@
-// Copyright (c) 2025 Rather Labs, Inc.
-// SPDX-License-Identifier: BUSL-1.1
-
-module stylus::types;
-
-/// Checks if the argument type is a one-time witness, that is a type with only one instantiation
-/// across the entire code base.
-public native fun is_one_time_witness<T: drop>(_: &T): bool;
