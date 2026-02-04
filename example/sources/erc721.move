@@ -80,12 +80,18 @@ public struct Transfer has copy, drop {
 }
 
 // Errors:
-const EInvalidOwner: u64 = 1;
-const ENonExistentToken: u64 = 2;
-const EIncorrectOwner: u64 = 3;
-const EInvalidReceiver: u64 = 4;
-const EInvalidApprover: u64 = 5;
-const EInvalidOperator: u64 = 6;
+#[error]
+const EInvalidOwner: vector<u8> = b"Invalid owner";
+#[error]
+const ENonExistentToken: vector<u8> = b"Non-existent token";
+#[error]
+const EIncorrectOwner: vector<u8> = b"Incorrect owner";
+#[error]
+const EInvalidReceiver: vector<u8> = b"Invalid receiver";
+#[error]
+const EInvalidApprover: vector<u8> = b"Invalid approver";
+#[error]
+const EInvalidOperator: vector<u8> = b"Invalid operator";
 
 // Methods:
 
