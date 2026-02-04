@@ -79,6 +79,13 @@ entry fun revert_custom_error4(a: String, b: String, c: u64) {
 #[error]
 const ETest: vector<u8> = b"Error for testing #[error] macro";
 
-entry fun abort_with_error_macro() {
+entry fun abort_with_clever_error() {
     abort(ETest)
+}
+
+#[error]
+const EAnotherTest: vector<u8> = b"Another error for testing clever errors";
+
+entry fun abort_with_another_clever_error() {
+    abort(EAnotherTest)
 }
