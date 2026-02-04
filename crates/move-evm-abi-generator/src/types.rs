@@ -66,6 +66,7 @@ pub enum Type {
         identifier: Symbol,
         type_instances: Option<Vec<Type>>,
         module_id: ModuleId,
+        has_key: bool,
     },
     Enum {
         identifier: Symbol,
@@ -238,6 +239,7 @@ impl Type {
                         identifier: struct_.identifier,
                         type_instances: None,
                         module_id: *module_id,
+                        has_key: struct_.has_key,
                     },
                 }
             }
@@ -266,6 +268,7 @@ impl Type {
                         identifier: struct_.identifier,
                         type_instances: Some(types),
                         module_id: *module_id,
+                        has_key: struct_.has_key,
                     },
                 }
             }

@@ -392,43 +392,59 @@ fn encode_for_json_abi(type_: Type, abi: &Abi) -> JsonAbiData {
                 components,
             }
         }
-        Type::Struct { module_id, .. } => {
-            // Find corresponding processed struct, searching by the name, which differs from the identifier in case of generic structs
-            let abi_struct = abi
-                .structs
-                .iter()
-                .find(|s| s.identifier == type_.name())
-                .unwrap();
-
-            let components = abi_struct
-                .fields
-                .iter()
-                .map(|named_type| {
-                    let JsonAbiData {
-                        abi_type,
-                        abi_internal_type,
-                        components,
-                    } = encode_for_json_abi(named_type.type_.clone(), abi);
-
-                    JsonComponent {
-                        name: named_type.identifier,
-                        type_: abi_type,
-                        internal_type: abi_internal_type,
-                        components,
-                    }
-                })
-                .collect();
-
-            let abi_type = Symbol::from("tuple");
+        Type::Struct {
+            module_id,
+            has_key,
+            identifier,
+            ..
+        } => {
             let abi_internal_type = Symbol::from(format!(
                 "struct {}.{}",
                 snake_to_upper_camel(&module_id.module_name),
-                type_.name()
+                identifier
             ));
-            JsonAbiData {
-                abi_type,
-                abi_internal_type,
-                components: Some(components),
+            if *has_key {
+                // Struct with key: encode as bytes32 with struct internalType
+                let abi_type = Symbol::from("bytes32");
+                JsonAbiData {
+                    abi_type,
+                    abi_internal_type,
+                    components: None,
+                }
+            } else {
+                // Regular struct: encode as tuple with components
+                // Find corresponding processed struct, searching by the name, which differs from the identifier in case of generic structs
+                let abi_struct = abi
+                    .structs
+                    .iter()
+                    .find(|s| s.identifier == type_.name())
+                    .unwrap();
+
+                let components = abi_struct
+                    .fields
+                    .iter()
+                    .map(|named_type| {
+                        let JsonAbiData {
+                            abi_type,
+                            abi_internal_type,
+                            components,
+                        } = encode_for_json_abi(named_type.type_.clone(), abi);
+
+                        JsonComponent {
+                            name: named_type.identifier,
+                            type_: abi_type,
+                            internal_type: abi_internal_type,
+                            components,
+                        }
+                    })
+                    .collect();
+
+                let abi_type = Symbol::from("tuple");
+                JsonAbiData {
+                    abi_type,
+                    abi_internal_type,
+                    components: Some(components),
+                }
             }
         }
         Type::Tuple(_) => {
