@@ -393,15 +393,12 @@ fn encode_for_json_abi(type_: Type, abi: &Abi) -> JsonAbiData {
             }
         }
         Type::Struct {
-            module_id,
-            has_key,
-            identifier,
-            ..
+            module_id, has_key, ..
         } => {
             let abi_internal_type = Symbol::from(format!(
                 "struct {}.{}",
                 snake_to_upper_camel(&module_id.module_name),
-                identifier
+                type_.name()
             ));
             if *has_key {
                 // Struct with key: encode as bytes32 with struct internalType
