@@ -11,7 +11,7 @@ use stylus::{
 };
 use hello_world::delegated_counter_named_id_interface as dci;
 
-public struct COUNTER_ has key {}
+public struct COUNTER_ {}
 
 public struct Counter has key {
     id: NamedId<COUNTER_>,

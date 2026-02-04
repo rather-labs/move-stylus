@@ -17,7 +17,7 @@ use stylus::{
 /// 
 /// Internally converts the `NamedId` reference to a `UID` to leverage 
 /// the standard dynamic_field logic.
-public fun add<NId: key, Name: copy + drop + store, Value: store>(
+public fun add<NId, Name: copy + drop + store, Value: store>(
     object: &mut NamedId<NId>,
     name: Name,
     value: Value,
@@ -30,7 +30,7 @@ public fun add<NId: key, Name: copy + drop + store, Value: store>(
 /// 
 /// @abort EFieldDoesNotExist if the field is not found.
 /// @abort EFieldTypeMismatch if the field exists but the value type is different.
-public fun borrow<NId: key, Name: copy + drop + store, Value: store>(
+public fun borrow<NId, Name: copy + drop + store, Value: store>(
     object: &NamedId<NId>,
     name: Name
 ): &Value {
@@ -39,7 +39,7 @@ public fun borrow<NId: key, Name: copy + drop + store, Value: store>(
 }
 
 /// Mutably borrows a dynamic field from an object identified by a `NamedId`.
-public fun borrow_mut<NId: key, Name: copy + drop + store, Value: store>(
+public fun borrow_mut<NId, Name: copy + drop + store, Value: store>(
     object: &mut NamedId<NId>,
     name: Name,
 ): &mut Value {
@@ -48,7 +48,7 @@ public fun borrow_mut<NId: key, Name: copy + drop + store, Value: store>(
 }
 
 /// Removes a dynamic field from a deterministic object and returns its value.
-public fun remove<NId: key, Name: copy + drop + store, Value: store>(
+public fun remove<NId, Name: copy + drop + store, Value: store>(
     object: &mut NamedId<NId>,
     name: Name
 ): Value {
@@ -57,7 +57,7 @@ public fun remove<NId: key, Name: copy + drop + store, Value: store>(
 }
 
 /// Returns true if a dynamic field with the specified name exists on the Named object.
-public fun exists_<NId: key, Name: copy + drop + store>(
+public fun exists_<NId, Name: copy + drop + store>(
     object: &NamedId<NId>,
     name: Name
 ): bool {
@@ -68,7 +68,7 @@ public fun exists_<NId: key, Name: copy + drop + store>(
 /// Safely removes a dynamic field from a Named object if it exists.
 /// 
 /// Returns `Option::some(Value)` if found and removed, or `Option::none()` otherwise.
-public fun remove_if_exists<NId: key, Name: copy + drop + store, Value: store>(
+public fun remove_if_exists<NId, Name: copy + drop + store, Value: store>(
     object: &mut NamedId<NId>,
     name: Name,
 ): Option<Value> {
@@ -77,7 +77,7 @@ public fun remove_if_exists<NId: key, Name: copy + drop + store, Value: store>(
 }
 
 /// Returns true if a dynamic field exists and matches the specified `Value` type.
-public fun exists_with_type<NId: key, Name: copy + drop + store, Value: store>(
+public fun exists_with_type<NId, Name: copy + drop + store, Value: store>(
     object: &NamedId<NId>,
     name: Name,
 ): bool {

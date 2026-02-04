@@ -39,7 +39,7 @@ entry fun invalid_uid_argument(uid: UID): uid {
     uid
 }
 
-public struct NamedIdStruct has key {}
+public struct NamedIdStruct  {}
 
 // namedid as argument is invalid
 entry fun invalid_namedid_argument(namedid: NamedId<NamedIdStruct>): NamedId<NamedIdStruct> {

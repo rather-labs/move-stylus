@@ -8,7 +8,7 @@ use stylus::{
     object::NamedId
 };
 
-public struct COUNTER_ has key {}
+public struct COUNTER_ {}
 
 #[ext(external_struct(module_name = b"delegated_counter_named_id", address = @0x0))]
 public struct Counter has key {
