@@ -15,7 +15,7 @@ use std::collections::HashMap;
 
 #[derive(thiserror::Error, Debug)]
 pub enum StructValidationError {
-    #[error("Struct '{0}' with key ability cannot be empty (must have at least one field).")]
+    #[error("Struct '{0}' with key ability cannot be empty (must have at least the id field).")]
     StructWithKeyIsEmpty(Symbol),
 
     #[error("Struct '{0}' with key ability must have UID or NamedId as its first field.")]
