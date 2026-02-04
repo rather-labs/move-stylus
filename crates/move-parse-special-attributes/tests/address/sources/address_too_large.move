@@ -1,0 +1,25 @@
+module test::address_too_large;
+
+const LARGE_ADDRESS_A: address = @0x1234567890123456789012345678901234567890123456789012345678901234;
+
+entry fun get_large_address_a(): address {
+    LARGE_ADDRESS_A
+}
+
+const LARGE_ADDRESS_B: address = @0x0000000000000000000000011234567890123456789012345678901234561234;
+
+entry fun get_large_address_b(): address {
+    LARGE_ADDRESS_B
+}
+
+const LARGE_ADDRESS_C: address = @0x1000000000000000000000001234567890123456789012345678901234561234;
+
+entry fun get_large_address_c(): address {
+    LARGE_ADDRESS_C
+}
+
+const LARGE_ADDRESS_D: address = @0x1234567890123456789012340000000000000000000000000000000000000000;
+
+entry fun get_large_address_d(): address {
+    LARGE_ADDRESS_D
+}
