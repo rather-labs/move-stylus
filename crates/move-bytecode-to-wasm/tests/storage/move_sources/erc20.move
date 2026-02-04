@@ -10,8 +10,10 @@ use stylus::{
 };
 use std::ascii::{Self, String};
 
-const EInssuficientFunds: u64 = 1;
-const ENotAllowed: u64 = 2;
+#[error]
+const EInsufficientFunds: vector<u8> = b"Insufficient funds";
+#[error]
+const ENotAllowed: vector<u8> = b"Not allowed";
 
 public struct TOTAL_SUPPLY has key {}
 public struct CONTRACT_INFO has key {}
@@ -103,13 +105,13 @@ entry fun burn(
     balance: &mut Balance
 ) {
     if (amount > 0 && !field::exists_(&balance.id, from)) {
-        abort(EInssuficientFunds)
+        abort(EInsufficientFunds)
     };
 
     let balance_amount = field::borrow_mut(&mut balance.id, from);
 
     if (*balance_amount < amount) {
-        abort(EInssuficientFunds)
+        abort(EInsufficientFunds)
     };
 
     if (amount > total_supply.total) {
@@ -162,7 +164,7 @@ entry fun transfer(
         tx_context.sender()
     );
     if (*sender_balance < amount) {
-        abort(EInssuficientFunds)
+        abort(EInsufficientFunds)
     };
 
     *sender_balance = *sender_balance - amount;
@@ -261,7 +263,7 @@ entry fun transfer_from(
         );
 
         if (*sender_balance < amount) {
-            abort(EInssuficientFunds)
+            abort(EInsufficientFunds)
         };
 
 

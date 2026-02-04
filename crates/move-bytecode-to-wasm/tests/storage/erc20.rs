@@ -1,6 +1,6 @@
 use crate::common::runtime;
-use alloy_primitives::{U256, address};
-use alloy_sol_types::{SolCall, SolValue, sol};
+use alloy_primitives::{U256, address, keccak256};
+use alloy_sol_types::{SolCall, SolType, SolValue, sol};
 use move_test_runner::wasm_runner::RuntimeSandbox;
 use rstest::rstest;
 
@@ -120,6 +120,17 @@ fn test_erc20(#[with("erc20", "tests/storage/move_sources/erc20.move")] runtime:
     let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
     assert_eq!(9996666.abi_encode(), result_data);
+
+    // Burn more than the balance to trigger error
+    let call_data = burnCall::new((address_1, U256::from(12345678))).abi_encode();
+    let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+    assert_eq!(1, result);
+    let expected_data = [
+        keccak256(b"Error(string)")[..4].to_vec(),
+        <sol!((string,))>::abi_encode_params(&("Insufficient funds" as &str,)),
+    ]
+    .concat();
+    assert_eq!(expected_data, result_data);
 
     // Allowance
     // Allow address_1 to spend 100 TST from address_2
