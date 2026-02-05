@@ -102,7 +102,7 @@ public native fun remove<T>(id: NamedId<T>);
 public(package) native fun as_uid<T>(named_id: &NamedId<T>): &UID;
 
 /// Internal cast to treat a mutable NamedId reference as a mutable UID.
-public(package) native fun as_uid_mut<T: key>(named_id: &mut NamedId<T>): &mut UID;
+public(package) native fun as_uid_mut<T>(named_id: &mut NamedId<T>): &mut UID;
 
 /// Get the `UID` for `obj`.
 /// Cannot be made public as the access to `UID` for a given object must be privileged, and
