@@ -47,7 +47,7 @@ pub fn test_errors_and_events() {
         panic!("Expected error due to invalid errors and events usage");
     };
 
-    assert_eq!(special_attributes_errors.len(), 7);
+    assert_eq!(special_attributes_errors.len(), 11);
 
     assert_eq!(
         1,
@@ -78,7 +78,7 @@ pub fn test_errors_and_events() {
             .filter(|e| matches!(
                 &e.kind,
                 SpecialAttributeErrorKind::FunctionValidation(
-                    FunctionValidationError::InvalidRevertFunction
+                    FunctionValidationError::InvalidErrorArgument
                 )
             ))
             .count()
@@ -91,7 +91,7 @@ pub fn test_errors_and_events() {
             .filter(|e| matches!(
                 &e.kind,
                 SpecialAttributeErrorKind::FunctionValidation(
-                    FunctionValidationError::InvalidEmitFunction
+                    FunctionValidationError::InvalidEventArgument
                 )
             ))
             .count()
@@ -116,6 +116,174 @@ pub fn test_errors_and_events() {
                 &e.kind,
                 SpecialAttributeErrorKind::StructValidation(
                     StructValidationError::StructWithKeyMissingUidField(_)
+                )
+            ))
+            .count()
+    );
+
+    assert_eq!(
+        3,
+        special_attributes_errors
+            .iter()
+            .filter(|e| matches!(
+                &e.kind,
+                SpecialAttributeErrorKind::FunctionValidation(
+                    FunctionValidationError::NativeRevertNotErrorArgument
+                )
+            ))
+            .count()
+    );
+
+    assert_eq!(
+        1,
+        special_attributes_errors
+            .iter()
+            .filter(|e| matches!(
+                &e.kind,
+                SpecialAttributeErrorKind::FunctionValidation(
+                    FunctionValidationError::NativeEmitNotEventArgument
+                )
+            ))
+            .count()
+    );
+}
+
+#[test]
+pub fn test_errors_and_events_aliases() {
+    let package_address = [
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0,
+    ];
+    let address_alias_instantiation = std::collections::HashMap::from([
+        (
+            Symbol::from("std"),
+            [
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ],
+        ),
+        (
+            Symbol::from("stylus"),
+            [
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 2,
+            ],
+        ),
+        (
+            Symbol::from("test"),
+            [
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0,
+            ],
+        ),
+    ]);
+    let file = std::path::Path::new("tests/errors_and_events/sources/aliases.move");
+    let absolute: PathBuf = fs::canonicalize(file).unwrap();
+
+    let Err((_, special_attributes_errors)) = process_special_attributes(
+        &absolute,
+        package_address,
+        &std::collections::HashMap::new(),
+        &address_alias_instantiation,
+    ) else {
+        panic!("Expected error due to invalid errors and events usage");
+    };
+
+    assert_eq!(special_attributes_errors.len(), 11);
+
+    assert_eq!(
+        1,
+        special_attributes_errors
+            .iter()
+            .filter(|e| matches!(
+                &e.kind,
+                SpecialAttributeErrorKind::AbiError(AbiErrorParseError::AbiErrorWithKey)
+            ))
+            .count()
+    );
+
+    assert_eq!(
+        1,
+        special_attributes_errors
+            .iter()
+            .filter(|e| matches!(
+                &e.kind,
+                SpecialAttributeErrorKind::Event(EventParseError::EventWithKey)
+            ))
+            .count()
+    );
+
+    assert_eq!(
+        1,
+        special_attributes_errors
+            .iter()
+            .filter(|e| matches!(
+                &e.kind,
+                SpecialAttributeErrorKind::FunctionValidation(
+                    FunctionValidationError::InvalidErrorArgument
+                )
+            ))
+            .count()
+    );
+
+    assert_eq!(
+        1,
+        special_attributes_errors
+            .iter()
+            .filter(|e| matches!(
+                &e.kind,
+                SpecialAttributeErrorKind::FunctionValidation(
+                    FunctionValidationError::InvalidEventArgument
+                )
+            ))
+            .count()
+    );
+
+    assert_eq!(
+        1,
+        special_attributes_errors
+            .iter()
+            .filter(|e| matches!(
+                &e.kind,
+                SpecialAttributeErrorKind::AbiError(AbiErrorParseError::InvalidAbiErrorName)
+            ))
+            .count()
+    );
+
+    assert_eq!(
+        2,
+        special_attributes_errors
+            .iter()
+            .filter(|e| matches!(
+                &e.kind,
+                SpecialAttributeErrorKind::StructValidation(
+                    StructValidationError::StructWithKeyMissingUidField(_)
+                )
+            ))
+            .count()
+    );
+
+    assert_eq!(
+        3,
+        special_attributes_errors
+            .iter()
+            .filter(|e| matches!(
+                &e.kind,
+                SpecialAttributeErrorKind::FunctionValidation(
+                    FunctionValidationError::NativeRevertNotErrorArgument
+                )
+            ))
+            .count()
+    );
+
+    assert_eq!(
+        1,
+        special_attributes_errors
+            .iter()
+            .filter(|e| matches!(
+                &e.kind,
+                SpecialAttributeErrorKind::FunctionValidation(
+                    FunctionValidationError::NativeEmitNotEventArgument
                 )
             ))
             .count()

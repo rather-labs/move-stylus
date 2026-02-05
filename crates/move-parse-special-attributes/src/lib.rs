@@ -449,8 +449,10 @@ pub fn process_special_attributes(
 
                                     if let ModuleUse::Members(members) = module_use {
                                         for member in members {
-                                            let member_tuple =
-                                                (member.0.value, member.1.as_ref().map(|s| s.value));
+                                            let member_tuple = (
+                                                member.0.value,
+                                                member.1.as_ref().map(|s| s.value),
+                                            );
                                             imported_members
                                                 .entry(module_id.clone())
                                                 .or_default()
