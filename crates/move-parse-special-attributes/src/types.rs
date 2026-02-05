@@ -5,6 +5,9 @@ use std::sync::Arc;
 
 use move_compiler::parser::ast::{NameAccessChain_, Type_};
 use move_symbol_pool::Symbol;
+use std::collections::HashMap;
+
+use crate::{AbiError, Event};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Type {
@@ -110,6 +113,33 @@ impl Type {
                 Self::Function(arguments, Arc::new(return_type))
             }
             Type_::UnresolvedError => todo!(),
+        }
+    }
+
+    /// Extracts all struct names from a type (recursively handles vectors, tuples, etc.)
+    pub fn extract_user_data_type_names(&self) -> Vec<Symbol> {
+        match self {
+            Type::UserDataType(name, _) => vec![*name],
+            Type::Vector(inner) => inner.extract_user_data_type_names(),
+            Type::Tuple(types) => types
+                .iter()
+                .flat_map(|t| t.extract_user_data_type_names())
+                .collect(),
+            _ => Vec::new(),
+        }
+    }
+
+    pub fn is_event(&self, events: &HashMap<Symbol, Event>) -> bool {
+        match self {
+            Type::UserDataType(name, _) => events.contains_key(name),
+            _ => false,
+        }
+    }
+
+    pub fn is_abi_error(&self, abi_errors: &HashMap<Symbol, AbiError>) -> bool {
+        match self {
+            Type::UserDataType(name, _) => abi_errors.contains_key(name),
+            _ => false,
         }
     }
 }
