@@ -14,12 +14,12 @@ use stylus::{
 use erc721Utils::utils as erc721_utils;
 use std::ascii::{Self, String};
 
-public struct COLLECTION_INFO has key {}
-public struct TOTAL_SUPPLY has key {}
-public struct OWNERS_ has key {}
-public struct BALANCES_ has key {}
-public struct TOKEN_APPROVALS has key {}
-public struct OPERATOR_APPROVALS has key {}
+public struct COLLECTION_INFO  {}
+public struct TOTAL_SUPPLY  {}
+public struct OWNERS_  {}
+public struct BALANCES_  {}
+public struct TOKEN_APPROVALS  {}
+public struct OPERATOR_APPROVALS  {}
 
 const IERC721_INTERFACE_ID: vector<u8> = x"80ac58cd";
 const IERC721_METADATA_INTERFACE_ID: vector<u8> = x"01ffc9a7";
@@ -80,12 +80,18 @@ public struct Transfer has copy, drop {
 }
 
 // Errors:
-const EInvalidOwner: u64 = 1;
-const ENonExistentToken: u64 = 2;
-const EIncorrectOwner: u64 = 3;
-const EInvalidReceiver: u64 = 4;
-const EInvalidApprover: u64 = 5;
-const EInvalidOperator: u64 = 6;
+#[error]
+const EInvalidOwner: vector<u8> = b"Invalid owner";
+#[error]
+const ENonExistentToken: vector<u8> = b"Non-existent token";
+#[error]
+const EIncorrectOwner: vector<u8> = b"Incorrect owner";
+#[error]
+const EInvalidReceiver: vector<u8> = b"Invalid receiver";
+#[error]
+const EInvalidApprover: vector<u8> = b"Invalid approver";
+#[error]
+const EInvalidOperator: vector<u8> = b"Invalid operator";
 
 // Methods:
 

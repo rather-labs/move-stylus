@@ -70,12 +70,18 @@ sol!(
             NestedStruct2 b,
         );
 
+        // The standard EVM error type
+        #[derive(Debug, PartialEq)]
+        error Error(string);
+
         // Functions from the Move contract
         function revertStandardError(string s) external;
         function revertCustomError(string s, uint64 code) external;
         function revertCustomError2(bool a, uint8 b, uint16 c, uint32 d, uint64 e, uint128 f, uint256 g, address h, uint8 i) external;
         function revertCustomError3(uint32[] a, uint128[] b, uint64[][] c) external;
         function revertCustomError4(string a, uint64 b) external;
+        function abortWithCleverError() external;
+        function abortWithAnotherCleverError() external;
     }
 );
 
@@ -220,6 +226,24 @@ async fn main() -> eyre::Result<()> {
         .send()
         .await;
     check_and_decode_revert_error(custom_error4, pending_tx).await;
+
+    println!("\nTest 6: abortWithCleverError");
+    println!("  Calling abortWithCleverError");
+    let pending_tx = contract.abortWithCleverError().send().await;
+    check_and_decode_revert_error(
+        RevertErrors::Error::new((String::from("Error for testing #[error] macro"),)),
+        pending_tx,
+    )
+    .await;
+
+    println!("\nTest 7: abortWithAnotherCleverError");
+    println!("  Calling abortWithAnotherCleverError");
+    let pending_tx = contract.abortWithAnotherCleverError().send().await;
+    check_and_decode_revert_error(
+        RevertErrors::Error::new((String::from("Another error for testing clever errors"),)),
+        pending_tx,
+    )
+    .await;
 
     println!("\n==============================================================================");
     println!(" ✓ All revert error tests completed successfully!");

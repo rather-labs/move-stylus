@@ -1,6 +1,7 @@
 use super::*;
 use crate::common::runtime;
-use alloy_sol_types::{SolCall, SolValue, sol};
+use alloy_primitives::keccak256;
+use alloy_sol_types::{SolCall, SolType, SolValue, sol};
 use move_test_runner::wasm_runner::RuntimeSandbox;
 use rstest::rstest;
 
@@ -60,14 +61,17 @@ fn test_successful_swap(
     let call_data = readObjectCall::new((obj_a_id,)).abi_encode();
     let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
     let return_data = readObjectCall::abi_decode_returns(&return_data).unwrap();
-    let obj_a_expected = Object::abi_encode(&Object {
+    let obj_a_expected: Vec<u8> = <Object as SolValue>::abi_encode(&Object {
         id: UID {
             id: ID { bytes: obj_a_id },
         },
         scarcity: 7,
         style: 2,
     });
-    assert_eq!(Object::abi_encode(&return_data), obj_a_expected);
+    assert_eq!(
+        <Object as SolValue>::abi_encode(&return_data),
+        obj_a_expected
+    );
     assert_eq!(0, result);
 
     let call_data = requestSwapCall::new((obj_a_id, SERVICE.into(), fee_a)).abi_encode();
@@ -102,14 +106,17 @@ fn test_successful_swap(
     let call_data = readObjectCall::new((obj_b_id,)).abi_encode();
     let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
     let return_data = readObjectCall::abi_decode_returns(&return_data).unwrap();
-    let obj_b_expected = Object::abi_encode(&Object {
+    let obj_b_expected: Vec<u8> = <Object as SolValue>::abi_encode(&Object {
         id: UID {
             id: ID { bytes: obj_b_id },
         },
         scarcity: 7,
         style: 3,
     });
-    assert_eq!(Object::abi_encode(&return_data), obj_b_expected);
+    assert_eq!(
+        <Object as SolValue>::abi_encode(&return_data),
+        obj_b_expected
+    );
     assert_eq!(0, result);
 
     let call_data = requestSwapCall::new((obj_b_id, SERVICE.into(), fee_b)).abi_encode();
@@ -155,7 +162,10 @@ fn test_successful_swap(
     let call_data = readObjectCall::new((obj_b_id,)).abi_encode();
     let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
     let return_data = readObjectCall::abi_decode_returns(&return_data).unwrap();
-    assert_eq!(Object::abi_encode(&return_data), obj_b_expected);
+    assert_eq!(
+        <Object as SolValue>::abi_encode(&return_data),
+        obj_b_expected
+    );
     assert_eq!(0, result);
 
     runtime.set_msg_sender(OWNER_B);
@@ -164,12 +174,14 @@ fn test_successful_swap(
     let call_data = readObjectCall::new((obj_a_id,)).abi_encode();
     let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
     let return_data = readObjectCall::abi_decode_returns(&return_data).unwrap();
-    assert_eq!(Object::abi_encode(&return_data), obj_a_expected);
+    assert_eq!(
+        <Object as SolValue>::abi_encode(&return_data),
+        obj_a_expected
+    );
     assert_eq!(0, result);
 }
 
 #[rstest]
-#[should_panic]
 fn test_swap_too_cheap(
     #[with("trusted_swap", "tests/storage/move_sources/trusted_swap.move")] runtime: RuntimeSandbox,
 ) {
@@ -187,12 +199,19 @@ fn test_swap_too_cheap(
     // Request a swap with a fee too low
     let fee_a = 999;
     let call_data = requestSwapCall::new((obj_a_id, SERVICE.into(), fee_a)).abi_encode();
-    let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-    assert_eq!(0, result);
+    let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+    assert_eq!(1, result);
+
+    // The error should be ABI-encoded as Error(string)
+    let expected_data = [
+        keccak256(b"Error(string)")[..4].to_vec(),
+        <sol!((string,))>::abi_encode_params(&("Fee is too low for the service",)),
+    ]
+    .concat();
+    assert_eq!(expected_data, result_data);
 }
 
 #[rstest]
-#[should_panic]
 fn test_swap_different_scarcity(
     #[with("trusted_swap", "tests/storage/move_sources/trusted_swap.move")] runtime: RuntimeSandbox,
 ) {
@@ -238,12 +257,18 @@ fn test_swap_different_scarcity(
     runtime.set_tx_origin(SERVICE);
 
     let call_data = executeSwapCall::new((swap_request_a_id, swap_request_b_id)).abi_encode();
-    let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-    assert_eq!(0, result);
+    let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+    assert_eq!(1, result);
+    let expected_data = [
+        keccak256(b"Error(string)")[..4].to_vec(),
+        <sol!((string,))>::abi_encode_params(&("The two swap requests are not compatible",)),
+    ]
+    .concat();
+
+    assert_eq!(expected_data, result_data);
 }
 
 #[rstest]
-#[should_panic]
 fn test_swap_same_style(
     #[with("trusted_swap", "tests/storage/move_sources/trusted_swap.move")] runtime: RuntimeSandbox,
 ) {
@@ -289,6 +314,12 @@ fn test_swap_same_style(
     runtime.set_tx_origin(SERVICE);
 
     let call_data = executeSwapCall::new((swap_request_a_id, swap_request_b_id)).abi_encode();
-    let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-    assert_eq!(0, result);
+    let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+    assert_eq!(1, result);
+    let expected_data = [
+        keccak256(b"Error(string)")[..4].to_vec(),
+        <sol!((string,))>::abi_encode_params(&("The two swap requests are not compatible",)),
+    ]
+    .concat();
+    assert_eq!(expected_data, result_data);
 }

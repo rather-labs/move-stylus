@@ -1,4 +1,26 @@
-# Moving stylus
+<h1 align="center">Moving Stylus</h1>
+
+<div align="center">
+  <img src="https://repository-images.githubusercontent.com/954083773/3559f268-2708-498d-a0c3-0ea17e0d82a5" alt="Move Stylus" style="max-height: 350px;">
+</div>
+
+**A compiler that translates Move smart contracts to WASM to run on Arbitrum Stylus, enabling Move development in EVM-compatible environments.**
+
+Built by [Rather Labs](https://www.ratherlabs.com/). 
+
+
+<div align="center">
+
+[![License](https://img.shields.io/badge/License-BSL%201.1-blue.svg)](LICENSE.md)
+![Beta](https://img.shields.io/badge/Status-Beta-yellow.svg)
+![Rust](https://img.shields.io/badge/Rust-1.88.0-orange.svg?logo=rust)
+![Arbitrum](https://img.shields.io/badge/Arbitrum-Stylus-blue?logo=arbitrum)
+[![Documentation](https://img.shields.io/badge/docs-online-green.svg)](https://rather-labs.github.io/move-stylus-docs/)
+[![Test](https://github.com/rather-labs/move-stylus/actions/workflows/test.yml/badge.svg)](https://github.com/rather-labs/move-stylus/actions/workflows/test.yml)
+
+</div>
+
+
 
 ## Overview
 
@@ -13,6 +35,10 @@ The Move-to-Stylus compiler translates Move bytecode directly into WASM. This ap
 
 > [!WARNING]
 > The code has not been audited and may contain security vulnerabilities or bugs. Use at your own risk.
+
+## Documentation
+
+You can find the documentation [here](https://rather-labs.github.io/move-stylus-docs/).
 
 ## Move compiler
 The Move compiler, based on the [Sui Move implementation](https://github.com/MystenLabs/sui/tree/main/external-crates/move/crates/move-compiler), passes and validate the move code through several stages and return Move-bytecode.

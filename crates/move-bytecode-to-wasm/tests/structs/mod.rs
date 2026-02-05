@@ -8,6 +8,7 @@ mod generic_fields;
 mod generic_misc;
 mod generic_mut_fields;
 mod generic_pack_unpack;
+mod hot_potato;
 mod misc;
 mod mut_fields;
 mod pack_unpack;
