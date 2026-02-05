@@ -15,6 +15,9 @@ use std::collections::HashMap;
 
 #[derive(thiserror::Error, Debug)]
 pub enum StructValidationError {
+    #[error("Struct '{0}' with key ability cannot be empty (must have at least the id field).")]
+    StructWithKeyIsEmpty(Symbol),
+
     #[error("Struct '{0}' with key ability must have UID or NamedId as its first field.")]
     StructWithKeyMissingUidField(Symbol),
 
@@ -95,9 +98,15 @@ fn validate_uid_and_named_id_placement(
     // Only validate structs not from Stylus Framework
     if package_address != SF_ADDRESS {
         if struct_.has_key {
-            // Struct with key ability: first field must be UID or NamedId named "id", no other field can be
-            // For now we allow empty structs to have the key ability, but that may change in the future.
-            if !struct_.fields.is_empty() {
+            // Struct with key ability: cannot be empty, first field must be UID or NamedId named "id", no other field can be
+            if struct_.fields.is_empty() {
+                errors.push(SpecialAttributeError {
+                    kind: SpecialAttributeErrorKind::StructValidation(
+                        StructValidationError::StructWithKeyIsEmpty(struct_.name),
+                    ),
+                    line_of_code: struct_.loc,
+                });
+            } else {
                 let first_field_name = &struct_.fields[0].0;
                 let first_field_type = &struct_.fields[0].1;
                 let is_first_uid_or_named_id = matches!(
