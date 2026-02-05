@@ -14,6 +14,10 @@ The Move-to-Stylus compiler translates Move bytecode directly into WASM. This ap
 > [!WARNING]
 > The code has not been audited and may contain security vulnerabilities or bugs. Use at your own risk.
 
+## Documentation
+
+You can find the documentation [here](https://rather-labs.github.io/move-stylus-docs/).
+
 ## Move compiler
 The Move compiler, based on the [Sui Move implementation](https://github.com/MystenLabs/sui/tree/main/external-crates/move/crates/move-compiler), passes and validate the move code through several stages and return Move-bytecode.
 
