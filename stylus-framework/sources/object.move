@@ -32,8 +32,6 @@ public struct UID has store {
     id: ID,
 }
 
-
-
 #[ext(event(indexes = 1))]
 /// Event emitted whenever a new unique identifier is generated.
 public struct NewUID has copy, drop {
@@ -75,7 +73,7 @@ public fun uid_to_inner(uid: &UID): ID {
 /// passed as type parameter. For example:
 ///
 /// ```move
-/// public struct TOTAL_SUPPLY has key {}
+/// public struct TOTAL_SUPPLY {}
 ///
 /// public struct TotalSupply has key {
 ///     id: NamedId<TOTAL_SUPPLY>,
@@ -85,23 +83,43 @@ public fun uid_to_inner(uid: &UID): ID {
 ///
 /// `NamedId`'s can only be used in one struct. Detecting the same NamedId in two different
 /// structs will result in a compilation error.
-public struct NamedId<phantom T: key> has store {
+public struct NamedId<phantom T> has store {
     id: ID,
 }
 
 /// Deterministically computes the address for a Named ID based on type `T`.
-native fun compute_named_id<T: key>(): address;
+native fun compute_named_id<T>(): address;
 
 /// Generates a new `NamedId` for the specified type marker `T`.
-public fun new_named_id<T: key>(): NamedId<T> {
+public fun new_named_id<T>(): NamedId<T> {
     NamedId { id: ID { bytes: compute_named_id<T>() } }
 }
 
 /// Removes an object identified by a `NamedId` from global storage.
-public native fun remove<T: key>(id: NamedId<T>);
+public native fun remove<T>(id: NamedId<T>);
 
 /// Internal cast to treat a NamedId reference as a standard UID.
-public(package) native fun as_uid<T: key>(named_id: &NamedId<T>): &UID;
+public(package) native fun as_uid<T>(named_id: &NamedId<T>): &UID;
 
 /// Internal cast to treat a mutable NamedId reference as a mutable UID.
-public(package) native fun as_uid_mut<T: key>(named_id: &mut NamedId<T>): &mut UID;
+public(package) native fun as_uid_mut<T>(named_id: &mut NamedId<T>): &mut UID;
+
+/// Get the `UID` for `obj`.
+/// Cannot be made public as the access to `UID` for a given object must be privileged, and
+/// restrictable in the object's module.
+native fun borrow_uid<T: key>(obj: &T): &UID;
+
+/// Get the underlying `ID` of `obj`
+public fun id<T: key>(obj: &T): ID {
+    borrow_uid(obj).id
+}
+
+/// Borrow the underlying `ID` of `obj`
+public fun borrow_id<T: key>(obj: &T): &ID {
+    &borrow_uid(obj).id
+}
+
+/// Get the inner bytes for the underlying `ID` of `obj`
+public fun id_address<T: key>(obj: &T): address {
+    borrow_uid(obj).id.bytes
+}

@@ -9,11 +9,11 @@ use stylus::{
 // STRUCT DEFINITIONS
 // ============================================================================
 
-public struct FOO_ has key {}
-public struct BAR_ has key {}
-public struct BAZ_ has key {}
-public struct BEZ_ has key {}
-public struct BIZ_ has key {}
+public struct FOO_  {}
+public struct BAR_  {}
+public struct BAZ_  {}
+public struct BEZ_  {}
+public struct BIZ_  {}
 
 // Simple struct with a single value field
 public struct Foo has key {
