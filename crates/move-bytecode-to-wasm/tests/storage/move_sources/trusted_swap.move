@@ -30,10 +30,12 @@ public struct SwapRequest has key {
 // === Errors ===
 
 /// Fee is too low for the service
-const EFeeTooLow: u64 = 2;
+#[error]
+const EFeeTooLow: vector<u8> = b"Fee is too low for the service";
 
 /// The two swap requests are not compatible
-const EBadSwap: u64 = 3;
+#[error]
+const EBadSwap: vector<u8> = b"The two swap requests are not compatible";
 
 // === Constants ===
 
