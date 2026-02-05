@@ -334,66 +334,132 @@ pub fn process_special_attributes(
             for module_member in module.members {
                 match module_member {
                     ModuleMember::Use(ref use_decl) => {
-                        if let Use::ModuleUse(module_ident, ModuleUse::Members(members)) =
-                            &use_decl.use_
-                        {
-                            // Extract address from module_ident
-                            let module_address = match &module_ident.value.address.value {
-                                move_compiler::parser::ast::LeadingNameAccess_::AnonymousAddress(addr) => {
-                                    // AnonymousAddress contains NumericalAddress, convert to bytes
-                                    Some(addr.into_inner().into_bytes())
-                                }
-                                move_compiler::parser::ast::LeadingNameAccess_::GlobalAddress(name) => {
-                                    // GlobalAddress is a named address, look it up in address_alias_instantiation
-                                    address_alias_instantiation
-                                        .get(&name.value)
-                                        .copied()
-                                        .or_else(|| {
-                                            found_error = true;
-                                            module_errors.push(SpecialAttributeError {
-                                                kind: SpecialAttributeErrorKind::NamedAddressNotFound(
-                                                    name.value,
-                                                ),
-                                                line_of_code: use_decl.loc,
-                                            });
-                                            None
-                                        })
-                                }
-                                move_compiler::parser::ast::LeadingNameAccess_::Name(name) => {
-                                    // Name is also a named address, look it up in address_alias_instantiation
-                                    address_alias_instantiation
-                                        .get(&name.value)
-                                        .copied()
-                                        .or_else(|| {
-                                            found_error = true;
-                                            module_errors.push(SpecialAttributeError {
-                                                kind: SpecialAttributeErrorKind::NamedAddressNotFound(
-                                                    name.value,
-                                                ),
-                                                line_of_code: use_decl.loc,
-                                            });
-                                            None
-                                        })
-                                }
-                            };
+                        match &use_decl.use_ {
+                            // Handle: use module::{ member1, member2 };
+                            Use::ModuleUse(module_ident, ModuleUse::Members(members)) => {
+                                // Extract address from module_ident
+                                let module_address = match &module_ident.value.address.value {
+                                    move_compiler::parser::ast::LeadingNameAccess_::AnonymousAddress(addr) => {
+                                        // AnonymousAddress contains NumericalAddress, convert to bytes
+                                        Some(addr.into_inner().into_bytes())
+                                    }
+                                    move_compiler::parser::ast::LeadingNameAccess_::GlobalAddress(name) => {
+                                        // GlobalAddress is a named address, look it up in address_alias_instantiation
+                                        address_alias_instantiation
+                                            .get(&name.value)
+                                            .copied()
+                                            .or_else(|| {
+                                                found_error = true;
+                                                module_errors.push(SpecialAttributeError {
+                                                    kind: SpecialAttributeErrorKind::NamedAddressNotFound(
+                                                        name.value,
+                                                    ),
+                                                    line_of_code: use_decl.loc,
+                                                });
+                                                None
+                                            })
+                                    }
+                                    move_compiler::parser::ast::LeadingNameAccess_::Name(name) => {
+                                        // Name is also a named address, look it up in address_alias_instantiation
+                                        address_alias_instantiation
+                                            .get(&name.value)
+                                            .copied()
+                                            .or_else(|| {
+                                                found_error = true;
+                                                module_errors.push(SpecialAttributeError {
+                                                    kind: SpecialAttributeErrorKind::NamedAddressNotFound(
+                                                        name.value,
+                                                    ),
+                                                    line_of_code: use_decl.loc,
+                                                });
+                                                None
+                                            })
+                                    }
+                                };
 
-                            let Some(module_address) = module_address else {
-                                continue;
-                            };
+                                let Some(module_address) = module_address else {
+                                    continue;
+                                };
 
-                            let module_id = ModuleId {
-                                address: module_address,
-                                module_name: module_ident.value.module.0.value,
-                            };
+                                let module_id = ModuleId {
+                                    address: module_address,
+                                    module_name: module_ident.value.module.0.value,
+                                };
 
-                            for member in members {
-                                let member_tuple =
-                                    (member.0.value, member.1.as_ref().map(|s| s.value));
-                                imported_members
-                                    .entry(module_id.to_owned())
-                                    .or_default()
-                                    .push(member_tuple);
+                                for member in members {
+                                    let member_tuple =
+                                        (member.0.value, member.1.as_ref().map(|s| s.value));
+                                    imported_members
+                                        .entry(module_id.to_owned())
+                                        .or_default()
+                                        .push(member_tuple);
+                                }
                             }
+                            // Handle: use addr::{ module1::member1, module2::member2 };
+                            // e.g., use stylus::{ error::revert, event::emit };
+                            Use::NestedModuleUses(leading_access, module_uses) => {
+                                // Extract address from leading_access (e.g., "stylus")
+                                let base_address = match &leading_access.value {
+                                    move_compiler::parser::ast::LeadingNameAccess_::AnonymousAddress(addr) => {
+                                        Some(addr.into_inner().into_bytes())
+                                    }
+                                    move_compiler::parser::ast::LeadingNameAccess_::GlobalAddress(name) => {
+                                        address_alias_instantiation
+                                            .get(&name.value)
+                                            .copied()
+                                            .or_else(|| {
+                                                found_error = true;
+                                                module_errors.push(SpecialAttributeError {
+                                                    kind: SpecialAttributeErrorKind::NamedAddressNotFound(
+                                                        name.value,
+                                                    ),
+                                                    line_of_code: use_decl.loc,
+                                                });
+                                                None
+                                            })
+                                    }
+                                    move_compiler::parser::ast::LeadingNameAccess_::Name(name) => {
+                                        address_alias_instantiation
+                                            .get(&name.value)
+                                            .copied()
+                                            .or_else(|| {
+                                                found_error = true;
+                                                module_errors.push(SpecialAttributeError {
+                                                    kind: SpecialAttributeErrorKind::NamedAddressNotFound(
+                                                        name.value,
+                                                    ),
+                                                    line_of_code: use_decl.loc,
+                                                });
+                                                None
+                                            })
+                                    }
+                                };
+
+                                let Some(base_address) = base_address else {
+                                    continue;
+                                };
+
+                                // Process each (module_name, module_use) pair
+                                // e.g., (error, Members([revert])), (event, Members([emit]))
+                                for (module_name, module_use) in module_uses {
+                                    let module_id = ModuleId {
+                                        address: base_address,
+                                        module_name: module_name.0.value,
+                                    };
+
+                                    if let ModuleUse::Members(members) = module_use {
+                                        for member in members {
+                                            let member_tuple =
+                                                (member.0.value, member.1.as_ref().map(|s| s.value));
+                                            imported_members
+                                                .entry(module_id.clone())
+                                                .or_default()
+                                                .push(member_tuple);
+                                        }
+                                    }
+                                }
+                            }
+                            _ => {}
                         }
                     }
                     _ => continue,
