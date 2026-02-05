@@ -84,6 +84,7 @@ impl NativeFunction {
     pub const NATIVE_COMPUTE_NAMED_ID: &str = "compute_named_id";
     pub const NATIVE_AS_UID: &str = "as_uid";
     pub const NATIVE_AS_UID_MUT: &str = "as_uid_mut";
+    pub const NATIVE_BORROW_UID: &str = "borrow_uid";
     // Peep function
     pub const NATIVE_PEEP: &str = "peep";
 
@@ -106,6 +107,9 @@ impl NativeFunction {
 
     // String
     const NATIVE_INTERNAL_CHECK_UTF8: &str = "internal_check_utf8";
+    const NATIVE_INTERNAL_IS_CHAR_BOUNDARY: &str = "internal_is_char_boundary";
+    const NATIVE_INTERNAL_INDEX_OF: &str = "internal_index_of";
+    const NATIVE_INTERNAL_SUB_STRING: &str = "internal_sub_string";
 
     // Tests
     const NATIVE_POISON: &str = "poison";
@@ -348,6 +352,21 @@ impl NativeFunction {
                     STANDARD_LIB_ADDRESS,
                     STDLIB_MODULE_NAME_STRING,
                 ) => string::add_internal_check_utf8(module, compilation_ctx, module_id)?,
+                (
+                    Self::NATIVE_INTERNAL_IS_CHAR_BOUNDARY,
+                    STANDARD_LIB_ADDRESS,
+                    STDLIB_MODULE_NAME_STRING,
+                ) => string::add_internal_is_char_boundary(module, compilation_ctx, module_id)?,
+                (
+                    Self::NATIVE_INTERNAL_INDEX_OF,
+                    STANDARD_LIB_ADDRESS,
+                    STDLIB_MODULE_NAME_STRING,
+                ) => string::add_internal_index_of(module, compilation_ctx, module_id)?,
+                (
+                    Self::NATIVE_INTERNAL_SUB_STRING,
+                    STANDARD_LIB_ADDRESS,
+                    STDLIB_MODULE_NAME_STRING,
+                ) => string::add_internal_sub_string(module, compilation_ctx, module_id)?,
                 _ => {
                     return Err(NativeFunctionError::NativeFunctionNotSupported(
                         *module_id,
@@ -568,7 +587,10 @@ impl NativeFunction {
                 Self::assert_generics_length(generics.len(), 1, name, module_id)?;
                 object::add_as_uid_fn(module, compilation_ctx, module_id)
             }
-
+            (Self::NATIVE_BORROW_UID, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT, _) => {
+                Self::assert_generics_length(generics.len(), 1, name, module_id)?;
+                object::add_borrow_uid_fn(module, compilation_ctx, module_id)
+            }
             //
             // Dynamic field
             //
