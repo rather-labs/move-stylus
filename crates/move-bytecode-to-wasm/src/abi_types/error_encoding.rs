@@ -171,6 +171,17 @@ fn build_abi_error_structure(
     compilation_ctx: &CompilationContext,
     error_len: LocalId,
 ) -> Result<(LocalId, i32), AbiError> {
+    // Memory layout for ABI-encoded Error(string):
+    //
+    // Offset from ptr (all values big-endian where applicable):
+    // ┌────────────┬────────────────────────────────────────────────────────┐
+    // │ 0   -   3  │ Total length prefix (LENGTH_HEADER_SIZE = 4)           │
+    // │ 4   -   7  │ Error selector (4 bytes) - value: ERROR_SELECTOR       │
+    // │ 8   -  39  │ Head word (32 bytes) - value: 32 (data offset)         │
+    // │ 40  -  71  │ Length word (32 bytes) - value: string length          │
+    // │ 72  ...    │ String data (padded to 32-byte boundary)               │
+    // └────────────┴────────────────────────────────────────────────────────┘
+
     let ptr = module.locals.add(ValType::I32);
     let total_len = module.locals.add(ValType::I32);
     let padded_error_len = module.locals.add(ValType::I32);
@@ -184,18 +195,18 @@ fn build_abi_error_structure(
         .binop(BinaryOp::I32And)
         .local_set(padded_error_len);
 
-    // Calculate total allocation: header(68) + padded_error
-    const ABI_HEADER_SIZE: i32 = 4 + 32 + 32; // selector(4) + head(32) + length(32)
+    // Total = selector(4) + head(32) + length(32) + padded_data
+    const ABI_HEADER_SIZE: i32 = 4 + 32 + 32;
     builder
         .i32_const(ABI_HEADER_SIZE)
         .local_get(padded_error_len)
         .binop(BinaryOp::I32Add)
         .local_set(total_len);
 
-    // Allocate memory
+    // Allocate: LENGTH_HEADER_SIZE + total_len, then store total_len at ptr[0..4]
     builder
-        .i32_const(LENGTH_HEADER_SIZE) // 4 bytes for the length
-        .local_get(total_len) // total length of the message
+        .i32_const(LENGTH_HEADER_SIZE)
+        .local_get(total_len)
         .binop(BinaryOp::I32Add)
         .call(compilation_ctx.allocator)
         .local_tee(ptr)
@@ -209,7 +220,7 @@ fn build_abi_error_structure(
             },
         );
 
-    // Write ABI header
+    // Write 4-byte error selector at ptr[4..8]
     for (i, b) in ERROR_SELECTOR.iter().enumerate() {
         builder.local_get(ptr).i32_const(*b as i32).store(
             compilation_ctx.memory_id,
@@ -221,8 +232,8 @@ fn build_abi_error_structure(
         );
     }
 
-    // Write head word
-    const HEAD_WORD_END: i32 = 35;
+    // Write head word: value 32 (big-endian). Points to string data offset.
+    const HEAD_WORD_END: i32 = 35; // Last byte of head word (bytes 4-35 from ABI start)
     builder.local_get(ptr).i32_const(32).store(
         compilation_ctx.memory_id,
         StoreKind::I32_8 { atomic: false },
@@ -232,8 +243,8 @@ fn build_abi_error_structure(
         },
     );
 
-    // Write message length in big-endian format
-    const LENGTH_WORD_END: i32 = 64;
+    // Write string length as big-endian i32 at end of length word (bytes 64-67 from ABI start)
+    const LENGTH_WORD_END: i32 = 64; // i32 write position; fills bytes 64-67
     let swap_i32 = RuntimeFunction::SwapI32Bytes.get(module, None, None)?;
     builder
         .local_get(ptr)
@@ -248,6 +259,7 @@ fn build_abi_error_structure(
             },
         );
 
+    // String data starts at offset 72 (4 + 68)
     const ERROR_DATA_OFFSET: i32 = LENGTH_HEADER_SIZE + ABI_HEADER_SIZE;
     Ok((ptr, ERROR_DATA_OFFSET))
 }

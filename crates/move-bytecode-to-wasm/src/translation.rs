@@ -558,6 +558,13 @@ fn translate_instruction(
         .first()
         .copied();
 
+    // Reset clever_error if this instruction isn't an Abort. A u64 on the stack may
+    // coincidentally match the clever error encoding without being one. Clearing it
+    // here ensures a later Abort won't misinterpret a plain error code as a clever error.
+    if !matches!(instruction, Bytecode::Abort) {
+        translate_flow_ctx.clever_error = None;
+    }
+
     match instruction {
         // Load a fixed constant
         Bytecode::LdConst(global_index) => {
@@ -2608,7 +2615,6 @@ fn translate_instruction(
                         None,
                         |_| {},
                         |else_block| {
-                            // TODO: replace this with a runtime error?
                             else_block.unreachable();
                         },
                     );
