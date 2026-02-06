@@ -16,6 +16,10 @@ use crate::{
     AbiError, Event,
     error::{SpecialAttributeError, SpecialAttributeErrorKind},
     function_validation::FunctionAliasMap,
+    reserved_modules::{
+        SF_ADDRESS, SF_MODULE_NAME_ERROR, SF_MODULE_NAME_EVENT, SF_NATIVE_FUNCTION_NAME_EMIT,
+        SF_NATIVE_FUNCTION_NAME_REVERT,
+    },
 };
 
 use super::{
@@ -27,20 +31,26 @@ use super::{
 ///
 /// The native emit function has the signature: `public native fun emit<T: copy + drop>(event: T)`
 /// and is defined in the stylus framework package.
-pub fn is_native_emit(function: &Function, package_address: [u8; 32]) -> bool {
-    function.name.to_string() == "emit"
+pub fn is_native_emit(function: &Function, package_address: [u8; 32], module_name: Symbol) -> bool {
+    function.name.to_string() == SF_NATIVE_FUNCTION_NAME_EMIT
         && function.body.value == FunctionBody_::Native
-        && package_address == crate::reserved_modules::SF_ADDRESS
+        && package_address == SF_ADDRESS
+        && module_name.as_str() == SF_MODULE_NAME_EVENT
 }
 
 /// Checks if a function is the native `revert` function from `stylus::error` module.
 ///
 /// The native revert function has the signature: `public native fun revert<T: copy + drop>(error: T)`
 /// and is defined in the stylus framework package.
-pub fn is_native_revert(function: &Function, package_address: [u8; 32]) -> bool {
-    function.name.to_string() == "revert"
+pub fn is_native_revert(
+    function: &Function,
+    package_address: [u8; 32],
+    module_name: Symbol,
+) -> bool {
+    function.name.to_string() == SF_NATIVE_FUNCTION_NAME_REVERT
         && function.body.value == FunctionBody_::Native
-        && package_address == crate::reserved_modules::SF_ADDRESS
+        && package_address == SF_ADDRESS
+        && module_name.as_str() == SF_MODULE_NAME_ERROR
 }
 
 /// Checks if a function call is to the native `emit` function from `stylus::event` module.
@@ -54,9 +64,9 @@ pub fn is_native_emit_call(
 ) -> bool {
     // Check if this function name (or alias) resolves to emit from stylus::event
     if let Some((original_name, module_id)) = function_alias_map.get(&call.function_name) {
-        return original_name.as_str() == "emit"
-            && module_id.address == crate::reserved_modules::SF_ADDRESS
-            && module_id.module_name.as_str() == "event";
+        return original_name.as_str() == SF_NATIVE_FUNCTION_NAME_EMIT
+            && module_id.address == SF_ADDRESS
+            && module_id.module_name.as_str() == SF_MODULE_NAME_EVENT;
     }
 
     false
@@ -73,9 +83,9 @@ pub fn is_native_revert_call(
 ) -> bool {
     // Check if this function name (or alias) resolves to revert from stylus::error
     if let Some((original_name, module_id)) = function_alias_map.get(&call.function_name) {
-        return original_name.as_str() == "revert"
-            && module_id.address == crate::reserved_modules::SF_ADDRESS
-            && module_id.module_name.as_str() == "error";
+        return original_name.as_str() == SF_NATIVE_FUNCTION_NAME_REVERT
+            && module_id.address == SF_ADDRESS
+            && module_id.module_name.as_str() == SF_MODULE_NAME_ERROR;
     }
 
     false
