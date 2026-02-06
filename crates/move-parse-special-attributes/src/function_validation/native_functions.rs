@@ -27,20 +27,26 @@ use super::{
 ///
 /// The native emit function has the signature: `public native fun emit<T: copy + drop>(event: T)`
 /// and is defined in the stylus framework package.
-pub fn is_native_emit(function: &Function, package_address: [u8; 32]) -> bool {
+pub fn is_native_emit(function: &Function, package_address: [u8; 32], module_name: Symbol) -> bool {
     function.name.to_string() == "emit"
         && function.body.value == FunctionBody_::Native
         && package_address == crate::reserved_modules::SF_ADDRESS
+        && module_name.as_str() == "event"
 }
 
 /// Checks if a function is the native `revert` function from `stylus::error` module.
 ///
 /// The native revert function has the signature: `public native fun revert<T: copy + drop>(error: T)`
 /// and is defined in the stylus framework package.
-pub fn is_native_revert(function: &Function, package_address: [u8; 32]) -> bool {
+pub fn is_native_revert(
+    function: &Function,
+    package_address: [u8; 32],
+    module_name: Symbol,
+) -> bool {
     function.name.to_string() == "revert"
         && function.body.value == FunctionBody_::Native
         && package_address == crate::reserved_modules::SF_ADDRESS
+        && module_name.as_str() == "error"
 }
 
 /// Checks if a function call is to the native `emit` function from `stylus::event` module.
