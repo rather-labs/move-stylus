@@ -31,7 +31,7 @@ pub const SF_MODULE_NAME_TABLE: &str = "table";
 pub const SF_MODULE_NAME_ERROR: &str = "error";
 pub const SF_MODULE_NAME_SOL_TYPES: &str = "sol_types";
 
-/// All reserved struct names in the Stylus Framework
+// All reserved struct names in the Stylus Framework
 pub const SF_RESERVED_STRUCTS: &[&str] = &[
     "TxContext",
     "Field",
@@ -46,3 +46,7 @@ pub const SF_RESERVED_STRUCTS: &[&str] = &[
     "OwnedStorageObject",
     "SharedStorageObject",
 ];
+
+// Stylus Framework native function names (on demand)
+pub const SF_NATIVE_FUNCTION_NAME_EMIT: &str = "emit";
+pub const SF_NATIVE_FUNCTION_NAME_REVERT: &str = "revert";
