@@ -46,9 +46,12 @@ pub fn is_native_revert(function: &Function, package_address: [u8; 32]) -> bool 
 /// Checks if a function call is to the native `emit` function from `stylus::event` module.
 ///
 /// This handles both:
-/// - Direct imports: `use stylus::event::emit;` then `emit(...)`
-/// - Aliased imports: `use stylus::event::emit as emit_alias;` then `emit_alias(...)`
-pub fn is_emit_call(call: &ExtractedFunctionCall, function_alias_map: &FunctionAliasMap) -> bool {
+/// - Direct imports: `use stylus::event::emit;`
+/// - Aliased imports: `use stylus::event::emit as emit_alias;`
+pub fn is_native_emit_call(
+    call: &ExtractedFunctionCall,
+    function_alias_map: &FunctionAliasMap,
+) -> bool {
     // Check if this function name (or alias) resolves to emit from stylus::event
     if let Some((original_name, module_id)) = function_alias_map.get(&call.function_name) {
         return original_name.as_str() == "emit"
@@ -62,9 +65,12 @@ pub fn is_emit_call(call: &ExtractedFunctionCall, function_alias_map: &FunctionA
 /// Checks if a function call is to the native `revert` function from `stylus::error` module.
 ///
 /// This handles both:
-/// - Direct imports: `use stylus::error::revert;` then `revert(...)`
-/// - Aliased imports: `use stylus::error::revert as revert_alias;` then `revert_alias(...)`
-pub fn is_revert_call(call: &ExtractedFunctionCall, function_alias_map: &FunctionAliasMap) -> bool {
+/// - Direct imports: `use stylus::error::revert;`
+/// - Aliased imports: `use stylus::error::revert as revert_alias;`
+pub fn is_native_revert_call(
+    call: &ExtractedFunctionCall,
+    function_alias_map: &FunctionAliasMap,
+) -> bool {
     // Check if this function name (or alias) resolves to revert from stylus::error
     if let Some((original_name, module_id)) = function_alias_map.get(&call.function_name) {
         return original_name.as_str() == "revert"
@@ -77,9 +83,9 @@ pub fn is_revert_call(call: &ExtractedFunctionCall, function_alias_map: &Functio
 
 /// Validates function calls to emit, revert, and borrow_uid
 ///
-/// - `emit()` must be called with a struct marked as #[event]
-/// - `revert()` must be called with a struct marked as #[abi_error]
-pub fn validate_function_calls(
+/// - `emit()` must be called with a struct marked as #[ext(event(...))]
+/// - `revert()` must be called with a struct marked as #[ext(abi_error)]
+pub fn validate_native_function_calls(
     calls: &[ExtractedFunctionCall],
     events: &HashMap<Symbol, Event>,
     abi_errors: &HashMap<Symbol, AbiError>,
@@ -87,55 +93,53 @@ pub fn validate_function_calls(
     function_alias_map: &FunctionAliasMap,
 ) -> Result<(), SpecialAttributeError> {
     for call in calls {
-        if is_emit_call(call, function_alias_map) {
-            // emit() should have exactly one argument that is an event struct
-            if call.arguments.is_empty() {
+        if is_native_emit_call(call, function_alias_map) {
+            // If the function is the stylus framework's native `emit` function, then we know it has exactly one argument.
+            // This is a sanity check to ensure the function is called correctly. It should never fail.
+            if call.arguments.len() != 1 {
                 return Err(SpecialAttributeError {
                     kind: SpecialAttributeErrorKind::FunctionValidation(
-                        FunctionValidationError::NativeEmitNoArgument,
+                        FunctionValidationError::EmitWrongArgumentCount,
                     ),
                     line_of_code: call.loc,
                 });
             }
 
-            // Try to extract the struct name from the first argument
-            if let Some(struct_name) = extract_struct_name_from_exp(&call.arguments[0], bindings) {
-                // Check if the struct is marked as an event
-                if !events.contains_key(&struct_name) {
-                    return Err(SpecialAttributeError {
-                        kind: SpecialAttributeErrorKind::FunctionValidation(
-                            FunctionValidationError::NativeEmitNotEventArgument,
-                        ),
-                        line_of_code: call.loc,
-                    });
-                }
-            } else {
-                panic!("struct_name not found for emit call");
-            }
-        } else if is_revert_call(call, function_alias_map) {
-            // revert() should have exactly one argument that is an error struct
-            if call.arguments.is_empty() {
+            // Check if the argument is a struct marked as an event
+            let is_valid_event = extract_struct_name_from_exp(&call.arguments[0], bindings)
+                .is_some_and(|name| events.contains_key(&name));
+
+            if !is_valid_event {
                 return Err(SpecialAttributeError {
                     kind: SpecialAttributeErrorKind::FunctionValidation(
-                        FunctionValidationError::NativeRevertNoArgument,
+                        FunctionValidationError::EmitArgumentNotEvent,
+                    ),
+                    line_of_code: call.loc,
+                });
+            }
+        } else if is_native_revert_call(call, function_alias_map) {
+            // If the function is the stylus framework's native `revert` function, then we know it has exactly one argument.
+            // This is a sanity check to ensure the function is called correctly. It should never fail.
+            if call.arguments.len() != 1 {
+                return Err(SpecialAttributeError {
+                    kind: SpecialAttributeErrorKind::FunctionValidation(
+                        FunctionValidationError::RevertWrongArgumentCount,
                     ),
                     line_of_code: call.loc,
                 });
             }
 
-            // Try to extract the struct name from the first argument
-            if let Some(struct_name) = extract_struct_name_from_exp(&call.arguments[0], bindings) {
-                // Check if the struct is marked as an abi_error
-                if !abi_errors.contains_key(&struct_name) {
-                    return Err(SpecialAttributeError {
-                        kind: SpecialAttributeErrorKind::FunctionValidation(
-                            FunctionValidationError::NativeRevertNotErrorArgument,
-                        ),
-                        line_of_code: call.loc,
-                    });
-                }
-            } else {
-                panic!("struct_name not found for revert call");
+            // Check if the argument is a struct marked as an abi_error
+            let is_valid_error = extract_struct_name_from_exp(&call.arguments[0], bindings)
+                .is_some_and(|name| abi_errors.contains_key(&name));
+
+            if !is_valid_error {
+                return Err(SpecialAttributeError {
+                    kind: SpecialAttributeErrorKind::FunctionValidation(
+                        FunctionValidationError::RevertArgumentNotAbiError,
+                    ),
+                    line_of_code: call.loc,
+                });
             }
         }
         // Other function calls don't need special validation

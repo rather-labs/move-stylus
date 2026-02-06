@@ -29,7 +29,7 @@ use crate::{
     types::Type,
 };
 
-use native_functions::{is_native_emit, is_native_revert, validate_function_calls};
+use native_functions::{is_native_emit, is_native_revert, validate_native_function_calls};
 use parse_body::extract_function_calls;
 
 /// Maps function names (or aliases) to their original name and source module.
@@ -217,7 +217,7 @@ pub fn validate_function(
         .filter(|call| !known_struct_names.contains(&call.function_name))
         .collect();
 
-    validate_function_calls(
+    validate_native_function_calls(
         &function_calls,
         events,
         abi_errors,

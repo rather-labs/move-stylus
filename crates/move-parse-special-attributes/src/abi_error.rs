@@ -27,7 +27,7 @@ pub enum AbiErrorParseError {
     #[error(r#"abi errors with key are not supported"#)]
     AbiErrorWithKey,
 
-    #[error(r#"The built-in errors "Error" and "Panic" cannot be re-defined."#)]
+    #[error(r#"The built-in error "Error" cannot be re-defined."#)]
     InvalidAbiErrorName,
 }
 
@@ -61,7 +61,8 @@ impl TryFrom<&StructDefinition> for AbiError {
                 // continue
                 let abi_error = match parameterized.first() {
                     Some(p) if p.value.attribute_name().value.as_str() == "abi_error" => {
-                        if value.name.to_string() == "Error" || value.name.to_string() == "Panic" {
+                        // Error is a reserved error name as its the one used for clever errors.
+                        if value.name.to_string() == "Error" {
                             return Err(SpecialAttributeError {
                                 kind: SpecialAttributeErrorKind::AbiError(
                                     AbiErrorParseError::InvalidAbiErrorName,

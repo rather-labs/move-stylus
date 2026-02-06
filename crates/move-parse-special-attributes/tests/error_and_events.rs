@@ -128,7 +128,7 @@ pub fn test_errors_and_events() {
             .filter(|e| matches!(
                 &e.kind,
                 SpecialAttributeErrorKind::FunctionValidation(
-                    FunctionValidationError::NativeRevertNotErrorArgument
+                    FunctionValidationError::RevertArgumentNotAbiError
                 )
             ))
             .count()
@@ -141,7 +141,7 @@ pub fn test_errors_and_events() {
             .filter(|e| matches!(
                 &e.kind,
                 SpecialAttributeErrorKind::FunctionValidation(
-                    FunctionValidationError::NativeEmitNotEventArgument
+                    FunctionValidationError::EmitArgumentNotEvent
                 )
             ))
             .count()
@@ -270,7 +270,7 @@ pub fn test_errors_and_events_aliases() {
             .filter(|e| matches!(
                 &e.kind,
                 SpecialAttributeErrorKind::FunctionValidation(
-                    FunctionValidationError::NativeRevertNotErrorArgument
+                    FunctionValidationError::RevertArgumentNotAbiError
                 )
             ))
             .count()
@@ -283,7 +283,7 @@ pub fn test_errors_and_events_aliases() {
             .filter(|e| matches!(
                 &e.kind,
                 SpecialAttributeErrorKind::FunctionValidation(
-                    FunctionValidationError::NativeEmitNotEventArgument
+                    FunctionValidationError::EmitArgumentNotEvent
                 )
             ))
             .count()

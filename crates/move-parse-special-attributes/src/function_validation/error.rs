@@ -10,10 +10,10 @@ use crate::error::DIAGNOSTIC_CATEGORY;
 
 #[derive(thiserror::Error, Debug)]
 pub enum FunctionValidationError {
-    #[error("Only native emit function can take an event struct as an argument")]
+    #[error("Only Stylus Framework's `emit` function can take an event struct as an argument")]
     InvalidEventArgument,
 
-    #[error("Only native revert function can take an error struct as an argument")]
+    #[error("Only Stylus Framework's `revert` function can take an error struct as an argument")]
     InvalidErrorArgument,
 
     #[error("Generic functions cannot be entrypoints")]
@@ -45,17 +45,17 @@ pub enum FunctionValidationError {
     #[error("init function cannot be entry")]
     InitFunctionCannotBeEntry,
 
-    #[error("emit() requires an argument that is a struct marked with #[event]")]
-    NativeEmitNoArgument,
+    #[error("emit() requires exactly one argument")]
+    EmitWrongArgumentCount,
 
-    #[error("revert() requires an argument that is a struct marked with #[abi_error]")]
-    NativeRevertNoArgument,
+    #[error("revert() requires exactly one argument")]
+    RevertWrongArgumentCount,
 
-    #[error("emit() was called with a non-event argument")]
-    NativeEmitNotEventArgument,
+    #[error("emit() argument must be a struct marked with #[event]")]
+    EmitArgumentNotEvent,
 
-    #[error("revert() was called with a non-error argument")]
-    NativeRevertNotErrorArgument,
+    #[error("revert() argument must be a struct marked with #[abi_error]")]
+    RevertArgumentNotAbiError,
 }
 
 impl From<&FunctionValidationError> for DiagnosticInfo {
