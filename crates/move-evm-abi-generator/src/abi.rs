@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 
 use move_bytecode_to_wasm::compilation_context::{
     ModuleData, ModuleId,
-    module_data::struct_data::{IStruct, IStructType, IntermediateType},
+    module_data::struct_data::{IStruct, IntermediateType},
     reserved_modules::{
         SF_MODULE_NAME_OBJECT, SF_MODULE_NAME_TX_CONTEXT, STYLUS_FRAMEWORK_ADDRESS,
     },
@@ -203,11 +203,6 @@ impl Abi {
                     } => {
                         let struct_module = modules_data.get(module_id).unwrap();
                         let struct_ = struct_module.structs.get_by_index(*index).unwrap();
-
-                        // Skip one-time witness structs
-                        if struct_.type_ == IStructType::OneTimeWitness {
-                            continue;
-                        }
 
                         match (
                             struct_.identifier.as_str(),
@@ -706,7 +701,6 @@ impl Abi {
                     && !is_id(&struct_.identifier, module_id)
                     && !is_string(&struct_.identifier, module_id)
                     && !is_bytes_n(&struct_.identifier, module_id)
-                    && struct_.type_ != IStructType::OneTimeWitness
             }
 
             _ => false,

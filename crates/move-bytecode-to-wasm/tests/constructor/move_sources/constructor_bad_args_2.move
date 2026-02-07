@@ -11,7 +11,7 @@ public struct Foo has key {
     value: u64
 }
 
-// An init function can only take an OTW as first argument and a TxContext as last argument,
+// An init function can only take a TxContext as argument
 // To be considered a constructor.
 entry fun init(ctx: &mut TxContext, value: u64) {
   let foo = Foo {

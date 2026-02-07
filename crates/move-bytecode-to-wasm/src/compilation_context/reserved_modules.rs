@@ -16,7 +16,6 @@ pub const SF_MODULE_NAME_DYNAMIC_FIELD_NAMED_ID: &str = "dynamic_field_named_id"
 pub const SF_MODULE_NAME_OBJECT: &str = "object";
 pub const SF_MODULE_NAME_TRANSFER: &str = "transfer";
 pub const SF_MODULE_NAME_EVENT: &str = "event";
-pub const SF_MODULE_NAME_TYPES: &str = "types";
 pub const SF_MODULE_NAME_TABLE: &str = "table";
 pub const SF_MODULE_NAME_ERROR: &str = "error";
 pub const SF_MODULE_NAME_ACCOUNT: &str = "account";
