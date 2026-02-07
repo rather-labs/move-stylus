@@ -14,7 +14,6 @@ mod string;
 mod tests;
 mod transaction;
 pub mod transfer;
-mod types;
 mod unit_test;
 
 use std::hash::Hasher;
@@ -31,8 +30,8 @@ use crate::{
             SF_MODULE_NAME_ACCOUNT, SF_MODULE_NAME_DYNAMIC_FIELD, SF_MODULE_NAME_ERROR,
             SF_MODULE_NAME_EVENT, SF_MODULE_NAME_OBJECT, SF_MODULE_NAME_PEEP,
             SF_MODULE_NAME_SOL_TYPES, SF_MODULE_NAME_TRANSFER, SF_MODULE_NAME_TX_CONTEXT,
-            SF_MODULE_NAME_TYPES, SF_MODULE_TEST_SCENARIO, STANDARD_LIB_ADDRESS,
-            STDLIB_MODULE_NAME_STRING, STDLIB_MODULE_UNIT_TEST, STYLUS_FRAMEWORK_ADDRESS,
+            SF_MODULE_TEST_SCENARIO, STANDARD_LIB_ADDRESS, STDLIB_MODULE_NAME_STRING,
+            STDLIB_MODULE_UNIT_TEST, STYLUS_FRAMEWORK_ADDRESS,
         },
     },
     data::RuntimeErrorData,
@@ -60,9 +59,6 @@ impl NativeFunction {
     pub const NATIVE_TRANSFER_OBJECT: &str = "transfer";
     pub const NATIVE_SHARE_OBJECT: &str = "share_object";
     pub const NATIVE_FREEZE_OBJECT: &str = "freeze_object";
-
-    // Types functions
-    pub const NATIVE_IS_ONE_TIME_WITNESS: &str = "is_one_time_witness";
 
     // Storage
     #[cfg(debug_assertions)]
@@ -557,19 +553,6 @@ impl NativeFunction {
                     &generics[0],
                     module_id,
                 )?
-            }
-
-            //
-            // Types
-            //
-            (
-                Self::NATIVE_IS_ONE_TIME_WITNESS,
-                STYLUS_FRAMEWORK_ADDRESS,
-                SF_MODULE_NAME_TYPES,
-                _,
-            ) => {
-                Self::assert_generics_length(generics.len(), 1, name, module_id)?;
-                types::add_is_one_time_witness_fn(module, compilation_ctx, &generics[0], module_id)?
             }
 
             //

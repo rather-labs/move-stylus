@@ -6,8 +6,7 @@ module hello_world::counter_with_init;
 use stylus::{
     tx_context::TxContext, 
     object::{Self, UID}, 
-    transfer::{Self}, 
-    types as types
+    transfer::{Self}
 };
 
 public struct Counter has key {
@@ -16,11 +15,7 @@ public struct Counter has key {
     value: u64
 }
 
-public struct COUNTER_WITH_INIT has drop {}
-
-entry fun init(otw: COUNTER_WITH_INIT, ctx: &mut TxContext) {
-
-  assert!(types::is_one_time_witness(&otw), 0);
+entry fun init(ctx: &mut TxContext) {
 
   let counter = Counter {
     id: object::new(ctx),
