@@ -474,6 +474,7 @@ pub fn process_special_attributes(
 
     for source in ast.source_definitions {
         if let Definition::Module(module) = source.def {
+            let module_name = module.name.0.value;
             for module_member in module.members {
                 match module_member {
                     ModuleMember::Function(ref f) => {
@@ -501,6 +502,7 @@ pub fn process_special_attributes(
                             deps_structs,
                             &imported_members,
                             package_address,
+                            module_name,
                         ) {
                             found_error = true;
                             module_errors.push(error);

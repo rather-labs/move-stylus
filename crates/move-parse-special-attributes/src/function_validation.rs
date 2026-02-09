@@ -64,6 +64,7 @@ pub fn build_function_alias_map(
 /// - Functions cannot take a UID as arguments, unless it is a function from the Stylus Framework package.
 /// - Calls to `emit` must pass an event struct as argument.
 /// - Calls to `revert` must pass an error struct as argument.
+#[allow(clippy::too_many_arguments)]
 pub fn validate_function(
     function: &Function,
     events: &HashMap<Symbol, Event>,
@@ -72,6 +73,7 @@ pub fn validate_function(
     deps_structs: &HashMap<ModuleId, Vec<Struct_>>,
     imported_members: &HashMap<ModuleId, Vec<(Symbol, Option<Symbol>)>>,
     package_address: [u8; 32],
+    module_name: Symbol,
 ) -> Result<(), SpecialAttributeError> {
     let signature = crate::function_modifiers::Function::parse_signature(&function.signature);
 
@@ -169,7 +171,7 @@ pub fn validate_function(
     // our `is_event_type` check since it's not a concrete event type registered in the `events` map.
 
     // Event types can only be passed as arguments to the native `emit` function from `stylus::event` module.
-    if !is_native_emit(function, package_address)
+    if !is_native_emit(function, package_address, module_name)
         && signature
             .parameters
             .iter()
@@ -184,7 +186,7 @@ pub fn validate_function(
     }
 
     // Error types can only be passed as arguments to the native `revert` function from `stylus::error` module.
-    if !is_native_revert(function, package_address)
+    if !is_native_revert(function, package_address, module_name)
         && signature
             .parameters
             .iter()
