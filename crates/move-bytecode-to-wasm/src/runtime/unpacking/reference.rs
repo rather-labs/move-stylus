@@ -56,6 +56,7 @@ pub fn unpack_reference_function(
                 calldata_reader_pointer,
                 compilation_ctx,
                 Some(runtime_error_data),
+                None,
             )?;
 
             builder.store(
@@ -146,6 +147,7 @@ mod tests {
                 calldata_reader_pointer,
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
+                None,
             )
             .unwrap();
 

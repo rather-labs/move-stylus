@@ -134,6 +134,7 @@ mod tests {
                 args_pointer,
                 &compilation_ctx,
                 None,
+                None,
             )
             .unwrap();
 

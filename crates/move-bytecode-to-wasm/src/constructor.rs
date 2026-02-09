@@ -59,6 +59,7 @@ pub fn inject_constructor<'a>(
             "constructor",
             &compilation_ctx.empty_signature,
             compilation_ctx,
+            None,
         )?);
     };
 
