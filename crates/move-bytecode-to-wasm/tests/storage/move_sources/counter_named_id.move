@@ -6,7 +6,7 @@ use stylus::{
     transfer::{Self}
 };
 
-public struct COUNTER_ has key {}
+public struct COUNTER_  {}
 
 public struct Counter has key {
     id: NamedId<COUNTER_>,

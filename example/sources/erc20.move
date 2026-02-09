@@ -13,13 +13,15 @@ use stylus::{
 };
 use std::ascii::{Self, String};
 
-const EInssuficientFunds: u64 = 1;
-const ENotAllowed: u64 = 2;
+#[error]
+const EInssuficientFunds: vector<u8> = b"Insufficient funds";
+#[error]
+const ENotAllowed: vector<u8> = b"Not allowed";
 
-public struct TOTAL_SUPPLY has key {}
-public struct CONTRACT_INFO has key {}
-public struct ALLOWANCE_ has key {}
-public struct BALANCE_ has key {}
+public struct TOTAL_SUPPLY {}
+public struct CONTRACT_INFO {}
+public struct ALLOWANCE_ {}
+public struct BALANCE_ {}
 
 public struct TotalSupply has key {
     id: NamedId<TOTAL_SUPPLY>,

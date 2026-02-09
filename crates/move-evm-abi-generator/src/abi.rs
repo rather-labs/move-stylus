@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 
 use move_bytecode_to_wasm::compilation_context::{
     ModuleData, ModuleId,
-    module_data::struct_data::{IStruct, IStructType, IntermediateType},
+    module_data::struct_data::{IStruct, IntermediateType},
     reserved_modules::{
         SF_MODULE_NAME_OBJECT, SF_MODULE_NAME_TX_CONTEXT, STYLUS_FRAMEWORK_ADDRESS,
     },
@@ -204,11 +204,6 @@ impl Abi {
                         let struct_module = modules_data.get(module_id).unwrap();
                         let struct_ = struct_module.structs.get_by_index(*index).unwrap();
 
-                        // Skip one-time witness structs
-                        if struct_.type_ == IStructType::OneTimeWitness {
-                            continue;
-                        }
-
                         match (
                             struct_.identifier.as_str(),
                             module_id.address,
@@ -219,14 +214,12 @@ impl Abi {
                             }
                             _ => {
                                 if struct_.has_key {
-                                    // TODO: can an error/event have a key? if so, we need to resolve conflicts here too!
                                     Self::process_storage_struct(
                                         struct_,
                                         itype,
                                         modules_data,
                                         &mut function_parameters,
                                         param,
-                                        structs_to_process,
                                     );
                                 } else {
                                     function_parameters.push(NamedType {
@@ -260,7 +253,6 @@ impl Abi {
                                 modules_data,
                                 &mut function_parameters,
                                 param,
-                                structs_to_process,
                             );
                         } else {
                             {
@@ -383,7 +375,6 @@ impl Abi {
         modules_data: &HashMap<ModuleId, ModuleData>,
         function_parameters: &mut Vec<NamedType>,
         param: &Parameter,
-        structs_to_process: &mut HashSet<IntermediateType>,
     ) {
         assert!(struct_.has_key);
         let first_parameter = struct_.fields.first();
@@ -404,19 +395,15 @@ impl Abi {
                     module_id.module_name.as_str(),
                 ) {
                     ("UID", STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => {
+                        // Convert struct_itype to get the struct identifier and module_id
+                        let struct_type = Type::from_intermediate_type(struct_itype, modules_data);
                         function_parameters.push(NamedType {
                             identifier: param.name,
-                            type_: Type::Bytes32,
+                            type_: struct_type,
                         });
                     }
                     _ => {
-                        function_parameters.push(NamedType {
-                            identifier: param.name,
-                            type_: Type::from_intermediate_type(struct_itype, modules_data),
-                        });
-                        if Self::should_process_struct(struct_itype, modules_data) {
-                            structs_to_process.insert(struct_itype.clone());
-                        }
+                        panic!("processing a storage struct that has no uid as first parameter");
                     }
                 }
             }
@@ -440,17 +427,13 @@ impl Abi {
                 ) {
                     ("NamedId", STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => {}
                     _ => {
-                        function_parameters.push(NamedType {
-                            identifier: param.name,
-                            type_: Type::from_intermediate_type(struct_itype, modules_data),
-                        });
-                        if Self::should_process_struct(struct_itype, modules_data) {
-                            structs_to_process.insert(struct_itype.clone());
-                        }
+                        panic!(
+                            "processing a storage struct that has no named id as first parameter"
+                        );
                     }
                 }
             }
-            _ => panic!("processing a storager struct that has no id as first parameter"),
+            _ => panic!("processing a storage struct that has no id as first parameter"),
         }
     }
 
@@ -718,7 +701,6 @@ impl Abi {
                     && !is_id(&struct_.identifier, module_id)
                     && !is_string(&struct_.identifier, module_id)
                     && !is_bytes_n(&struct_.identifier, module_id)
-                    && struct_.type_ != IStructType::OneTimeWitness
             }
 
             _ => false,

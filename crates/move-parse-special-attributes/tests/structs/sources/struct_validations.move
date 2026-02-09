@@ -23,7 +23,7 @@ public struct StructWithKeyManyUids has key {
     value: u64
 }
 
-public struct NamedIdStruct has key {}
+public struct NamedIdStruct  {}
 
 public struct StructWithKeyManyNamedIds has key {
     id: NamedId<NamedIdStruct>,

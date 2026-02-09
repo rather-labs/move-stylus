@@ -23,7 +23,7 @@ use function_data::FunctionData;
 use move_binary_format::{
     CompiledModule,
     file_format::{
-        Ability, AbilitySet, DatatypeHandleIndex, EnumDefInstantiationIndex, EnumDefinitionIndex,
+        Ability, DatatypeHandleIndex, EnumDefInstantiationIndex, EnumDefinitionIndex,
         FieldHandleIndex, FieldInstantiationIndex, FunctionDefinition, FunctionDefinitionIndex,
         Signature, SignatureIndex, SignatureToken, StructDefInstantiationIndex,
         StructDefinitionIndex, VariantHandleIndex, VariantInstantiationHandleIndex, Visibility,
@@ -454,9 +454,7 @@ impl ModuleData<'_> {
                 .into_iter()
                 .any(|a| a == Ability::Key);
 
-            let type_ = if Self::is_one_time_witness(module, struct_def.struct_handle) {
-                IStructType::OneTimeWitness
-            } else if let Some(event) = module_special_attributes
+            let type_ = if let Some(event) = module_special_attributes
                 .events
                 .get(&Symbol::from(identifier))
             {
@@ -830,7 +828,6 @@ impl ModuleData<'_> {
                     move_function_return,
                     function_def,
                     datatype_handles_map,
-                    move_module,
                     move_module_dependencies,
                     test_mode,
                 )?;
@@ -953,11 +950,10 @@ impl ModuleData<'_> {
     // For the init() function to be considered valid, it must adhere to the following requirements:
     // 1. It must be named `init`.
     // 2. It must be private.
-    // 3. It must have &TxContext or &mut TxContext as its last argument, with an optional One Time Witness (OTW) as its first argument.
+    // 3. It must have &TxContext or &mut TxContext as its only argument.
     // 4. It must not return any values.
     //
     // entry fun init(ctx: &TxContext) { /* ... */}
-    // entry fun init(otw: OTW, ctx: &mut TxContext) { /* ... */ }
     //
 
     /// Checks if the given function (by index) is a valid `init` function.
@@ -969,7 +965,6 @@ impl ModuleData<'_> {
         move_function_return: &Signature,
         function_def: &FunctionDefinition,
         datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
-        module: &CompiledModule,
         move_module_dependencies: &[(PackageName, CompiledUnitWithSource)],
         test_mode: bool,
     ) -> Result<bool> {
@@ -985,20 +980,20 @@ impl ModuleData<'_> {
             return Err(CompilationContextError::InitFunctionBadPrivacy);
         }
 
-        // Must have 1 or 2 arguments
+        // Must have 1 argument
         let arg_count = move_function_arguments.len();
-        if arg_count > 2 {
+        if arg_count > 1 {
             return Err(CompilationContextError::InitFunctionTooManyArgs);
         } else if arg_count == 0 {
             return Err(CompilationContextError::InitFunctionNoAguments);
         }
 
-        // Check TxContext in the last argument
+        // If theres an argument, it must be a reference to the `TxContext` struct from the Stylus Framework
         // The compilation context is not available yet, so we can't use it to check if the
         // `TxContext` is the one from the stylus framework. It is done manually
         let is_tx_context_ref = move_function_arguments
             .0
-            .last()
+            .first()
             .and_then(|last| {
                 IntermediateType::try_from_signature_token(last, datatype_handles_map).ok()
             })
@@ -1011,77 +1006,12 @@ impl ModuleData<'_> {
             return Err(CompilationContextError::InitFunctionNoTxContext);
         }
 
-        // Check OTW if 2 arguments
-        if arg_count == 2 {
-            let SignatureToken::Datatype(idx) = &move_function_arguments.0[0] else {
-                return Err(CompilationContextError::InitFunctionNoOTW);
-            };
-
-            if !Self::is_one_time_witness(module, *idx) {
-                return Err(CompilationContextError::InitFunctionNoOTW);
-            }
-        }
-
         // Must not return any values
         if !move_function_return.is_empty() {
             return Err(CompilationContextError::InitFunctionBadRetrunValues);
         }
 
         Ok(true)
-    }
-
-    /// Checks if the given signature token is a one-time witness type.
-    //
-    // OTW (One-time witness) types are structs with the following requirements:
-    // i. Their name is the upper-case version of the module's name.
-    // ii. They have no fields (or a single boolean field).
-    // iii. They have no type parameters.
-    // iv. They have only the 'drop' ability.
-    fn is_one_time_witness(
-        module: &CompiledModule,
-        datatype_handle_index: DatatypeHandleIndex,
-    ) -> bool {
-        // 1. Datatype handle must be a struct
-        let datatype_handle = module.datatype_handle_at(datatype_handle_index);
-
-        // 2. Name must match uppercase module name
-        let module_handle = module.module_handle_at(datatype_handle.module);
-        let module_name = module.identifier_at(module_handle.name).as_str();
-        let struct_name = module.identifier_at(datatype_handle.name).as_str();
-        if struct_name != module_name.to_ascii_uppercase() {
-            return false;
-        }
-
-        // 3. Must have only the Drop ability
-        if datatype_handle.abilities != (AbilitySet::EMPTY | Ability::Drop) {
-            return false;
-        }
-
-        // 4. Must have no type parameters
-        if !datatype_handle.type_parameters.is_empty() {
-            return false;
-        }
-
-        // 5. Must have 0 or 1 field (and if 1, it must be Bool)
-        let struct_def = match module
-            .struct_defs
-            .iter()
-            .find(|def| def.struct_handle == datatype_handle_index)
-        {
-            Some(def) => def,
-            None => return false,
-        };
-
-        let field_count = struct_def.declared_field_count().unwrap_or(0);
-        if field_count > 1 {
-            return false;
-        }
-
-        if let Some(field) = struct_def.field(0) {
-            field.signature.0 == SignatureToken::Bool
-        } else {
-            true
-        }
     }
 
     // Determines whether a function is a valid receive function.
