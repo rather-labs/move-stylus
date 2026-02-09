@@ -2,20 +2,21 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 /// This module extends the Dynamic Field functionality to work with Named IDs.
-/// It provides a high-level API for adding, borrowing, and removing dynamic fields 
-/// from deterministic singleton objects (NamedId) by internally casting them 
+/// It provides a high-level API for adding, borrowing, and removing dynamic fields
+/// from deterministic singleton objects (NamedId) by internally casting them
 /// to their underlying UID representation.
 
 module stylus::dynamic_field_named_id;
 
 use stylus::{
-    object::{Self, UID, NamedId}, 
+    object::{Self, UID, NamedId},
     dynamic_field as dynamic_field
 };
+use std::option::Option;
 
 /// Adds a dynamic field to a deterministic object identified by a `NamedId`.
-/// 
-/// Internally converts the `NamedId` reference to a `UID` to leverage 
+///
+/// Internally converts the `NamedId` reference to a `UID` to leverage
 /// the standard dynamic_field logic.
 public fun add<NId, Name: copy + drop + store, Value: store>(
     object: &mut NamedId<NId>,
@@ -27,7 +28,7 @@ public fun add<NId, Name: copy + drop + store, Value: store>(
 }
 
 /// Immutably borrows a dynamic field from an object identified by a `NamedId`.
-/// 
+///
 /// @abort EFieldDoesNotExist if the field is not found.
 /// @abort EFieldTypeMismatch if the field exists but the value type is different.
 public fun borrow<NId, Name: copy + drop + store, Value: store>(
@@ -66,7 +67,7 @@ public fun exists_<NId, Name: copy + drop + store>(
 }
 
 /// Safely removes a dynamic field from a Named object if it exists.
-/// 
+///
 /// Returns `Option::some(Value)` if found and removed, or `Option::none()` otherwise.
 public fun remove_if_exists<NId, Name: copy + drop + store, Value: store>(
     object: &mut NamedId<NId>,
