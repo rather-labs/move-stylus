@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use move_symbol_pool::Symbol;
 use walrus::{
     FunctionId, InstrSeqBuilder, LocalId, Module,
@@ -46,10 +48,9 @@ pub struct PublicFunction<'a> {
     pub(crate) function_selector: AbiFunctionSelector,
     signature: &'a ISignature,
     /// Per-argument object kinds derived from function modifiers (owned_objects, shared_objects, frozen_objects).
-    /// Aligned 1:1 with the function's parameter list. `Some(ObjectKind)` for arguments with
-    /// explicit ownership, `None` for arguments without a modifier.
-    /// The outer `Option` is `None` when the function has no storage object modifiers at all.
-    arguments_object_kind: Option<Vec<Option<ObjectKind>>>,
+    /// Maps argument index to its `ObjectKind`. Only arguments with an explicit modifier are present.
+    /// `None` when the function has no storage object modifiers at all.
+    arguments_object_kind: Option<HashMap<usize, ObjectKind>>,
 }
 
 impl<'a> PublicFunction<'a> {
@@ -58,7 +59,7 @@ impl<'a> PublicFunction<'a> {
         function_name: &str,
         signature: &'a ISignature,
         compilation_ctx: &CompilationContext,
-        arguments_object_kind: Option<Vec<Option<ObjectKind>>>,
+        arguments_object_kind: Option<HashMap<usize, ObjectKind>>,
     ) -> Result<Self, AbiError> {
         Self::check_signature_arguments(function_name, &signature.arguments)?;
 
@@ -164,7 +165,7 @@ impl<'a> PublicFunction<'a> {
             args_pointer,
             compilation_ctx,
             runtime_error_data,
-            self.arguments_object_kind.as_deref(),
+            self.arguments_object_kind.as_ref(),
         )?;
 
         // Call the function

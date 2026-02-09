@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use alloy_sol_types::{SolType, sol_data};
 use walrus::{InstrSeqBuilder, LocalId, Module, ValType, ir::InstrSeqId};
 
@@ -75,7 +77,7 @@ pub fn build_unpack_instructions<T: Unpackable>(
     args_pointer: LocalId,
     compilation_ctx: &CompilationContext,
     runtime_error_data: &mut RuntimeErrorData,
-    arguments_object_kind: Option<&[Option<ObjectKind>]>,
+    arguments_object_kind: Option<&HashMap<usize, ObjectKind>>,
 ) -> Result<(), AbiError> {
     let reader_pointer = module.locals.add(ValType::I32);
     let calldata_base_pointer = module.locals.add(ValType::I32);
@@ -94,9 +96,8 @@ pub fn build_unpack_instructions<T: Unpackable>(
     // Static types are stored in-place, but dynamic types are referenced to the call data
     for (i, signature_token) in function_arguments_signature.iter().enumerate() {
         let object_kind = arguments_object_kind
-            .and_then(|kinds| kinds.get(i))
-            .copied()
-            .flatten();
+            .and_then(|kinds| kinds.get(&i))
+            .copied();
 
         signature_token.add_unpack_instructions(
             None,

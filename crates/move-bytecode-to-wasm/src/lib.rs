@@ -260,13 +260,13 @@ pub fn translate_package<'move_package>(
 /// in the `owned_objects`, `shared_objects`, or `frozen_objects` lists from the function's
 /// special attribute modifiers.
 ///
-/// Returns a `Vec<Option<ObjectKind>>` aligned 1:1 with the function's parameter list.
-/// Arguments with explicit ownership get `Some(ObjectKind::Owned|Shared|Frozen)`, arguments
-/// without a modifier get `None`. Returns `None` (outer) if the function has no modifiers at all.
+/// Returns a `HashMap<usize, ObjectKind>` mapping argument index to its object kind.
+/// Only arguments with an explicit modifier are included. Returns `None` if the function
+/// has no storage object modifiers at all.
 fn compute_arguments_object_kind(
     function_name: &Symbol,
     special_attributes: &SpecialAttributes,
-) -> Option<Vec<Option<ObjectKind>>> {
+) -> Option<HashMap<usize, ObjectKind>> {
     let function_sa = special_attributes
         .functions
         .iter()
@@ -280,17 +280,18 @@ fn compute_arguments_object_kind(
         return None;
     }
 
-    let arguments_object_kind: Vec<Option<ObjectKind>> = function_sa
+    let arguments_object_kind: HashMap<usize, ObjectKind> = function_sa
         .signature
         .parameters
         .iter()
-        .map(|param| {
+        .enumerate()
+        .filter_map(|(i, param)| {
             if function_sa.owned_objects.contains(&param.name) {
-                Some(ObjectKind::Owned)
+                Some((i, ObjectKind::Owned))
             } else if function_sa.shared_objects.contains(&param.name) {
-                Some(ObjectKind::Shared)
+                Some((i, ObjectKind::Shared))
             } else if function_sa.frozen_objects.contains(&param.name) {
-                Some(ObjectKind::Frozen)
+                Some((i, ObjectKind::Frozen))
             } else {
                 None
             }
