@@ -21,6 +21,7 @@ pub use event::Event;
 use event::EventParseError;
 pub use external_call::error::{ExternalCallFunctionError, ExternalCallStructError};
 pub use function_validation::FunctionValidationError;
+use function_validation::StorageObjectModifier;
 use function_validation::check_repeated_storage_object_param;
 use function_validation::check_storage_object_param;
 use move_symbol_pool::Symbol;
@@ -542,6 +543,7 @@ pub fn process_special_attributes(
                                                 *owned_object_identifier,
                                                 *loc,
                                                 &result.structs,
+                                                StorageObjectModifier::Owned,
                                             ) {
                                                 found_error = true;
                                                 module_errors.push(e);
@@ -573,6 +575,7 @@ pub fn process_special_attributes(
                                                 *shared_object_identifier,
                                                 *loc,
                                                 &result.structs,
+                                                StorageObjectModifier::Shared,
                                             ) {
                                                 found_error = true;
                                                 module_errors.push(e);
@@ -604,6 +607,7 @@ pub fn process_special_attributes(
                                                 *frozen_object_identifier,
                                                 *loc,
                                                 &result.structs,
+                                                StorageObjectModifier::Frozen,
                                             ) {
                                                 found_error = true;
                                                 module_errors.push(e);

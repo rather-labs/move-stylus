@@ -50,3 +50,8 @@ entry fun invalid_namedid_argument(namedid: NamedId<NamedIdStruct>): NamedId<Nam
 entry fun valid_ref_uid_argument(uid: &UID): &UID {
     uid
 }
+
+#[ext(frozen_objects(frozen))]
+entry fun invalid_frozen_object_argument(frozen: &mut frozen KeyStruct): &mut frozen KeyStruct {
+    frozen
+}

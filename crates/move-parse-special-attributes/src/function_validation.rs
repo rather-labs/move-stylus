@@ -228,58 +228,79 @@ pub fn validate_function(
     Ok(())
 }
 
-/// Checks if a storage object parameter is valid (must be a struct with key ability)
+/// The kind of storage object modifier applied to a function parameter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StorageObjectModifier {
+    Owned,
+    Shared,
+    Frozen,
+}
+
+/// Checks if a storage object parameter is valid (must be a struct with key ability).
+/// When the modifier is `Frozen`, additionally validates that the parameter is an
+/// immutable reference (`&T`), not a mutable reference (`&mut T`) or a bare value.
 pub fn check_storage_object_param(
     signature: &Signature,
     identifier: Symbol,
     identifier_loc: move_ir_types::location::Loc,
     module_structs: &[Struct_],
+    modifier: StorageObjectModifier,
 ) -> Result<(), SpecialAttributeError> {
-    if let Some(param_type_name) = signature.parameters.iter().find_map(|p| {
-        if p.name == identifier {
-            match &p.type_ {
-                Type::UserDataType(name, _) => Some(name),
-                Type::Ref(inner) => {
-                    if let Type::UserDataType(name, _) = &**inner {
-                        Some(name)
-                    } else {
-                        None
-                    }
-                }
-                Type::MutRef(inner) => {
-                    if let Type::UserDataType(name, _) = &**inner {
-                        Some(name)
-                    } else {
-                        None
-                    }
-                }
-                _ => None,
-            }
-        } else {
-            None
-        }
-    }) {
-        if let Some(struct_) = module_structs.iter().find(|s| s.name == *param_type_name) {
-            if !struct_.has_key {
-                return Err(SpecialAttributeError {
-                    kind: SpecialAttributeErrorKind::FunctionValidation(
-                        FunctionValidationError::StructWithoutKey(identifier),
-                    ),
-                    line_of_code: identifier_loc,
-                });
-            }
-        } else {
-            return Err(SpecialAttributeError {
-                kind: SpecialAttributeErrorKind::FunctionValidation(
-                    FunctionValidationError::StructNotFound(identifier),
-                ),
-                line_of_code: identifier_loc,
-            });
-        }
-    } else {
-        return Err(SpecialAttributeError {
+    let param = signature
+        .parameters
+        .iter()
+        .find(|p| p.name == identifier)
+        .ok_or(SpecialAttributeError {
             kind: SpecialAttributeErrorKind::FunctionValidation(
                 FunctionValidationError::ParameterNotFound(identifier),
+            ),
+            line_of_code: identifier_loc,
+        })?;
+
+    // For frozen objects, the parameter must be an immutable reference
+    if modifier == StorageObjectModifier::Frozen && !matches!(&param.type_, Type::Ref(_)) {
+        return Err(SpecialAttributeError {
+            kind: SpecialAttributeErrorKind::FunctionValidation(
+                FunctionValidationError::FrozenObjectNotImmutableRef(identifier),
+            ),
+            line_of_code: identifier_loc,
+        });
+    }
+
+    // Extract the struct name from the parameter type (bare, &, or &mut)
+    let param_type_name = match &param.type_ {
+        Type::UserDataType(name, _) => Some(name),
+        Type::Ref(inner) | Type::MutRef(inner) => {
+            if let Type::UserDataType(name, _) = &**inner {
+                Some(name)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+    .ok_or(SpecialAttributeError {
+        kind: SpecialAttributeErrorKind::FunctionValidation(
+            FunctionValidationError::ParameterNotFound(identifier),
+        ),
+        line_of_code: identifier_loc,
+    })?;
+
+    // Check that the struct exists and has the key ability
+    let struct_ = module_structs
+        .iter()
+        .find(|s| s.name == *param_type_name)
+        .ok_or(SpecialAttributeError {
+            kind: SpecialAttributeErrorKind::FunctionValidation(
+                FunctionValidationError::StructNotFound(identifier),
+            ),
+            line_of_code: identifier_loc,
+        })?;
+
+    if !struct_.has_key {
+        return Err(SpecialAttributeError {
+            kind: SpecialAttributeErrorKind::FunctionValidation(
+                FunctionValidationError::StructWithoutKey(identifier),
             ),
             line_of_code: identifier_loc,
         });

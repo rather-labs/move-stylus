@@ -92,7 +92,7 @@ pub fn test_function_validation() {
         panic!("Expected error due to invalid function validation");
     };
 
-    assert_eq!(special_attributes_errors.len(), 5);
+    assert_eq!(special_attributes_errors.len(), 6);
 
     assert_eq!(
         3,
@@ -128,6 +128,19 @@ pub fn test_function_validation() {
                 &e.kind,
                 SpecialAttributeErrorKind::FunctionValidation(
                     FunctionValidationError::InvalidNamedIdArgument
+                )
+            ))
+            .count()
+    );
+
+    assert_eq!(
+        1,
+        special_attributes_errors
+            .iter()
+            .filter(|e| matches!(
+                &e.kind,
+                SpecialAttributeErrorKind::FunctionValidation(
+                    FunctionValidationError::FrozenObjectNotImmutableRef(_)
                 )
             ))
             .count()

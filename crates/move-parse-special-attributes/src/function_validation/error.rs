@@ -53,6 +53,9 @@ pub enum FunctionValidationError {
 
     #[error("revert() argument must be a struct marked with #[abi_error]")]
     RevertArgumentNotAbiError,
+
+    #[error("Frozen objects '{0}' can only be passed as an immutable reference")]
+    FrozenObjectNotImmutableRef(Symbol),
 }
 
 impl From<&FunctionValidationError> for DiagnosticInfo {
