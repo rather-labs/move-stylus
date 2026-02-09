@@ -22,7 +22,7 @@ mod wasm_validation;
 #[cfg(any(test, feature = "inject-host-debug-fns"))]
 mod test_tools;
 
-use abi_types::public_function::PublicFunction;
+use abi_types::{public_function::PublicFunction, unpacking::ObjectKind};
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
 use compilation_context::{ModuleData, ModuleId};
 use constructor::inject_constructor;
@@ -35,7 +35,7 @@ use move_package::{
     compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource},
     source_package::parsed_manifest::PackageName,
 };
-use move_parse_special_attributes::process_special_attributes;
+use move_parse_special_attributes::{SpecialAttributes, process_special_attributes};
 use move_symbol_pool::Symbol;
 use std::{collections::HashMap, path::PathBuf};
 use translation::{
@@ -204,11 +204,19 @@ pub fn translate_package<'move_package>(
                     .wasm_function_id
                     .ok_or(TranslationError::EntryFunctionWasmIdNotFound)?;
 
+                // Compute per-argument ObjectKind from special attributes (owned_objects,
+                // shared_objects, frozen_objects modifiers)
+                let arguments_object_kind = compute_arguments_object_kind(
+                    &function_information.function_id.identifier,
+                    &root_module_data.special_attributes,
+                );
+
                 public_functions.push(PublicFunction::new(
                     wasm_function_id,
                     &function_information.function_id.identifier,
                     &function_information.signature,
                     &compilation_ctx,
+                    arguments_object_kind,
                 )?);
             }
         }
@@ -244,6 +252,52 @@ pub fn translate_package<'move_package>(
             errors,
         })
     }
+}
+
+/// Computes per-argument `ObjectKind` for a function based on its special attributes.
+///
+/// For each parameter in the function's signature, checks whether the parameter name appears
+/// in the `owned_objects`, `shared_objects`, or `frozen_objects` lists from the function's
+/// special attribute modifiers.
+///
+/// Returns a `Vec<Option<ObjectKind>>` aligned 1:1 with the function's parameter list.
+/// Arguments with explicit ownership get `Some(ObjectKind::Owned|Shared|Frozen)`, arguments
+/// without a modifier get `None`. Returns `None` (outer) if the function has no modifiers at all.
+fn compute_arguments_object_kind(
+    function_name: &Symbol,
+    special_attributes: &SpecialAttributes,
+) -> Option<Vec<Option<ObjectKind>>> {
+    let function_sa = special_attributes
+        .functions
+        .iter()
+        .find(|f| *f.name == **function_name)?;
+
+    // If no storage object modifiers are specified, return None
+    if function_sa.owned_objects.is_empty()
+        && function_sa.shared_objects.is_empty()
+        && function_sa.frozen_objects.is_empty()
+    {
+        return None;
+    }
+
+    let arguments_object_kind: Vec<Option<ObjectKind>> = function_sa
+        .signature
+        .parameters
+        .iter()
+        .map(|param| {
+            if function_sa.owned_objects.contains(&param.name) {
+                Some(ObjectKind::Owned)
+            } else if function_sa.shared_objects.contains(&param.name) {
+                Some(ObjectKind::Shared)
+            } else if function_sa.frozen_objects.contains(&param.name) {
+                Some(ObjectKind::Frozen)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    Some(arguments_object_kind)
 }
 
 #[derive(Debug)]

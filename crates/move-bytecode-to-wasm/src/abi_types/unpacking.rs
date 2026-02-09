@@ -19,6 +19,23 @@ use crate::{
     wasm_builder_extensions::WasmBuilderExtension,
 };
 
+/// Represents the kind of storage object for gas-optimized storage lookup.
+///
+/// When unpacking storage structs, if the object kind is known (via function modifiers
+/// like `#[owned_objects]`, `#[shared_objects]`, `#[frozen_objects]`), we can directly
+/// access the correct storage mapping instead of searching all mappings sequentially.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[repr(i32)]
+pub enum ObjectKind {
+    /// Object is explicitly declared as owned — uses `LocateStorageOwnedData`.
+    #[default]
+    Owned = 0,
+    /// Object is explicitly declared as shared — uses `LocateStorageSharedData`.
+    Shared = 1,
+    /// Object is explicitly declared as frozen — uses `LocateStorageFrozenData`.
+    Frozen = 2,
+}
+
 pub trait Unpackable {
     /// Adds the instructions to unpack the abi encoded type to WASM function parameters
     ///
@@ -41,6 +58,7 @@ pub trait Unpackable {
         calldata_base_pointer: LocalId,
         compilation_ctx: &CompilationContext,
         runtime_error_data: Option<&mut RuntimeErrorData>,
+        object_kind: Option<ObjectKind>,
     ) -> Result<(), AbiError>;
 }
 
@@ -48,6 +66,7 @@ pub trait Unpackable {
 ///
 /// Each parameter is decoded and loaded in the WASM stack. Complex data types are kept in memory
 /// and the pointer is pushed onto the stack in the parameter location.
+#[allow(clippy::too_many_arguments)]
 pub fn build_unpack_instructions<T: Unpackable>(
     function_builder: &mut InstrSeqBuilder,
     return_block_id: InstrSeqId,
@@ -56,6 +75,7 @@ pub fn build_unpack_instructions<T: Unpackable>(
     args_pointer: LocalId,
     compilation_ctx: &CompilationContext,
     runtime_error_data: &mut RuntimeErrorData,
+    arguments_object_kind: Option<&[Option<ObjectKind>]>,
 ) -> Result<(), AbiError> {
     let reader_pointer = module.locals.add(ValType::I32);
     let calldata_base_pointer = module.locals.add(ValType::I32);
@@ -72,7 +92,12 @@ pub fn build_unpack_instructions<T: Unpackable>(
 
     // The ABI encoded params are always a tuple
     // Static types are stored in-place, but dynamic types are referenced to the call data
-    for signature_token in function_arguments_signature.iter() {
+    for (i, signature_token) in function_arguments_signature.iter().enumerate() {
+        let object_kind = arguments_object_kind
+            .and_then(|kinds| kinds.get(i))
+            .copied()
+            .flatten();
+
         signature_token.add_unpack_instructions(
             None,
             function_builder,
@@ -83,6 +108,7 @@ pub fn build_unpack_instructions<T: Unpackable>(
             calldata_base_pointer,
             compilation_ctx,
             Some(runtime_error_data),
+            object_kind,
         )?;
     }
 
@@ -101,6 +127,7 @@ impl Unpackable for IntermediateType {
         calldata_base_pointer: LocalId,
         compilation_ctx: &CompilationContext,
         runtime_error_data: Option<&mut RuntimeErrorData>,
+        object_kind: Option<ObjectKind>,
     ) -> Result<(), AbiError> {
         match self {
             IntermediateType::IBool
@@ -190,6 +217,7 @@ impl Unpackable for IntermediateType {
                             calldata_base_pointer,
                             compilation_ctx,
                             runtime_error_data,
+                            object_kind,
                         )?;
                     }
                     _ => {
@@ -260,6 +288,15 @@ impl Unpackable for IntermediateType {
                     } else {
                         builder.i32_const(0);
                     }
+
+                    // Push the object_kind constant. When the kind is explicitly known
+                    // (via #[owned_objects], #[shared_objects], or #[frozen_objects] modifiers),
+                    // the runtime can go directly to the correct storage mapping.
+                    // -1 means "not specified" — the generic LocateStorageData is used instead.
+                    builder.i32_const(match object_kind {
+                        Some(kind) => kind as i32,
+                        None => -1,
+                    });
 
                     let unpack_storage_struct_function = RuntimeFunction::UnpackStorageStruct
                         .get_generic(module, compilation_ctx, runtime_error_data, &[self])?;
@@ -437,6 +474,7 @@ mod tests {
             args_pointer,
             &compilation_ctx,
             &mut runtime_error_data,
+            None,
         )
         .unwrap();
 
@@ -501,6 +539,7 @@ mod tests {
             args_pointer,
             &compilation_ctx,
             &mut runtime_error_data,
+            None,
         )
         .unwrap();
 
@@ -572,6 +611,7 @@ mod tests {
             args_pointer,
             &compilation_ctx,
             &mut runtime_error_data,
+            None,
         )
         .unwrap();
 

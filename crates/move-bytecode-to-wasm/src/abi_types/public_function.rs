@@ -16,9 +16,11 @@ use crate::{
 };
 
 use super::{
-    abi_encoding::AbiFunctionSelector, error::AbiError,
-    function_encoding::move_signature_to_abi_selector, packing::build_pack_instructions,
-    unpacking::build_unpack_instructions,
+    abi_encoding::AbiFunctionSelector,
+    error::AbiError,
+    function_encoding::move_signature_to_abi_selector,
+    packing::build_pack_instructions,
+    unpacking::{ObjectKind, build_unpack_instructions},
 };
 
 #[derive(thiserror::Error, Debug)]
@@ -43,6 +45,11 @@ pub struct PublicFunction<'a> {
     pub(crate) function_name: Symbol,
     pub(crate) function_selector: AbiFunctionSelector,
     signature: &'a ISignature,
+    /// Per-argument object kinds derived from function modifiers (owned_objects, shared_objects, frozen_objects).
+    /// Aligned 1:1 with the function's parameter list. `Some(ObjectKind)` for arguments with
+    /// explicit ownership, `None` for arguments without a modifier.
+    /// The outer `Option` is `None` when the function has no storage object modifiers at all.
+    arguments_object_kind: Option<Vec<Option<ObjectKind>>>,
 }
 
 impl<'a> PublicFunction<'a> {
@@ -51,6 +58,7 @@ impl<'a> PublicFunction<'a> {
         function_name: &str,
         signature: &'a ISignature,
         compilation_ctx: &CompilationContext,
+        arguments_object_kind: Option<Vec<Option<ObjectKind>>>,
     ) -> Result<Self, AbiError> {
         Self::check_signature_arguments(function_name, &signature.arguments)?;
 
@@ -62,6 +70,7 @@ impl<'a> PublicFunction<'a> {
             function_name: Symbol::from(function_name),
             function_selector,
             signature,
+            arguments_object_kind,
         })
     }
 
@@ -155,6 +164,7 @@ impl<'a> PublicFunction<'a> {
             args_pointer,
             compilation_ctx,
             runtime_error_data,
+            self.arguments_object_kind.as_deref(),
         )?;
 
         // Call the function
@@ -530,8 +540,14 @@ mod tests {
             ],
             returns,
         };
-        let public_function =
-            PublicFunction::new(function, "test_function", &signature, &compilation_ctx).unwrap();
+        let public_function = PublicFunction::new(
+            function,
+            "test_function",
+            &signature,
+            &compilation_ctx,
+            None,
+        )
+        .unwrap();
 
         let mut data =
             <sol!((bool, uint16, uint64))>::abi_encode_params(&(true, 1234, 123456789012345));
@@ -614,8 +630,14 @@ mod tests {
             arguments: vec![IntermediateType::ISigner, IntermediateType::IU8],
             returns,
         };
-        let public_function =
-            PublicFunction::new(function, "test_function", &signature, &compilation_ctx).unwrap();
+        let public_function = PublicFunction::new(
+            function,
+            "test_function",
+            &signature,
+            &compilation_ctx,
+            None,
+        )
+        .unwrap();
 
         let mut data = <sol!((uint8,))>::abi_encode_params(&(1,));
         data = [public_function.get_selector().to_vec(), data].concat();
@@ -688,8 +710,14 @@ mod tests {
             ],
             returns: vec![IntermediateType::IU32],
         };
-        let public_function =
-            PublicFunction::new(function, "test_function", &signature, &compilation_ctx).unwrap();
+        let public_function = PublicFunction::new(
+            function,
+            "test_function",
+            &signature,
+            &compilation_ctx,
+            None,
+        )
+        .unwrap();
 
         let mut data =
             <sol!((bool, uint16, uint64))>::abi_encode_params(&(true, 1234, 123456789012345));
@@ -745,7 +773,14 @@ mod tests {
             ],
             returns: vec![],
         };
-        PublicFunction::new(function, "test_function", &signature, &compilation_ctx).unwrap();
+        PublicFunction::new(
+            function,
+            "test_function",
+            &signature,
+            &compilation_ctx,
+            None,
+        )
+        .unwrap();
     }
 
     #[test]
@@ -771,9 +806,15 @@ mod tests {
             ],
             returns: vec![],
         };
-        let err = PublicFunction::new(function, "test_function", &signature, &compilation_ctx)
-            .err()
-            .unwrap();
+        let err = PublicFunction::new(
+            function,
+            "test_function",
+            &signature,
+            &compilation_ctx,
+            None,
+        )
+        .err()
+        .unwrap();
 
         let err = match err {
             AbiError::PublicFunction(e) => e,
@@ -809,9 +850,15 @@ mod tests {
             returns: vec![],
         };
 
-        let err = PublicFunction::new(function, "test_function", &signature, &compilation_ctx)
-            .err()
-            .unwrap();
+        let err = PublicFunction::new(
+            function,
+            "test_function",
+            &signature,
+            &compilation_ctx,
+            None,
+        )
+        .err()
+        .unwrap();
 
         let err = match err {
             AbiError::PublicFunction(e) => e,
@@ -848,11 +895,24 @@ mod tests {
             ],
             returns: vec![],
         };
-        PublicFunction::new(function, "test_function", &signature, &compilation_ctx).err();
+        PublicFunction::new(
+            function,
+            "test_function",
+            &signature,
+            &compilation_ctx,
+            None,
+        )
+        .err();
 
-        let err = PublicFunction::new(function, "test_function", &signature, &compilation_ctx)
-            .err()
-            .unwrap();
+        let err = PublicFunction::new(
+            function,
+            "test_function",
+            &signature,
+            &compilation_ctx,
+            None,
+        )
+        .err()
+        .unwrap();
 
         let err = match err {
             AbiError::PublicFunction(e) => e,
