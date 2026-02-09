@@ -70,7 +70,6 @@ use walrus::{InstrSeqBuilder, Module, ValType, ir::BinaryOp};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IStructType {
-    OneTimeWitness,
     Event { indexes: u8, is_anonymous: bool },
     AbiError,
     Common,

@@ -127,18 +127,6 @@ pub fn build_constructor(
     builder.if_else(
         None,
         |then| {
-            // If an `init()` function is present, call it
-            let init_ty = module.funcs.get(init).ty();
-            let params = module.types.get(init_ty).params();
-
-            // If the function expects an OTW, push dummy value.
-            // The OTW is a Move pattern used to ensure that the init function is called only once.
-            // Here we replace that logic by writing a marker value into the storage.
-            // TODO: revisit the OTW implementation and check if this approach is correct.
-            if params.len() == 2 {
-                then.i32_const(0); // OTW = 0
-            }
-
             // Inject TxContext as last argument
             inner_result = TxContext::inject(then, module, compilation_ctx);
 

@@ -113,9 +113,6 @@ pub enum CompilationContextError {
     #[error("init functions does not have TxContext as parameter")]
     InitFunctionNoTxContext,
 
-    #[error("init function second argument must be a OTW")]
-    InitFunctionNoOTW,
-
     #[error("expected no return values for init function")]
     InitFunctionBadRetrunValues,
 
