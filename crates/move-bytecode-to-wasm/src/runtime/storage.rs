@@ -255,22 +255,25 @@ pub fn locate_storage_owned_data(
 
     // Check if it is empty (all zeroes)
     builder
-        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
         .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
         .i32_const(32)
         .call(is_zero_fn)
-        .negate()
-        .return_()
-        .drop();
+        .if_else(
+            None,
+            |then| {
+                then.return_error(
+                    module,
+                    compilation_ctx,
+                    Some(ValType::I32),
+                    runtime_error_data,
+                    RuntimeError::StorageObjectNotFound,
+                );
+            },
+            |_| {},
+        );
 
-    // If we get here means the object was not found
-    builder.return_error(
-        module,
-        compilation_ctx,
-        Some(ValType::I32),
-        runtime_error_data,
-        RuntimeError::StorageObjectNotFound,
-    );
+    // Slot has data → return the owner pointer
+    builder.i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET);
 
     Ok(function.finish(vec![uid_ptr], &mut module.funcs))
 }
@@ -329,22 +332,25 @@ pub fn locate_storage_shared_data(
 
     // Check if it is empty (all zeroes)
     builder
-        .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
         .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
         .i32_const(32)
         .call(is_zero_fn)
-        .negate()
-        .return_()
-        .drop();
+        .if_else(
+            None,
+            |then| {
+                then.return_error(
+                    module,
+                    compilation_ctx,
+                    Some(ValType::I32),
+                    runtime_error_data,
+                    RuntimeError::StorageObjectNotFound,
+                );
+            },
+            |_| {},
+        );
 
-    // If we get here means the object was not found
-    builder.return_error(
-        module,
-        compilation_ctx,
-        Some(ValType::I32),
-        runtime_error_data,
-        RuntimeError::StorageObjectNotFound,
-    );
+    // Slot has data → return the owner pointer
+    builder.i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET);
 
     Ok(function.finish(vec![uid_ptr], &mut module.funcs))
 }
@@ -403,22 +409,25 @@ pub fn locate_storage_frozen_data(
 
     // Check if it is empty (all zeroes)
     builder
-        .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
         .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
         .i32_const(32)
         .call(is_zero_fn)
-        .negate()
-        .return_()
-        .drop();
+        .if_else(
+            None,
+            |then| {
+                then.return_error(
+                    module,
+                    compilation_ctx,
+                    Some(ValType::I32),
+                    runtime_error_data,
+                    RuntimeError::StorageObjectNotFound,
+                );
+            },
+            |_| {},
+        );
 
-    // If we get here means the object was not found
-    builder.return_error(
-        module,
-        compilation_ctx,
-        Some(ValType::I32),
-        runtime_error_data,
-        RuntimeError::StorageObjectNotFound,
-    );
+    // Slot has data → return the owner pointer
+    builder.i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET);
 
     Ok(function.finish(vec![uid_ptr], &mut module.funcs))
 }

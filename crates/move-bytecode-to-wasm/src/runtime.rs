@@ -717,6 +717,9 @@ impl RuntimeFunction {
             | Self::StorageNextSlot
             | Self::DeriveDynArraySlot
             | Self::LocateStorageData
+            | Self::LocateStorageOwnedData
+            | Self::LocateStorageSharedData
+            | Self::LocateStorageFrozenData
             | Self::EncodeAndSaveInStorage
             | Self::ReadAndDecodeFromStorage
             | Self::DeleteFromStorage
@@ -757,9 +760,6 @@ impl RuntimeFunction {
             | Self::AllocateVectorWithHeader
             | Self::DeriveMappingSlot
             | Self::WriteObjectSlot
-            | Self::LocateStorageOwnedData
-            | Self::LocateStorageSharedData
-            | Self::LocateStorageFrozenData
             | Self::LocateStructSlot
             | Self::GetIdBytesPtr
             | Self::GetStructOwner
