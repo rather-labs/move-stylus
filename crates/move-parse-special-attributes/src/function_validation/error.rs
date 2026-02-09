@@ -30,17 +30,14 @@ pub enum FunctionValidationError {
     )]
     InvalidNamedIdArgument,
 
-    #[error("Storage object '{0}' must be a struct with the key ability")]
-    StorageObjectNotKeyedStruct(Symbol),
+    #[error("Struct '{0}' must have the key ability to be a storage object")]
+    StructWithoutKey(Symbol),
 
-    #[error("Storage object struct '{0}' not found")]
-    StorageObjectStructNotFound(Symbol),
+    #[error("Struct '{0}' not found")]
+    StructNotFound(Symbol),
 
     #[error("Parameter '{0}' not found in function signature")]
     ParameterNotFound(Symbol),
-
-    #[error("Struct not found in local or imported modules")]
-    StructNotFound,
 
     #[error("init function cannot be entry")]
     InitFunctionCannotBeEntry,

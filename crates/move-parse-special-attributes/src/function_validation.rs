@@ -263,7 +263,7 @@ pub fn check_storage_object_param(
             if !struct_.has_key {
                 return Err(SpecialAttributeError {
                     kind: SpecialAttributeErrorKind::FunctionValidation(
-                        FunctionValidationError::StorageObjectNotKeyedStruct(identifier),
+                        FunctionValidationError::StructWithoutKey(identifier),
                     ),
                     line_of_code: identifier_loc,
                 });
@@ -271,7 +271,7 @@ pub fn check_storage_object_param(
         } else {
             return Err(SpecialAttributeError {
                 kind: SpecialAttributeErrorKind::FunctionValidation(
-                    FunctionValidationError::StorageObjectStructNotFound(identifier),
+                    FunctionValidationError::StructNotFound(identifier),
                 ),
                 line_of_code: identifier_loc,
             });
