@@ -3,7 +3,6 @@
 
 use clap::*;
 use move_bytecode_to_wasm::package_module_data;
-use move_compiler::diagnostics::{Diagnostics, report_diagnostics};
 use move_evm_abi_generator::generate_abi;
 use move_package::{BuildConfig, compilation::compiled_package::CompiledUnitWithSource};
 use std::path::Path;
@@ -97,13 +96,11 @@ impl ExportAbi {
                     }
                 }
             }
-            Err((mapped_files, errors)) => {
-                let mut diagnostics = Diagnostics::new();
+            Err(errors) => {
                 for error in &errors {
-                    diagnostics.add(error.into());
+                    eprintln!("ABI generation error: {error}");
                 }
-
-                report_diagnostics(&mapped_files, diagnostics)
+                anyhow::bail!("ABI generation failed with {} error(s)", errors.len());
             }
         }
 

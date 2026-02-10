@@ -7,6 +7,7 @@
 //! NOTE: This is a POC and it is WIP
 mod abi;
 mod common;
+pub mod error;
 mod human_readable;
 mod json_format;
 mod special_types;
@@ -17,6 +18,7 @@ use std::{
     path::PathBuf,
 };
 
+use error::{AbiGeneratorError, AbiGeneratorErrorKind};
 use move_binary_format::file_format::{
     Bytecode, CompiledModule, DatatypeHandleIndex, SignatureToken, StructDefInstantiationIndex,
     StructDefinitionIndex,
@@ -26,10 +28,8 @@ use move_bytecode_to_wasm::{
     PackageModuleData,
     compilation_context::{ModuleData, module_data::struct_data::IntermediateType},
 };
-use move_compiler::shared::files::MappedFiles;
 use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
 use move_package::compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource};
-use move_parse_special_attributes::SpecialAttributeError;
 use move_symbol_pool::Symbol;
 
 pub struct Abi {
@@ -44,19 +44,19 @@ pub fn generate_abi(
     package_module_data: &PackageModuleData,
     generate_json: bool,
     generate_human_readable: bool,
-) -> Result<Vec<Abi>, (MappedFiles, Vec<SpecialAttributeError>)> {
+) -> Result<Vec<Abi>, Vec<AbiGeneratorError>> {
     let mut result = Vec::new();
     for root_compiled_module in root_compiled_units {
         let file = &root_compiled_module.source_path;
         let module_id = package_module_data
             .modules_paths
             .get(file)
-            .expect("error getting module id");
+            .ok_or_else(|| vec![AbiGeneratorErrorKind::ModuleIdNotFound.into()])?;
 
         let module_data = package_module_data
             .modules_data
             .get(module_id)
-            .expect("error getting module data");
+            .ok_or_else(|| vec![AbiGeneratorErrorKind::ModuleDataNotFound.into()])?;
 
         // Collect all the calls to emit<> and revert<> function to know which events and errors
         // are emmited in this module so we can put them in the ABI
@@ -67,14 +67,16 @@ pub fn generate_abi(
             root_compiled_units,
             &mut processed_modules,
             &package_module_data.modules_data,
-        );
+        )
+        .map_err(|e| vec![e])?;
 
         let abi = abi::Abi::new(
             module_data,
             &package_module_data.modules_data,
             &module_emitted_events,
             &module_errors,
-        );
+        )
+        .map_err(|e| vec![e])?;
 
         if abi.is_empty() {
             continue;
@@ -133,7 +135,7 @@ fn process_events_and_errors(
     root_compiled_units: &[&CompiledUnitWithSource],
     processed_modules: &mut HashSet<ModuleId>,
     modules_data: &HashMap<ctx::ModuleId, ModuleData>,
-) -> (HashSet<EventStruct>, HashSet<ErrorStruct>) {
+) -> Result<(HashSet<EventStruct>, HashSet<ErrorStruct>), AbiGeneratorError> {
     let module = &root_compiled_module.unit.module;
 
     processed_modules.insert(module.self_id());
@@ -186,13 +188,19 @@ fn process_events_and_errors(
                                                 event_module_id.address().into_bytes().into(),
                                                 event_module_id.name().as_str(),
                                             ))
-                                            .unwrap();
+                                            .ok_or_else(|| {
+                                                AbiGeneratorError::new(
+                                                    AbiGeneratorErrorKind::ModuleDataNotFound,
+                                                )
+                                            })?;
 
                                         let event_type_parameters = type_parameters
                                             .iter()
                                             .map(|t| IntermediateType::try_from_signature_token(t, &event_module.datatype_handles_map))
                                             .collect::<std::result::Result<Vec<IntermediateType>, _>>()
-                                            .unwrap();
+                                            .map_err(|e| AbiGeneratorError::new(
+                                                AbiGeneratorErrorKind::InvalidEmitType(format!("{e:?}")),
+                                            ))?;
 
                                         // The identifier is the same accross instantiations because events can be overloaded in the ABI
                                         let event_identifier = Symbol::from(
@@ -205,10 +213,13 @@ fn process_events_and_errors(
                                             type_parameters: Some(event_type_parameters),
                                         });
                                     }
-                                    _ => panic!(
-                                        "invalid type found in emit function {:?}",
-                                        signature.0[0]
-                                    ),
+                                    other => {
+                                        return Err(AbiGeneratorError::new(
+                                            AbiGeneratorErrorKind::InvalidEmitType(format!(
+                                                "{other:?}"
+                                            )),
+                                        ));
+                                    }
                                 }
                             } else if module_id.name().as_str() == "error"
                                 && identifier.as_str() == "revert"
@@ -227,7 +238,11 @@ fn process_events_and_errors(
                                             ),
                                         });
                                     }
-                                    _ => panic!("invalid type found in revert function"),
+                                    _ => {
+                                        return Err(AbiGeneratorError::new(
+                                            AbiGeneratorErrorKind::InvalidRevertType,
+                                        ));
+                                    }
                                 }
                             }
                         }
@@ -273,7 +288,11 @@ fn process_events_and_errors(
                         .find(|c| c.unit.module.self_id() == function_call.module_id)
                         .copied()
                 })
-                .unwrap_or_else(|| panic!("Could not find dependency {}", function_call.module_id));
+                .ok_or_else(|| {
+                    AbiGeneratorError::new(AbiGeneratorErrorKind::DependencyNotFound(
+                        function_call.module_id.to_string(),
+                    ))
+                })?;
 
             let (events, errors) = process_events_and_errors(
                 package,
@@ -281,7 +300,7 @@ fn process_events_and_errors(
                 root_compiled_units,
                 processed_modules,
                 modules_data,
-            );
+            )?;
             result_events.extend(events);
             result_errors.extend(errors);
         }
@@ -290,7 +309,7 @@ fn process_events_and_errors(
     result_events.extend(top_level_events);
     result_errors.extend(top_level_errors);
 
-    (result_events, result_errors)
+    Ok((result_events, result_errors))
 }
 
 /// Maps a `DatatypeHandleIndex` to a `StructDefInstantiationIndex` by finding the struct definition
