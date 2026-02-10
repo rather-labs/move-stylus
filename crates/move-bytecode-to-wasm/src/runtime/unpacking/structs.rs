@@ -281,7 +281,7 @@ pub fn unpack_storage_struct_function(
 
     // When the object kind is known at compile time, we only need uid_ptr.
     // When unknown, we also need unpack_frozen to search multiple storage mappings.
-    let params = if object_kind.is_some() {
+    let params: Vec<ValType> = if object_kind.is_some() {
         vec![ValType::I32]
     } else {
         vec![ValType::I32, ValType::I32]
@@ -292,15 +292,11 @@ pub fn unpack_storage_struct_function(
 
     // Arguments
     let uid_ptr = module.locals.add(ValType::I32);
-    let unpack_frozen = if object_kind.is_none() {
-        Some(module.locals.add(ValType::I32))
-    } else {
-        None
-    };
-    let owner_id_ptr = module.locals.add(ValType::I32);
 
-    // Resolve and call the appropriate locate_storage function based on object_kind
-    match object_kind {
+    // Resolve and call the appropriate locate_storage function based on object_kind.
+    // The match also returns param_locals so that `unpack_frozen` can be declared as a
+    // plain LocalId inside the `None` arm — the only place it exists.
+    let param_locals = match object_kind {
         Some(ObjectKind::Owned) => {
             let locate_fn = RuntimeFunction::LocateStorageOwnedData.get(
                 module,
@@ -313,6 +309,7 @@ pub fn unpack_storage_struct_function(
                 &RuntimeFunction::LocateStorageOwnedData,
                 Some(ValType::I32),
             );
+            vec![uid_ptr]
         }
         Some(ObjectKind::Shared) => {
             let locate_fn = RuntimeFunction::LocateStorageSharedData.get(
@@ -326,6 +323,7 @@ pub fn unpack_storage_struct_function(
                 &RuntimeFunction::LocateStorageSharedData,
                 Some(ValType::I32),
             );
+            vec![uid_ptr]
         }
         Some(ObjectKind::Frozen) => {
             let locate_fn = RuntimeFunction::LocateStorageFrozenData.get(
@@ -339,8 +337,10 @@ pub fn unpack_storage_struct_function(
                 &RuntimeFunction::LocateStorageFrozenData,
                 Some(ValType::I32),
             );
+            vec![uid_ptr]
         }
         None => {
+            let unpack_frozen = module.locals.add(ValType::I32);
             let locate_fn = RuntimeFunction::LocateStorageData.get(
                 module,
                 Some(compilation_ctx),
@@ -348,16 +348,18 @@ pub fn unpack_storage_struct_function(
             )?;
             builder
                 .local_get(uid_ptr)
-                .local_get(unpack_frozen.unwrap())
+                .local_get(unpack_frozen)
                 .call_runtime_function(
                     compilation_ctx,
                     locate_fn,
                     &RuntimeFunction::LocateStorageData,
                     Some(ValType::I32),
                 );
+            vec![uid_ptr, unpack_frozen]
         }
-    }
+    };
 
+    let owner_id_ptr = module.locals.add(ValType::I32);
     builder.local_set(owner_id_ptr);
 
     // Read the object
@@ -383,11 +385,6 @@ pub fn unpack_storage_struct_function(
         .local_get(uid_ptr)
         .local_get(owner_id_ptr)
         .call(read_and_decode_from_storage_fn);
-
-    let mut param_locals = vec![uid_ptr];
-    if let Some(unpack_frozen) = unpack_frozen {
-        param_locals.push(unpack_frozen);
-    }
 
     Ok(function.finish(param_locals, &mut module.funcs))
 }
