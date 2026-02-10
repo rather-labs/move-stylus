@@ -12,19 +12,19 @@ use move_package::source_package::parsed_manifest::{
 mod implicit_dependency_info;
 
 /// Base git repository where dependencies are located
-const GIT_BASE_REPOSITORY: &str = "https://github.com/rather-labs/move-stylus-dependencies";
+const GIT_BASE_REPOSITORY: &str = "https://github.com/rather-labs/move-stylus";
 
 /// List of implicit dependencies supported by the compiler
 const DEPENDENCIES: [ImplicitDepenencyInfo; 2] = [
     ImplicitDepenencyInfo {
         name: "MoveStdlib",
         subdir: "move-packages/move-stdlib",
-        rev: "move_move_packages_to_main_repo",
+        rev: "main",
     },
     ImplicitDepenencyInfo {
         name: "StylusFramework",
         subdir: "move-packages/stylus-framework",
-        rev: "move_move_packages_to_main_repo",
+        rev: "main",
     },
 ];
 
