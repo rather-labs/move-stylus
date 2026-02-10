@@ -88,7 +88,7 @@ pub fn generate_abi(
         }
 
         let json_abi = if generate_json {
-            Some(json_format::process_abi(&abi))
+            Some(json_format::process_abi(&abi).map_err(|e| vec![e])?)
         } else {
             None
         };

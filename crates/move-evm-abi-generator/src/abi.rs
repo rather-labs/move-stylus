@@ -234,7 +234,7 @@ impl Abi {
                                 } else {
                                     function_parameters.push(NamedType {
                                         identifier: param.name,
-                                        type_: Type::from_intermediate_type(itype, modules_data),
+                                        type_: Type::from_intermediate_type(itype, modules_data)?,
                                     });
                                     if Self::should_process_struct(itype, modules_data)? {
                                         structs_to_process.insert(itype.clone());
@@ -273,7 +273,7 @@ impl Abi {
                             {
                                 function_parameters.push(NamedType {
                                     identifier: param.name,
-                                    type_: Type::from_intermediate_type(itype, modules_data),
+                                    type_: Type::from_intermediate_type(itype, modules_data)?,
                                 });
                                 if Self::should_process_struct(itype, modules_data)? {
                                     structs_to_process.insert(itype.clone());
@@ -299,7 +299,7 @@ impl Abi {
                         } else {
                             function_parameters.push(NamedType {
                                 identifier: param.name,
-                                type_: Type::from_intermediate_type(itype, modules_data),
+                                type_: Type::from_intermediate_type(itype, modules_data)?,
                             });
 
                             enums_to_process.insert(itype.clone());
@@ -330,7 +330,7 @@ impl Abi {
                         } else {
                             function_parameters.push(NamedType {
                                 identifier: param.name,
-                                type_: Type::from_intermediate_type(itype, modules_data),
+                                type_: Type::from_intermediate_type(itype, modules_data)?,
                             });
 
                             enums_to_process.insert(itype.clone());
@@ -339,7 +339,7 @@ impl Abi {
                     _ => {
                         function_parameters.push(NamedType {
                             identifier: param.name,
-                            type_: Type::from_intermediate_type(itype, modules_data),
+                            type_: Type::from_intermediate_type(itype, modules_data)?,
                         });
                     }
                 }
@@ -355,7 +355,7 @@ impl Abi {
                     enums_to_process,
                 )?;
 
-                Type::from_intermediate_type(&function.signature.returns[0], modules_data)
+                Type::from_intermediate_type(&function.signature.returns[0], modules_data)?
             } else {
                 let mut tuple_types: Vec<Type> = Vec::new();
                 for t in &function.signature.returns {
@@ -365,7 +365,7 @@ impl Abi {
                         structs_to_process,
                         enums_to_process,
                     )?;
-                    tuple_types.push(Type::from_intermediate_type(t, modules_data));
+                    tuple_types.push(Type::from_intermediate_type(t, modules_data)?);
                 }
                 Type::Tuple(tuple_types)
             };
@@ -433,7 +433,7 @@ impl Abi {
                 ) {
                     ("UID", STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => {
                         // Convert struct_itype to get the struct identifier and module_id
-                        let struct_type = Type::from_intermediate_type(struct_itype, modules_data);
+                        let struct_type = Type::from_intermediate_type(struct_itype, modules_data)?;
                         function_parameters.push(NamedType {
                             identifier: param.name,
                             type_: struct_type,
@@ -603,11 +603,11 @@ impl Abi {
                 }
                 fields.push(NamedType {
                     identifier: *name,
-                    type_: Type::from_intermediate_type(field_itype, modules_data),
+                    type_: Type::from_intermediate_type(field_itype, modules_data)?,
                 });
             }
 
-            let struct_abi_type = Type::from_intermediate_type(&struct_itype, modules_data);
+            let struct_abi_type = Type::from_intermediate_type(&struct_itype, modules_data)?;
 
             result.push(Struct_ {
                 // Resolve struct identifier conflicts with events or errors
@@ -681,21 +681,25 @@ impl Abi {
                 }
             }
 
-            result.push(Event {
-                identifier: event.identifier,
-                fields: event_struct
-                    .fields
-                    .iter()
-                    .zip(&event_struct_parsed.fields)
-                    .enumerate()
-                    .map(|(index, (f, (identifier, _)))| EventField {
+            let event_fields = event_struct
+                .fields
+                .iter()
+                .zip(&event_struct_parsed.fields)
+                .enumerate()
+                .map(|(index, (f, (identifier, _)))| {
+                    Ok(EventField {
                         named_type: NamedType {
                             identifier: *identifier,
-                            type_: Type::from_intermediate_type(f, modules_data),
+                            type_: Type::from_intermediate_type(f, modules_data)?,
                         },
                         indexed: index < event_special_attributes.indexes as usize,
                     })
-                    .collect(),
+                })
+                .collect::<Result<Vec<_>, AbiGeneratorError>>()?;
+
+            result.push(Event {
+                identifier: event.identifier,
+                fields: event_fields,
                 is_anonymous: event_special_attributes.is_anonymous,
                 positional_fields: event_struct_parsed.positional_fields,
             });
@@ -746,17 +750,21 @@ impl Abi {
                 }
             }
 
+            let error_fields = error_struct_data
+                .fields
+                .iter()
+                .zip(&error_struct_parsed.fields)
+                .map(|(f, (identifier, _))| {
+                    Ok(NamedType {
+                        identifier: *identifier,
+                        type_: Type::from_intermediate_type(f, modules_data)?,
+                    })
+                })
+                .collect::<Result<Vec<_>, AbiGeneratorError>>()?;
+
             result.push(Struct_ {
                 identifier: error_struct_data.identifier,
-                fields: error_struct_data
-                    .fields
-                    .iter()
-                    .zip(&error_struct_parsed.fields)
-                    .map(|(f, (identifier, _))| NamedType {
-                        identifier: *identifier,
-                        type_: Type::from_intermediate_type(f, modules_data),
-                    })
-                    .collect(),
+                fields: error_fields,
                 positional_fields: error_struct_parsed.positional_fields,
             });
         }
