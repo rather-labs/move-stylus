@@ -27,15 +27,14 @@ use crate::{
 /// like `#[owned_objects]`, `#[shared_objects]`, `#[frozen_objects]`), we can directly
 /// access the correct storage mapping instead of searching all mappings sequentially.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-#[repr(i32)]
 pub enum ObjectKind {
     /// Object is explicitly declared as owned — uses `LocateStorageOwnedData`.
     #[default]
-    Owned = 0,
+    Owned,
     /// Object is explicitly declared as shared — uses `LocateStorageSharedData`.
-    Shared = 1,
+    Shared,
     /// Object is explicitly declared as frozen — uses `LocateStorageFrozenData`.
-    Frozen = 2,
+    Frozen,
 }
 
 pub trait Unpackable {
@@ -282,25 +281,26 @@ impl Unpackable for IntermediateType {
                         caller_return_type,
                     )?;
 
-                    // If the inner type is a storage struct, we need to pass the flag unpack_frozen.
-                    // If the parent type is an immutable reference, we need to unpack frozen objects, so we push a 1 to the stack. Else we push a 0 to the stack.
-                    if parent_type.is_some_and(|p| matches!(p, IntermediateType::IRef(_))) {
-                        builder.i32_const(1);
-                    } else {
-                        builder.i32_const(0);
+                    // When the object kind is not known at compile time, we also need
+                    // to pass the unpack_frozen flag so the runtime can search multiple
+                    // storage mappings. If the parent type is an immutable reference, we
+                    // unpack frozen objects (1), otherwise we don't (0).
+                    if object_kind.is_none() {
+                        if parent_type.is_some_and(|p| matches!(p, IntermediateType::IRef(_))) {
+                            builder.i32_const(1);
+                        } else {
+                            builder.i32_const(0);
+                        }
                     }
 
-                    // Push the object_kind constant. When the kind is explicitly known
-                    // (via #[owned_objects], #[shared_objects], or #[frozen_objects] modifiers),
-                    // the runtime can go directly to the correct storage mapping.
-                    // -1 means "not specified" — the generic LocateStorageData is used instead.
-                    builder.i32_const(match object_kind {
-                        Some(kind) => kind as i32,
-                        None => -1,
-                    });
-
-                    let unpack_storage_struct_function = RuntimeFunction::UnpackStorageStruct
-                        .get_generic(module, compilation_ctx, runtime_error_data, &[self])?;
+                    let unpack_storage_struct_function =
+                        RuntimeFunction::get_unpack_storage_struct_fn(
+                            module,
+                            compilation_ctx,
+                            runtime_error_data,
+                            self,
+                            object_kind,
+                        )?;
 
                     // Unpack the storage struct
                     builder.call_runtime_function_conditional_return(
