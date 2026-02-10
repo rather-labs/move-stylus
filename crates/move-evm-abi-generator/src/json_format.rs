@@ -101,9 +101,12 @@ pub fn process_abi(abi: &Abi) -> String {
 }
 
 fn process_errors(abi: &Abi) -> Vec<JsonAbiItem> {
-    let mut errors: Vec<JsonAbiItem> = abi
-        .abi_errors
-        .iter()
+    // Sort errors by name for deterministic output
+    let mut sorted_errors: Vec<_> = abi.abi_errors.iter().collect();
+    sorted_errors.sort_by_key(|e| e.identifier);
+
+    sorted_errors
+        .into_iter()
         .map(|error| {
             let mut inputs = vec![];
             error.fields.iter().for_each(|field| {
@@ -126,21 +129,24 @@ fn process_errors(abi: &Abi) -> Vec<JsonAbiItem> {
                 inputs,
             }
         })
-        .collect();
-
-    // Sort errors by name for deterministic output
-    errors.sort_by_key(|item| match item {
-        JsonAbiItem::Error { name, .. } => *name,
-        _ => panic!(),
-    });
-
-    errors
+        .collect()
 }
 
 fn process_events(abi: &Abi) -> Vec<JsonAbiItem> {
-    let mut events: Vec<JsonAbiItem> = abi
-        .events
-        .iter()
+    // Sort events by name and field signatures for deterministic output
+    // This handles event overloading (same name, different fields)
+    let mut sorted_events: Vec<_> = abi.events.iter().collect();
+    sorted_events.sort_by_key(|event| {
+        let field_sigs: Vec<String> = event
+            .fields
+            .iter()
+            .map(|f| format!("{}{}", f.named_type.identifier, f.named_type.type_.name()))
+            .collect();
+        format!("{}{}", event.identifier, field_sigs.join(""))
+    });
+
+    sorted_events
+        .into_iter()
         .map(|event| {
             let mut inputs = vec![];
             event.fields.iter().for_each(|field| {
@@ -164,28 +170,24 @@ fn process_events(abi: &Abi) -> Vec<JsonAbiItem> {
                 anonymous: event.is_anonymous,
             }
         })
-        .collect();
-
-    // Sort events by name and field signatures (name + internal_type) for deterministic output
-    // This handles event overloading (same name, different fields)
-    events.sort_by_key(|item| match item {
-        JsonAbiItem::Event { name, inputs, .. } => {
-            let field_sigs: Vec<String> = inputs
-                .iter()
-                .map(|input| format!("{}{}", input.name, input.internal_type))
-                .collect();
-            format!("{}{}", name, field_sigs.join(""))
-        }
-        _ => panic!(),
-    });
-
-    events
+        .collect()
 }
 
 fn process_functions(abi: &Abi) -> Vec<JsonAbiItem> {
-    let mut functions: Vec<JsonAbiItem> = abi
-        .functions
-        .iter()
+    // Sort functions: special functions first (Constructor, Receive, Fallback), then regular functions by name
+    let mut sorted_functions: Vec<_> = abi.functions.iter().collect();
+    sorted_functions.sort_by_key(|f| {
+        let priority = match f.function_type {
+            FunctionType::Constructor => 0,
+            FunctionType::Receive => 1,
+            FunctionType::Fallback => 2,
+            FunctionType::Function => 3,
+        };
+        (priority, Some(f.identifier))
+    });
+
+    sorted_functions
+        .into_iter()
         .map(|f| {
             let (name, inputs, outputs) = match f.function_type {
                 // Fallback and Receive have no name, inputs, or outputs
@@ -244,26 +246,7 @@ fn process_functions(abi: &Abi) -> Vec<JsonAbiItem> {
                 state_mutability,
             }
         })
-        .collect();
-
-    // Sort functions: special functions first (Constructor, Receive, Fallback), then regular functions by name
-    functions.sort_by_key(|item| {
-        match item {
-            JsonAbiItem::Function { type_, name, .. } => {
-                let priority = match type_ {
-                    FunctionType::Constructor => 0,
-                    FunctionType::Receive => 1,
-                    FunctionType::Fallback => 2,
-                    FunctionType::Function => 3,
-                };
-                // For regular functions, use the name; for special functions, use empty string
-                (priority, *name)
-            }
-            _ => panic!("Expected Function variant"),
-        }
-    });
-
-    functions
+        .collect()
 }
 
 fn map_state_mutability(mods: &[SolidityFunctionModifier]) -> &'static str {
