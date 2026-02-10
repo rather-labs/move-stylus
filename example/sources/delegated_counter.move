@@ -28,6 +28,7 @@ entry fun create(contract_logic: address, ctx: &mut TxContext) {
 }
 
 /// Increment a counter by 1.
+#[ext(shared_objects(counter))]
 entry fun increment(counter: &mut Counter) {
     let delegated_counter = dci::new(
         contract_calls::new(counter.contract_address)
@@ -37,6 +38,7 @@ entry fun increment(counter: &mut Counter) {
     assert!(res.succeded(), 33);
 }
 
+#[ext(shared_objects(counter))]
 entry fun increment_modify_before(counter: &mut Counter) {
     counter.value = counter.value + 10;
     let delegated_counter = dci::new(
@@ -47,6 +49,7 @@ entry fun increment_modify_before(counter: &mut Counter) {
     assert!(res.succeded(), 33);
 }
 
+#[ext(shared_objects(counter))]
 entry fun increment_modify_after(counter: &mut Counter) {
     let delegated_counter = dci::new(
         contract_calls::new(counter.contract_address)
@@ -57,6 +60,7 @@ entry fun increment_modify_after(counter: &mut Counter) {
     counter.value = counter.value + 20;
 }
 
+#[ext(shared_objects(counter))]
 entry fun increment_modify_before_after(counter: &mut Counter) {
     counter.value = counter.value + 10;
     let delegated_counter = dci::new(
@@ -69,21 +73,25 @@ entry fun increment_modify_before_after(counter: &mut Counter) {
 }
 
 /// Read counter.
+#[ext(shared_objects(counter))]
 entry fun read(counter: &Counter): u64 {
     counter.value
 }
 
 /// Read counter.
+#[ext(shared_objects(counter))]
 entry fun logic_address(counter: &Counter): address {
     counter.contract_address
 }
 
 /// Change the address where the delegated calls are made.
+#[ext(shared_objects(counter))]
 entry fun change_logic(counter: &mut Counter, logic_address: address) {
     counter.contract_address = logic_address;
 }
 
 /// Set value (only runnable by the Counter owner)
+#[ext(shared_objects(counter))]
 entry fun set_value(counter: &mut Counter, value: u64, ctx: &TxContext) {
     assert!(counter.owner == ctx.sender(), 0);
     let delegated_counter = dci::new(
