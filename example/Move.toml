@@ -4,9 +4,11 @@ edition = "2024"
 flavor = "core"
 
 [dependencies]
-StylusFramework = { local = "../stylus-framework/" }
-Erc20Call = { local = "../erc20call/" }
-Erc721Utils = { local = "../erc721Utils/" }
+#Erc20Call = { git = "https://github.com/rather-labs/move-stylus/", subdir = "move-packages/erc20call", rev = "main" }
+#Erc721Utils = { git = "https://github.com/rather-labs/move-stylus/", subdir = "move-packages/erc721Utils", rev = "main" }
+
+Erc20Call = { git = "https://github.com/rather-labs/move-stylus-dependencies/", subdir = "move-packages/erc20call", rev = "move_move_packages_to_main_repo" }
+Erc721Utils = { git = "https://github.com/rather-labs/move-stylus-dependencies/", subdir = "move-packages/erc721Utils", rev = "move_move_packages_to_main_repo" }
 
 [addresses]
 hello_world = "0x0"

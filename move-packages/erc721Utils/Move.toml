@@ -5,5 +5,5 @@ edition = "2024"
 [addresses]
 erc721Utils = "0x4"
 
-[dependencies]
-StylusFramework = { local = "../stylus-framework/" }
+# [dependencies]
+# StylusFramework = { local = "../stylus-framework/" }
