@@ -39,9 +39,6 @@ pub enum FunctionValidationError {
     #[error("Parameter '{0}' not found in function signature")]
     ParameterNotFound(Symbol),
 
-    #[error("Struct not found in local or imported modules")]
-    StructNotFound,
-
     #[error("init function cannot be entry")]
     InitFunctionCannotBeEntry,
 

@@ -3,17 +3,7 @@
 
 use std::fmt::{self, Display};
 
-use move_compiler::{
-    diag,
-    diagnostics::{
-        Diagnostic,
-        codes::{DiagnosticInfo, Severity, custom},
-    },
-};
-use move_ir_types::location::Loc;
 use move_symbol_pool::Symbol;
-
-pub const DIAGNOSTIC_CATEGORY: &str = "Stylus ABI Generator";
 
 #[derive(thiserror::Error, Debug)]
 pub enum AbiGeneratorErrorKind {
@@ -95,8 +85,6 @@ pub enum AbiGeneratorErrorKind {
 #[derive(thiserror::Error, Debug)]
 pub struct AbiGeneratorError {
     pub kind: AbiGeneratorErrorKind,
-    #[allow(dead_code)]
-    pub line_of_code: Loc,
 }
 
 impl Display for AbiGeneratorError {
@@ -105,34 +93,8 @@ impl Display for AbiGeneratorError {
     }
 }
 
-impl AbiGeneratorError {
-    /// Convenience constructor for when no source location is available
-    /// (e.g., when processing compiled bytecode rather than source AST).
-    pub fn new(kind: AbiGeneratorErrorKind) -> Self {
-        Self {
-            kind,
-            line_of_code: Loc::new(FileHash::empty(), 0, 0),
-        }
-    }
-}
-
 impl From<AbiGeneratorErrorKind> for AbiGeneratorError {
     fn from(kind: AbiGeneratorErrorKind) -> Self {
-        Self::new(kind)
+        Self { kind }
     }
 }
-
-impl From<&AbiGeneratorError> for Diagnostic {
-    fn from(value: &AbiGeneratorError) -> Self {
-        let diagnostic_info: DiagnosticInfo = custom(
-            DIAGNOSTIC_CATEGORY,
-            Severity::BlockingError,
-            3,
-            3,
-            Box::leak(value.to_string().into_boxed_str()),
-        );
-
-        diag!(diagnostic_info, (value.line_of_code, "".to_string()))
-    }
-}
-

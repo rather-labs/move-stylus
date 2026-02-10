@@ -48,15 +48,20 @@ pub fn generate_abi(
     let mut result = Vec::new();
     for root_compiled_module in root_compiled_units {
         let file = &root_compiled_module.source_path;
-        let module_id = package_module_data
-            .modules_paths
-            .get(file)
-            .ok_or_else(|| vec![AbiGeneratorErrorKind::ModuleIdNotFound.into()])?;
+        let module_id = package_module_data.modules_paths.get(file).ok_or_else(|| {
+            vec![AbiGeneratorError {
+                kind: AbiGeneratorErrorKind::ModuleIdNotFound,
+            }]
+        })?;
 
         let module_data = package_module_data
             .modules_data
             .get(module_id)
-            .ok_or_else(|| vec![AbiGeneratorErrorKind::ModuleDataNotFound.into()])?;
+            .ok_or_else(|| {
+                vec![AbiGeneratorError {
+                    kind: AbiGeneratorErrorKind::ModuleDataNotFound,
+                }]
+            })?;
 
         // Collect all the calls to emit<> and revert<> function to know which events and errors
         // are emmited in this module so we can put them in the ABI
@@ -188,19 +193,17 @@ fn process_events_and_errors(
                                                 event_module_id.address().into_bytes().into(),
                                                 event_module_id.name().as_str(),
                                             ))
-                                            .ok_or_else(|| {
-                                                AbiGeneratorError::new(
-                                                    AbiGeneratorErrorKind::ModuleDataNotFound,
-                                                )
+                                            .ok_or(AbiGeneratorError {
+                                                kind: AbiGeneratorErrorKind::ModuleDataNotFound,
                                             })?;
 
                                         let event_type_parameters = type_parameters
                                             .iter()
                                             .map(|t| IntermediateType::try_from_signature_token(t, &event_module.datatype_handles_map))
                                             .collect::<std::result::Result<Vec<IntermediateType>, _>>()
-                                            .map_err(|e| AbiGeneratorError::new(
-                                                AbiGeneratorErrorKind::InvalidEmitType(format!("{e:?}")),
-                                            ))?;
+                                            .map_err(|e| AbiGeneratorError {
+                                                kind: AbiGeneratorErrorKind::InvalidEmitType(format!("{e:?}")),
+                                            })?;
 
                                         // The identifier is the same accross instantiations because events can be overloaded in the ABI
                                         let event_identifier = Symbol::from(
@@ -214,11 +217,11 @@ fn process_events_and_errors(
                                         });
                                     }
                                     other => {
-                                        return Err(AbiGeneratorError::new(
-                                            AbiGeneratorErrorKind::InvalidEmitType(format!(
+                                        return Err(AbiGeneratorError {
+                                            kind: AbiGeneratorErrorKind::InvalidEmitType(format!(
                                                 "{other:?}"
                                             )),
-                                        ));
+                                        });
                                     }
                                 }
                             } else if module_id.name().as_str() == "error"
@@ -239,9 +242,9 @@ fn process_events_and_errors(
                                         });
                                     }
                                     _ => {
-                                        return Err(AbiGeneratorError::new(
-                                            AbiGeneratorErrorKind::InvalidRevertType,
-                                        ));
+                                        return Err(AbiGeneratorError {
+                                            kind: AbiGeneratorErrorKind::InvalidRevertType,
+                                        });
                                     }
                                 }
                             }
@@ -288,10 +291,10 @@ fn process_events_and_errors(
                         .find(|c| c.unit.module.self_id() == function_call.module_id)
                         .copied()
                 })
-                .ok_or_else(|| {
-                    AbiGeneratorError::new(AbiGeneratorErrorKind::DependencyNotFound(
+                .ok_or_else(|| AbiGeneratorError {
+                    kind: AbiGeneratorErrorKind::DependencyNotFound(
                         function_call.module_id.to_string(),
-                    ))
+                    ),
                 })?;
 
             let (events, errors) = process_events_and_errors(

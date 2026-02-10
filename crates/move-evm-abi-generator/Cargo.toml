@@ -4,8 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-move-compiler.workspace = true
-move-ir-types.workspace = true
 move-parse-special-attributes.workspace = true
 move-bytecode-to-wasm.workspace = true
 move-package.workspace = true
