@@ -322,7 +322,8 @@ pub fn add_has_child_object_fn(
     Ok(function.finish(vec![parent_address, child_address], &mut module.funcs))
 }
 
-/// Checks if a child object exists for a given parent and child ID
+/// Checks if a child object exists for a given parent and child ID, with type validation.
+/// The provided generic type is hashed and compared to the child object's type hash if found in the storage.
 ///
 /// # Arguments
 /// * `parent_address` - i32 pointer to the parent object's address in memory (e.g. parent_object.to_address())
@@ -346,6 +347,13 @@ pub fn add_has_child_object_with_ty_fn(
         return Ok(function);
     };
 
+    let has_child_object_fn = NativeFunction::get(
+        NativeFunction::NATIVE_HAS_CHILD_OBJECT,
+        module,
+        compilation_ctx,
+        module_id,
+    )?;
+
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32],
@@ -354,45 +362,38 @@ pub fn add_has_child_object_with_ty_fn(
 
     let mut builder = function.name(name).func_body();
 
-    let (storage_load, _) = storage_load_bytes32(module);
-    let write_object_slot_fn =
-        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx), None)?;
-    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx), None)?;
-
     // Arguments
     let parent_address = module.locals.add(ValType::I32);
     let child_address = module.locals.add(ValType::I32);
 
-    // Calculate the destination slot
+    let child_type_hash = itype.get_hash(compilation_ctx)?;
+
+    // Call `has_child_object` to check if the child object exists
+    // This loads the slot of the child object into DATA_SLOT_DATA_PTR_OFFSET
     builder
         .local_get(parent_address)
         .local_get(child_address)
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .call(write_object_slot_fn);
-
-    builder
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-        .call(storage_load);
-
-    // Check slot is not empty AND type hash matches
-    builder
-        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-        .i32_const(32)
-        .call(is_zero_fn)
-        .negate()
-        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I64 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 24,
+        .call(has_child_object_fn)
+        .if_else(
+            ValType::I32,
+            |then| {
+                // Check if the child object has the correct type
+                then.i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 24,
+                        },
+                    )
+                    .i64_const(child_type_hash as i64)
+                    .binop(BinaryOp::I64Eq);
             },
-        )
-        .i64_const(itype.get_hash(compilation_ctx)? as i64)
-        .binop(BinaryOp::I64Eq)
-        .binop(BinaryOp::I32And);
+            |else_| {
+                else_.i32_const(0);
+            },
+        );
 
     Ok(function.finish(vec![parent_address, child_address], &mut module.funcs))
 }

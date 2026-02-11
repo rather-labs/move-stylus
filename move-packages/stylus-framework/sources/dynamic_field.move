@@ -11,7 +11,7 @@
 /// This gives Sui programmers the flexibility to extend objects on-the-fly, and it also serves as a
 /// building block for core collection types
 module stylus::dynamic_field;
-
+use std::option::Option;
 use stylus::object::{Self, UID};
 
 /// The object already has a dynamic field with this name (with the value and type specified)
