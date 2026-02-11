@@ -8,6 +8,7 @@ mod encoding;
 mod enums;
 mod erc20;
 mod simple_warrior;
+mod storage_modifiers;
 mod transfer;
 mod transfer_named_id;
 mod trusted_swap;

@@ -5,5 +5,5 @@ edition = "2024"
 [addresses]
 erc20call = "0x3"
 
-[dependencies]
-StylusFramework = { local = "../stylus-framework/" }
+# [dependencies]
+# StylusFramework = { local = "../stylus-framework/" }

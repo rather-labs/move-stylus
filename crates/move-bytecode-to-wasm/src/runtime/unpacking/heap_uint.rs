@@ -160,6 +160,7 @@ mod tests {
                 args_pointer,
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
+                None,
             )
             .unwrap();
 

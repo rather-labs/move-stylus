@@ -13,6 +13,7 @@
 module stylus::dynamic_field;
 
 use stylus::object::{Self, UID};
+use std::option::Option;
 
 /// The object already has a dynamic field with this name (with the value and type specified)
 const EFieldAlreadyExists: u64 = 0;

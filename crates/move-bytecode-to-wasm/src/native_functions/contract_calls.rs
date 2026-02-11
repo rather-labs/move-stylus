@@ -481,6 +481,7 @@ pub fn add_external_contract_call_fn(
                             calldata_reader_pointer,
                             compilation_ctx,
                             Some(runtime_error_data),
+                            None,
                         )?;
 
                         let abi_decoded_call_result = if result_type == &IntermediateType::IU64 {

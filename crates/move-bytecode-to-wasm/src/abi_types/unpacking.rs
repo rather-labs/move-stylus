@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use alloy_sol_types::{SolType, sol_data};
 use walrus::{InstrSeqBuilder, LocalId, Module, ValType, ir::InstrSeqId};
 
@@ -18,6 +20,22 @@ use crate::{
     },
     wasm_builder_extensions::WasmBuilderExtension,
 };
+
+/// Represents the kind of storage object for gas-optimized storage lookup.
+///
+/// When unpacking storage structs, if the object kind is known (via function modifiers
+/// like `#[owned_objects]`, `#[shared_objects]`, `#[frozen_objects]`), we can directly
+/// access the correct storage mapping instead of searching all mappings sequentially.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ObjectKind {
+    /// Object is explicitly declared as owned — uses `LocateStorageOwnedData`.
+    #[default]
+    Owned,
+    /// Object is explicitly declared as shared — uses `LocateStorageSharedData`.
+    Shared,
+    /// Object is explicitly declared as frozen — uses `LocateStorageFrozenData`.
+    Frozen,
+}
 
 pub trait Unpackable {
     /// Adds the instructions to unpack the abi encoded type to WASM function parameters
@@ -41,6 +59,7 @@ pub trait Unpackable {
         calldata_base_pointer: LocalId,
         compilation_ctx: &CompilationContext,
         runtime_error_data: Option<&mut RuntimeErrorData>,
+        object_kind: Option<ObjectKind>,
     ) -> Result<(), AbiError>;
 }
 
@@ -48,6 +67,7 @@ pub trait Unpackable {
 ///
 /// Each parameter is decoded and loaded in the WASM stack. Complex data types are kept in memory
 /// and the pointer is pushed onto the stack in the parameter location.
+#[allow(clippy::too_many_arguments)]
 pub fn build_unpack_instructions<T: Unpackable>(
     function_builder: &mut InstrSeqBuilder,
     return_block_id: InstrSeqId,
@@ -56,6 +76,7 @@ pub fn build_unpack_instructions<T: Unpackable>(
     args_pointer: LocalId,
     compilation_ctx: &CompilationContext,
     runtime_error_data: &mut RuntimeErrorData,
+    arguments_object_kind: Option<&HashMap<usize, ObjectKind>>,
 ) -> Result<(), AbiError> {
     let reader_pointer = module.locals.add(ValType::I32);
     let calldata_base_pointer = module.locals.add(ValType::I32);
@@ -72,7 +93,11 @@ pub fn build_unpack_instructions<T: Unpackable>(
 
     // The ABI encoded params are always a tuple
     // Static types are stored in-place, but dynamic types are referenced to the call data
-    for signature_token in function_arguments_signature.iter() {
+    for (i, signature_token) in function_arguments_signature.iter().enumerate() {
+        let object_kind = arguments_object_kind
+            .and_then(|kinds| kinds.get(&i))
+            .copied();
+
         signature_token.add_unpack_instructions(
             None,
             function_builder,
@@ -83,6 +108,7 @@ pub fn build_unpack_instructions<T: Unpackable>(
             calldata_base_pointer,
             compilation_ctx,
             Some(runtime_error_data),
+            object_kind,
         )?;
     }
 
@@ -101,6 +127,7 @@ impl Unpackable for IntermediateType {
         calldata_base_pointer: LocalId,
         compilation_ctx: &CompilationContext,
         runtime_error_data: Option<&mut RuntimeErrorData>,
+        object_kind: Option<ObjectKind>,
     ) -> Result<(), AbiError> {
         match self {
             IntermediateType::IBool
@@ -190,6 +217,7 @@ impl Unpackable for IntermediateType {
                             calldata_base_pointer,
                             compilation_ctx,
                             runtime_error_data,
+                            object_kind,
                         )?;
                     }
                     _ => {
@@ -253,16 +281,26 @@ impl Unpackable for IntermediateType {
                         caller_return_type,
                     )?;
 
-                    // If the inner type is a storage struct, we need to pass the flag unpack_frozen.
-                    // If the parent type is an immutable reference, we need to unpack frozen objects, so we push a 1 to the stack. Else we push a 0 to the stack.
-                    if parent_type.is_some_and(|p| matches!(p, IntermediateType::IRef(_))) {
-                        builder.i32_const(1);
-                    } else {
-                        builder.i32_const(0);
+                    // When the object kind is not known at compile time, we also need
+                    // to pass the unpack_frozen flag so the runtime can search multiple
+                    // storage mappings. If the parent type is an immutable reference, we
+                    // unpack frozen objects (1), otherwise we don't (0).
+                    if object_kind.is_none() {
+                        if parent_type.is_some_and(|p| matches!(p, IntermediateType::IRef(_))) {
+                            builder.i32_const(1);
+                        } else {
+                            builder.i32_const(0);
+                        }
                     }
 
-                    let unpack_storage_struct_function = RuntimeFunction::UnpackStorageStruct
-                        .get_generic(module, compilation_ctx, runtime_error_data, &[self])?;
+                    let unpack_storage_struct_function =
+                        RuntimeFunction::get_unpack_storage_struct_fn(
+                            module,
+                            compilation_ctx,
+                            runtime_error_data,
+                            self,
+                            object_kind,
+                        )?;
 
                     // Unpack the storage struct
                     builder.call_runtime_function_conditional_return(
@@ -437,6 +475,7 @@ mod tests {
             args_pointer,
             &compilation_ctx,
             &mut runtime_error_data,
+            None,
         )
         .unwrap();
 
@@ -501,6 +540,7 @@ mod tests {
             args_pointer,
             &compilation_ctx,
             &mut runtime_error_data,
+            None,
         )
         .unwrap();
 
@@ -572,6 +612,7 @@ mod tests {
             args_pointer,
             &compilation_ctx,
             &mut runtime_error_data,
+            None,
         )
         .unwrap();
 

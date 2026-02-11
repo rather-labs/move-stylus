@@ -76,7 +76,7 @@ pub fn test_storage_objects() {
             .filter(|e| matches!(
                 &e.kind,
                 SpecialAttributeErrorKind::FunctionValidation(
-                    FunctionValidationError::StorageObjectNotKeyedStruct(_),
+                    FunctionValidationError::StructWithoutKey(_),
                 )
             ))
             .count()

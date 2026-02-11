@@ -182,6 +182,7 @@ pub fn unpack_vector_function(
                     calldata_base_pointer_,
                     compilation_ctx,
                     Some(runtime_error_data),
+                    None,
                 )?;
 
                 // Store the value
@@ -275,6 +276,7 @@ mod tests {
                 calldata_reader_pointer,
                 &compilation_ctx,
                 Some(&mut runtime_error_data),
+                None,
             )
             .unwrap();
 

@@ -79,6 +79,7 @@ entry fun init(_ctx: &mut TxContext) {
     });
 }
 
+#[ext(shared_objects(total_supply, balance))]
 entry fun mint(
     to: address,
     amount: u256,
@@ -101,6 +102,7 @@ entry fun mint(
     });
 }
 
+#[ext(shared_objects(total_supply, balance))]
 entry fun burn(
     from: address,
     amount: u256,
@@ -132,23 +134,27 @@ entry fun burn(
     });
 }
 
-entry fun total_supply(t_supply: &TotalSupply): u256 {
-    t_supply.total
+#[ext(shared_objects(total_supply))]
+entry fun total_supply(total_supply: &TotalSupply): u256 {
+    total_supply.total
 }
 
+#[ext(frozen_objects(contract_info))]
 entry fun decimals(contract_info: &Info): u8 {
     contract_info.decimals
 }
 
+#[ext(frozen_objects(contract_info))]
 entry fun name(contract_info: &Info): String {
     contract_info.name
 }
 
+#[ext(frozen_objects(contract_info))]
 entry fun symbol(contract_info: &Info): String {
     contract_info.symbol
 }
 
-
+#[ext(shared_objects(balance))]
 entry fun balance_of(account: address, balance: &Balance): u256 {
     if (field::exists_(&balance.id, account)) {
         *field::borrow<BALANCE_, address, u256>(&balance.id, account)
@@ -157,6 +163,7 @@ entry fun balance_of(account: address, balance: &Balance): u256 {
     }
 }
 
+#[ext(shared_objects(balance))]
 entry fun transfer(
     recipient: address,
     amount: u256,
@@ -189,6 +196,7 @@ entry fun transfer(
     true
 }
 
+#[ext(shared_objects(allowance))]
 entry fun approve(
     spender: address,
     amount: u256,
@@ -222,6 +230,7 @@ entry fun approve(
     true
 }
 
+#[ext(shared_objects(allowance))]
 entry fun allowance(
     owner: address,
     spender: address,
@@ -243,6 +252,7 @@ entry fun allowance(
     }
 }
 
+#[ext(shared_objects(allowance, balance))]
 entry fun transfer_from(
     sender: address,
     recipient: address,
