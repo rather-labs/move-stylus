@@ -12,6 +12,9 @@ sol!(
     function attachDynamicField(bytes32 foo, string name, uint64 value) public view;
     function readDynamicField(bytes32 foo, string name) public view returns (uint64);
     function dynamicFieldExists(bytes32 foo, string name) public view returns (bool);
+    function dynamicFieldExistsWithType(bytes32 foo, string name) public view returns (bool);
+    function dynamicFieldExistsWithTypeBad(bytes32 foo, string name) public view returns (bool);
+    function dynamicFieldExistsWithTypeBad2(bytes32 foo, string name) public view returns (bool);
     function mutateDynamicField(bytes32 foo, string name) public view;
     function mutateDynamicFieldTwo(bytes32 foo, string name, string name2) public view;
     function removeDynamicField(bytes32 foo, string name) public view returns (uint64);
@@ -121,6 +124,24 @@ fn test_dynamic_fields(
     let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
     assert_eq!(0, result);
     assert_eq!(true.abi_encode(), result_data);
+
+    let call_data =
+        dynamicFieldExistsWithTypeCall::new((object_id, field_name_1.clone())).abi_encode();
+    let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+    assert_eq!(0, result);
+    assert_eq!(true.abi_encode(), result_data);
+
+    let call_data =
+        dynamicFieldExistsWithTypeBadCall::new((object_id, field_name_1.clone())).abi_encode();
+    let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+    assert_eq!(0, result);
+    assert_eq!(false.abi_encode(), result_data);
+
+    let call_data =
+        dynamicFieldExistsWithTypeBad2Call::new((object_id, field_name_1.clone())).abi_encode();
+    let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+    assert_eq!(0, result);
+    assert_eq!(false.abi_encode(), result_data);
 
     let call_data = dynamicFieldExistsAddrU256Call::new((object_id, field_name_3)).abi_encode();
     let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
