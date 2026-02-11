@@ -204,7 +204,7 @@ entry fun approve(
 
     if (to != @0x0) {
         // Set the approval for `token_id` to `to`
-        if (field::exists_(&token_approvals.id, token_id)) {
+        if (field::exists_with_type<TOKEN_APPROVALS, u256, address>(&token_approvals.id, token_id)) {
             *field::borrow_mut<TOKEN_APPROVALS, u256, address>(&mut token_approvals.id, token_id) = to;
         } else {
             field::add(
@@ -261,7 +261,7 @@ entry fun set_approval_for_all(
 
     if (approved) {
         // If approved is true, set or add the entry
-        if (field::exists_(&operator_approvals.id, ctx.sender())) {
+        if (field::exists_with_type<OPERATOR_APPROVALS, address, address>(&operator_approvals.id, ctx.sender())) {
             *field::borrow_mut<OPERATOR_APPROVALS, address, address>(&mut operator_approvals.id, ctx.sender()) = operator;
         } else {
             field::add(&mut operator_approvals.id, ctx.sender(), operator);
