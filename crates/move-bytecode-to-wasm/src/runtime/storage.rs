@@ -33,8 +33,8 @@ use walrus::{
 /// * The value is the encoded structure.
 ///
 /// The lookup is done in the following order:
-/// * In the shared objects key (1)
 /// * In the signer's owned objects (key is the signer's address).
+/// * In the shared objects key (1)
 /// * In the frozen objects key (2)
 ///
 /// If no data is found an unrechable error is thrown. Otherwise the slot number to reconstruct the
@@ -78,32 +78,6 @@ pub fn locate_storage_data(
         let exit_block = block.id();
 
         // ==
-        // Shared objects
-        // ==
-
-        block
-            .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
-            .local_get(uid_ptr)
-            .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-            .call(write_object_slot_fn);
-
-        // Load data from slot
-        block
-            .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-            .call(storage_load);
-
-        // Check if it is empty (all zeroes)
-        block
-            .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
-            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-            .i32_const(32)
-            .call(is_zero_fn)
-            .negate()
-            .br_if(exit_block)
-            .drop();
-
-        // ==
         // Signer's objects
         // ==
 
@@ -134,6 +108,32 @@ pub fn locate_storage_data(
         // Check if it is empty (all zeroes)
         block
             .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+            .i32_const(32)
+            .call(is_zero_fn)
+            .negate()
+            .br_if(exit_block)
+            .drop();
+
+        // ==
+        // Shared objects
+        // ==
+
+        block
+            .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
+            .local_get(uid_ptr)
+            .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+            .call(write_object_slot_fn);
+
+        // Load data from slot
+        block
+            .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+            .call(storage_load);
+
+        // Check if it is empty (all zeroes)
+        block
+            .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
             .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
             .i32_const(32)
             .call(is_zero_fn)
@@ -255,22 +255,25 @@ pub fn locate_storage_owned_data(
 
     // Check if it is empty (all zeroes)
     builder
-        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
         .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
         .i32_const(32)
         .call(is_zero_fn)
-        .negate()
-        .return_()
-        .drop();
+        .if_else(
+            None,
+            |then| {
+                then.return_error(
+                    module,
+                    compilation_ctx,
+                    Some(ValType::I32),
+                    runtime_error_data,
+                    RuntimeError::StorageObjectNotFound,
+                );
+            },
+            |_| {},
+        );
 
-    // If we get here means the object was not found
-    builder.return_error(
-        module,
-        compilation_ctx,
-        Some(ValType::I32),
-        runtime_error_data,
-        RuntimeError::StorageObjectNotFound,
-    );
+    // Slot has data → return the owner pointer
+    builder.i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET);
 
     Ok(function.finish(vec![uid_ptr], &mut module.funcs))
 }
@@ -329,22 +332,25 @@ pub fn locate_storage_shared_data(
 
     // Check if it is empty (all zeroes)
     builder
-        .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
         .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
         .i32_const(32)
         .call(is_zero_fn)
-        .negate()
-        .return_()
-        .drop();
+        .if_else(
+            None,
+            |then| {
+                then.return_error(
+                    module,
+                    compilation_ctx,
+                    Some(ValType::I32),
+                    runtime_error_data,
+                    RuntimeError::StorageObjectNotFound,
+                );
+            },
+            |_| {},
+        );
 
-    // If we get here means the object was not found
-    builder.return_error(
-        module,
-        compilation_ctx,
-        Some(ValType::I32),
-        runtime_error_data,
-        RuntimeError::StorageObjectNotFound,
-    );
+    // Slot has data → return the owner pointer
+    builder.i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET);
 
     Ok(function.finish(vec![uid_ptr], &mut module.funcs))
 }
@@ -403,22 +409,25 @@ pub fn locate_storage_frozen_data(
 
     // Check if it is empty (all zeroes)
     builder
-        .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
         .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
         .i32_const(32)
         .call(is_zero_fn)
-        .negate()
-        .return_()
-        .drop();
+        .if_else(
+            None,
+            |then| {
+                then.return_error(
+                    module,
+                    compilation_ctx,
+                    Some(ValType::I32),
+                    runtime_error_data,
+                    RuntimeError::StorageObjectNotFound,
+                );
+            },
+            |_| {},
+        );
 
-    // If we get here means the object was not found
-    builder.return_error(
-        module,
-        compilation_ctx,
-        Some(ValType::I32),
-        runtime_error_data,
-        RuntimeError::StorageObjectNotFound,
-    );
+    // Slot has data → return the owner pointer
+    builder.i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET);
 
     Ok(function.finish(vec![uid_ptr], &mut module.funcs))
 }

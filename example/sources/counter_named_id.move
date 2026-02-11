@@ -26,17 +26,20 @@ entry fun create(ctx: &TxContext) {
 }
 
 /// Increment a counter by 1.
+#[ext(shared_objects(counter))]
 entry fun increment(counter: &mut Counter) {
     counter.value = counter.value + 1;
 }
 
 
 /// Read counter.
+#[ext(shared_objects(counter))]
 entry fun read(counter: &Counter): u64 {
     counter.value
 }
 
 /// Set value (only runnable by the Counter owner)
+#[ext(shared_objects(counter))]
 entry fun set_value(counter: &mut Counter, value: u64, ctx: &TxContext) {
     assert!(counter.owner == ctx.sender(), 0);
     counter.value = value;

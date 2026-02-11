@@ -27,16 +27,19 @@ entry fun init(ctx: &mut TxContext) {
 }
 
 /// Increment a counter by 1.
+#[ext(owned_objects(counter))]
 entry fun increment(counter: &mut Counter) {
     counter.value = counter.value + 1;
 }
 
 /// Read counter.
+#[ext(owned_objects(counter))]
 entry fun read(counter: &Counter): u64 {
     counter.value
 }
 
 /// Set value
+#[ext(owned_objects(counter))]
 entry fun set_value(counter: &mut Counter, value: u64) {
     counter.value = value;
 }

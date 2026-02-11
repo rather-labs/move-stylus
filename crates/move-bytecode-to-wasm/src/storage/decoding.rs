@@ -57,6 +57,9 @@ pub fn add_read_and_decode_storage_struct_instructions(
         Some(runtime_error_data),
     )?;
 
+    let is_zero_fn =
+        RuntimeFunction::IsZero.get(module, Some(compilation_ctx), Some(runtime_error_data))?;
+
     // Get the IStruct representation
     let struct_ = compilation_ctx.get_struct_by_intermediate_type(itype)?;
 
@@ -77,11 +80,31 @@ pub fn add_read_and_decode_storage_struct_instructions(
 
         // Check if the type hash is the same as the one in the storage
 
-        // i. Retrieve the initial slot from storage, which contains the type hash in the first 8 bytes
+        // i. Retrieve the initial slot from storage
+        // If the slot is empty, return a runtime error indicating object not found
         builder
             .local_get(slot_ptr)
             .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
             .call(storage_load)
+            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+            .i32_const(32)
+            .call(is_zero_fn)
+            .if_else(
+                None,
+                |then| {
+                    then.return_error(
+                        module,
+                        compilation_ctx,
+                        Some(ValType::I32),
+                        runtime_error_data,
+                        RuntimeError::StorageObjectNotFound,
+                    );
+                },
+                |_| {},
+            );
+
+        // ii. Hash the type and compare it with the retrieved one from the storage
+        builder
             .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
             .load(
                 compilation_ctx.memory_id,
@@ -90,10 +113,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
                     align: 0,
                     offset: 24,
                 },
-            );
-
-        // ii. Hash the type and compare it with the retrieved one from the storage
-        builder
+            )
             .i64_const(itype.get_hash(compilation_ctx)? as i64)
             .binop(BinaryOp::I64Eq)
             .if_else(

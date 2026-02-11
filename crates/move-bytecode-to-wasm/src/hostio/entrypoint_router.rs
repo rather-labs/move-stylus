@@ -350,7 +350,7 @@ mod tests {
 
         let noop = noop_builder.finish(vec![], &mut module.funcs);
 
-        PublicFunction::new(noop, "noop", signature, compilation_ctx).unwrap()
+        PublicFunction::new(noop, "noop", signature, compilation_ctx, None).unwrap()
     }
 
     fn add_noop_2_function<'a>(
@@ -364,7 +364,7 @@ mod tests {
 
         let noop = noop_builder.finish(vec![], &mut module.funcs);
 
-        PublicFunction::new(noop, "noop_2", signature, compilation_ctx).unwrap()
+        PublicFunction::new(noop, "noop_2", signature, compilation_ctx, None).unwrap()
     }
 
     struct ReadArgsData {

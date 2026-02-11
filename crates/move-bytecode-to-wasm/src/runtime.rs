@@ -5,6 +5,7 @@ use walrus::{FunctionId, GlobalId, Module};
 
 use crate::{
     CompilationContext,
+    abi_types::unpacking::ObjectKind,
     data::RuntimeErrorData,
     hasher::get_hasher,
     translation::intermediate_types::{
@@ -563,15 +564,6 @@ impl RuntimeFunction {
                     generics[0],
                 )?
             }
-            (Self::UnpackStorageStruct, Some(runtime_error_data)) => {
-                Self::assert_generics_length(generics.len(), 1, self.name())?;
-                unpacking::structs::unpack_storage_struct_function(
-                    module,
-                    compilation_ctx,
-                    runtime_error_data,
-                    generics[0],
-                )?
-            }
             (Self::UnpackReference, Some(runtime_error_data)) => {
                 Self::assert_generics_length(generics.len(), 1, self.name())?;
                 unpacking::reference::unpack_reference_function(
@@ -655,6 +647,25 @@ impl RuntimeFunction {
         }
     }
 
+    pub fn get_unpack_storage_struct_fn(
+        module: &mut Module,
+        compilation_ctx: &CompilationContext,
+        runtime_error_data: Option<&mut RuntimeErrorData>,
+        itype: &IntermediateType,
+        object_kind: Option<ObjectKind>,
+    ) -> Result<FunctionId, RuntimeFunctionError> {
+        let runtime_error_data = runtime_error_data.ok_or_else(|| {
+            RuntimeFunctionError::CouldNotLink(Self::UnpackStorageStruct.name().to_owned())
+        })?;
+        unpacking::structs::unpack_storage_struct_function(
+            module,
+            compilation_ctx,
+            runtime_error_data,
+            itype,
+            object_kind,
+        )
+    }
+
     fn assert_generics_length(
         len: usize,
         expected: usize,
@@ -717,6 +728,9 @@ impl RuntimeFunction {
             | Self::StorageNextSlot
             | Self::DeriveDynArraySlot
             | Self::LocateStorageData
+            | Self::LocateStorageOwnedData
+            | Self::LocateStorageSharedData
+            | Self::LocateStorageFrozenData
             | Self::EncodeAndSaveInStorage
             | Self::ReadAndDecodeFromStorage
             | Self::DeleteFromStorage
@@ -757,9 +771,6 @@ impl RuntimeFunction {
             | Self::AllocateVectorWithHeader
             | Self::DeriveMappingSlot
             | Self::WriteObjectSlot
-            | Self::LocateStorageOwnedData
-            | Self::LocateStorageSharedData
-            | Self::LocateStorageFrozenData
             | Self::LocateStructSlot
             | Self::GetIdBytesPtr
             | Self::GetStructOwner

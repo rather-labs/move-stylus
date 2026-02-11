@@ -131,6 +131,7 @@ entry fun supports_interface(interface_id: Bytes4): bool {
 }
 
 // Returns the number of tokens in `owner`'s account.
+#[ext(shared_objects(balances))]
 entry fun balance_of(owner: address, balances: &Balances): u256 {
     if (owner == @0x0) {
         abort(EInvalidOwner)
@@ -147,24 +148,29 @@ entry fun balance_of(owner: address, balances: &Balances): u256 {
 //
 // Requirements:
 // - `token_id` must exist.
+#[ext(shared_objects(owners))]
 entry fun owner_of(token_id: u256, owners: &Owners): address {
     require_owned_(token_id, owners)
 }
 
+#[ext(frozen_objects(contract_info))]
 entry fun name(contract_info: &Info): String {
     contract_info.name
 }
 
+#[ext(frozen_objects(contract_info))]
 entry fun symbol(contract_info: &Info): String {
     contract_info.symbol
 }
 
+#[ext(frozen_objects(contract_info))]
 entry fun token_URI(token_id: u256, contract_info: &Info): String {
     let mut token_url = std::ascii::string(*contract_info.base_uri.as_bytes());
     token_url.append(std::ascii::string(*token_id.to_string().as_bytes()));
     token_url
 }
 
+#[ext(shared_objects(t_supply))]
 entry fun total_supply(t_supply: &TotalSupply): u256 {
     t_supply.total
 }
@@ -179,6 +185,7 @@ entry fun total_supply(t_supply: &TotalSupply): u256 {
 // - The `token_id` must exist.
 //
 // Emits an Approval event.
+#[ext(shared_objects(owners, token_approvals, operator_approvals))]
 entry fun approve(
     to: address,
     token_id: u256,
@@ -223,6 +230,7 @@ entry fun approve(
 //
 // Requirements:
 // - `token_id` must exist.
+#[ext(shared_objects(owners, token_approvals))]
 entry fun get_approved(token_id: u256, owners: &Owners, token_approvals: &TokenApprovals): address {
     require_owned_(token_id, owners);
 
@@ -240,6 +248,7 @@ entry fun get_approved(token_id: u256, owners: &Owners, token_approvals: &TokenA
 // - The operator cannot be the address zero.
 //
 // Emits an ApprovalForAll event.
+#[ext(shared_objects(operator_approvals))]
 entry fun set_approval_for_all(
     operator: address,
     approved: bool,
@@ -271,6 +280,7 @@ entry fun set_approval_for_all(
 // Returns if the operator is allowed to manage all of the assets of owner.
 //
 // See setApprovalForAll()
+#[ext(shared_objects(operator_approvals))]
 entry fun is_approved_for_all(
     owner: address,
     operator: address,
@@ -290,6 +300,7 @@ entry fun is_approved_for_all(
 // - `token_id` must not exist.
 //
 // Emits a Transfer event.
+#[ext(shared_objects(owners, balances, total_supply))]
 entry fun mint(
     to: address,
     token_id: u256,
@@ -331,6 +342,7 @@ entry fun mint(
 // - `token_id` must exist.
 //
 // Emits a Transfer event.
+#[ext(shared_objects(owners, balances, token_approvals, total_supply))]
 entry fun burn(
     token_id: u256,
     owners: &Owners,
@@ -374,6 +386,7 @@ entry fun burn(
 //
 // Emits a Transfer event.
 // TODO: should be private
+#[ext(shared_objects(owners, balances, token_approvals))]
 entry fun transfer(
     from: address,
     to: address,
@@ -432,6 +445,7 @@ entry fun transfer(
 //
 // Note that the caller is responsible to confirm that the recipient is capable of receiving ERC-721 or else they may be permanently lost.
 // Usage of safeTransferFrom() prevents loss, though the caller must understand this adds an external call which potentially creates a reentrancy vulnerability.
+#[ext(shared_objects(owners, balances, token_approvals, operator_approvals))]
 entry fun transfer_from(
     from: address,
     to: address,
@@ -446,6 +460,7 @@ entry fun transfer_from(
     transfer(from, to, token_id, owners, balances, token_approvals);
 }
 
+#[ext(shared_objects(owners, balances, token_approvals, operator_approvals))]
 entry fun safeTransferFrom(
     from: address,
     to: address,

@@ -19,11 +19,13 @@ public struct Counter has key {
 }
 
 /// Increment a counter by 2.
+#[ext(shared_objects(counter))]
 entry fun increment(counter: &mut Counter) {
     counter.value = counter.value + 1;
 }
 
 /// Set value (only runnable by the Counter owner)
+#[ext(shared_objects(counter))]
 entry fun set_value(counter: &mut Counter, value: u64, ctx: &TxContext) {
     assert!(counter.owner == ctx.sender(), 0);
     counter.value = value;
