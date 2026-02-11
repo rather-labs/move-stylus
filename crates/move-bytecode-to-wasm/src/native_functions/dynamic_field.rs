@@ -72,7 +72,7 @@ pub fn add_child_object_fn(
         .call(compilation_ctx.allocator)
         .local_set(slot_ptr);
 
-    // Calculate the destiny slot
+    // Calculate the destination slot
     builder
         .local_get(parent_address)
         .local_get(child_ptr)
@@ -151,7 +151,7 @@ pub fn add_borrow_object_fn(
         .call(compilation_ctx.allocator)
         .local_set(slot_ptr);
 
-    // Calculate the destiny slot
+    // Calculate the destination slot
     builder
         .local_get(parent_uid)
         .load(
@@ -269,8 +269,8 @@ pub fn add_remove_child_object_fn(
 /// Checks if a child object exists for a given parent and child ID
 ///
 /// # Arguments
-/// * `parent_uid` - i32 pointer to the parent object's UID in memory
-/// * `child_id` - i32 pointer to the child ID in memory
+/// * `parent_address` - i32 pointer to the parent object's address in memory (e.g. parent_object.to_address())
+/// * `child_address` - i32 pointer to the child address in memory (e.g. hash_type_and_key(parent_address, field_name))
 ///
 /// Returns
 /// * i32 - 1 if the child object exists, 0 otherwise
@@ -298,13 +298,13 @@ pub fn add_has_child_object_fn(
     let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx), None)?;
 
     // Arguments
-    let parent_uid = module.locals.add(ValType::I32);
-    let child_id = module.locals.add(ValType::I32);
+    let parent_address = module.locals.add(ValType::I32);
+    let child_address = module.locals.add(ValType::I32);
 
-    // Calculate the destiny slot
+    // Calculate the destination slot
     builder
-        .local_get(parent_uid)
-        .local_get(child_id)
+        .local_get(parent_address)
+        .local_get(child_address)
         .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
         .call(write_object_slot_fn);
 
@@ -319,7 +319,82 @@ pub fn add_has_child_object_fn(
         .call(is_zero_fn)
         .negate();
 
-    Ok(function.finish(vec![parent_uid, child_id], &mut module.funcs))
+    Ok(function.finish(vec![parent_address, child_address], &mut module.funcs))
+}
+
+/// Checks if a child object exists for a given parent and child ID
+///
+/// # Arguments
+/// * `parent_address` - i32 pointer to the parent object's address in memory (e.g. parent_object.to_address())
+/// * `child_address` - i32 pointer to the child address in memory (e.g. hash_type_and_key(parent_address, field_name))
+///
+/// Returns
+/// * i32 - 1 if the child object exists, 0 otherwise
+pub fn add_has_child_object_with_ty_fn(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    itype: &IntermediateType,
+    module_id: &ModuleId,
+) -> Result<FunctionId, NativeFunctionError> {
+    let name = NativeFunction::get_generic_function_name(
+        NativeFunction::NATIVE_HAS_CHILD_OBJECT_WITH_TY,
+        compilation_ctx,
+        &[&itype.clone()],
+        module_id,
+    )?;
+    if let Some(function) = module.funcs.by_name(&name) {
+        return Ok(function);
+    };
+
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32],
+        &[ValType::I32],
+    );
+
+    let mut builder = function.name(name).func_body();
+
+    let (storage_load, _) = storage_load_bytes32(module);
+    let write_object_slot_fn =
+        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx), None)?;
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx), None)?;
+
+    // Arguments
+    let parent_address = module.locals.add(ValType::I32);
+    let child_address = module.locals.add(ValType::I32);
+
+    // Calculate the destination slot
+    builder
+        .local_get(parent_address)
+        .local_get(child_address)
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .call(write_object_slot_fn);
+
+    builder
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+        .call(storage_load);
+
+    // Check slot is not empty AND type hash matches
+    builder
+        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+        .i32_const(32)
+        .call(is_zero_fn)
+        .negate()
+        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I64 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 24,
+            },
+        )
+        .i64_const(itype.get_hash(compilation_ctx)? as i64)
+        .binop(BinaryOp::I64Eq)
+        .binop(BinaryOp::I32And);
+
+    Ok(function.finish(vec![parent_address, child_address], &mut module.funcs))
 }
 
 /// Computes a keccak256 hash from:

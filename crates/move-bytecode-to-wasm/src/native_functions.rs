@@ -93,6 +93,7 @@ impl NativeFunction {
     const NATIVE_BORROW_CHILD_OBJECT_MUT: &str = "borrow_child_object_mut";
     const NATIVE_REMOVE_CHILD_OBJECT: &str = "remove_child_object";
     const NATIVE_HAS_CHILD_OBJECT: &str = "has_child_object";
+    const NATIVE_HAS_CHILD_OBJECT_WITH_TY: &str = "has_child_object_with_ty";
 
     // Account functions
     const NATIVE_ACCOUNT_CODE_SIZE: &str = "account_code_size";
@@ -642,7 +643,20 @@ impl NativeFunction {
                     module_id,
                 )?
             }
-
+            (
+                Self::NATIVE_HAS_CHILD_OBJECT_WITH_TY,
+                STYLUS_FRAMEWORK_ADDRESS,
+                SF_MODULE_NAME_DYNAMIC_FIELD,
+                _,
+            ) => {
+                Self::assert_generics_length(generics.len(), 1, name, module_id)?;
+                dynamic_field::add_has_child_object_with_ty_fn(
+                    module,
+                    compilation_ctx,
+                    &generics[0],
+                    module_id,
+                )?
+            }
             //
             // Bytes
             //
