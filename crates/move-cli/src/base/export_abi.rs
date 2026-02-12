@@ -5,7 +5,7 @@ use clap::*;
 use move_bytecode_to_wasm::package_module_data;
 use move_evm_abi_generator::generate_abi;
 use move_package::{BuildConfig, compilation::compiled_package::CompiledUnitWithSource};
-use std::path::Path;
+use std::{path::Path, process::exit};
 
 use crate::error::PrintDiagnostic;
 
@@ -50,7 +50,10 @@ impl ExportAbi {
         let package_modules =
             match package_module_data(&package, &root_compiled_units, verbose, false) {
                 Ok(pm) => pm,
-                Err(e) => e.print_error_diagnostic(),
+                Err(e) => {
+                    e.print_error_diagnostic();
+                    exit(1);
+                }
             };
 
         // If neither flag is set, default to generating JSON
@@ -100,7 +103,10 @@ impl ExportAbi {
                 }
             }
 
-            Err(abi_error) => abi_error.print_error_diagnostic(),
+            Err(abi_error) => {
+                abi_error.print_error_diagnostic();
+                exit(1);
+            }
         }
 
         Ok(())

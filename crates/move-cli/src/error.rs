@@ -3,7 +3,7 @@
 
 //! This module is in charge of processing the move-bytecode-to-wasm errors
 
-use std::{backtrace::BacktraceStatus, error::Error, process::exit};
+use std::{backtrace::BacktraceStatus, error::Error};
 
 use move_bytecode_to_wasm::error::CompilationError;
 use move_compiler::diagnostics::{Diagnostics, report_diagnostics};
@@ -15,11 +15,11 @@ const CLI_VERSION: &str = env!("CARGO_PKG_VERSION");
 const CLI_NAME: &str = env!("CARGO_PKG_NAME");
 
 pub(crate) trait PrintDiagnostic {
-    fn print_error_diagnostic(self) -> !;
+    fn print_error_diagnostic(self);
 }
 
 impl PrintDiagnostic for AbiGeneratorError {
-    fn print_error_diagnostic(self) -> ! {
+    fn print_error_diagnostic(self) {
         eprintln!(
             "\x1B[1m\x1B[31mAn Internal Compiler Error (ICE) has ocurred\x1B[0m: {}\n",
             self.kind
@@ -44,12 +44,11 @@ impl PrintDiagnostic for AbiGeneratorError {
         );
 
         eprintln!("\n\x1B[1m\x1B[34mNOTE\x1B[0m: we would appreciate a bug report: {GITHUB_URL}");
-        exit(1);
     }
 }
 
 impl PrintDiagnostic for CompilationError {
-    fn print_error_diagnostic(self) -> ! {
+    fn print_error_diagnostic(self) {
         match &self {
             CompilationError::ICE(iceerror) => {
                 eprintln!(
@@ -90,7 +89,6 @@ impl PrintDiagnostic for CompilationError {
                 eprintln!(
                     "\n\x1B[1m\x1B[34mNOTE\x1B[0m: we would appreciate a bug report: {GITHUB_URL}"
                 );
-                exit(1)
             }
             CompilationError::CodeError {
                 mapped_files,
@@ -107,7 +105,6 @@ impl PrintDiagnostic for CompilationError {
                 eprintln!(
                     "\n\x1B[1m\x1B[34mNOTE\x1B[0m: If there are source files in the project, this is an internal error and we would appreciate a bug report: {GITHUB_URL}"
                 );
-                exit(1);
             }
         }
     }

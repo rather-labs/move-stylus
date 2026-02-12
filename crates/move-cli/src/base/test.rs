@@ -43,7 +43,8 @@ impl Test {
             false,
             true,
         ) {
-            (*compilation_error).print_error_diagnostic()
+            (*compilation_error).print_error_diagnostic();
+            exit(1);
         }
 
         let root_compiled_units: Vec<&CompiledUnitWithSource> =
@@ -52,7 +53,10 @@ impl Test {
         let package_modules =
             match package_module_data(&package, &root_compiled_units, verbose, true) {
                 Ok(pm) => pm,
-                Err(e) => e.print_error_diagnostic(),
+                Err(e) => {
+                    e.print_error_diagnostic();
+                    exit(1);
+                }
             };
 
         let mut test_failed = false;

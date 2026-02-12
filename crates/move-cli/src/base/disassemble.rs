@@ -11,7 +11,7 @@ use move_bytecode_source_map::utils::serialize_to_json_string;
 use move_compiler::compiled_unit::NamedCompiledModule;
 use move_disassembler::disassembler::Disassembler;
 use move_package::{BuildConfig, compilation::compiled_package::CompiledUnitWithSource};
-use std::path::Path;
+use std::{path::Path, process::exit};
 
 /// Disassemble the Move bytecode pointed to
 #[derive(Parser)]
@@ -105,7 +105,8 @@ impl Disassemble {
             false,
             false,
         ) {
-            (*compilation_error).print_error_diagnostic()
+            (*compilation_error).print_error_diagnostic();
+            exit(1);
         }
 
         Ok(())
