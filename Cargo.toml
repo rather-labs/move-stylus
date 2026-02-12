@@ -34,6 +34,7 @@ move-evm-abi-generator = { path = "crates/move-evm-abi-generator" }
 move-parse-special-attributes = { path = "crates/move-parse-special-attributes" }
 move-test-runner = { path = "crates/move-test-runner" }
 move-ir-types = { git = "https://github.com/MystenLabs/sui" }
+thiserror = "2.0.17"
 wasmprinter = "0.228"
 
 [profile.fuzz]
