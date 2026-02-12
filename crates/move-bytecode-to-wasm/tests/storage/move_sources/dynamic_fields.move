@@ -29,6 +29,18 @@ entry fun dynamic_field_exists(foo: &Foo, name: String): bool {
     dynamic_field::exists_(&foo.id, name)
 }
 
+entry fun dynamic_field_exists_with_type(foo: &Foo, name: String): bool {
+    dynamic_field::exists_with_type<String, u64>(&foo.id, name)
+}
+
+entry fun dynamic_field_exists_with_type_bad(foo: &Foo, name: String): bool {
+    dynamic_field::exists_with_type<u32, u64>(&foo.id, 42)
+}
+
+entry fun dynamic_field_exists_with_type_bad_2(foo: &Foo, name: String): bool {
+    dynamic_field::exists_with_type<String, u32>(&foo.id, name)
+}
+
 entry fun mutate_dynamic_field(foo: &mut Foo, name: String) {
     let val = dynamic_field::borrow_mut(&mut foo.id, name);
     *val = *val + 1;

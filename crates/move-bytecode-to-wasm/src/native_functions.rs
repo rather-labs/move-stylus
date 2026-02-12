@@ -575,20 +575,6 @@ impl NativeFunction {
                 Self::assert_generics_length(generics.len(), 1, name, module_id)?;
                 object::add_borrow_uid_fn(module, compilation_ctx, module_id)
             }
-            (
-                Self::NATIVE_HAS_CHILD_OBJECT_WITH_TY,
-                STYLUS_FRAMEWORK_ADDRESS,
-                SF_MODULE_NAME_DYNAMIC_FIELD,
-                _,
-            ) => {
-                Self::assert_generics_length(generics.len(), 1, name, module_id)?;
-                dynamic_field::add_has_child_object_with_ty_fn(
-                    module,
-                    compilation_ctx,
-                    &generics[0],
-                    module_id,
-                )?
-            }
             //
             // Dynamic field
             //
@@ -657,7 +643,20 @@ impl NativeFunction {
                     module_id,
                 )?
             }
-
+            (
+                Self::NATIVE_HAS_CHILD_OBJECT_WITH_TY,
+                STYLUS_FRAMEWORK_ADDRESS,
+                SF_MODULE_NAME_DYNAMIC_FIELD,
+                _,
+            ) => {
+                Self::assert_generics_length(generics.len(), 1, name, module_id)?;
+                dynamic_field::add_has_child_object_with_ty_fn(
+                    module,
+                    compilation_ctx,
+                    &generics[0],
+                    module_id,
+                )?
+            }
             //
             // Bytes
             //

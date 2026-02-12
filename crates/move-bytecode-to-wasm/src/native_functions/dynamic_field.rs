@@ -72,7 +72,7 @@ pub fn add_child_object_fn(
         .call(compilation_ctx.allocator)
         .local_set(slot_ptr);
 
-    // Calculate the destiny slot
+    // Calculate the destination slot
     builder
         .local_get(parent_address)
         .local_get(child_ptr)
@@ -151,7 +151,7 @@ pub fn add_borrow_object_fn(
         .call(compilation_ctx.allocator)
         .local_set(slot_ptr);
 
-    // Calculate the destiny slot
+    // Calculate the destination slot
     builder
         .local_get(parent_uid)
         .load(
