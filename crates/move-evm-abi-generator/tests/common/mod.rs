@@ -146,16 +146,7 @@ pub fn generate_abi(
         generate_json,
         generate_human_readable,
     )
-    .map_err(|(_mapped_files, errors)| {
-        format!(
-            "Failed to generate ABI: {:?}",
-            errors
-                .iter()
-                .map(|e| format!("{e:?}"))
-                .collect::<Vec<_>>()
-                .join(", ")
-        )
-    })?;
+    .map_err(|abi_error| format!("Failed to generate ABI: {:?}", abi_error.kind))?;
 
     // Find the ABI for the requested module, or return the first one
     let abi = abis

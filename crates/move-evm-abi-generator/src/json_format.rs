@@ -3,6 +3,7 @@
 
 use crate::abi::{Abi, FunctionType};
 use crate::common::snake_to_upper_camel;
+use crate::error::{AbiGeneratorError, AbiGeneratorErrorKind};
 use crate::types::Type;
 use move_parse_special_attributes::function_modifiers::SolidityFunctionModifier;
 use move_symbol_pool::Symbol;
@@ -85,28 +86,30 @@ struct JsonComponent {
     components: Option<Vec<JsonComponent>>,
 }
 
-pub fn process_abi(abi: &Abi) -> String {
+pub fn process_abi(abi: &Abi) -> Result<String, AbiGeneratorError> {
     // Collect all the JSON ABI items into a single vector
-    let abi_json_items = process_events(abi)
+    let abi_json_items = process_events(abi)?
         .into_iter()
-        .chain(process_errors(abi))
-        .chain(process_functions(abi))
+        .chain(process_errors(abi)?)
+        .chain(process_functions(abi)?)
         .collect();
 
     let json_abi = JsonAbi {
         abi: abi_json_items,
     };
 
-    serde_json::to_string_pretty(&json_abi).unwrap()
+    serde_json::to_string_pretty(&json_abi).map_err(|e| AbiGeneratorError {
+        kind: AbiGeneratorErrorKind::SerializationError(e),
+    })
 }
 
-fn process_errors(abi: &Abi) -> Vec<JsonAbiItem> {
+fn process_errors(abi: &Abi) -> Result<Vec<JsonAbiItem>, AbiGeneratorError> {
     let mut errors: Vec<JsonAbiItem> = abi
         .abi_errors
         .iter()
         .map(|error| {
             let mut inputs = vec![];
-            error.fields.iter().for_each(|field| {
+            for field in &error.fields {
                 process_io(
                     field.type_.clone(),
                     if error.positional_fields {
@@ -117,33 +120,33 @@ fn process_errors(abi: &Abi) -> Vec<JsonAbiItem> {
                     None,
                     &mut inputs,
                     abi,
-                );
-            });
+                )?;
+            }
 
-            JsonAbiItem::Error {
+            Ok(JsonAbiItem::Error {
                 type_: AbiItemType::Error,
                 name: error.identifier,
                 inputs,
-            }
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, AbiGeneratorError>>()?;
 
     // Sort errors by name for deterministic output
     errors.sort_by_key(|item| match item {
         JsonAbiItem::Error { name, .. } => *name,
-        _ => panic!(),
+        _ => Symbol::from(""),
     });
 
-    errors
+    Ok(errors)
 }
 
-fn process_events(abi: &Abi) -> Vec<JsonAbiItem> {
+fn process_events(abi: &Abi) -> Result<Vec<JsonAbiItem>, AbiGeneratorError> {
     let mut events: Vec<JsonAbiItem> = abi
         .events
         .iter()
         .map(|event| {
             let mut inputs = vec![];
-            event.fields.iter().for_each(|field| {
+            for field in &event.fields {
                 process_io(
                     field.named_type.type_.clone(),
                     if event.positional_fields {
@@ -154,17 +157,17 @@ fn process_events(abi: &Abi) -> Vec<JsonAbiItem> {
                     Some(field.indexed),
                     &mut inputs,
                     abi,
-                );
-            });
+                )?;
+            }
 
-            JsonAbiItem::Event {
+            Ok(JsonAbiItem::Event {
                 type_: AbiItemType::Event,
                 name: event.identifier,
                 inputs,
                 anonymous: event.is_anonymous,
-            }
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, AbiGeneratorError>>()?;
 
     // Sort events by name and field signatures (name + internal_type) for deterministic output
     // This handles event overloading (same name, different fields)
@@ -176,13 +179,13 @@ fn process_events(abi: &Abi) -> Vec<JsonAbiItem> {
                 .collect();
             format!("{}{}", name, field_sigs.join(""))
         }
-        _ => panic!(),
+        _ => String::new(),
     });
 
-    events
+    Ok(events)
 }
 
-fn process_functions(abi: &Abi) -> Vec<JsonAbiItem> {
+fn process_functions(abi: &Abi) -> Result<Vec<JsonAbiItem>, AbiGeneratorError> {
     let mut functions: Vec<JsonAbiItem> = abi
         .functions
         .iter()
@@ -193,40 +196,40 @@ fn process_functions(abi: &Abi) -> Vec<JsonAbiItem> {
                 // Constructor has no name, but has inputs
                 FunctionType::Constructor => {
                     let mut inputs = vec![];
-                    f.parameters.iter().for_each(|param| {
+                    for param in &f.parameters {
                         process_io(
                             param.type_.clone(),
                             param.identifier,
                             None,
                             &mut inputs,
                             abi,
-                        );
-                    });
+                        )?;
+                    }
                     (None, Some(inputs), None)
                 }
                 FunctionType::Function => {
                     // Handle normal functions
                     let mut inputs = vec![];
-                    f.parameters.iter().for_each(|param| {
+                    for param in &f.parameters {
                         process_io(
                             param.type_.clone(),
                             param.identifier,
                             None,
                             &mut inputs,
                             abi,
-                        );
-                    });
+                        )?;
+                    }
 
                     let mut outputs = vec![];
                     match &f.return_types {
                         Type::Tuple(types_) => {
                             // For tuples, we iterate over the elements and collect them in a vector of JsonIOs
-                            types_.iter().for_each(|t| {
-                                process_io(t.clone(), EMPTY_STR, None, &mut outputs, abi);
-                            });
+                            for t in types_ {
+                                process_io(t.clone(), EMPTY_STR, None, &mut outputs, abi)?;
+                            }
                         }
                         _ => {
-                            process_io(f.return_types.clone(), EMPTY_STR, None, &mut outputs, abi);
+                            process_io(f.return_types.clone(), EMPTY_STR, None, &mut outputs, abi)?;
                         }
                     };
 
@@ -236,15 +239,15 @@ fn process_functions(abi: &Abi) -> Vec<JsonAbiItem> {
 
             let state_mutability = map_state_mutability(&f.modifiers);
 
-            JsonAbiItem::Function {
+            Ok(JsonAbiItem::Function {
                 type_: f.function_type,
                 name,
                 inputs,
                 outputs,
                 state_mutability,
-            }
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, AbiGeneratorError>>()?;
 
     // Sort functions: special functions first (Constructor, Receive, Fallback), then regular functions by name
     functions.sort_by_key(|item| {
@@ -259,11 +262,11 @@ fn process_functions(abi: &Abi) -> Vec<JsonAbiItem> {
                 // For regular functions, use the name; for special functions, use empty string
                 (priority, *name)
             }
-            _ => panic!("Expected Function variant"),
+            _ => (4, None),
         }
     });
 
-    functions
+    Ok(functions)
 }
 
 fn map_state_mutability(mods: &[SolidityFunctionModifier]) -> &'static str {
@@ -285,13 +288,13 @@ fn process_io(
     indexed: Option<bool>,
     io: &mut Vec<JsonIO>,
     abi: &Abi,
-) {
+) -> Result<(), AbiGeneratorError> {
     if type_ != Type::None {
         let JsonAbiData {
             abi_type,
             abi_internal_type,
             components,
-        } = encode_for_json_abi(type_.clone(), abi);
+        } = encode_for_json_abi(type_.clone(), abi)?;
 
         io.push(JsonIO {
             name: name.into(),
@@ -301,6 +304,7 @@ fn process_io(
             components,
         });
     }
+    Ok(())
 }
 
 // A struct containing the ABI type, ABI internal type, and components.
@@ -315,7 +319,7 @@ struct JsonAbiData {
 /// Returns a JsonAbiData struct containing the ABI type, ABI internal type, and components.
 ///
 /// Recursively processes nested types (arrays, struct fields) to build the complete ABI representation.
-fn encode_for_json_abi(type_: Type, abi: &Abi) -> JsonAbiData {
+fn encode_for_json_abi(type_: Type, abi: &Abi) -> Result<JsonAbiData, AbiGeneratorError> {
     match &type_ {
         Type::Address
         | Type::Bool
@@ -358,11 +362,11 @@ fn encode_for_json_abi(type_: Type, abi: &Abi) -> JsonAbiData {
         | Type::Bytes30
         | Type::Bytes31
         | Type::Bytes32
-        | Type::String => JsonAbiData {
+        | Type::String => Ok(JsonAbiData {
             abi_type: type_.name(),
             abi_internal_type: type_.name(),
             components: None,
-        },
+        }),
         Type::Enum {
             identifier,
             module_id,
@@ -373,24 +377,24 @@ fn encode_for_json_abi(type_: Type, abi: &Abi) -> JsonAbiData {
                 snake_to_upper_camel(&module_id.module_name),
                 identifier
             ));
-            JsonAbiData {
+            Ok(JsonAbiData {
                 abi_type,
                 abi_internal_type,
                 components: None,
-            }
+            })
         }
         Type::Array(inner) => {
             let JsonAbiData {
                 abi_type,
                 abi_internal_type,
                 components,
-            } = encode_for_json_abi((**inner).clone(), abi);
+            } = encode_for_json_abi((**inner).clone(), abi)?;
 
-            JsonAbiData {
+            Ok(JsonAbiData {
                 abi_type: Symbol::from(format!("{abi_type}[]")),
                 abi_internal_type: Symbol::from(format!("{abi_internal_type}[]")),
                 components,
-            }
+            })
         }
         Type::Struct {
             module_id, has_key, ..
@@ -403,11 +407,11 @@ fn encode_for_json_abi(type_: Type, abi: &Abi) -> JsonAbiData {
             if *has_key {
                 // Struct with key: encode as bytes32 with struct internalType
                 let abi_type = Symbol::from("bytes32");
-                JsonAbiData {
+                Ok(JsonAbiData {
                     abi_type,
                     abi_internal_type,
                     components: None,
-                }
+                })
             } else {
                 // Regular struct: encode as tuple with components
                 // Find corresponding processed struct, searching by the name, which differs from the identifier in case of generic structs
@@ -415,7 +419,9 @@ fn encode_for_json_abi(type_: Type, abi: &Abi) -> JsonAbiData {
                     .structs
                     .iter()
                     .find(|s| s.identifier == type_.name())
-                    .unwrap();
+                    .ok_or(AbiGeneratorError {
+                        kind: AbiGeneratorErrorKind::AbiStructNotFound(type_.name()),
+                    })?;
 
                 let components = abi_struct
                     .fields
@@ -425,30 +431,30 @@ fn encode_for_json_abi(type_: Type, abi: &Abi) -> JsonAbiData {
                             abi_type,
                             abi_internal_type,
                             components,
-                        } = encode_for_json_abi(named_type.type_.clone(), abi);
+                        } = encode_for_json_abi(named_type.type_.clone(), abi)?;
 
-                        JsonComponent {
+                        Ok(JsonComponent {
                             name: named_type.identifier,
                             type_: abi_type,
                             internal_type: abi_internal_type,
                             components,
-                        }
+                        })
                     })
-                    .collect();
+                    .collect::<Result<Vec<_>, AbiGeneratorError>>()?;
 
                 let abi_type = Symbol::from("tuple");
-                JsonAbiData {
+                Ok(JsonAbiData {
                     abi_type,
                     abi_internal_type,
                     components: Some(components),
-                }
+                })
             }
         }
-        Type::Tuple(_) => {
-            panic!("Found a Tuple type in the JSON ABI generation");
-        }
-        Type::None => {
-            panic!("Found a None type in the JSON ABI generation");
-        }
+        Type::Tuple(_) => Err(AbiGeneratorError {
+            kind: AbiGeneratorErrorKind::TupleInJsonAbi,
+        }),
+        Type::None => Err(AbiGeneratorError {
+            kind: AbiGeneratorErrorKind::NoneTypeInJsonAbi,
+        }),
     }
 }

@@ -17,19 +17,19 @@ use crate::{
 
 #[derive(thiserror::Error, Debug)]
 pub enum DependencyProcessingError {
-    #[error("internal compiler error(s) ocurred")]
+    #[error("internal compiler error(s) occurred")]
     ICE(#[from] ICEError),
 
-    #[error("code error ocurred")]
+    #[error("code error occurred")]
     CodeError(Vec<CodeError>),
 }
 
 #[derive(thiserror::Error, Debug)]
 pub enum CompilationError {
-    #[error("internal compiler error(s) ocurred")]
+    #[error("internal compiler error(s) occurred")]
     ICE(#[from] ICEError),
 
-    #[error("code error ocurred")]
+    #[error("code error occurred")]
     CodeError {
         mapped_files: MappedFiles,
         errors: Vec<CodeError>,
@@ -99,28 +99,28 @@ impl From<DependencyError> for DependencyProcessingError {
 
 #[derive(thiserror::Error, Debug)]
 pub enum ICEErrorKind {
-    #[error("an error ocurred processing the compilation context")]
+    #[error("an error occurred processing the compilation context")]
     CompilationContext(#[from] CompilationContextError),
 
-    #[error("an error ocurred while translating move bytecode")]
+    #[error("an error occurred while translating move bytecode")]
     Translation(#[from] TranslationError),
 
-    #[error("an error ocurred while handling the function table")]
+    #[error("an error occurred while handling the function table")]
     FunctionTable(#[from] FunctionTableError),
 
-    #[error("an error ocurred while generating a native function's code")]
+    #[error("an error occurred while generating a native function's code")]
     NativeFunction(#[from] NativeFunctionError),
 
-    #[error("an error ocurred whie processing a contract's ABI")]
+    #[error("an error occurred whie processing a contract's ABI")]
     Abi(#[from] AbiError),
 
-    #[error("an error ocurred while processing a contract's constructor")]
+    #[error("an error occurred while processing a contract's constructor")]
     Constructor(#[from] ConstructorError),
 
-    #[error("an error ocurred while processing building host environment")]
+    #[error("an error occurred while processing building host environment")]
     HostIO(#[from] HostIOError),
 
-    #[error("an error ocurred while processing a contact's dependencies")]
+    #[error("an error occurred while processing a contact's dependencies")]
     Dependency(#[from] DependencyError),
 
     #[error("io error")]
