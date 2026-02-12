@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Portions of this file were modified by Rather Labs, Inc on 2025-2026.
 
-use crate::error::print_error_diagnostic;
+use crate::error::PrintDiagnostic;
 
 use super::{reroot_path, translate_package_cli};
 use clap::*;
@@ -105,7 +105,7 @@ impl Disassemble {
             false,
             false,
         ) {
-            print_error_diagnostic(*compilation_error)
+            (*compilation_error).print_error_diagnostic()
         }
 
         Ok(())
