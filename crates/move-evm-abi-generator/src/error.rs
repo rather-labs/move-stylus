@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 
 use move_binary_format::file_format::SignatureToken;
-use move_core_types::language_storage::ModuleId;
+use move_bytecode_to_wasm::compilation_context::ModuleId;
 use move_symbol_pool::Symbol;
+
+use std::path::PathBuf;
 
 pub struct AbiGeneratorError {
     pub kind: AbiGeneratorErrorKind,
@@ -12,11 +14,11 @@ pub struct AbiGeneratorError {
 #[derive(thiserror::Error, Debug)]
 pub enum AbiGeneratorErrorKind {
     // Data lookup errors
-    #[error("Module ID not found for path")]
-    ModuleIdNotFound,
+    #[error("Module ID not found for path '{0}'")]
+    ModuleIdNotFound(PathBuf),
 
-    #[error("Module data not found for module ID")]
-    ModuleDataNotFound,
+    #[error("Module data not found for module id {0}")]
+    ModuleDataNotFound(ModuleId),
 
     #[error("Could not find dependency module '{0}'")]
     DependencyNotFound(ModuleId),
@@ -24,26 +26,26 @@ pub enum AbiGeneratorErrorKind {
     #[error("Function '{0}' not found in parsed special attributes")]
     FunctionNotFound(Symbol),
 
-    #[error("Struct not found by index in module")]
-    StructNotFoundByIndex,
+    #[error("Struct not found by index {0} in module {1}")]
+    StructNotFoundByIndex(u16, ModuleId),
 
-    #[error("Struct not found by identifier '{0}'")]
-    StructNotFoundByIdentifier(Symbol),
+    #[error("Struct not found by identifier '{0}' in module {1}")]
+    StructNotFoundByIdentifier(Symbol, ModuleId),
 
-    #[error("Enum not found by index in module")]
-    EnumNotFoundByIndex,
+    #[error("Enum not found by index {0} in module {1}")]
+    EnumNotFoundByIndex(u16, ModuleId),
 
-    #[error("Parsed event not found for '{0}'")]
-    ParsedEventNotFound(Symbol),
+    #[error("Parsed event not found for '{0}' in module {1}")]
+    ParsedEventNotFound(Symbol, ModuleId),
 
-    #[error("Parsed struct not found for '{0}'")]
-    ParsedStructNotFound(Symbol),
+    #[error("Parsed struct not found for '{0}' in module {1}")]
+    ParsedStructNotFound(Symbol, ModuleId),
 
-    #[error("Parsed enum not found for '{0}'")]
-    ParsedEnumNotFound(Symbol),
+    #[error("Parsed enum not found for '{0}' in module {1}")]
+    ParsedEnumNotFound(Symbol, ModuleId),
 
-    #[error("Missing type parameter")]
-    MissingTypeParameter,
+    #[error("Missing type parameter in call to '{0}'")]
+    MissingTypeParameter(String),
 
     // Type processing errors
     #[error(
@@ -54,20 +56,14 @@ pub enum AbiGeneratorErrorKind {
     #[error("Invalid type found in native revert function: expected Datatype, found {0:?}")]
     InvalidRevertType(SignatureToken),
 
-    #[error("Non-simple enum '{0}' found in function signature")]
-    NonSimpleEnumInSignature(Symbol),
+    #[error("Non-simple enum '{0}' found in function {1}")]
+    NonSimpleEnumInSignature(Symbol, String),
 
-    #[error("Storage struct first field is not a UID")]
-    StorageStructMissingUid,
+    #[error("Storage struct '{0}' in module {1} has no fields")]
+    StorageStructNoFields(Symbol, ModuleId),
 
-    #[error("Storage struct first field is not a NamedId")]
-    StorageStructMissingNamedId,
-
-    #[error("Storage struct has no fields")]
-    StorageStructNoFields,
-
-    #[error("Storage struct first field is not a UID or NamedId")]
-    StorageStructInvalidFirstField,
+    #[error("Invalid first field for storage struct '{0}' in module {1}: expected {2} or {3}.")]
+    StorageStructInvalidFirstField(Symbol, ModuleId, String, String),
 
     #[error("Unknown BytesN type: Bytes{0}")]
     UnknownBytesNType(String),

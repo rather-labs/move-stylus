@@ -23,6 +23,9 @@ use crate::{
 
 use serde::Serialize;
 
+const STYLUS_FW_NAMED_ID: &str = "NamedId";
+const STYLUS_FW_UID: &str = "UID";
+
 #[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum FunctionType {
@@ -206,11 +209,13 @@ impl Abi {
                     } => {
                         let struct_module =
                             modules_data.get(module_id).ok_or(AbiGeneratorError {
-                                kind: AbiGeneratorErrorKind::ModuleIdNotFound,
+                                kind: AbiGeneratorErrorKind::ModuleDataNotFound(*module_id),
                             })?;
                         let struct_ = struct_module.structs.get_by_index(*index).map_err(|_| {
                             AbiGeneratorError {
-                                kind: AbiGeneratorErrorKind::StructNotFoundByIndex,
+                                kind: AbiGeneratorErrorKind::StructNotFoundByIndex(
+                                    *index, *module_id,
+                                ),
                             }
                         })?;
 
@@ -227,6 +232,7 @@ impl Abi {
                                     Self::process_storage_struct(
                                         struct_,
                                         itype,
+                                        *module_id,
                                         modules_data,
                                         &mut function_parameters,
                                         param,
@@ -251,13 +257,15 @@ impl Abi {
                     } => {
                         let struct_module =
                             modules_data.get(module_id).ok_or(AbiGeneratorError {
-                                kind: AbiGeneratorErrorKind::ModuleIdNotFound,
+                                kind: AbiGeneratorErrorKind::ModuleDataNotFound(*module_id),
                             })?;
                         let struct_ = struct_module
                             .structs
                             .get_by_index(*index)
                             .map_err(|_| AbiGeneratorError {
-                                kind: AbiGeneratorErrorKind::StructNotFoundByIndex,
+                                kind: AbiGeneratorErrorKind::StructNotFoundByIndex(
+                                    *index, *module_id,
+                                ),
                             })?
                             .instantiate(types);
 
@@ -265,6 +273,7 @@ impl Abi {
                             Self::process_storage_struct(
                                 &struct_,
                                 itype,
+                                *module_id,
                                 modules_data,
                                 &mut function_parameters,
                                 param,
@@ -283,17 +292,20 @@ impl Abi {
                     }
                     IntermediateType::IEnum { module_id, index } => {
                         let enum_module = modules_data.get(module_id).ok_or(AbiGeneratorError {
-                            kind: AbiGeneratorErrorKind::ModuleIdNotFound,
+                            kind: AbiGeneratorErrorKind::ModuleDataNotFound(*module_id),
                         })?;
                         let enum_ = enum_module.enums.get_by_index(*index).map_err(|_| {
                             AbiGeneratorError {
-                                kind: AbiGeneratorErrorKind::EnumNotFoundByIndex,
+                                kind: AbiGeneratorErrorKind::EnumNotFoundByIndex(
+                                    *index, *module_id,
+                                ),
                             }
                         })?;
                         if !enum_.is_simple {
                             return Err(AbiGeneratorError {
                                 kind: AbiGeneratorErrorKind::NonSimpleEnumInSignature(
                                     enum_.identifier,
+                                    function.function_id.identifier.to_string(),
                                 ),
                             });
                         } else {
@@ -311,13 +323,15 @@ impl Abi {
                         types,
                     } => {
                         let enum_module = modules_data.get(module_id).ok_or(AbiGeneratorError {
-                            kind: AbiGeneratorErrorKind::ModuleIdNotFound,
+                            kind: AbiGeneratorErrorKind::ModuleDataNotFound(*module_id),
                         })?;
                         let enum_ = enum_module
                             .enums
                             .get_by_index(*index)
                             .map_err(|_| AbiGeneratorError {
-                                kind: AbiGeneratorErrorKind::EnumNotFoundByIndex,
+                                kind: AbiGeneratorErrorKind::EnumNotFoundByIndex(
+                                    *index, *module_id,
+                                ),
                             })?
                             .instantiate(types);
 
@@ -325,6 +339,7 @@ impl Abi {
                             return Err(AbiGeneratorError {
                                 kind: AbiGeneratorErrorKind::NonSimpleEnumInSignature(
                                     enum_.identifier,
+                                    function.function_id.identifier.to_string(),
                                 ),
                             });
                         } else {
@@ -405,6 +420,7 @@ impl Abi {
     fn process_storage_struct(
         struct_: &IStruct,
         struct_itype: &IntermediateType,
+        module_id: ModuleId,
         modules_data: &HashMap<ModuleId, ModuleData>,
         function_parameters: &mut Vec<NamedType>,
         param: &Parameter,
@@ -413,7 +429,7 @@ impl Abi {
 
         // 1. Identify the first field and its metadata
         let first_field = struct_.fields.first().ok_or(AbiGeneratorError {
-            kind: AbiGeneratorErrorKind::StorageStructNoFields,
+            kind: AbiGeneratorErrorKind::StorageStructNoFields(struct_.identifier, module_id),
         })?;
 
         let (m_id, index, is_generic) = match first_field {
@@ -425,21 +441,26 @@ impl Abi {
             } => (module_id, index, true),
             _ => {
                 return Err(AbiGeneratorError {
-                    kind: AbiGeneratorErrorKind::StorageStructInvalidFirstField,
+                    kind: AbiGeneratorErrorKind::StorageStructInvalidFirstField(
+                        struct_.identifier,
+                        module_id,
+                        format!("{STYLUS_FW_UID} or {STYLUS_FW_NAMED_ID}"),
+                        format!("{first_field:?}"),
+                    ),
                 });
             }
         };
 
         // 2. Resolve the struct definition
         let struct_module = modules_data.get(m_id).ok_or(AbiGeneratorError {
-            kind: AbiGeneratorErrorKind::ModuleIdNotFound,
+            kind: AbiGeneratorErrorKind::ModuleDataNotFound(*m_id),
         })?;
         let field_struct =
             struct_module
                 .structs
                 .get_by_index(*index)
                 .map_err(|_| AbiGeneratorError {
-                    kind: AbiGeneratorErrorKind::StructNotFoundByIndex,
+                    kind: AbiGeneratorErrorKind::StructNotFoundByIndex(*index, *m_id),
                 })?;
 
         let is_stylus_fw = m_id.address == STYLUS_FRAMEWORK_ADDRESS
@@ -448,19 +469,46 @@ impl Abi {
 
         // 3. Strict requirement validation
         match (ident, is_generic, is_stylus_fw) {
-            ("UID", false, true) => {
+            (STYLUS_FW_UID, false, true) => {
                 // Success case for UID
                 function_parameters.push(NamedType {
                     identifier: param.name,
                     type_: Type::from_intermediate_type(struct_itype, modules_data)?,
                 });
             }
-            ("NamedId", true, true) => {
+            (STYLUS_FW_UID, true, true) => {
+                // Expected NamedId, but got UID
+                return Err(AbiGeneratorError {
+                    kind: AbiGeneratorErrorKind::StorageStructInvalidFirstField(
+                        struct_.identifier,
+                        module_id,
+                        STYLUS_FW_NAMED_ID.to_string(),
+                        STYLUS_FW_UID.to_string(),
+                    ),
+                });
+            }
+            (STYLUS_FW_NAMED_ID, true, true) => {
                 // Success case for NamedId (ignored)
+            }
+            (STYLUS_FW_NAMED_ID, false, true) => {
+                // Expected UID, but got NamedId
+                return Err(AbiGeneratorError {
+                    kind: AbiGeneratorErrorKind::StorageStructInvalidFirstField(
+                        struct_.identifier,
+                        module_id,
+                        STYLUS_FW_UID.to_string(),
+                        STYLUS_FW_NAMED_ID.to_string(),
+                    ),
+                });
             }
             _ => {
                 return Err(AbiGeneratorError {
-                    kind: AbiGeneratorErrorKind::StorageStructInvalidFirstField,
+                    kind: AbiGeneratorErrorKind::StorageStructInvalidFirstField(
+                        struct_.identifier,
+                        module_id,
+                        format!("{STYLUS_FW_UID} or {STYLUS_FW_NAMED_ID}"),
+                        ident.to_string(),
+                    ),
                 });
             }
         }
@@ -501,7 +549,7 @@ impl Abi {
 
             // 2. Resolve Module and Base Struct
             let module_data = modules_data.get(module_id).ok_or(AbiGeneratorError {
-                kind: AbiGeneratorErrorKind::ModuleIdNotFound,
+                kind: AbiGeneratorErrorKind::ModuleDataNotFound(*module_id),
             })?;
 
             let base_struct =
@@ -509,7 +557,7 @@ impl Abi {
                     .structs
                     .get_by_index(*index)
                     .map_err(|_| AbiGeneratorError {
-                        kind: AbiGeneratorErrorKind::StructNotFoundByIndex,
+                        kind: AbiGeneratorErrorKind::StructNotFoundByIndex(*index, *module_id),
                     })?;
 
             // 3. Instantiate if needed and get parsed metadata from the special attributes
@@ -521,7 +569,10 @@ impl Abi {
                 .iter()
                 .find(|s| *s.name == *struct_.identifier)
                 .ok_or(AbiGeneratorError {
-                    kind: AbiGeneratorErrorKind::ParsedStructNotFound(struct_.identifier),
+                    kind: AbiGeneratorErrorKind::ParsedStructNotFound(
+                        struct_.identifier,
+                        *module_id,
+                    ),
                 })?;
 
             // 4. Process fields and discover children
@@ -588,7 +639,7 @@ impl Abi {
 
             // 2. Resolve Module and Base Enum safely
             let enum_module = modules_data.get(module_id).ok_or(AbiGeneratorError {
-                kind: AbiGeneratorErrorKind::ModuleIdNotFound,
+                kind: AbiGeneratorErrorKind::ModuleDataNotFound(*module_id),
             })?;
 
             let base_enum =
@@ -596,7 +647,7 @@ impl Abi {
                     .enums
                     .get_by_index(*index)
                     .map_err(|_| AbiGeneratorError {
-                        kind: AbiGeneratorErrorKind::EnumNotFoundByIndex,
+                        kind: AbiGeneratorErrorKind::EnumNotFoundByIndex(*index, *module_id),
                     })?;
 
             // 3. Instantiate if needed and get parsed metadata from the special attributes
@@ -608,7 +659,7 @@ impl Abi {
                 .iter()
                 .find(|e| *e.name == *enum_.identifier)
                 .ok_or(AbiGeneratorError {
-                    kind: AbiGeneratorErrorKind::ParsedEnumNotFound(enum_.identifier),
+                    kind: AbiGeneratorErrorKind::ParsedEnumNotFound(enum_.identifier, *module_id),
                 })?;
 
             // 4. Build ABI Enum
@@ -630,13 +681,14 @@ impl Abi {
 
         for event in events {
             // 1. Resolve Module Data
+            let event_module_id = ModuleId::new(
+                event.module_id.address().into_bytes().into(),
+                event.module_id.name().as_str(),
+            );
             let event_module = modules_data
-                .get(&ModuleId::new(
-                    event.module_id.address().into_bytes().into(),
-                    event.module_id.name().as_str(),
-                ))
+                .get(&event_module_id)
                 .ok_or(AbiGeneratorError {
-                    kind: AbiGeneratorErrorKind::ModuleIdNotFound,
+                    kind: AbiGeneratorErrorKind::ModuleDataNotFound(event_module_id),
                 })?;
 
             // 2. Resolve and Instantiate the underlying Struct
@@ -644,7 +696,10 @@ impl Abi {
                 .structs
                 .get_by_identifier(&event.identifier)
                 .map_err(|_| AbiGeneratorError {
-                    kind: AbiGeneratorErrorKind::StructNotFoundByIdentifier(event.identifier),
+                    kind: AbiGeneratorErrorKind::StructNotFoundByIdentifier(
+                        event.identifier,
+                        event_module_id,
+                    ),
                 })?;
 
             let event_struct = match &event.type_parameters {
@@ -658,7 +713,10 @@ impl Abi {
                 .events
                 .get(&event_struct.identifier)
                 .ok_or(AbiGeneratorError {
-                    kind: AbiGeneratorErrorKind::ParsedEventNotFound(event_struct.identifier),
+                    kind: AbiGeneratorErrorKind::ParsedEventNotFound(
+                        event_struct.identifier,
+                        event_module_id,
+                    ),
                 })?;
 
             let parsed_struct = event_module
@@ -667,7 +725,10 @@ impl Abi {
                 .iter()
                 .find(|s| *s.name == *event_struct.identifier)
                 .ok_or(AbiGeneratorError {
-                    kind: AbiGeneratorErrorKind::ParsedStructNotFound(event_struct.identifier),
+                    kind: AbiGeneratorErrorKind::ParsedStructNotFound(
+                        event_struct.identifier,
+                        event_module_id,
+                    ),
                 })?;
 
             // 4. Collect nested structs for later processing
@@ -713,13 +774,14 @@ impl Abi {
 
         for error in error_structs {
             // 1. Resolve Module Data
+            let error_module_id = ModuleId::new(
+                error.module_id.address().into_bytes().into(),
+                error.module_id.name().as_str(),
+            );
             let error_module = modules_data
-                .get(&ModuleId::new(
-                    error.module_id.address().into_bytes().into(),
-                    error.module_id.name().as_str(),
-                ))
+                .get(&error_module_id)
                 .ok_or(AbiGeneratorError {
-                    kind: AbiGeneratorErrorKind::ModuleIdNotFound,
+                    kind: AbiGeneratorErrorKind::ModuleDataNotFound(error_module_id),
                 })?;
 
             // 2. Resolve Bytecode Struct
@@ -727,7 +789,10 @@ impl Abi {
                 .structs
                 .get_by_identifier(&error.identifier)
                 .map_err(|_| AbiGeneratorError {
-                    kind: AbiGeneratorErrorKind::StructNotFoundByIdentifier(error.identifier),
+                    kind: AbiGeneratorErrorKind::StructNotFoundByIdentifier(
+                        error.identifier,
+                        error_module_id,
+                    ),
                 })?;
 
             // 3. Get parsed struct from the special attributes
@@ -737,7 +802,10 @@ impl Abi {
                 .iter()
                 .find(|s| *s.name == *struct_def.identifier)
                 .ok_or(AbiGeneratorError {
-                    kind: AbiGeneratorErrorKind::ParsedStructNotFound(struct_def.identifier),
+                    kind: AbiGeneratorErrorKind::ParsedStructNotFound(
+                        struct_def.identifier,
+                        error_module_id,
+                    ),
                 })?;
 
             // 4. Update the "Structs to Process" set for deep resolution
@@ -782,14 +850,14 @@ impl Abi {
                 module_id, index, ..
             } => {
                 let struct_module = modules_data.get(module_id).ok_or(AbiGeneratorError {
-                    kind: AbiGeneratorErrorKind::ModuleIdNotFound,
+                    kind: AbiGeneratorErrorKind::ModuleDataNotFound(*module_id),
                 })?;
                 let struct_ =
                     struct_module
                         .structs
                         .get_by_index(*index)
                         .map_err(|_| AbiGeneratorError {
-                            kind: AbiGeneratorErrorKind::StructNotFoundByIndex,
+                            kind: AbiGeneratorErrorKind::StructNotFoundByIndex(*index, *module_id),
                         })?;
 
                 // True if the struct is not a named_id, uid or string
@@ -821,14 +889,14 @@ impl Abi {
             }
             IntermediateType::IEnum { module_id, index } => {
                 let enum_module = modules_data.get(module_id).ok_or(AbiGeneratorError {
-                    kind: AbiGeneratorErrorKind::ModuleIdNotFound,
+                    kind: AbiGeneratorErrorKind::ModuleDataNotFound(*module_id),
                 })?;
                 let enum_ =
                     enum_module
                         .enums
                         .get_by_index(*index)
                         .map_err(|_| AbiGeneratorError {
-                            kind: AbiGeneratorErrorKind::EnumNotFoundByIndex,
+                            kind: AbiGeneratorErrorKind::EnumNotFoundByIndex(*index, *module_id),
                         })?;
                 if enum_.is_simple {
                     enums_to_process.insert(itype.clone());
@@ -840,14 +908,14 @@ impl Abi {
                 types,
             } => {
                 let enum_module = modules_data.get(module_id).ok_or(AbiGeneratorError {
-                    kind: AbiGeneratorErrorKind::ModuleIdNotFound,
+                    kind: AbiGeneratorErrorKind::ModuleDataNotFound(*module_id),
                 })?;
                 let enum_ =
                     enum_module
                         .enums
                         .get_by_index(*index)
                         .map_err(|_| AbiGeneratorError {
-                            kind: AbiGeneratorErrorKind::EnumNotFoundByIndex,
+                            kind: AbiGeneratorErrorKind::EnumNotFoundByIndex(*index, *module_id),
                         })?;
                 let enum_ = enum_.instantiate(types);
                 if enum_.is_simple {

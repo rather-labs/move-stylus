@@ -51,7 +51,7 @@ pub fn generate_abi(
             .modules_paths
             .get(file)
             .ok_or(AbiGeneratorError {
-                kind: AbiGeneratorErrorKind::ModuleIdNotFound,
+                kind: AbiGeneratorErrorKind::ModuleIdNotFound(file.clone()),
             })?;
 
         let module_data =
@@ -59,7 +59,7 @@ pub fn generate_abi(
                 .modules_data
                 .get(module_id)
                 .ok_or(AbiGeneratorError {
-                    kind: AbiGeneratorErrorKind::ModuleDataNotFound,
+                    kind: AbiGeneratorErrorKind::ModuleDataNotFound(*module_id),
                 })?;
 
         // Collect all the calls to emit<> and revert<> function to know which events and errors
@@ -177,7 +177,9 @@ fn process_events_and_errors(
                                 if name.as_str() == STYLUS_FRAMEWORK_NATIVE_EMIT_FUNCTION =>
                             {
                                 let first_ty = type_params.first().ok_or(AbiGeneratorError {
-                                    kind: AbiGeneratorErrorKind::MissingTypeParameter,
+                                    kind: AbiGeneratorErrorKind::MissingTypeParameter(
+                                        name.as_str().to_string(),
+                                    ),
                                 })?;
 
                                 events.insert(parse_event(module, first_ty, modules_data)?);
@@ -186,7 +188,9 @@ fn process_events_and_errors(
                                 if name.as_str() == STYLUS_FRAMEWORK_NATIVE_REVERT_FUNCTION =>
                             {
                                 let first_ty = type_params.first().ok_or(AbiGeneratorError {
-                                    kind: AbiGeneratorErrorKind::MissingTypeParameter,
+                                    kind: AbiGeneratorErrorKind::MissingTypeParameter(
+                                        name.as_str().to_string(),
+                                    ),
                                 })?;
                                 errors.insert(parse_error(module, first_ty)?);
                             }
@@ -252,7 +256,10 @@ fn find_child_module<'a>(
                 .copied()
         })
         .ok_or(AbiGeneratorError {
-            kind: AbiGeneratorErrorKind::DependencyNotFound(target.clone()),
+            kind: AbiGeneratorErrorKind::DependencyNotFound(ctx::ModuleId::new(
+                target.address().into_bytes().into(),
+                target.name().as_str(),
+            )),
         })
 }
 
@@ -284,7 +291,10 @@ fn parse_event(
                     event_module_id.name().as_str(),
                 ))
                 .ok_or(AbiGeneratorError {
-                    kind: AbiGeneratorErrorKind::DependencyNotFound(event_module_id.clone()),
+                    kind: AbiGeneratorErrorKind::DependencyNotFound(ctx::ModuleId::new(
+                        event_module_id.address().into_bytes().into(),
+                        event_module_id.name().as_str(),
+                    )),
                 })?;
 
             let event_type_parameters = type_params

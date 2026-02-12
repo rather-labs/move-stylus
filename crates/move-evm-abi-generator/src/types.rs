@@ -181,7 +181,7 @@ impl Type {
                 module_id, index, ..
             } => {
                 let struct_module = modules_data.get(module_id).ok_or(AbiGeneratorError {
-                    kind: AbiGeneratorErrorKind::ModuleDataNotFound,
+                    kind: AbiGeneratorErrorKind::ModuleDataNotFound(*module_id),
                 })?;
 
                 let struct_ =
@@ -189,7 +189,7 @@ impl Type {
                         .structs
                         .get_by_index(*index)
                         .map_err(|_| AbiGeneratorError {
-                            kind: AbiGeneratorErrorKind::StructNotFoundByIndex,
+                            kind: AbiGeneratorErrorKind::StructNotFoundByIndex(*index, *module_id),
                         })?;
 
                 match (
@@ -265,14 +265,14 @@ impl Type {
                 ..
             } => {
                 let struct_module = modules_data.get(module_id).ok_or(AbiGeneratorError {
-                    kind: AbiGeneratorErrorKind::ModuleDataNotFound,
+                    kind: AbiGeneratorErrorKind::ModuleDataNotFound(*module_id),
                 })?;
                 let struct_ =
                     struct_module
                         .structs
                         .get_by_index(*index)
                         .map_err(|_| AbiGeneratorError {
-                            kind: AbiGeneratorErrorKind::StructNotFoundByIndex,
+                            kind: AbiGeneratorErrorKind::StructNotFoundByIndex(*index, *module_id),
                         })?;
                 let types = types
                     .iter()
@@ -297,14 +297,14 @@ impl Type {
             }
             IntermediateType::IEnum { module_id, index } => {
                 let enum_module = modules_data.get(module_id).ok_or(AbiGeneratorError {
-                    kind: AbiGeneratorErrorKind::ModuleDataNotFound,
+                    kind: AbiGeneratorErrorKind::ModuleDataNotFound(*module_id),
                 })?;
                 let enum_ =
                     enum_module
                         .enums
                         .get_by_index(*index)
                         .map_err(|_| AbiGeneratorError {
-                            kind: AbiGeneratorErrorKind::EnumNotFoundByIndex,
+                            kind: AbiGeneratorErrorKind::EnumNotFoundByIndex(*index, *module_id),
                         })?;
                 if enum_.is_simple {
                     Ok(Type::Enum {
@@ -321,13 +321,13 @@ impl Type {
                 types,
             } => {
                 let enum_module = modules_data.get(module_id).ok_or(AbiGeneratorError {
-                    kind: AbiGeneratorErrorKind::ModuleDataNotFound,
+                    kind: AbiGeneratorErrorKind::ModuleDataNotFound(*module_id),
                 })?;
                 let enum_ = enum_module
                     .enums
                     .get_by_index(*index)
                     .map_err(|_| AbiGeneratorError {
-                        kind: AbiGeneratorErrorKind::EnumNotFoundByIndex,
+                        kind: AbiGeneratorErrorKind::EnumNotFoundByIndex(*index, *module_id),
                     })?
                     .instantiate(types);
 
