@@ -13,6 +13,7 @@ move-core-types.workspace = true
 move-symbol-pool.workspace = true
 serde = "1.0.228"
 serde_json = "1.0.145"
+thiserror = "2.0.17"
 
 [dev-dependencies]
 move-packages-build.workspace = true

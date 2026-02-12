@@ -16,6 +16,7 @@ use move_symbol_pool::Symbol;
 use crate::{
     ErrorStruct, EventStruct,
     common::snake_to_camel,
+    error::{AbiGeneratorError, AbiGeneratorErrorKind},
     special_types::{is_bytes_n, is_id, is_named_id, is_string, is_uid},
     types::Type,
 };
@@ -102,38 +103,38 @@ impl Abi {
         modules_data: &HashMap<ModuleId, ModuleData>,
         event_structs: &HashSet<EventStruct>,
         error_structs: &HashSet<ErrorStruct>,
-    ) -> Abi {
+    ) -> Result<Abi, AbiGeneratorError> {
         // Create a single HashSet to collect all structs that need to be processed
         // This includes structs from events, errors, and functions
         let mut structs_to_process = HashSet::new();
         let mut enums_to_process = HashSet::new();
 
-        let events = Self::process_events(event_structs, modules_data, &mut structs_to_process);
+        let events = Self::process_events(event_structs, modules_data, &mut structs_to_process)?;
 
         let abi_errors =
-            Self::process_abi_errors(error_structs, modules_data, &mut structs_to_process);
+            Self::process_abi_errors(error_structs, modules_data, &mut structs_to_process)?;
 
         let functions = Self::process_functions(
             processing_module,
             modules_data,
             &mut structs_to_process,
             &mut enums_to_process,
-        );
+        )?;
 
         let mut processed_structs = HashSet::new();
         let structs =
-            Self::process_structs(structs_to_process, modules_data, &mut processed_structs);
+            Self::process_structs(structs_to_process, modules_data, &mut processed_structs)?;
 
-        let enums = Self::process_enums(enums_to_process, modules_data);
+        let enums = Self::process_enums(enums_to_process, modules_data)?;
 
-        Abi {
+        Ok(Abi {
             contract_name: processing_module.special_attributes.module_name,
             functions,
             structs,
             enums,
             events,
             abi_errors,
-        }
+        })
     }
 
     /// This contains all the structs that appear as argument or return of functions. Once we
@@ -143,7 +144,7 @@ impl Abi {
         modules_data: &HashMap<ModuleId, ModuleData>,
         structs_to_process: &mut HashSet<IntermediateType>,
         enums_to_process: &mut HashSet<IntermediateType>,
-    ) -> Vec<Function> {
+    ) -> Result<Vec<Function>, AbiGeneratorError> {
         let mut result = Vec::new();
 
         // First we filter the functions we are going to process
@@ -160,7 +161,9 @@ impl Abi {
                 .functions
                 .iter()
                 .find(|f| *f.name == *function.function_id.identifier)
-                .expect("function not found");
+                .ok_or(AbiGeneratorError {
+                    kind: AbiGeneratorErrorKind::FunctionNotFound(function.function_id.identifier),
+                })?;
 
             // Determine the function type based on the function ID
             let function_type = if processing_module.functions.init.as_ref()
@@ -201,8 +204,15 @@ impl Abi {
                     IntermediateType::IStruct {
                         module_id, index, ..
                     } => {
-                        let struct_module = modules_data.get(module_id).unwrap();
-                        let struct_ = struct_module.structs.get_by_index(*index).unwrap();
+                        let struct_module =
+                            modules_data.get(module_id).ok_or(AbiGeneratorError {
+                                kind: AbiGeneratorErrorKind::ModuleIdNotFound,
+                            })?;
+                        let struct_ = struct_module.structs.get_by_index(*index).map_err(|_| {
+                            AbiGeneratorError {
+                                kind: AbiGeneratorErrorKind::StructNotFoundByIndex,
+                            }
+                        })?;
 
                         match (
                             struct_.identifier.as_str(),
@@ -220,13 +230,13 @@ impl Abi {
                                         modules_data,
                                         &mut function_parameters,
                                         param,
-                                    );
+                                    )?;
                                 } else {
                                     function_parameters.push(NamedType {
                                         identifier: param.name,
-                                        type_: Type::from_intermediate_type(itype, modules_data),
+                                        type_: Type::from_intermediate_type(itype, modules_data)?,
                                     });
-                                    if Self::should_process_struct(itype, modules_data) {
+                                    if Self::should_process_struct(itype, modules_data)? {
                                         structs_to_process.insert(itype.clone());
                                     }
                                 }
@@ -239,11 +249,16 @@ impl Abi {
                         types,
                         ..
                     } => {
-                        let struct_module = modules_data.get(module_id).unwrap();
+                        let struct_module =
+                            modules_data.get(module_id).ok_or(AbiGeneratorError {
+                                kind: AbiGeneratorErrorKind::ModuleIdNotFound,
+                            })?;
                         let struct_ = struct_module
                             .structs
                             .get_by_index(*index)
-                            .unwrap()
+                            .map_err(|_| AbiGeneratorError {
+                                kind: AbiGeneratorErrorKind::StructNotFoundByIndex,
+                            })?
                             .instantiate(types);
 
                         if struct_.has_key {
@@ -253,28 +268,38 @@ impl Abi {
                                 modules_data,
                                 &mut function_parameters,
                                 param,
-                            );
+                            )?;
                         } else {
                             {
                                 function_parameters.push(NamedType {
                                     identifier: param.name,
-                                    type_: Type::from_intermediate_type(itype, modules_data),
+                                    type_: Type::from_intermediate_type(itype, modules_data)?,
                                 });
-                                if Self::should_process_struct(itype, modules_data) {
+                                if Self::should_process_struct(itype, modules_data)? {
                                     structs_to_process.insert(itype.clone());
                                 }
                             }
                         }
                     }
                     IntermediateType::IEnum { module_id, index } => {
-                        let enum_module = modules_data.get(module_id).unwrap();
-                        let enum_ = enum_module.enums.get_by_index(*index).unwrap();
+                        let enum_module = modules_data.get(module_id).ok_or(AbiGeneratorError {
+                            kind: AbiGeneratorErrorKind::ModuleIdNotFound,
+                        })?;
+                        let enum_ = enum_module.enums.get_by_index(*index).map_err(|_| {
+                            AbiGeneratorError {
+                                kind: AbiGeneratorErrorKind::EnumNotFoundByIndex,
+                            }
+                        })?;
                         if !enum_.is_simple {
-                            panic!("found not simple enum in function signature");
+                            return Err(AbiGeneratorError {
+                                kind: AbiGeneratorErrorKind::NonSimpleEnumInSignature(
+                                    enum_.identifier,
+                                ),
+                            });
                         } else {
                             function_parameters.push(NamedType {
                                 identifier: param.name,
-                                type_: Type::from_intermediate_type(itype, modules_data),
+                                type_: Type::from_intermediate_type(itype, modules_data)?,
                             });
 
                             enums_to_process.insert(itype.clone());
@@ -285,19 +310,27 @@ impl Abi {
                         index,
                         types,
                     } => {
-                        let enum_module = modules_data.get(module_id).unwrap();
+                        let enum_module = modules_data.get(module_id).ok_or(AbiGeneratorError {
+                            kind: AbiGeneratorErrorKind::ModuleIdNotFound,
+                        })?;
                         let enum_ = enum_module
                             .enums
                             .get_by_index(*index)
-                            .unwrap()
+                            .map_err(|_| AbiGeneratorError {
+                                kind: AbiGeneratorErrorKind::EnumNotFoundByIndex,
+                            })?
                             .instantiate(types);
 
                         if !enum_.is_simple {
-                            panic!("found not simple enum in function signature");
+                            return Err(AbiGeneratorError {
+                                kind: AbiGeneratorErrorKind::NonSimpleEnumInSignature(
+                                    enum_.identifier,
+                                ),
+                            });
                         } else {
                             function_parameters.push(NamedType {
                                 identifier: param.name,
-                                type_: Type::from_intermediate_type(itype, modules_data),
+                                type_: Type::from_intermediate_type(itype, modules_data)?,
                             });
 
                             enums_to_process.insert(itype.clone());
@@ -306,7 +339,7 @@ impl Abi {
                     _ => {
                         function_parameters.push(NamedType {
                             identifier: param.name,
-                            type_: Type::from_intermediate_type(itype, modules_data),
+                            type_: Type::from_intermediate_type(itype, modules_data)?,
                         });
                     }
                 }
@@ -320,24 +353,24 @@ impl Abi {
                     modules_data,
                     structs_to_process,
                     enums_to_process,
-                );
+                )?;
 
-                Type::from_intermediate_type(&function.signature.returns[0], modules_data)
+                Type::from_intermediate_type(&function.signature.returns[0], modules_data)?
             } else {
+                for t in &function.signature.returns {
+                    Self::process_return_type(
+                        t,
+                        modules_data,
+                        structs_to_process,
+                        enums_to_process,
+                    )?;
+                }
                 let tuple_types: Vec<Type> = function
                     .signature
                     .returns
                     .iter()
-                    .inspect(|t| {
-                        Self::process_return_type(
-                            t,
-                            modules_data,
-                            structs_to_process,
-                            enums_to_process,
-                        )
-                    })
                     .map(|t| Type::from_intermediate_type(t, modules_data))
-                    .collect();
+                    .collect::<Result<Vec<_>, AbiGeneratorError>>()?;
                 Type::Tuple(tuple_types)
             };
 
@@ -366,7 +399,7 @@ impl Abi {
                 visibility,
             });
         }
-        result
+        Ok(result)
     }
 
     fn process_storage_struct(
@@ -375,75 +408,168 @@ impl Abi {
         modules_data: &HashMap<ModuleId, ModuleData>,
         function_parameters: &mut Vec<NamedType>,
         param: &Parameter,
-    ) {
+    ) -> Result<(), AbiGeneratorError> {
         assert!(struct_.has_key);
-        let first_parameter = struct_.fields.first();
-        // If the first parameter:
-        // - is a UID, then the signature type is bytes32
-        // - is a NamedId<>, then the signature type ignored
 
-        match first_parameter {
-            Some(IntermediateType::IStruct {
+        // 1. Identify the first field and its metadata
+        let first_field = struct_.fields.first().ok_or(AbiGeneratorError {
+            kind: AbiGeneratorErrorKind::StorageStructNoFields,
+        })?;
+
+        let (m_id, index, is_generic) = match first_field {
+            IntermediateType::IStruct {
                 module_id, index, ..
-            }) => {
-                let struct_module = modules_data.get(module_id).unwrap();
-                let struct_ = struct_module.structs.get_by_index(*index).unwrap();
-
-                match (
-                    struct_.identifier.as_str(),
-                    module_id.address,
-                    module_id.module_name.as_str(),
-                ) {
-                    ("UID", STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => {
-                        // Convert struct_itype to get the struct identifier and module_id
-                        let struct_type = Type::from_intermediate_type(struct_itype, modules_data);
-                        function_parameters.push(NamedType {
-                            identifier: param.name,
-                            type_: struct_type,
-                        });
-                    }
-                    _ => {
-                        panic!("processing a storage struct that has no uid as first parameter");
-                    }
-                }
+            } => (module_id, index, false),
+            IntermediateType::IGenericStructInstance {
+                module_id, index, ..
+            } => (module_id, index, true),
+            _ => {
+                return Err(AbiGeneratorError {
+                    kind: AbiGeneratorErrorKind::StorageStructInvalidFirstField,
+                });
             }
-            Some(IntermediateType::IGenericStructInstance {
-                module_id,
-                index,
-                types,
-                ..
-            }) => {
-                let struct_module = modules_data.get(module_id).unwrap();
-                let struct_ = struct_module
+        };
+
+        // 2. Resolve the struct definition
+        let struct_module = modules_data.get(m_id).ok_or(AbiGeneratorError {
+            kind: AbiGeneratorErrorKind::ModuleIdNotFound,
+        })?;
+        let field_struct =
+            struct_module
+                .structs
+                .get_by_index(*index)
+                .map_err(|_| AbiGeneratorError {
+                    kind: AbiGeneratorErrorKind::StructNotFoundByIndex,
+                })?;
+
+        let is_stylus_fw = m_id.address == STYLUS_FRAMEWORK_ADDRESS
+            && m_id.module_name.as_str() == SF_MODULE_NAME_OBJECT;
+        let ident = field_struct.identifier.as_str();
+
+        // 3. Strict requirement validation
+        match (ident, is_generic, is_stylus_fw) {
+            ("UID", false, true) => {
+                // Success case for UID
+                function_parameters.push(NamedType {
+                    identifier: param.name,
+                    type_: Type::from_intermediate_type(struct_itype, modules_data)?,
+                });
+            }
+            ("NamedId", true, true) => {
+                // Success case for NamedId (ignored)
+            }
+            _ => {
+                return Err(AbiGeneratorError {
+                    kind: AbiGeneratorErrorKind::StorageStructInvalidFirstField,
+                });
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn process_structs(
+        structs: HashSet<IntermediateType>,
+        modules_data: &HashMap<ModuleId, ModuleData>,
+        processed_structs: &mut HashSet<IntermediateType>,
+    ) -> Result<Vec<Struct_>, AbiGeneratorError> {
+        let mut result = Vec::new();
+
+        for itype in structs {
+            // Atomic check-and-insert to prevent infinite recursion and duplicates
+            if !processed_structs.insert(itype.clone()) {
+                continue;
+            }
+
+            // 1. Resolve Location and Generics
+            let (module_id, index, types) = match &itype {
+                IntermediateType::IStruct {
+                    module_id, index, ..
+                } => (module_id, index, None),
+                IntermediateType::IGenericStructInstance {
+                    module_id,
+                    index,
+                    types,
+                    ..
+                } => (module_id, index, Some(types)),
+                t => {
+                    return Err(AbiGeneratorError {
+                        kind: AbiGeneratorErrorKind::ExpectedStructType(format!("{t:?}")),
+                    });
+                }
+            };
+
+            // 2. Resolve Module and Base Struct
+            let module_data = modules_data.get(module_id).ok_or(AbiGeneratorError {
+                kind: AbiGeneratorErrorKind::ModuleIdNotFound,
+            })?;
+
+            let base_struct =
+                module_data
                     .structs
                     .get_by_index(*index)
-                    .unwrap()
-                    .instantiate(types);
+                    .map_err(|_| AbiGeneratorError {
+                        kind: AbiGeneratorErrorKind::StructNotFoundByIndex,
+                    })?;
 
-                match (
-                    struct_.identifier.as_str(),
-                    module_id.address,
-                    module_id.module_name.as_str(),
-                ) {
-                    ("NamedId", STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => {}
-                    _ => {
-                        panic!(
-                            "processing a storage struct that has no named id as first parameter"
-                        );
+            // 3. Instantiate if needed and get parsed metadata from the special attributes
+            let struct_ = types.map_or_else(|| base_struct.clone(), |t| base_struct.instantiate(t));
+
+            let parsed_struct = module_data
+                .special_attributes
+                .structs
+                .iter()
+                .find(|s| *s.name == *struct_.identifier)
+                .ok_or(AbiGeneratorError {
+                    kind: AbiGeneratorErrorKind::ParsedStructNotFound(struct_.identifier),
+                })?;
+
+            // 4. Process fields and discover children
+            let mut child_structs = HashSet::new();
+            let fields: Vec<NamedType> = struct_
+                .fields
+                .iter()
+                .zip(&parsed_struct.fields)
+                .map(|(field_itype, (name, _))| {
+                    if Self::should_process_struct(field_itype, modules_data)? {
+                        child_structs.insert(field_itype.clone());
                     }
-                }
+                    Ok(NamedType {
+                        identifier: *name,
+                        type_: Type::from_intermediate_type(field_itype, modules_data)?,
+                    })
+                })
+                .collect::<Result<Vec<_>, AbiGeneratorError>>()?;
+
+            // 5. Build ABI Struct and Recurse
+            result.push(Struct_ {
+                identifier: Type::from_intermediate_type(&itype, modules_data)?.name(),
+                fields,
+                positional_fields: parsed_struct.positional_fields,
+            });
+
+            // Recurse for nested structs found in fields
+            if !child_structs.is_empty() {
+                result.extend(Self::process_structs(
+                    child_structs,
+                    modules_data,
+                    processed_structs,
+                )?);
             }
-            _ => panic!("processing a storage struct that has no id as first parameter"),
         }
+
+        Ok(result)
     }
 
     pub fn process_enums(
         enums: HashSet<IntermediateType>,
         modules_data: &HashMap<ModuleId, ModuleData>,
-    ) -> Vec<Enum_> {
+    ) -> Result<Vec<Enum_>, AbiGeneratorError> {
         let mut result = Vec::new();
-        for enum_itype in enums {
-            let (module_id, index, types) = match &enum_itype {
+
+        for itype in enums {
+            // 1. Resolve Location and Generics
+            let (module_id, index, types) = match &itype {
                 IntermediateType::IEnum {
                     module_id, index, ..
                 } => (module_id, index, None),
@@ -453,230 +579,193 @@ impl Abi {
                     types,
                     ..
                 } => (module_id, index, Some(types)),
-                t => panic!("found {t:?} instead of enum"),
+                t => {
+                    return Err(AbiGeneratorError {
+                        kind: AbiGeneratorErrorKind::ExpectedEnumType(format!("{t:?}")),
+                    });
+                }
             };
 
-            let enum_module = modules_data.get(module_id).unwrap();
-            let enum_ = enum_module.enums.get_by_index(*index).unwrap();
-            let enum_ = match types {
-                Some(types) => enum_.instantiate(types),
-                None => enum_.clone(),
-            };
+            // 2. Resolve Module and Base Enum safely
+            let enum_module = modules_data.get(module_id).ok_or(AbiGeneratorError {
+                kind: AbiGeneratorErrorKind::ModuleIdNotFound,
+            })?;
+
+            let base_enum =
+                enum_module
+                    .enums
+                    .get_by_index(*index)
+                    .map_err(|_| AbiGeneratorError {
+                        kind: AbiGeneratorErrorKind::EnumNotFoundByIndex,
+                    })?;
+
+            // 3. Instantiate if needed and get parsed metadata from the special attributes
+            let enum_ = types.map_or_else(|| base_enum.clone(), |t| base_enum.instantiate(t));
 
             let parsed_enum = enum_module
                 .special_attributes
                 .enums
                 .iter()
                 .find(|e| *e.name == *enum_.identifier)
-                .unwrap();
+                .ok_or(AbiGeneratorError {
+                    kind: AbiGeneratorErrorKind::ParsedEnumNotFound(enum_.identifier),
+                })?;
 
+            // 4. Build ABI Enum
             result.push(Enum_ {
                 identifier: enum_.identifier,
                 variants: parsed_enum.variants.iter().map(|v| v.0).collect(),
             });
         }
 
-        result
-    }
-
-    pub fn process_structs(
-        structs: HashSet<IntermediateType>,
-        modules_data: &HashMap<ModuleId, ModuleData>,
-        processed_structs: &mut HashSet<IntermediateType>,
-    ) -> Vec<Struct_> {
-        let mut result = Vec::new();
-        for struct_itype in structs {
-            if processed_structs.contains(&struct_itype) {
-                continue;
-            }
-
-            let (struct_, parsed_struct) = {
-                let (module_id, index, types) = match &struct_itype {
-                    IntermediateType::IStruct {
-                        module_id, index, ..
-                    } => (module_id, index, None),
-                    IntermediateType::IGenericStructInstance {
-                        module_id,
-                        index,
-                        types,
-                        ..
-                    } => (module_id, index, Some(types)),
-                    t => panic!("found {t:?} instead of struct"),
-                };
-
-                let struct_module = modules_data.get(module_id).unwrap();
-                let struct_ = struct_module.structs.get_by_index(*index).unwrap();
-                let struct_ = match types {
-                    Some(types) => struct_.instantiate(types),
-                    None => struct_.clone(),
-                };
-                let parsed_struct = struct_module
-                    .special_attributes
-                    .structs
-                    .iter()
-                    .find(|s| *s.name == *struct_.identifier)
-                    .unwrap();
-
-                (struct_, parsed_struct)
-            };
-
-            let mut child_structs_to_process = HashSet::new();
-            let fields = struct_
-                .fields
-                .iter()
-                .zip(&parsed_struct.fields)
-                .map(|(field_itype, (name, _))| {
-                    if Self::should_process_struct(field_itype, modules_data) {
-                        child_structs_to_process.insert(field_itype.clone());
-                    }
-                    NamedType {
-                        identifier: *name,
-                        type_: Type::from_intermediate_type(field_itype, modules_data),
-                    }
-                })
-                .collect();
-
-            let struct_abi_type = Type::from_intermediate_type(&struct_itype, modules_data);
-
-            result.push(Struct_ {
-                // Resolve struct identifier conflicts with events or errors
-                identifier: struct_abi_type.name(),
-                fields,
-                positional_fields: parsed_struct.positional_fields,
-            });
-
-            processed_structs.insert(struct_itype);
-
-            // Process child structs
-            let child_structs =
-                Self::process_structs(child_structs_to_process, modules_data, processed_structs);
-
-            result.extend(child_structs);
-        }
-
-        result
+        Ok(result)
     }
 
     pub fn process_events(
         events: &HashSet<EventStruct>,
         modules_data: &HashMap<ModuleId, ModuleData>,
         structs_to_process: &mut HashSet<IntermediateType>,
-    ) -> Vec<Event> {
+    ) -> Result<Vec<Event>, AbiGeneratorError> {
         let mut result = Vec::new();
 
         for event in events {
+            // 1. Resolve Module Data
             let event_module = modules_data
                 .get(&ModuleId::new(
                     event.module_id.address().into_bytes().into(),
                     event.module_id.name().as_str(),
                 ))
-                .unwrap();
+                .ok_or(AbiGeneratorError {
+                    kind: AbiGeneratorErrorKind::ModuleIdNotFound,
+                })?;
 
-            let mut event_struct = event_module
+            // 2. Resolve and Instantiate the underlying Struct
+            let base_struct = event_module
                 .structs
                 .get_by_identifier(&event.identifier)
-                .unwrap()
-                .clone();
+                .map_err(|_| AbiGeneratorError {
+                    kind: AbiGeneratorErrorKind::StructNotFoundByIdentifier(event.identifier),
+                })?;
 
-            if let Some(type_parameters) = &event.type_parameters {
-                event_struct = event_struct.instantiate(type_parameters);
-            }
+            let event_struct = match &event.type_parameters {
+                Some(params) => base_struct.instantiate(params),
+                None => base_struct.clone(),
+            };
 
-            let event_special_attributes = event_module
+            // 3. Get parsed event and struct from the special attributes
+            let parsed_event = event_module
                 .special_attributes
                 .events
                 .get(&event_struct.identifier)
-                .unwrap();
+                .ok_or(AbiGeneratorError {
+                    kind: AbiGeneratorErrorKind::ParsedEventNotFound(event_struct.identifier),
+                })?;
 
-            let event_struct_parsed = event_module
+            let parsed_struct = event_module
                 .special_attributes
                 .structs
                 .iter()
                 .find(|s| *s.name == *event_struct.identifier)
-                .unwrap();
+                .ok_or(AbiGeneratorError {
+                    kind: AbiGeneratorErrorKind::ParsedStructNotFound(event_struct.identifier),
+                })?;
 
-            // Collect structs from event fields
+            // 4. Collect nested structs for later processing
             for field_itype in &event_struct.fields {
-                if Self::should_process_struct(field_itype, modules_data) {
+                if Self::should_process_struct(field_itype, modules_data)? {
                     structs_to_process.insert(field_itype.clone());
                 }
             }
 
+            // 5. Build the Event ABI
             result.push(Event {
                 identifier: event.identifier,
                 fields: event_struct
                     .fields
                     .iter()
-                    .zip(&event_struct_parsed.fields)
+                    .zip(&parsed_struct.fields)
                     .enumerate()
-                    .map(|(index, (f, (identifier, _)))| EventField {
-                        named_type: NamedType {
-                            identifier: *identifier,
-                            type_: Type::from_intermediate_type(f, modules_data),
-                        },
-                        indexed: index < event_special_attributes.indexes as usize,
+                    .map(|(i, (itype, (name, _)))| {
+                        Ok(EventField {
+                            named_type: NamedType {
+                                identifier: *name,
+                                type_: Type::from_intermediate_type(itype, modules_data)?,
+                            },
+                            // Stylus/Move events usually index the first N fields
+                            indexed: i < parsed_event.indexes as usize,
+                        })
                     })
-                    .collect(),
-                is_anonymous: event_special_attributes.is_anonymous,
-                positional_fields: event_struct_parsed.positional_fields,
+                    .collect::<Result<Vec<_>, AbiGeneratorError>>()?,
+                is_anonymous: parsed_event.is_anonymous,
+                positional_fields: parsed_struct.positional_fields,
             });
         }
 
-        result
+        Ok(result)
     }
 
     pub fn process_abi_errors(
         error_structs: &HashSet<ErrorStruct>,
         modules_data: &HashMap<ModuleId, ModuleData>,
         structs_to_process: &mut HashSet<IntermediateType>,
-    ) -> Vec<Struct_> {
+    ) -> Result<Vec<Struct_>, AbiGeneratorError> {
         let mut result = Vec::new();
 
-        for error_struct in error_structs {
+        for error in error_structs {
+            // 1. Resolve Module Data
             let error_module = modules_data
                 .get(&ModuleId::new(
-                    error_struct.module_id.address().into_bytes().into(),
-                    error_struct.module_id.name().as_str(),
+                    error.module_id.address().into_bytes().into(),
+                    error.module_id.name().as_str(),
                 ))
-                .unwrap();
+                .ok_or(AbiGeneratorError {
+                    kind: AbiGeneratorErrorKind::ModuleIdNotFound,
+                })?;
 
-            let error_struct = error_module
+            // 2. Resolve Bytecode Struct
+            let struct_def = error_module
                 .structs
-                .get_by_identifier(&error_struct.identifier)
-                .unwrap();
+                .get_by_identifier(&error.identifier)
+                .map_err(|_| AbiGeneratorError {
+                    kind: AbiGeneratorErrorKind::StructNotFoundByIdentifier(error.identifier),
+                })?;
 
-            let error_struct_parsed = error_module
+            // 3. Get parsed struct from the special attributes
+            let parsed_struct = error_module
                 .special_attributes
                 .structs
                 .iter()
-                .find(|s| *s.name == *error_struct.identifier)
-                .unwrap();
+                .find(|s| *s.name == *struct_def.identifier)
+                .ok_or(AbiGeneratorError {
+                    kind: AbiGeneratorErrorKind::ParsedStructNotFound(struct_def.identifier),
+                })?;
 
-            // Collect structs from error fields
-            error_struct
-                .fields
-                .iter()
-                .filter(|field_itype| Self::should_process_struct(field_itype, modules_data))
-                .for_each(|field_itype| {
+            // 4. Update the "Structs to Process" set for deep resolution
+            for field_itype in &struct_def.fields {
+                if Self::should_process_struct(field_itype, modules_data)? {
                     structs_to_process.insert(field_itype.clone());
-                });
+                }
+            }
 
+            // 5. Transform into ABI Struct
             result.push(Struct_ {
-                identifier: error_struct.identifier,
-                fields: error_struct
+                identifier: struct_def.identifier,
+                fields: struct_def
                     .fields
                     .iter()
-                    .zip(&error_struct_parsed.fields)
-                    .map(|(f, (identifier, _))| NamedType {
-                        identifier: *identifier,
-                        type_: Type::from_intermediate_type(f, modules_data),
+                    .zip(&parsed_struct.fields)
+                    .map(|(itype, (name, _))| {
+                        Ok(NamedType {
+                            identifier: *name,
+                            type_: Type::from_intermediate_type(itype, modules_data)?,
+                        })
                     })
-                    .collect(),
-                positional_fields: error_struct_parsed.positional_fields,
+                    .collect::<Result<Vec<_>, AbiGeneratorError>>()?,
+                positional_fields: parsed_struct.positional_fields,
             });
         }
 
-        result
+        Ok(result)
     }
 
     /// Helper function to check if a struct type should be added to the process HashSet.
@@ -684,7 +773,7 @@ impl Abi {
     fn should_process_struct(
         itype: &IntermediateType,
         modules_data: &HashMap<ModuleId, ModuleData>,
-    ) -> bool {
+    ) -> Result<bool, AbiGeneratorError> {
         match itype {
             IntermediateType::IStruct {
                 module_id, index, ..
@@ -692,18 +781,26 @@ impl Abi {
             | IntermediateType::IGenericStructInstance {
                 module_id, index, ..
             } => {
-                let struct_module = modules_data.get(module_id).unwrap();
-                let struct_ = struct_module.structs.get_by_index(*index).unwrap();
+                let struct_module = modules_data.get(module_id).ok_or(AbiGeneratorError {
+                    kind: AbiGeneratorErrorKind::ModuleIdNotFound,
+                })?;
+                let struct_ =
+                    struct_module
+                        .structs
+                        .get_by_index(*index)
+                        .map_err(|_| AbiGeneratorError {
+                            kind: AbiGeneratorErrorKind::StructNotFoundByIndex,
+                        })?;
 
                 // True if the struct is not a named_id, uid or string
-                !is_named_id(&struct_.identifier, module_id)
+                Ok(!is_named_id(&struct_.identifier, module_id)
                     && !is_uid(&struct_.identifier, module_id)
                     && !is_id(&struct_.identifier, module_id)
                     && !is_string(&struct_.identifier, module_id)
-                    && !is_bytes_n(&struct_.identifier, module_id)
+                    && !is_bytes_n(&struct_.identifier, module_id))
             }
 
-            _ => false,
+            _ => Ok(false),
         }
     }
 
@@ -712,7 +809,7 @@ impl Abi {
         modules_data: &HashMap<ModuleId, ModuleData>,
         structs_to_process: &mut HashSet<IntermediateType>,
         enums_to_process: &mut HashSet<IntermediateType>,
-    ) {
+    ) -> Result<(), AbiGeneratorError> {
         match itype {
             IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
                 Self::process_return_type(
@@ -720,11 +817,19 @@ impl Abi {
                     modules_data,
                     structs_to_process,
                     enums_to_process,
-                )
+                )?;
             }
             IntermediateType::IEnum { module_id, index } => {
-                let enum_module = modules_data.get(module_id).unwrap();
-                let enum_ = enum_module.enums.get_by_index(*index).unwrap();
+                let enum_module = modules_data.get(module_id).ok_or(AbiGeneratorError {
+                    kind: AbiGeneratorErrorKind::ModuleIdNotFound,
+                })?;
+                let enum_ =
+                    enum_module
+                        .enums
+                        .get_by_index(*index)
+                        .map_err(|_| AbiGeneratorError {
+                            kind: AbiGeneratorErrorKind::EnumNotFoundByIndex,
+                        })?;
                 if enum_.is_simple {
                     enums_to_process.insert(itype.clone());
                 }
@@ -734,19 +839,28 @@ impl Abi {
                 index,
                 types,
             } => {
-                let enum_module = modules_data.get(module_id).unwrap();
-                let enum_ = enum_module.enums.get_by_index(*index).unwrap();
+                let enum_module = modules_data.get(module_id).ok_or(AbiGeneratorError {
+                    kind: AbiGeneratorErrorKind::ModuleIdNotFound,
+                })?;
+                let enum_ =
+                    enum_module
+                        .enums
+                        .get_by_index(*index)
+                        .map_err(|_| AbiGeneratorError {
+                            kind: AbiGeneratorErrorKind::EnumNotFoundByIndex,
+                        })?;
                 let enum_ = enum_.instantiate(types);
                 if enum_.is_simple {
                     enums_to_process.insert(itype.clone());
                 }
             }
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. }
-                if Self::should_process_struct(itype, modules_data) =>
+                if Self::should_process_struct(itype, modules_data)? =>
             {
                 structs_to_process.insert(itype.clone());
             }
             _ => {}
         }
+        Ok(())
     }
 }

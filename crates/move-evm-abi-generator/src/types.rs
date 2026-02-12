@@ -14,6 +14,7 @@ use move_bytecode_to_wasm::compilation_context::{
 use move_symbol_pool::Symbol;
 
 use crate::common::snake_to_upper_camel;
+use crate::error::{AbiGeneratorError, AbiGeneratorErrorKind};
 
 const TYPES_WITH_NO_SIGNATURE: &[&str] = &["TxContext"];
 
@@ -157,20 +158,20 @@ impl Type {
     pub fn from_intermediate_type(
         itype: &IntermediateType,
         modules_data: &HashMap<ModuleId, ModuleData>,
-    ) -> Self {
+    ) -> Result<Self, AbiGeneratorError> {
         match itype {
-            IntermediateType::IBool => Self::Bool,
-            IntermediateType::IU8 => Self::Uint8,
-            IntermediateType::IU16 => Self::Uint16,
-            IntermediateType::IU32 => Self::Uint32,
-            IntermediateType::IU64 => Self::Uint64,
-            IntermediateType::IU128 => Self::Uint128,
-            IntermediateType::IU256 => Self::Uint256,
-            IntermediateType::IAddress => Self::Address,
-            IntermediateType::ISigner | IntermediateType::ITypeParameter(_) => Self::None,
+            IntermediateType::IBool => Ok(Self::Bool),
+            IntermediateType::IU8 => Ok(Self::Uint8),
+            IntermediateType::IU16 => Ok(Self::Uint16),
+            IntermediateType::IU32 => Ok(Self::Uint32),
+            IntermediateType::IU64 => Ok(Self::Uint64),
+            IntermediateType::IU128 => Ok(Self::Uint128),
+            IntermediateType::IU256 => Ok(Self::Uint256),
+            IntermediateType::IAddress => Ok(Self::Address),
+            IntermediateType::ISigner | IntermediateType::ITypeParameter(_) => Ok(Self::None),
             IntermediateType::IVector(intermediate_type) => {
-                let inner = Self::from_intermediate_type(intermediate_type, modules_data);
-                Self::Array(Rc::new(inner))
+                let inner = Self::from_intermediate_type(intermediate_type, modules_data)?;
+                Ok(Self::Array(Rc::new(inner)))
             }
             IntermediateType::IRef(intermediate_type)
             | IntermediateType::IMutRef(intermediate_type) => {
@@ -179,68 +180,82 @@ impl Type {
             IntermediateType::IStruct {
                 module_id, index, ..
             } => {
-                let struct_module = modules_data
-                    .get(module_id)
-                    .expect("struct module not found");
+                let struct_module = modules_data.get(module_id).ok_or(AbiGeneratorError {
+                    kind: AbiGeneratorErrorKind::ModuleDataNotFound,
+                })?;
 
-                let struct_ = struct_module.structs.get_by_index(*index).unwrap();
+                let struct_ =
+                    struct_module
+                        .structs
+                        .get_by_index(*index)
+                        .map_err(|_| AbiGeneratorError {
+                            kind: AbiGeneratorErrorKind::StructNotFoundByIndex,
+                        })?;
 
                 match (
                     struct_.identifier.as_str(),
                     module_id.address,
                     module_id.module_name.as_str(),
                 ) {
-                    ("ID", STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => Self::Bytes32,
-                    ("UID", STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => Self::Bytes32,
-                    ("String", STANDARD_LIB_ADDRESS, STDLIB_MODULE_NAME_STRING) => Self::String,
-                    ("String", STANDARD_LIB_ADDRESS, STDLIB_MODULE_NAME_ASCII) => Self::String,
+                    ("ID", STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => Ok(Self::Bytes32),
+                    ("UID", STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => Ok(Self::Bytes32),
+                    ("String", STANDARD_LIB_ADDRESS, STDLIB_MODULE_NAME_STRING) => Ok(Self::String),
+                    ("String", STANDARD_LIB_ADDRESS, STDLIB_MODULE_NAME_ASCII) => Ok(Self::String),
                     (identifier, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_SOL_TYPES) => {
                         if let Some(bytes_num) = identifier.strip_prefix("Bytes") {
                             match bytes_num {
-                                "1" => Self::Bytes1,
-                                "2" => Self::Bytes2,
-                                "3" => Self::Bytes3,
-                                "4" => Self::Bytes4,
-                                "5" => Self::Bytes5,
-                                "6" => Self::Bytes6,
-                                "7" => Self::Bytes7,
-                                "8" => Self::Bytes8,
-                                "9" => Self::Bytes9,
-                                "10" => Self::Bytes10,
-                                "11" => Self::Bytes11,
-                                "12" => Self::Bytes12,
-                                "13" => Self::Bytes13,
-                                "14" => Self::Bytes14,
-                                "15" => Self::Bytes15,
-                                "16" => Self::Bytes16,
-                                "17" => Self::Bytes17,
-                                "18" => Self::Bytes18,
-                                "19" => Self::Bytes19,
-                                "20" => Self::Bytes20,
-                                "21" => Self::Bytes21,
-                                "22" => Self::Bytes22,
-                                "23" => Self::Bytes23,
-                                "24" => Self::Bytes24,
-                                "25" => Self::Bytes25,
-                                "26" => Self::Bytes26,
-                                "27" => Self::Bytes27,
-                                "28" => Self::Bytes28,
-                                "29" => Self::Bytes29,
-                                "30" => Self::Bytes30,
-                                "31" => Self::Bytes31,
-                                "32" => Self::Bytes32,
-                                _ => panic!("unknown BytesN type"),
+                                "1" => Ok(Self::Bytes1),
+                                "2" => Ok(Self::Bytes2),
+                                "3" => Ok(Self::Bytes3),
+                                "4" => Ok(Self::Bytes4),
+                                "5" => Ok(Self::Bytes5),
+                                "6" => Ok(Self::Bytes6),
+                                "7" => Ok(Self::Bytes7),
+                                "8" => Ok(Self::Bytes8),
+                                "9" => Ok(Self::Bytes9),
+                                "10" => Ok(Self::Bytes10),
+                                "11" => Ok(Self::Bytes11),
+                                "12" => Ok(Self::Bytes12),
+                                "13" => Ok(Self::Bytes13),
+                                "14" => Ok(Self::Bytes14),
+                                "15" => Ok(Self::Bytes15),
+                                "16" => Ok(Self::Bytes16),
+                                "17" => Ok(Self::Bytes17),
+                                "18" => Ok(Self::Bytes18),
+                                "19" => Ok(Self::Bytes19),
+                                "20" => Ok(Self::Bytes20),
+                                "21" => Ok(Self::Bytes21),
+                                "22" => Ok(Self::Bytes22),
+                                "23" => Ok(Self::Bytes23),
+                                "24" => Ok(Self::Bytes24),
+                                "25" => Ok(Self::Bytes25),
+                                "26" => Ok(Self::Bytes26),
+                                "27" => Ok(Self::Bytes27),
+                                "28" => Ok(Self::Bytes28),
+                                "29" => Ok(Self::Bytes29),
+                                "30" => Ok(Self::Bytes30),
+                                "31" => Ok(Self::Bytes31),
+                                "32" => Ok(Self::Bytes32),
+                                _ => Err(AbiGeneratorError {
+                                    kind: AbiGeneratorErrorKind::UnknownBytesNType(
+                                        bytes_num.to_string(),
+                                    ),
+                                }),
                             }
                         } else {
-                            panic!("unknown sol types struct")
+                            Err(AbiGeneratorError {
+                                kind: AbiGeneratorErrorKind::UnknownSolTypesStruct(
+                                    identifier.to_string(),
+                                ),
+                            })
                         }
                     }
-                    _ => Self::Struct {
+                    _ => Ok(Self::Struct {
                         identifier: struct_.identifier,
                         type_instances: None,
                         module_id: *module_id,
                         has_key: struct_.has_key,
-                    },
+                    }),
                 }
             }
             IntermediateType::IGenericStructInstance {
@@ -249,39 +264,55 @@ impl Type {
                 types,
                 ..
             } => {
-                let struct_module = modules_data
-                    .get(module_id)
-                    .expect("struct module not found");
-                let struct_ = struct_module.structs.get_by_index(*index).unwrap();
+                let struct_module = modules_data.get(module_id).ok_or(AbiGeneratorError {
+                    kind: AbiGeneratorErrorKind::ModuleDataNotFound,
+                })?;
+                let struct_ =
+                    struct_module
+                        .structs
+                        .get_by_index(*index)
+                        .map_err(|_| AbiGeneratorError {
+                            kind: AbiGeneratorErrorKind::StructNotFoundByIndex,
+                        })?;
                 let types = types
                     .iter()
                     .map(|t| Self::from_intermediate_type(t, modules_data))
-                    .collect();
+                    .collect::<Result<Vec<_>, AbiGeneratorError>>()?;
 
                 match (
                     struct_.identifier.as_str(),
                     module_id.address,
                     module_id.module_name.as_str(),
                 ) {
-                    ("NamedId", STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => Self::Bytes32,
-                    _ => Self::Struct {
+                    ("NamedId", STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => {
+                        Ok(Self::Bytes32)
+                    }
+                    _ => Ok(Self::Struct {
                         identifier: struct_.identifier,
                         type_instances: Some(types),
                         module_id: *module_id,
                         has_key: struct_.has_key,
-                    },
+                    }),
                 }
             }
             IntermediateType::IEnum { module_id, index } => {
-                let enum_module = modules_data.get(module_id).expect("enum module not found");
-                let enum_ = enum_module.enums.get_by_index(*index).unwrap();
+                let enum_module = modules_data.get(module_id).ok_or(AbiGeneratorError {
+                    kind: AbiGeneratorErrorKind::ModuleDataNotFound,
+                })?;
+                let enum_ =
+                    enum_module
+                        .enums
+                        .get_by_index(*index)
+                        .map_err(|_| AbiGeneratorError {
+                            kind: AbiGeneratorErrorKind::EnumNotFoundByIndex,
+                        })?;
                 if enum_.is_simple {
-                    Type::Enum {
+                    Ok(Type::Enum {
                         identifier: enum_.identifier,
                         module_id: *module_id,
-                    }
+                    })
                 } else {
-                    Type::None
+                    Ok(Type::None)
                 }
             }
             IntermediateType::IGenericEnumInstance {
@@ -289,20 +320,24 @@ impl Type {
                 index,
                 types,
             } => {
-                let enum_module = modules_data.get(module_id).expect("enum module not found");
+                let enum_module = modules_data.get(module_id).ok_or(AbiGeneratorError {
+                    kind: AbiGeneratorErrorKind::ModuleDataNotFound,
+                })?;
                 let enum_ = enum_module
                     .enums
                     .get_by_index(*index)
-                    .unwrap()
+                    .map_err(|_| AbiGeneratorError {
+                        kind: AbiGeneratorErrorKind::EnumNotFoundByIndex,
+                    })?
                     .instantiate(types);
 
                 if enum_.is_simple {
-                    Type::Enum {
+                    Ok(Type::Enum {
                         identifier: enum_.identifier,
                         module_id: *module_id,
-                    }
+                    })
                 } else {
-                    Type::None
+                    Ok(Type::None)
                 }
             }
         }
