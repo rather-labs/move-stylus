@@ -170,6 +170,12 @@ impl FunctionModifier {
                         .collect::<Result<Vec<SolidityFunctionModifier>, SpecialAttributeError>>()?;
                         result.push(Self::ExternalCall(modifiers));
                     }
+                    // TODO: expected_failure(abort_code = ...) — parameters are ignored for now;
+                    // the test runner only checks whether the test aborted.
+                    "expected_failure" => {
+                        println!("spanned1.value: {:?}", spanned1.value);
+                        result.push(Self::ExpectedFailure);
+                    }
                     _ => result.extend(
                         spanned1
                             .value

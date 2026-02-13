@@ -1042,6 +1042,105 @@ impl IntermediateType {
         Ok(name)
     }
 
+    /// Returns the fully qualified type name as expected by `std::type_name::get<T>()`.
+    ///
+    /// Primitives: `"u8"`, `"bool"`, `"address"`, `"vector<u8>"`, etc.
+    /// Structs/Enums: `"<hex_address>::<module_name>::<TypeName>"` where the address is
+    /// 64 hex characters (32 bytes, zero-padded, lowercase, no `0x` prefix).
+    /// Generics: `"<hex_address>::<module_name>::<TypeName><T1,T2>"`.
+    pub fn get_type_name(
+        &self,
+        compilation_ctx: &CompilationContext,
+    ) -> Result<String, IntermediateTypeError> {
+        match self {
+            // Primitives use their simple name
+            IntermediateType::IBool => Ok("bool".to_string()),
+            IntermediateType::IU8 => Ok("u8".to_string()),
+            IntermediateType::IU16 => Ok("u16".to_string()),
+            IntermediateType::IU32 => Ok("u32".to_string()),
+            IntermediateType::IU64 => Ok("u64".to_string()),
+            IntermediateType::IU128 => Ok("u128".to_string()),
+            IntermediateType::IU256 => Ok("u256".to_string()),
+            IntermediateType::IAddress => Ok("address".to_string()),
+            IntermediateType::ISigner => Ok("signer".to_string()),
+            IntermediateType::IVector(inner) => {
+                Ok(format!("vector<{}>", inner.get_type_name(compilation_ctx)?))
+            }
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                Err(IntermediateTypeError::FoundReferenceInTypeName)
+            }
+            IntermediateType::IStruct {
+                module_id, index, ..
+            } => {
+                let struct_ = compilation_ctx.get_struct_by_index(module_id, *index)?;
+                Ok(format!(
+                    "{}::{}::{}",
+                    Self::address_to_type_name_hex(&module_id.address),
+                    module_id.module_name,
+                    struct_.identifier,
+                ))
+            }
+            IntermediateType::IGenericStructInstance {
+                module_id,
+                index,
+                types,
+                ..
+            } => {
+                let struct_ = compilation_ctx.get_struct_by_index(module_id, *index)?;
+                let types = types
+                    .iter()
+                    .map(|t| t.get_type_name(compilation_ctx))
+                    .collect::<Result<Vec<String>, IntermediateTypeError>>()?
+                    .join(",");
+                Ok(format!(
+                    "{}::{}::{}<{types}>",
+                    Self::address_to_type_name_hex(&module_id.address),
+                    module_id.module_name,
+                    struct_.identifier,
+                ))
+            }
+            IntermediateType::ITypeParameter(_) => Err(IntermediateTypeError::FoundTypeParameter),
+            IntermediateType::IEnum { index, module_id } => {
+                let enum_ = compilation_ctx.get_enum_by_index(module_id, *index)?;
+                Ok(format!(
+                    "{}::{}::{}",
+                    Self::address_to_type_name_hex(&module_id.address),
+                    module_id.module_name,
+                    enum_.identifier,
+                ))
+            }
+            IntermediateType::IGenericEnumInstance {
+                module_id,
+                index,
+                types,
+                ..
+            } => {
+                let enum_ = compilation_ctx.get_enum_by_index(module_id, *index)?;
+                let types = types
+                    .iter()
+                    .map(|t| t.get_type_name(compilation_ctx))
+                    .collect::<Result<Vec<String>, IntermediateTypeError>>()?
+                    .join(",");
+                Ok(format!(
+                    "{}::{}::{}<{types}>",
+                    Self::address_to_type_name_hex(&module_id.address),
+                    module_id.module_name,
+                    enum_.identifier,
+                ))
+            }
+        }
+    }
+
+    /// Formats an Address as a 64-character lowercase hex string (no `0x` prefix),
+    /// which is the format expected by `std::type_name`.
+    fn address_to_type_name_hex(address: &Address) -> String {
+        address
+            .as_slice()
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect::<String>()
+    }
+
     /// Returns the hash of the type
     pub fn get_hash(
         &self,

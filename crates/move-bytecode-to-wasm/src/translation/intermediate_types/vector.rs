@@ -23,16 +23,15 @@ impl IVector {
         let ptr_local = module.locals.add(ValType::I32);
         let len_local = module.locals.add(ValType::I32);
 
-        // First byte is the length of the vector
-        let len = bytes
-            .next()
-            .ok_or(IntermediateTypeError::EmptyBytesInVector)?;
-        builder.i32_const(*len as i32).local_set(len_local);
+        // Read the ULEB128-encoded length of the vector (BCS uses ULEB128 for sequence lengths)
+        let len =
+            crate::utils::decode_uleb128(bytes).ok_or(IntermediateTypeError::EmptyBytesInVector)?;
+        builder.i32_const(len as i32).local_set(len_local);
 
         let data_size: usize = inner.wasm_memory_data_size()? as usize;
 
         // len + capacity + data_size * len
-        let needed_bytes = 4 + 4 + data_size * (*len as usize);
+        let needed_bytes = 4 + 4 + data_size * len;
 
         let allocate_vector_with_header_function =
             RuntimeFunction::AllocateVectorWithHeader.get(module, Some(compilation_ctx), None)?;
