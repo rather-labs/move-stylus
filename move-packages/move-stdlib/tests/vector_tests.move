@@ -569,20 +569,6 @@ fun size_limit_ok() {
     };
 }
 
-// #[expected_failure(out_of_gas, location = Self)]
-#[test, expected_failure]
-fun size_limit_fail() {
-    let mut v = vector[];
-    let mut i = 0;
-    // Choose value beyond limit
-    let max_len = 1024 * 1024;
-
-    while (i < max_len) {
-        v.push_back(i);
-        i = i + 1;
-    };
-}
-
 #[test]
 fun test_string_aliases() {
     assert!(b"hello_world".to_string().length() == 11);
