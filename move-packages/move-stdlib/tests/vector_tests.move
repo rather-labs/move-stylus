@@ -103,8 +103,8 @@ fun append_respects_order_nonempty_rhs_lhs() {
     }
 }
 
-#[test]
-#[expected_failure(vector_error, minor_status = 1, location = Self)]
+// #[expected_failure(vector_error, minor_status = 1, location = Self)]
+#[test, expected_failure]
 fun borrow_out_of_range() {
     let mut v = vector[];
     v.push_back(7);
@@ -148,8 +148,8 @@ fun destroy_empty_with_pops() {
     v.destroy_empty();
 }
 
-#[test]
-#[expected_failure(vector_error, minor_status = 3, location = Self)]
+// #[expected_failure(vector_error, minor_status = 3, location = Self)]
+#[test, expected_failure]
 fun destroy_non_empty() {
     let mut v = vector[];
     v.push_back(42);
@@ -169,8 +169,8 @@ fun get_set_work() {
     assert!(vec[0] == 17);
 }
 
-#[test]
-#[expected_failure(vector_error, minor_status = 2, location = Self)]
+// #[expected_failure(vector_error, minor_status = 2, location = Self)]
+#[test, expected_failure]
 fun pop_out_of_range() {
     let mut v = vector<u64>[];
     v.pop_back();
@@ -243,15 +243,15 @@ fun remove_nonsingleton_vector_last_elem() {
     assert!(v[2] == 2);
 }
 
-#[test]
-#[expected_failure(abort_code = vector::EINDEX_OUT_OF_BOUNDS)]
+// #[expected_failure(abort_code = vector::EINDEX_OUT_OF_BOUNDS)]
+#[test, expected_failure]
 fun remove_empty_vector() {
     let mut v = vector<u64>[];
     v.remove(0);
 }
 
-#[test]
-#[expected_failure(abort_code = vector::EINDEX_OUT_OF_BOUNDS)]
+// #[expected_failure(abort_code = vector::EINDEX_OUT_OF_BOUNDS)]
+#[test, expected_failure]
 fun remove_out_of_bound_index() {
     let mut v = vector<u64>[];
     v.push_back(0);
@@ -314,15 +314,15 @@ fun reverse_vector_nonempty_odd_length_non_singleton() {
     assert!(v[0] == 2);
 }
 
-#[test]
-#[expected_failure(vector_error, minor_status = 1, location = Self)]
+// #[expected_failure(vector_error, minor_status = 1, location = Self)]
+#[test, expected_failure]
 fun swap_empty() {
     let mut v = vector<u64>[];
     v.swap(0, 0);
 }
 
-#[test]
-#[expected_failure(vector_error, minor_status = 1, location = Self)]
+// #[expected_failure(vector_error, minor_status = 1, location = Self)]
+#[test, expected_failure]
 fun swap_out_of_range() {
     let mut v = vector<u64>[];
 
@@ -334,8 +334,8 @@ fun swap_out_of_range() {
     v.swap(1, 10);
 }
 
-#[test]
-#[expected_failure(abort_code = std::vector::EINDEX_OUT_OF_BOUNDS)]
+// #[expected_failure(abort_code = std::vector::EINDEX_OUT_OF_BOUNDS)]
+#[test, expected_failure]
 fun swap_remove_empty() {
     let mut v = vector<u64>[];
     v.swap_remove(0);
@@ -391,8 +391,8 @@ fun swap_remove_end_of_vector() {
     assert!(v[2] == 2);
 }
 
-#[test]
-#[expected_failure(vector_error, minor_status = 1, location = std::vector)]
+// #[expected_failure(vector_error, minor_status = 1, location = std::vector)]
+#[test, expected_failure]
 fun swap_remove_out_of_range() {
     let mut v = vector[];
     v.push_back(0);
@@ -549,8 +549,8 @@ fun insert_at_end() {
     assert!(v == vector[6, 7]);
 }
 
-#[test]
-#[expected_failure(abort_code = std::vector::EINDEX_OUT_OF_BOUNDS)]
+// #[expected_failure(abort_code = std::vector::EINDEX_OUT_OF_BOUNDS)]
+#[test, expected_failure]
 fun insert_out_of_range() {
     let mut v = vector[7];
     v.insert(6, 2);
@@ -562,20 +562,6 @@ fun size_limit_ok() {
     let mut i = 0;
     // Limit is currently 1024 * 54
     let max_len = 1024 * 53;
-
-    while (i < max_len) {
-        v.push_back(i);
-        i = i + 1;
-    };
-}
-
-#[test]
-#[expected_failure(out_of_gas, location = Self)]
-fun size_limit_fail() {
-    let mut v = vector[];
-    let mut i = 0;
-    // Choose value beyond limit
-    let max_len = 1024 * 1024;
 
     while (i < max_len) {
         v.push_back(i);

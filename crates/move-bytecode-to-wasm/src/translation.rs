@@ -1529,6 +1529,7 @@ fn translate_instruction(
                 module,
                 builder,
                 compilation_ctx,
+                runtime_error_data,
                 *length,
             )?;
 
@@ -1818,10 +1819,11 @@ fn translate_instruction(
             );
         }
         Bytecode::VecLen(signature_index) => {
-            let elem_ir_type =
+            let inner_type =
                 bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
-
-            if let IntermediateType::ITypeParameter(_) = elem_ir_type {
+            if type_contains_generics(&inner_type) {
+                // If the `inner_type` is not fully resolved, we check that the type in the stack
+                // is a reference to a vector.
                 let ref_ty = types_stack.pop()?;
                 types_stack::match_types!(
                     (IntermediateType::IRef(inner), "vector reference", ref_ty),
@@ -1833,7 +1835,7 @@ fn translate_instruction(
                 );
             } else {
                 types_stack.pop_expecting(&IntermediateType::IRef(Arc::new(
-                    IntermediateType::IVector(Arc::new(elem_ir_type)),
+                    IntermediateType::IVector(Arc::new(inner_type)),
                 )))?;
             };
 

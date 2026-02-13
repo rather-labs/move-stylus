@@ -176,6 +176,8 @@ pub enum RuntimeError {
     MemoryAccessOutOfBounds,
     /// The size of an enum is too large to handle.
     EnumSizeTooLarge,
+    /// The vector is NOT empty. Thrown by vector::destroy_empty.
+    VectorNotEmpty,
 }
 
 impl RuntimeError {
@@ -196,6 +198,7 @@ impl RuntimeError {
             RuntimeError::OutOfBounds => b"Out of bounds",
             RuntimeError::MemoryAccessOutOfBounds => b"Memory access out of bounds",
             RuntimeError::EnumSizeTooLarge => b"Enum size too large",
+            RuntimeError::VectorNotEmpty => b"Attempted to destroy an non-empty vector",
         }
     }
 
