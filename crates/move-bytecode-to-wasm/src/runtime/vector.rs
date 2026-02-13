@@ -200,6 +200,25 @@ pub fn vec_swap_function(
         )
         .local_set(len);
 
+    // Throw `OutOfBounds` error if vector is empty
+    builder.block(None, |block| {
+        let block_id = block.id();
+
+        block
+            .local_get(len)
+            .unop(UnaryOp::I32Eqz)
+            .negate()
+            .br_if(block_id);
+
+        block.return_error(
+            module,
+            compilation_ctx,
+            None,
+            runtime_error_data,
+            RuntimeError::OutOfBounds,
+        );
+    });
+
     let vector_ptr = vector_ref;
 
     builder.block(None, |block| {
