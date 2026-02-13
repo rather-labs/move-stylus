@@ -110,26 +110,22 @@ fun test_get_module() {
     assert!(get_module(&get<TestGenerics<std::string::String>>()) ==  string(b"type_name_tests"));
 }
 
-// #[test, expected_failure(abort_code = std::type_name::ENonModuleType)]
-#[test, expected_failure]
+#[test, expected_failure(abort_code = std::type_name::ENonModuleType)]
 fun test_get_address_aborts_with_primitive() {
     get_address(&get<u8>());
 }
 
-// #[test, expected_failure(abort_code = std::type_name::ENonModuleType)]
-#[test, expected_failure]
+#[test, expected_failure(abort_code = std::type_name::ENonModuleType)]
 fun test_get_module_aborts_with_primitive() {
     get_module(&get<bool>());
 }
 
-// #[test, expected_failure(abort_code = std::type_name::ENonModuleType)]
-#[test, expected_failure]
+#[test, expected_failure(abort_code = std::type_name::ENonModuleType)]
 fun test_get_address_aborts_with_primitive_generic() {
     get_address(&get<vector<std::ascii::String>>());
 }
 
-// #[test, expected_failure(abort_code = std::type_name::ENonModuleType)]
-#[test, expected_failure]
+#[test, expected_failure(abort_code = std::type_name::ENonModuleType)]
 fun test_get_module_aborts_with_primitive_generic() {
     get_module(&get<vector<TestGenerics<std::ascii::String>>>());
 }
