@@ -53,6 +53,9 @@ pub enum IntermediateTypeError {
     #[error("found a reference of a reference")]
     FoundReferenceOfReference,
 
+    #[error("reference types are not supported in TypeName")]
+    FoundReferenceInTypeName,
+
     #[error("cannot perform WriteRef on signer type")]
     CannotWriteRefOnSigner,
 

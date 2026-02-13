@@ -65,6 +65,23 @@ pub fn snake_to_upper_camel(input: &str) -> String {
     result
 }
 
+/// Decodes a ULEB128-encoded integer from a byte iterator.
+/// BCS (Binary Canonical Serialization) uses ULEB128 to encode sequence lengths.
+/// Returns `None` if the iterator is exhausted before a complete value is read.
+pub fn decode_uleb128(bytes: &mut std::slice::Iter<'_, u8>) -> Option<usize> {
+    let mut value: u64 = 0;
+    let mut shift: u32 = 0;
+    loop {
+        let byte = bytes.next()?;
+        value |= ((*byte & 0x7F) as u64) << shift;
+        if *byte & 0x80 == 0 {
+            break;
+        }
+        shift += 7;
+    }
+    Some(value as usize)
+}
+
 /// Stores the keccak256 hash of the input string into the memory at the given pointer
 pub fn keccak_string_to_memory(
     builder: &mut InstrSeqBuilder,
