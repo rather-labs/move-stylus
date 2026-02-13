@@ -9,3 +9,4 @@ __fuzz__
 .env.bak
 
 .DS_Store
+move-packages/**/build
