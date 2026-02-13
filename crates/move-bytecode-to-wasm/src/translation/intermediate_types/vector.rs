@@ -1,13 +1,12 @@
+use super::{IntermediateType, error::IntermediateTypeError};
+use crate::{
+    CompilationContext, data::RuntimeErrorData, error::RuntimeError, runtime::RuntimeFunction,
+    wasm_builder_extensions::WasmBuilderExtension,
+};
 use walrus::{
     InstrSeqBuilder, Module, ValType,
-    ir::{BinaryOp, MemArg},
+    ir::{BinaryOp, LoadKind, MemArg},
 };
-
-use super::{IntermediateType, error::IntermediateTypeError};
-use crate::CompilationContext;
-use crate::data::RuntimeErrorData;
-use crate::runtime::RuntimeFunction;
-use crate::wasm_builder_extensions::WasmBuilderExtension;
 
 #[derive(Clone)]
 pub struct IVector;
@@ -137,10 +136,39 @@ impl IVector {
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
+        runtime_error_data: &mut RuntimeErrorData,
         length: u64,
     ) -> Result<(), IntermediateTypeError> {
         let vec_ptr = module.locals.add(ValType::I32);
         builder.local_set(vec_ptr);
+
+        // Verify the vector's in-memory length matches the VecUnpack expected length.
+        // A mismatch indicates `destroy_empty` was called on a non-empty vector (only known case so far), so we abort with `VectorNotEmpty`.
+        builder.block(None, |block| {
+            let block_id = block.id();
+
+            block
+                .local_get(vec_ptr)
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
+                .i32_const(length as i32)
+                .binop(BinaryOp::I32Eq)
+                .br_if(block_id);
+
+            block.return_error(
+                module,
+                compilation_ctx,
+                Some(ValType::I32),
+                runtime_error_data,
+                RuntimeError::VectorNotEmpty,
+            );
+        });
 
         let i = module.locals.add(ValType::I32);
         builder.i32_const(0).local_set(i);

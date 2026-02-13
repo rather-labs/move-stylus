@@ -1529,6 +1529,7 @@ fn translate_instruction(
                 module,
                 builder,
                 compilation_ctx,
+                runtime_error_data,
                 *length,
             )?;
 
