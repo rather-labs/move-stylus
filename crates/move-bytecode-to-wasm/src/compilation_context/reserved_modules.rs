@@ -27,3 +27,4 @@ pub const SF_MODULE_NAME_PEEP: &str = "peep";
 pub const STDLIB_MODULE_NAME_ASCII: &str = "ascii";
 pub const STDLIB_MODULE_NAME_STRING: &str = "string";
 pub const STDLIB_MODULE_UNIT_TEST: &str = "unit_test";
+pub const STDLIB_MODULE_NAME_TYPE_NAME: &str = "type_name";

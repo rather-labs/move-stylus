@@ -14,6 +14,7 @@ mod string;
 mod tests;
 mod transaction;
 pub mod transfer;
+mod type_name;
 mod unit_test;
 
 use std::hash::Hasher;
@@ -31,7 +32,7 @@ use crate::{
             SF_MODULE_NAME_EVENT, SF_MODULE_NAME_OBJECT, SF_MODULE_NAME_PEEP,
             SF_MODULE_NAME_SOL_TYPES, SF_MODULE_NAME_TRANSFER, SF_MODULE_NAME_TX_CONTEXT,
             SF_MODULE_TEST_SCENARIO, STANDARD_LIB_ADDRESS, STDLIB_MODULE_NAME_STRING,
-            STDLIB_MODULE_UNIT_TEST, STYLUS_FRAMEWORK_ADDRESS,
+            STDLIB_MODULE_NAME_TYPE_NAME, STDLIB_MODULE_UNIT_TEST, STYLUS_FRAMEWORK_ADDRESS,
         },
     },
     data::RuntimeErrorData,
@@ -107,6 +108,10 @@ impl NativeFunction {
     const NATIVE_INTERNAL_IS_CHAR_BOUNDARY: &str = "internal_is_char_boundary";
     const NATIVE_INTERNAL_INDEX_OF: &str = "internal_index_of";
     const NATIVE_INTERNAL_SUB_STRING: &str = "internal_sub_string";
+
+    // Standard library functions
+    pub const NATIVE_TYPE_NAME_GET: &str = "get";
+    pub const NATIVE_TYPE_NAME_GET_WITH_ORIGINAL_IDS: &str = "get_with_original_ids";
 
     // Tests
     const NATIVE_POISON: &str = "poison";
@@ -720,7 +725,42 @@ impl NativeFunction {
                     module_id,
                 )?
             }
-
+            //
+            // Standard library
+            //
+            (
+                Self::NATIVE_TYPE_NAME_GET,
+                STANDARD_LIB_ADDRESS,
+                STDLIB_MODULE_NAME_TYPE_NAME,
+                Some(runtime_error_data),
+            ) => {
+                Self::assert_generics_length(generics.len(), 1, name, module_id)?;
+                type_name::add_type_name_get_fn(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    &generics[0],
+                    module_id,
+                )?
+            }
+            (
+                Self::NATIVE_TYPE_NAME_GET_WITH_ORIGINAL_IDS,
+                STANDARD_LIB_ADDRESS,
+                STDLIB_MODULE_NAME_TYPE_NAME,
+                Some(runtime_error_data),
+            ) => {
+                Self::assert_generics_length(generics.len(), 1, name, module_id)?;
+                // In Sui, get() returns the type name using the defining (where type is introduced) package version,
+                // while get_with_original_ids() preserves the original package version.
+                // Since package versioning is Sui-specific, both map to the same implementation here.
+                type_name::add_type_name_get_fn(
+                    module,
+                    compilation_ctx,
+                    runtime_error_data,
+                    &generics[0],
+                    module_id,
+                )?
+            }
             _ => {
                 return Err(NativeFunctionError::GenericdNativeFunctionNotSupported(
                     *module_id,
