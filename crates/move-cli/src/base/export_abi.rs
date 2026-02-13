@@ -3,12 +3,11 @@
 
 use clap::*;
 use move_bytecode_to_wasm::package_module_data;
-use move_compiler::diagnostics::{Diagnostics, report_diagnostics};
 use move_evm_abi_generator::generate_abi;
 use move_package::{BuildConfig, compilation::compiled_package::CompiledUnitWithSource};
-use std::path::Path;
+use std::{path::Path, process::exit};
 
-use crate::error::print_error_diagnostic;
+use crate::error::PrintDiagnostic;
 
 use super::reroot_path;
 
@@ -48,8 +47,14 @@ impl ExportAbi {
                 package.root_compiled_units.iter().collect()
             };
 
-        let package_modules = package_module_data(&package, &root_compiled_units, verbose, false)
-            .map_err(print_error_diagnostic)?;
+        let package_modules =
+            match package_module_data(&package, &root_compiled_units, verbose, false) {
+                Ok(pm) => pm,
+                Err(e) => {
+                    e.print_error_diagnostic();
+                    exit(1);
+                }
+            };
 
         // If neither flag is set, default to generating JSON
         let generate_json = self.json || !self.human_readable;
@@ -97,13 +102,10 @@ impl ExportAbi {
                     }
                 }
             }
-            Err((mapped_files, errors)) => {
-                let mut diagnostics = Diagnostics::new();
-                for error in &errors {
-                    diagnostics.add(error.into());
-                }
 
-                report_diagnostics(&mapped_files, diagnostics)
+            Err(abi_error) => {
+                abi_error.print_error_diagnostic();
+                exit(1);
             }
         }
 

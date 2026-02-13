@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Portions of this file were modified by Rather Labs, Inc on 2025-2026.
 
-use crate::error::print_error_diagnostic;
+use crate::error::PrintDiagnostic;
 
 use super::{get_build_directory, reroot_path, translate_package_cli};
 use clap::*;
@@ -43,14 +43,21 @@ impl Test {
             false,
             true,
         ) {
-            print_error_diagnostic(*compilation_error)
+            (*compilation_error).print_error_diagnostic();
+            exit(1);
         }
 
         let root_compiled_units: Vec<&CompiledUnitWithSource> =
             package.root_compiled_units.iter().collect();
 
-        let package_modules = package_module_data(&package, &root_compiled_units, verbose, true)
-            .map_err(print_error_diagnostic)?;
+        let package_modules =
+            match package_module_data(&package, &root_compiled_units, verbose, true) {
+                Ok(pm) => pm,
+                Err(e) => {
+                    e.print_error_diagnostic();
+                    exit(1);
+                }
+            };
 
         let mut test_failed = false;
         for (path, module_id) in &package_modules.modules_paths {

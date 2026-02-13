@@ -3,12 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // Portions of this file were modified by Rather Labs, Inc on 2025-2026.
 
-use crate::error::print_error_diagnostic;
+use crate::error::PrintDiagnostic;
 
 use super::{reroot_path, translate_package_cli};
 use clap::*;
 use move_package::BuildConfig;
-use std::path::Path;
+use std::{path::Path, process::exit};
 
 /// Build the package at `path`. If no path is provided defaults to current directory.
 #[derive(Parser)]
@@ -53,7 +53,8 @@ impl Build {
             !config.dev_mode,
             false,
         ) {
-            print_error_diagnostic(*compilation_error)
+            (*compilation_error).print_error_diagnostic();
+            exit(1);
         }
 
         Ok(())

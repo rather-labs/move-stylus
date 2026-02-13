@@ -7,6 +7,7 @@
 //! NOTE: This is a POC and it is WIP
 mod abi;
 mod common;
+pub mod error;
 mod human_readable;
 mod json_format;
 mod special_types;
@@ -17,19 +18,17 @@ use std::{
     path::PathBuf,
 };
 
+use crate::error::{AbiGeneratorError, AbiGeneratorErrorKind};
 use move_binary_format::file_format::{
-    Bytecode, CompiledModule, DatatypeHandleIndex, SignatureToken, StructDefInstantiationIndex,
-    StructDefinitionIndex,
+    Bytecode, CompiledModule, DatatypeHandleIndex, FunctionHandleIndex, SignatureToken,
+    StructDefInstantiationIndex, StructDefinitionIndex,
 };
-use move_bytecode_to_wasm::compilation_context as ctx;
 use move_bytecode_to_wasm::{
-    PackageModuleData,
+    PackageModuleData, compilation_context as ctx,
     compilation_context::{ModuleData, module_data::struct_data::IntermediateType},
 };
-use move_compiler::shared::files::MappedFiles;
 use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
 use move_package::compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource};
-use move_parse_special_attributes::SpecialAttributeError;
 use move_symbol_pool::Symbol;
 
 pub struct Abi {
@@ -44,19 +43,24 @@ pub fn generate_abi(
     package_module_data: &PackageModuleData,
     generate_json: bool,
     generate_human_readable: bool,
-) -> Result<Vec<Abi>, (MappedFiles, Vec<SpecialAttributeError>)> {
+) -> Result<Vec<Abi>, AbiGeneratorError> {
     let mut result = Vec::new();
     for root_compiled_module in root_compiled_units {
         let file = &root_compiled_module.source_path;
         let module_id = package_module_data
             .modules_paths
             .get(file)
-            .expect("error getting module id");
+            .ok_or(AbiGeneratorError {
+                kind: AbiGeneratorErrorKind::ModuleIdNotFound(file.clone()),
+            })?;
 
-        let module_data = package_module_data
-            .modules_data
-            .get(module_id)
-            .expect("error getting module data");
+        let module_data =
+            package_module_data
+                .modules_data
+                .get(module_id)
+                .ok_or(AbiGeneratorError {
+                    kind: AbiGeneratorErrorKind::ModuleDataNotFound(*module_id),
+                })?;
 
         // Collect all the calls to emit<> and revert<> function to know which events and errors
         // are emmited in this module so we can put them in the ABI
@@ -67,21 +71,21 @@ pub fn generate_abi(
             root_compiled_units,
             &mut processed_modules,
             &package_module_data.modules_data,
-        );
+        )?;
 
         let abi = abi::Abi::new(
             module_data,
             &package_module_data.modules_data,
             &module_emitted_events,
             &module_errors,
-        );
+        )?;
 
         if abi.is_empty() {
             continue;
         }
 
         let json_abi = if generate_json {
-            Some(json_format::process_abi(&abi))
+            Some(json_format::process_abi(&abi)?)
         } else {
             None
         };
@@ -106,6 +110,11 @@ const STYLUS_FRAMEWORK_ADDRESS: AccountAddress = AccountAddress::new([
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
 ]);
 
+const STYLUS_FRAMEWORK_EVENT_MODULE: &str = "event";
+const STYLUS_FRAMEWORK_ERROR_MODULE: &str = "error";
+const STYLUS_FRAMEWORK_NATIVE_EMIT_FUNCTION: &str = "emit";
+const STYLUS_FRAMEWORK_NATIVE_REVERT_FUNCTION: &str = "revert";
+
 #[derive(Debug)]
 pub(crate) struct FunctionCall {
     module_id: ModuleId,
@@ -125,172 +134,210 @@ pub(crate) struct ErrorStruct {
     identifier: Symbol,
 }
 
-/// This functions recursively searches for `emit` and `revert` calls to put in the ABI which
-/// structs are used for events and errors respectively.
+/// Processes the events and errors emitted by the module and its children
 fn process_events_and_errors(
     package: &CompiledPackage,
     root_compiled_module: &CompiledUnitWithSource,
     root_compiled_units: &[&CompiledUnitWithSource],
     processed_modules: &mut HashSet<ModuleId>,
     modules_data: &HashMap<ctx::ModuleId, ModuleData>,
-) -> (HashSet<EventStruct>, HashSet<ErrorStruct>) {
+) -> Result<(HashSet<EventStruct>, HashSet<ErrorStruct>), AbiGeneratorError> {
     let module = &root_compiled_module.unit.module;
-
     processed_modules.insert(module.self_id());
 
-    // Process top level functions
-    let mut top_level_functions = Vec::new();
-    let mut top_level_events = HashSet::new();
-    let mut top_level_errors = HashSet::new();
-    for function in module.function_defs() {
-        if let Some(ref code) = function.code {
-            for instruction in &code.code {
-                match instruction {
-                    Bytecode::CallGeneric(idx) => {
-                        let instantiation = module.function_instantiation_at(*idx);
-                        let function_handle = module.function_handle_at(instantiation.handle);
-                        let module_id = module
-                            .module_id_for_handle(module.module_handle_at(function_handle.module));
-                        let identifier =
-                            Symbol::from(module.identifier_at(function_handle.name).as_str());
+    let mut function_calls = Vec::new();
+    let mut events = HashSet::new();
+    let mut errors = HashSet::new();
 
-                        if module_id.address() == &STYLUS_FRAMEWORK_ADDRESS {
-                            if module_id.name().as_str() == "event" && identifier.as_str() == "emit"
+    // Helper to resolve ModuleId and Symbol from a FunctionHandleIndex
+    let resolve_call = |handle_idx: FunctionHandleIndex| {
+        let handle = module.function_handle_at(handle_idx);
+        let m_id = module.module_id_for_handle(module.module_handle_at(handle.module));
+        let name = Symbol::from(module.identifier_at(handle.name).as_str());
+        (m_id, name)
+    };
+
+    for function in module
+        .function_defs()
+        .iter()
+        .filter_map(|f| f.code.as_ref())
+    {
+        for instruction in &function.code {
+            match instruction {
+                Bytecode::CallGeneric(idx) => {
+                    let inst = module.function_instantiation_at(*idx);
+                    let (m_id, name) = resolve_call(inst.handle);
+
+                    // Handle Stylus Framework specific calls (emit/revert)
+                    if m_id.address() == &STYLUS_FRAMEWORK_ADDRESS {
+                        let type_params = &module.signature_at(inst.type_parameters).0;
+
+                        match m_id.name().as_str() {
+                            STYLUS_FRAMEWORK_EVENT_MODULE
+                                if name.as_str() == STYLUS_FRAMEWORK_NATIVE_EMIT_FUNCTION =>
                             {
-                                let signature = module.signature_at(instantiation.type_parameters);
-                                match &signature.0[0] {
-                                    SignatureToken::Datatype(datatype_handle_index) => {
-                                        let struct_handle =
-                                            module.datatype_handle_at(*datatype_handle_index);
-                                        top_level_events.insert(EventStruct {
-                                            module_id: module.module_id_for_handle(
-                                                module.module_handle_at(struct_handle.module),
-                                            ),
-                                            identifier: Symbol::from(
-                                                module.identifier_at(struct_handle.name).as_str(),
-                                            ),
-                                            type_parameters: None,
-                                        });
-                                    }
-                                    SignatureToken::DatatypeInstantiation(data) => {
-                                        let (datatype_handle_index, type_parameters) =
-                                            data.as_ref();
-                                        let struct_handle =
-                                            module.datatype_handle_at(*datatype_handle_index);
-
-                                        let event_module_id = module.module_id_for_handle(
-                                            module.module_handle_at(struct_handle.module),
-                                        );
-                                        let event_module = modules_data
-                                            .get(&ctx::ModuleId::new(
-                                                event_module_id.address().into_bytes().into(),
-                                                event_module_id.name().as_str(),
-                                            ))
-                                            .unwrap();
-
-                                        let event_type_parameters = type_parameters
-                                            .iter()
-                                            .map(|t| IntermediateType::try_from_signature_token(t, &event_module.datatype_handles_map))
-                                            .collect::<std::result::Result<Vec<IntermediateType>, _>>()
-                                            .unwrap();
-
-                                        // The identifier is the same accross instantiations because events can be overloaded in the ABI
-                                        let event_identifier = Symbol::from(
-                                            module.identifier_at(struct_handle.name).as_str(),
-                                        );
-
-                                        top_level_events.insert(EventStruct {
-                                            module_id: event_module_id,
-                                            identifier: event_identifier,
-                                            type_parameters: Some(event_type_parameters),
-                                        });
-                                    }
-                                    _ => panic!(
-                                        "invalid type found in emit function {:?}",
-                                        signature.0[0]
+                                let first_ty = type_params.first().ok_or(AbiGeneratorError {
+                                    kind: AbiGeneratorErrorKind::MissingTypeParameter(
+                                        name.as_str().to_string(),
                                     ),
-                                }
-                            } else if module_id.name().as_str() == "error"
-                                && identifier.as_str() == "revert"
-                            {
-                                let signature = module.signature_at(instantiation.type_parameters);
-                                match signature.0[0] {
-                                    SignatureToken::Datatype(datatype_handle_index) => {
-                                        let struct_handle =
-                                            module.datatype_handle_at(datatype_handle_index);
-                                        top_level_errors.insert(ErrorStruct {
-                                            module_id: module.module_id_for_handle(
-                                                module.module_handle_at(struct_handle.module),
-                                            ),
-                                            identifier: Symbol::from(
-                                                module.identifier_at(struct_handle.name).as_str(),
-                                            ),
-                                        });
-                                    }
-                                    _ => panic!("invalid type found in revert function"),
-                                }
+                                })?;
+
+                                events.insert(parse_event(module, first_ty, modules_data)?);
                             }
+                            STYLUS_FRAMEWORK_ERROR_MODULE
+                                if name.as_str() == STYLUS_FRAMEWORK_NATIVE_REVERT_FUNCTION =>
+                            {
+                                let first_ty = type_params.first().ok_or(AbiGeneratorError {
+                                    kind: AbiGeneratorErrorKind::MissingTypeParameter(
+                                        name.as_str().to_string(),
+                                    ),
+                                })?;
+                                errors.insert(parse_error(module, first_ty)?);
+                            }
+                            _ => {}
                         }
-
-                        top_level_functions.push(FunctionCall {
-                            module_id,
-                            identifier,
-                        });
                     }
-                    Bytecode::Call(idx) => {
-                        let function_handle = module.function_handle_at(*idx);
-                        let module_id = module
-                            .module_id_for_handle(module.module_handle_at(function_handle.module));
-                        let identifier =
-                            Symbol::from(module.identifier_at(function_handle.name).as_str());
-                        top_level_functions.push(FunctionCall {
-                            module_id,
-                            identifier,
-                        });
-                    }
-
-                    _ => continue,
+                    function_calls.push(FunctionCall {
+                        module_id: m_id,
+                        identifier: name,
+                    });
                 }
+                Bytecode::Call(idx) => {
+                    let (m_id, name) = resolve_call(*idx);
+                    function_calls.push(FunctionCall {
+                        module_id: m_id,
+                        identifier: name,
+                    });
+                }
+                _ => continue,
             }
         }
     }
 
-    let mut result_events = HashSet::new();
-    let mut result_errors = HashSet::new();
-    // Recursively process calls
-    for function_call in &top_level_functions {
-        if function_call.module_id != module.self_id()
-            && !processed_modules.contains(&function_call.module_id)
-        {
-            let child_module = package
-                .deps_compiled_units
-                .iter()
-                .find(|(_, c)| c.unit.module.self_id() == function_call.module_id)
-                .map(|(_, c)| c)
-                .or_else(|| {
-                    root_compiled_units
-                        .iter()
-                        .find(|c| c.unit.module.self_id() == function_call.module_id)
-                        .copied()
-                })
-                .unwrap_or_else(|| panic!("Could not find dependency {}", function_call.module_id));
-
-            let (events, errors) = process_events_and_errors(
-                package,
-                child_module,
-                root_compiled_units,
-                processed_modules,
-                modules_data,
-            );
-            result_events.extend(events);
-            result_errors.extend(errors);
+    // --- Recursion Phase ---
+    for call in &function_calls {
+        let target_id = &call.module_id;
+        if target_id == &module.self_id() || processed_modules.contains(target_id) {
+            continue;
         }
+
+        let child_unit = find_child_module(package, root_compiled_units, target_id)?;
+        let (child_events, child_errors) = process_events_and_errors(
+            package,
+            child_unit,
+            root_compiled_units,
+            processed_modules,
+            modules_data,
+        )?;
+
+        events.extend(child_events);
+        errors.extend(child_errors);
     }
 
-    result_events.extend(top_level_events);
-    result_errors.extend(top_level_errors);
+    Ok((events, errors))
+}
 
-    (result_events, result_errors)
+/// Helper to find a module in dependencies or root units
+fn find_child_module<'a>(
+    package: &'a CompiledPackage,
+    roots: &[&'a CompiledUnitWithSource],
+    target: &ModuleId,
+) -> Result<&'a CompiledUnitWithSource, AbiGeneratorError> {
+    package
+        .deps_compiled_units
+        .iter()
+        // Destructure the tuple reference directly in the find closure
+        .find(|(_, compiled_unit)| compiled_unit.unit.module.self_id() == *target)
+        .map(|(_, compiled_unit)| compiled_unit)
+        .or_else(|| {
+            roots
+                .iter()
+                .find(|c| c.unit.module.self_id() == *target)
+                .copied()
+        })
+        .ok_or(AbiGeneratorError {
+            kind: AbiGeneratorErrorKind::DependencyNotFound(ctx::ModuleId::new(
+                target.address().into_bytes().into(),
+                target.name().as_str(),
+            )),
+        })
+}
+
+/// Parses an event from a signature token
+fn parse_event(
+    module: &CompiledModule,
+    token: &SignatureToken,
+    modules_data: &HashMap<ctx::ModuleId, ModuleData>,
+) -> Result<EventStruct, AbiGeneratorError> {
+    match token {
+        SignatureToken::Datatype(handle_idx) => {
+            let handle = module.datatype_handle_at(*handle_idx);
+            Ok(EventStruct {
+                module_id: module.module_id_for_handle(module.module_handle_at(handle.module)),
+                identifier: Symbol::from(module.identifier_at(handle.name).as_str()),
+                type_parameters: None,
+            })
+        }
+        SignatureToken::DatatypeInstantiation(data) => {
+            let (handle_idx, type_params) = data.as_ref();
+            let handle = module.datatype_handle_at(*handle_idx);
+            let event_module_id =
+                module.module_id_for_handle(module.module_handle_at(handle.module));
+
+            // Resolve module data to get handle mappings for type conversion
+            let event_module = modules_data
+                .get(&ctx::ModuleId::new(
+                    event_module_id.address().into_bytes().into(),
+                    event_module_id.name().as_str(),
+                ))
+                .ok_or(AbiGeneratorError {
+                    kind: AbiGeneratorErrorKind::DependencyNotFound(ctx::ModuleId::new(
+                        event_module_id.address().into_bytes().into(),
+                        event_module_id.name().as_str(),
+                    )),
+                })?;
+
+            let event_type_parameters = type_params
+                .iter()
+                .map(|t| {
+                    IntermediateType::try_from_signature_token(
+                        t,
+                        &event_module.datatype_handles_map,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|_| AbiGeneratorError {
+                    kind: AbiGeneratorErrorKind::InvalidEmitType(token.clone()),
+                })?;
+
+            Ok(EventStruct {
+                module_id: event_module_id,
+                identifier: Symbol::from(module.identifier_at(handle.name).as_str()),
+                type_parameters: Some(event_type_parameters),
+            })
+        }
+        _ => Err(AbiGeneratorError {
+            kind: AbiGeneratorErrorKind::InvalidEmitType(token.clone()),
+        }),
+    }
+}
+
+/// Parses an error from a signature token
+fn parse_error(
+    module: &CompiledModule,
+    token: &SignatureToken,
+) -> Result<ErrorStruct, AbiGeneratorError> {
+    if let SignatureToken::Datatype(handle_idx) = token {
+        let handle = module.datatype_handle_at(*handle_idx);
+        Ok(ErrorStruct {
+            module_id: module.module_id_for_handle(module.module_handle_at(handle.module)),
+            identifier: Symbol::from(module.identifier_at(handle.name).as_str()),
+        })
+    } else {
+        Err(AbiGeneratorError {
+            kind: AbiGeneratorErrorKind::InvalidRevertType(token.clone()),
+        })
+    }
 }
 
 /// Maps a `DatatypeHandleIndex` to a `StructDefInstantiationIndex` by finding the struct definition
@@ -300,71 +347,62 @@ fn find_struct_def_instantiation_index(
     datatype_handle_index: DatatypeHandleIndex,
     type_parameters: &[SignatureToken],
 ) -> Option<StructDefInstantiationIndex> {
-    // Verify the struct definition exists
-    module.find_struct_def(datatype_handle_index)?;
-
-    // Get the index of this struct definition
+    // 1. Locate the StructDefinitionIndex
     let struct_def_index = module
         .struct_defs()
         .iter()
         .position(|d| d.struct_handle == datatype_handle_index)
         .map(|idx| StructDefinitionIndex::new(idx as u16))?;
 
-    // Search through struct instantiations to find one that matches both the struct definition and type parameters
-    for (idx, instantiation) in module.struct_instantiations().iter().enumerate() {
-        if instantiation.def == struct_def_index {
-            // Get the type parameters for this instantiation
-            let instantiation_type_params = &module.signature_at(instantiation.type_parameters).0;
-
-            // Check if the type parameters match
-            if instantiation_type_params.len() == type_parameters.len() {
-                let mut matches = true;
-                for (inst_param, expected_param) in
-                    instantiation_type_params.iter().zip(type_parameters.iter())
-                {
-                    if !signature_tokens_match(inst_param, expected_param) {
-                        matches = false;
-                        break;
-                    }
-                }
-                if matches {
-                    return Some(StructDefInstantiationIndex::new(idx as u16));
-                }
+    // 2. Find the instantiation matching both the index and the type parameters
+    module
+        .struct_instantiations()
+        .iter()
+        .enumerate()
+        .find(|(_, inst)| {
+            if inst.def != struct_def_index {
+                return false;
             }
-        }
-    }
 
-    None
+            let inst_params = &module.signature_at(inst.type_parameters).0;
+
+            // Length check + element-wise comparison
+            inst_params.len() == type_parameters.len()
+                && inst_params
+                    .iter()
+                    .zip(type_parameters)
+                    .all(|(a, b)| signature_tokens_match(a, b))
+        })
+        .map(|(idx, _)| StructDefInstantiationIndex::new(idx as u16))
 }
 
 /// Checks if two signature tokens match (for type parameter comparison)
 fn signature_tokens_match(token1: &SignatureToken, token2: &SignatureToken) -> bool {
+    use SignatureToken::*;
     match (token1, token2) {
-        (SignatureToken::Vector(inner1), SignatureToken::Vector(inner2)) => {
-            signature_tokens_match(inner1, inner2)
+        // Group single-inner recursive types
+        (Vector(t1), Vector(t2))
+        | (Reference(t1), Reference(t2))
+        | (MutableReference(t1), MutableReference(t2)) => signature_tokens_match(t1, t2),
+
+        // Direct index comparisons
+        (Datatype(idx1), Datatype(idx2)) => idx1 == idx2,
+        (TypeParameter(idx1), TypeParameter(idx2)) => idx1 == idx2,
+
+        // Complex instantiations
+        (DatatypeInstantiation(inst1), DatatypeInstantiation(inst2)) => {
+            let (id1, params1) = inst1.as_ref();
+            let (id2, params2) = inst2.as_ref();
+
+            id1 == id2
+                && params1.len() == params2.len()
+                && params1
+                    .iter()
+                    .zip(params2)
+                    .all(|(p1, p2)| signature_tokens_match(p1, p2))
         }
-        (SignatureToken::Datatype(idx1), SignatureToken::Datatype(idx2)) => idx1 == idx2,
-        (
-            SignatureToken::DatatypeInstantiation(inst1),
-            SignatureToken::DatatypeInstantiation(inst2),
-        ) => {
-            let (idx1, params1) = inst1.as_ref();
-            let (idx2, params2) = inst2.as_ref();
-            if idx1 != idx2 || params1.len() != params2.len() {
-                return false;
-            }
-            params1
-                .iter()
-                .zip(params2.iter())
-                .all(|(p1, p2)| signature_tokens_match(p1, p2))
-        }
-        (SignatureToken::TypeParameter(idx1), SignatureToken::TypeParameter(idx2)) => idx1 == idx2,
-        (SignatureToken::Reference(inner1), SignatureToken::Reference(inner2)) => {
-            signature_tokens_match(inner1, inner2)
-        }
-        (SignatureToken::MutableReference(inner1), SignatureToken::MutableReference(inner2)) => {
-            signature_tokens_match(inner1, inner2)
-        }
+
+        // Catch-all for primitives (U8, Address, Bool, etc.) and mismatches
         (t1, t2) => t1 == t2,
     }
 }

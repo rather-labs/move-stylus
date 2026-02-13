@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Portions of this file were modified by Rather Labs, Inc on 2025-2026.
 
-use crate::error::print_error_diagnostic;
+use crate::error::PrintDiagnostic;
 
 use super::{reroot_path, translate_package_cli};
 use clap::*;
@@ -11,7 +11,7 @@ use move_bytecode_source_map::utils::serialize_to_json_string;
 use move_compiler::compiled_unit::NamedCompiledModule;
 use move_disassembler::disassembler::Disassembler;
 use move_package::{BuildConfig, compilation::compiled_package::CompiledUnitWithSource};
-use std::path::Path;
+use std::{path::Path, process::exit};
 
 /// Disassemble the Move bytecode pointed to
 #[derive(Parser)]
@@ -105,7 +105,8 @@ impl Disassemble {
             false,
             false,
         ) {
-            print_error_diagnostic(*compilation_error)
+            (*compilation_error).print_error_diagnostic();
+            exit(1);
         }
 
         Ok(())
