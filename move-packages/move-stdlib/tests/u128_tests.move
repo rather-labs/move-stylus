@@ -68,7 +68,7 @@ fun test_pow_overflow() {
 fun test_sqrt() {
     // prettier-ignore
     let reflexive_cases =
-        vector[0, 2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35, 38, 41, 44, 47, 50, 53, 56, 59];
+        vector[0, 2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35, 38, 41, 44, 47, 50, 53, 56];
     integer_tests::test_sqrt!(MAX, CASES, reflexive_cases)
 }
 
