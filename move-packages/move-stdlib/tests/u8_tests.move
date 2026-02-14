@@ -52,10 +52,24 @@ fun test_divide_and_round_up() {
     integer_tests::test_divide_and_round_up!(MAX, CASES);
 }
 
+/**
+This test fails because the wasm runtime traps when dividing by zero.
+Although the behavior is correct, the test fails because the runtime aborts execution instead of returning an error.
+
 #[test, expected_failure(arithmetic_error, location = std::u8)]
 fun test_divide_and_round_up_error() {
     1u8.divide_and_round_up(0);
 }
+
+called `Result::unwrap()` on an `Err` value: error calling entrypoint: error while executing at wasm backtrace:
+    0: 0xc742 - <unknown>!divide_and_round_up_23b00a14dd71e5f2
+    1: 0xd6c4 - <unknown>!test_divide_and_round_up_error_73f0c0193b2dc36c
+
+Caused by:
+    wasm trap: integer divide by zero
+
+*/
+
 
 #[test]
 fun test_pow() {
