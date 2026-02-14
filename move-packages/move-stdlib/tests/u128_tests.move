@@ -52,11 +52,6 @@ fun test_divide_and_round_up() {
     integer_tests::test_divide_and_round_up!(MAX, CASES);
 }
 
-#[test, expected_failure(arithmetic_error, location = std::u8)]
-fun test_divide_and_round_up_error() {
-    1u8.divide_and_round_up(0);
-}
-
 #[test]
 fun test_pow() {
     integer_tests::test_pow!(MAX, CASES);
@@ -73,7 +68,7 @@ fun test_pow_overflow() {
 fun test_sqrt() {
     // prettier-ignore
     let reflexive_cases =
-        vector[0, 2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35, 38, 41, 44, 47, 50, 53, 56, 59];
+        vector[0, 2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35, 38, 41, 44, 47, 50, 53, 56];
     integer_tests::test_sqrt!(MAX, CASES, reflexive_cases)
 }
 

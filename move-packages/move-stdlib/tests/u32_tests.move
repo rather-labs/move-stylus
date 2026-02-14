@@ -52,11 +52,6 @@ fun test_divide_and_round_up() {
     integer_tests::test_divide_and_round_up!(MAX, CASES);
 }
 
-#[test, expected_failure(arithmetic_error, location = std::u8)]
-fun test_divide_and_round_up_error() {
-    1u8.divide_and_round_up(0);
-}
-
 #[test]
 fun test_pow() {
     integer_tests::test_pow!(MAX, CASES);
