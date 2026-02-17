@@ -5,7 +5,7 @@ use crate::{
 use walrus::{FunctionBuilder, FunctionId, Module, ValType, ir::BinaryOp};
 
 pub fn inject_signer(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
-    let mut function = FunctionBuilder::new(&mut module.types, &[], &[]);
+    let mut function = FunctionBuilder::new(&mut module.types, &[], &[ValType::I32]);
     let mut builder = function
         .name(RuntimeFunction::InjectSigner.name().to_owned())
         .func_body();
