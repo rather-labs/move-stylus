@@ -66,3 +66,12 @@ entry fun freeze_ref(y: u8): u8 {
 entry fun unpack_ref_u8_misc(x: &u8, y: &u8, z: &u8): u8 {
   *x + *y + *z
 }
+
+fun write_mut_ref_no_return(x: &mut u8, y: u8) {
+  *x = y;
+}
+
+entry fun test_write_mut_ref_no_return(mut x: u8, y: u8): u8 {
+  write_mut_ref_no_return(&mut x, y);
+  x
+}

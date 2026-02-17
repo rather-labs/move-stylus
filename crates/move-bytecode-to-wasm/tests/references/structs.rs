@@ -48,6 +48,7 @@ sol!(
     function freezeRef(Foo x) external returns (Foo);
     function identityStructRef(Foo x) external returns (Foo);
     function identityStaticStructRef(Bar x) external returns (Bar);
+    function testWriteMutRefNoReturn(Bar x, Bar y) external returns (Bar);
 );
 
 fn get_foo() -> Foo {
@@ -142,6 +143,7 @@ fn test_struct_ref<T: SolCall>(
 
 #[rstest]
 #[case(identityStaticStructRefCall::new((Bar { a: 42, b: 4242 },)), Bar { a: 42, b: 4242 })]
+#[case(testWriteMutRefNoReturnCall::new((Bar { a: 1, b: 2 }, Bar { a: 3, b: 4 }),), Bar { a: 3, b: 4 })]
 fn test_static_struct_ref<T: SolCall>(
     #[by_ref] runtime: &RuntimeSandbox,
     #[case] call_data: T,

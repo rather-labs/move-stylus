@@ -23,6 +23,9 @@ sol!(
     function echoMutVecHeapType(uint128[] a) external returns (uint128[]);
     function echoMutAddress(address a) external returns (address);
     function echoBarStructFields(uint32 a, uint128 b) external returns (uint32, uint128);
+    function testMutateStackVec(uint32[] r) external returns (uint32[]);
+    function testMutateHeapVec(uint128[] s) external returns (uint128[]);
+    function testDerefAndReplaceFoo() external returns (uint8, uint16);
 );
 
 #[rstest]
@@ -49,6 +52,9 @@ sol!(
 #[case(echoBarStructFieldsCall::new((1, u128::MAX)), (1, u128::MAX),)]
 #[case(echoBarStructFieldsCall::new((u32::MAX, 1)), (u32::MAX, 1),)]
 #[case(echoBarStructFieldsCall::new((1, 1)), (1, 1),)]
+#[case(testMutateStackVecCall::new((vec![1, 2, 3],)), vec![1, 2, 3])]
+#[case(testMutateHeapVecCall::new((vec![1, 2, 3],)), vec![1, 2, 3])]
+#[case(testDerefAndReplaceFooCall::new(()), (1, 2),)]
 fn test_struct_field_mut_reference<T: SolCall, V: SolValue>(
     #[by_ref] runtime: &RuntimeSandbox,
     #[case] call_data: T,
