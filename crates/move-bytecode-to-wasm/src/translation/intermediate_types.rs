@@ -666,24 +666,116 @@ impl IntermediateType {
                     );
                 }
             }
-            // We just update the intermediate pointer, since the new values are already allocated
-            // in memory
-            IntermediateType::IVector(_)
-            | IntermediateType::IStruct { .. }
+            // ── WriteRef for vectors ──────────────────────────────────────
+            //
+            // Vectors use a variable-size heap allocation (length + capacity
+            // + data buffer), so `*ref = new_vec` may point to a completely
+            // different address.  We can't just memcpy in-place because the
+            // old and new allocations may have different capacities / sizes.
+            //
+            // To let *other* mutable references (held by callers up the
+            // stack) discover the new location, we leave a DEADBEEF
+            // redirect at the old allocation:
+            //
+            //   memory layout at old_vec_ptr after redirect:
+            //     [0xDEADBEEF (4 bytes)] [new_vec_ptr (4 bytes)] ...
+            //
+            // After a function call, the post-call fixup (`VecUpdateMutRef`)
+            // walks this chain from the caller's saved box_ptr and patches
+            // it to the final destination.
+            //
+            // If old_vec_ptr == new_vec_ptr (e.g. an in-place mutation that
+            // didn't reallocate), we skip the redirect — the data is already
+            // where every reference expects it.
+            //
+            IntermediateType::IVector(_) => {
+                let ref_ptr = module.locals.add(ValType::I32);
+                let new_vec_ptr = module.locals.add(ValType::I32);
+                let old_vec_ptr = module.locals.add(ValType::I32);
+
+                // Stack arrives as [..., ref_ptr, new_vec_ptr].  Pop both.
+                builder.local_set(ref_ptr).local_set(new_vec_ptr);
+
+                // old_vec_ptr = memory[ref_ptr]  — the pointer the ref currently holds.
+                builder
+                    .local_get(ref_ptr)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(old_vec_ptr);
+
+                // Guard: only write the redirect when the vector actually relocated.
+                builder
+                    .local_get(new_vec_ptr)
+                    .local_get(old_vec_ptr)
+                    .binop(BinaryOp::I32Ne)
+                    .if_else(
+                        None,
+                        |then| {
+                            then.mark_vec_as_relocated(compilation_ctx, old_vec_ptr, new_vec_ptr);
+                        },
+                        |_| {},
+                    );
+
+                // memory[ref_ptr] = new_vec_ptr  — update the immediate reference
+                // so subsequent reads through this ref see the new vector.
+                builder.local_get(ref_ptr).local_get(new_vec_ptr).store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            }
+            IntermediateType::IStruct { .. }
             | IntermediateType::IGenericStructInstance { .. }
             | IntermediateType::IEnum { .. }
             | IntermediateType::IGenericEnumInstance { .. } => {
-                // Since the memory needed for vectors might differ, we don't overwrite it.
-                // We update the inner pointer to point to the location where the new vector is already allocated.
+                let heap_size = match self {
+                    IntermediateType::IStruct { .. }
+                    | IntermediateType::IGenericStructInstance { .. } => {
+                        compilation_ctx
+                            .get_struct_by_intermediate_type(self)?
+                            .heap_size
+                    }
+                    _ => compilation_ctx
+                        .get_enum_by_intermediate_type(self)?
+                        .heap_size()?
+                        .ok_or(IntermediateTypeError::FoundTypeParameter)?,
+                };
+
                 let src_ptr = module.locals.add(ValType::I32);
                 let ref_ptr = module.locals.add(ValType::I32);
 
-                // Swap pointers order in the stack
-                builder.swap(ref_ptr, src_ptr);
+                // Pop ref_ptr and src_ptr from the wasm value stack.
+                builder.local_set(ref_ptr).local_set(src_ptr);
 
-                // Store src_ptr at ref_ptr
-                // Now the inner pointer is updated to point to the new vector/struct
-                builder.store(
+                // memcpy(dst=memory[ref_ptr], src=src_ptr, len=heap_size)
+                // Overwrites the old struct/enum data in-place so all
+                // existing references to that allocation observe the new value.
+                builder
+                    .local_get(ref_ptr)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_get(src_ptr)
+                    .i32_const(heap_size as i32)
+                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
+                // Update the immediate reference so subsequent reads through
+                // ref_ptr resolve to the (identical) new data.
+                builder.local_get(ref_ptr).local_get(src_ptr).store(
                     compilation_ctx.memory_id,
                     StoreKind::I32 { atomic: false },
                     MemArg {

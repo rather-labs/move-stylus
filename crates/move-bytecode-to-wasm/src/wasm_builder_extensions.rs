@@ -6,7 +6,10 @@ use walrus::{
 use crate::{
     CompilationContext,
     compilation_context::ModuleId,
-    data::{BAD_F00D, DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_SLOT_DATA_PTR_OFFSET, RuntimeErrorData},
+    data::{
+        BAD_F00D, DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_SLOT_DATA_PTR_OFFSET, DEAD_BEEF,
+        RuntimeErrorData,
+    },
     error::RuntimeError,
     native_functions::NativeFunction,
     runtime::RuntimeFunction,
@@ -155,6 +158,20 @@ pub trait WasmBuilderExtension {
         return_type: Option<ValType>,
         runtime_error_data: &mut RuntimeErrorData,
         runtime_error: RuntimeError,
+    ) -> &mut Self;
+
+    /// Writes the DEADBEEF redirect marker at the old vector location so that
+    /// stale mutable references can discover the new location by following the
+    /// forwarding chain.
+    ///
+    /// Emits:
+    ///   `memory[old_vec_ptr + 0] = 0xDEADBEEF`  (redirect marker)
+    ///   `memory[old_vec_ptr + 4] = new_vec_ptr`  (forwarding pointer)
+    fn mark_vec_as_relocated(
+        &mut self,
+        compilation_ctx: &CompilationContext,
+        old_vec_ptr: LocalId,
+        new_vec_ptr: LocalId,
     ) -> &mut Self;
 }
 
@@ -417,6 +434,33 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
         self.i32_const(runtime_error_data.get(module, compilation_ctx.memory_id, runtime_error));
 
         self.add_handle_error_instructions(module, compilation_ctx, return_type);
+        self
+    }
+
+    fn mark_vec_as_relocated(
+        &mut self,
+        compilation_ctx: &CompilationContext,
+        old_vec_ptr: LocalId,
+        new_vec_ptr: LocalId,
+    ) -> &mut Self {
+        // memory[old_vec_ptr + 0] = 0xDEADBEEF (redirect marker)
+        self.local_get(old_vec_ptr).i32_const(DEAD_BEEF).store(
+            compilation_ctx.memory_id,
+            StoreKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
+        // memory[old_vec_ptr + 4] = new_vec_ptr (forwarding pointer)
+        self.local_get(old_vec_ptr).local_get(new_vec_ptr).store(
+            compilation_ctx.memory_id,
+            StoreKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 4,
+            },
+        );
         self
     }
 }

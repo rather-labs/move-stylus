@@ -62,3 +62,13 @@ entry fun freeze_ref(y: u128): u128 {
     let x_frozen_ref: &u128 = freeze(x_mut_ref);
     *x_frozen_ref
 }
+
+
+fun write_mut_ref_no_return(x: &mut u128, y: u128) {
+  *x = y;
+}
+
+entry fun test_write_mut_ref_no_return(mut x: u128, y: u128): u128 {
+  write_mut_ref_no_return(&mut x, y);
+  x
+}

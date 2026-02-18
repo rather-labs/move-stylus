@@ -16,6 +16,11 @@ sol!(
     function unpackUtf83(string value, uint16 n, string value2) external returns (bool);
     function unpackUtf84(string value, uint16[] n, string value2) external returns (bool);
     function packUnpackUtf8(string value) external returns (string); function packUnpackUtf82(string value, string value2) external returns (string, string);
+    function testInsert(string s, uint64 at, string o) external returns (string);
+    function testSubstring(string s, uint64 i, uint64 j) external returns (string);
+    function testPartitionString(string s, uint64 i) external returns (string, string);
+    function testAppend(string s, string o) external returns (string);
+    function testCustomInsert(string s, uint64 at, string o) external;
 );
 
 #[rstest]
@@ -45,6 +50,30 @@ sol!(
         "test string".to_owned(),
     )), true)]
 #[case(packUnpackUtf8Call::new(("test string".to_owned(),)), "test string")]
+#[case(testInsertCall::new((
+        "abcd".to_owned(),
+        1,
+        "xy".to_owned(),
+    )), "axybcd")]
+#[case(testSubstringCall::new((
+        "abcd".to_owned(),
+        0,
+        2,
+    )), "ab".to_owned())]
+#[case(testSubstringCall::new((
+        "abcd".to_owned(),
+        2,
+        4,
+    )), "cd".to_owned())]
+#[case(testAppendCall::new((
+        "abcd".to_owned(),
+        "xy".to_owned(),
+    )), "abcdxy")]
+#[case(testCustomInsertCall::new((
+        "abcd".to_owned(),
+        1,
+        "xy".to_owned(),
+    )), "axybcd")]
 fn test_utf8<T: SolCall, V: SolValue>(
     #[by_ref] runtime: &RuntimeSandbox,
     #[case] call_data: T,
@@ -69,6 +98,10 @@ fn test_utf8<T: SolCall, V: SolValue>(
         "test string",
         "hello world",
     ))]
+#[case(testPartitionStringCall::new((
+        "abcd".to_owned(),
+        2,
+    )), ("ab".to_owned(), "cd".to_owned()))]
 fn test_utf8_multiple<T: SolCall, V: SolValue>(
     #[by_ref] runtime: &RuntimeSandbox,
     #[case] call_data: T,
