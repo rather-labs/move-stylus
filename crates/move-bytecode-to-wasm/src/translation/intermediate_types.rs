@@ -19,7 +19,6 @@ use std::{
 use crate::{
     CompilationContext, UserDefinedType,
     compilation_context::{ModuleId, module_data::Address},
-    data::DEAD_BEEF,
     data::RuntimeErrorData,
     hasher::get_hasher,
     runtime::RuntimeFunction,
@@ -675,7 +674,7 @@ impl IntermediateType {
             // old and new allocations may have different capacities / sizes.
             //
             // To let *other* mutable references (held by callers up the
-            // stack) discover the new location, we leave a DEADBEE
+            // stack) discover the new location, we leave a DEADBEEF
             // redirect at the old allocation:
             //
             //   memory layout at old_vec_ptr after redirect:
@@ -718,26 +717,7 @@ impl IntermediateType {
                     .if_else(
                         None,
                         |then| {
-                            // memory[old_vec_ptr + 0] = 0xDEADBEEF   (redirect marker,
-                            // overwrites the old vector's `length` field)
-                            then.local_get(old_vec_ptr).i32_const(DEAD_BEEF).store(
-                                compilation_ctx.memory_id,
-                                StoreKind::I32 { atomic: false },
-                                MemArg {
-                                    align: 0,
-                                    offset: 0,
-                                },
-                            );
-                            // memory[old_vec_ptr + 4] = new_vec_ptr  (forwarding pointer,
-                            // overwrites the old vector's `capacity` field)
-                            then.local_get(old_vec_ptr).local_get(new_vec_ptr).store(
-                                compilation_ctx.memory_id,
-                                StoreKind::I32 { atomic: false },
-                                MemArg {
-                                    align: 0,
-                                    offset: 4,
-                                },
-                            );
+                            then.mark_vec_as_relocated(compilation_ctx, old_vec_ptr, new_vec_ptr);
                         },
                         |_| {},
                     );

@@ -480,13 +480,13 @@ pub fn vec_push_back_function(
         },
     );
 
-    // Check if len == capacity. If true, we copy the original vector but doubling its capacity.
     let copy_local_function = RuntimeFunction::VecCopyLocal.get_generic(
         module,
         compilation_ctx,
         Some(runtime_error_data),
         &[inner],
     )?;
+    // Check if length == capacity. If true, we copy the original vector but doubling its capacity.
     builder.binop(BinaryOp::I32Eq).if_else(
         None,
         |then| {
@@ -510,30 +510,9 @@ pub fn vec_push_back_function(
                     },
                 );
 
-            // Mark the original vector location with the DEADBEEF flag to indicate relocation.
-            // When a vector is resized, any existing mutable references pointing to the old
-            // location become invalid. By writing DEADBEEF into the length field (first 4 bytes)
-            // of the original vector, we create a marker that can be detected after function calls.
-            // After a call_indirect, we check for this flag and update any mutable references
-            // that still point to the old location, following the chain to the new vector.
-            then.local_get(vec_ptr).i32_const(DEAD_BEEF).store(
-                compilation_ctx.memory_id,
-                StoreKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
-            // Set the original vector pointer to the new vector pointer.
-            // This way we can update the reference to it, as explained above
-            then.local_get(vec_ptr).local_get(new_vec_ptr).store(
-                compilation_ctx.memory_id,
-                StoreKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 4,
-                },
-            );
+            // Mark the original vector location with the DEADBEEF redirect so
+            // that stale mutable references can follow the forwarding chain.
+            then.mark_vec_as_relocated(compilation_ctx, vec_ptr, new_vec_ptr);
             then.local_get(new_vec_ptr).local_set(vec_ptr);
         },
         |_| {},
