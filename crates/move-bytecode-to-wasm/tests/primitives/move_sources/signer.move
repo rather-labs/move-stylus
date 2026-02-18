@@ -1,17 +1,7 @@
 module 0x01::signer_type;
 
-entry fun echo(x: signer): signer {
-    x
-}
+use std::signer::address_of;
 
-entry fun echo_identity(x: signer): signer {
-  identity(x)
-}
-
-fun identity(x: signer): signer{
-  x
-}
-
-entry fun echo_with_int(x: signer, y: u8): (u8, signer) {
-    (y, x)
+entry fun echo_address(x: signer): address {
+    address_of(&x)
 }

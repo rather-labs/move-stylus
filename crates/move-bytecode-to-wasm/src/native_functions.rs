@@ -10,6 +10,7 @@ pub mod error;
 mod event;
 pub mod object;
 mod peep;
+mod signer;
 mod string;
 mod tests;
 mod transaction;
@@ -31,8 +32,9 @@ use crate::{
             SF_MODULE_NAME_ACCOUNT, SF_MODULE_NAME_DYNAMIC_FIELD, SF_MODULE_NAME_ERROR,
             SF_MODULE_NAME_EVENT, SF_MODULE_NAME_OBJECT, SF_MODULE_NAME_PEEP,
             SF_MODULE_NAME_SOL_TYPES, SF_MODULE_NAME_TRANSFER, SF_MODULE_NAME_TX_CONTEXT,
-            SF_MODULE_TEST_SCENARIO, STANDARD_LIB_ADDRESS, STDLIB_MODULE_NAME_STRING,
-            STDLIB_MODULE_NAME_TYPE_NAME, STDLIB_MODULE_UNIT_TEST, STYLUS_FRAMEWORK_ADDRESS,
+            SF_MODULE_TEST_SCENARIO, STANDARD_LIB_ADDRESS, STDLIB_MODULE_NAME_SIGNER,
+            STDLIB_MODULE_NAME_STRING, STDLIB_MODULE_NAME_TYPE_NAME, STDLIB_MODULE_UNIT_TEST,
+            STYLUS_FRAMEWORK_ADDRESS,
         },
     },
     data::RuntimeErrorData,
@@ -112,6 +114,7 @@ impl NativeFunction {
     // Standard library functions
     pub const NATIVE_TYPE_NAME_GET: &str = "get";
     pub const NATIVE_TYPE_NAME_GET_WITH_ORIGINAL_IDS: &str = "get_with_original_ids";
+    pub const NATIVE_SIGNER_ADDRESS_OF: &str = "address_of";
 
     // Tests
     const NATIVE_POISON: &str = "poison";
@@ -369,6 +372,11 @@ impl NativeFunction {
                     STANDARD_LIB_ADDRESS,
                     STDLIB_MODULE_NAME_STRING,
                 ) => string::add_internal_sub_string(module, compilation_ctx, module_id)?,
+                (
+                    Self::NATIVE_SIGNER_ADDRESS_OF,
+                    STANDARD_LIB_ADDRESS,
+                    STDLIB_MODULE_NAME_SIGNER,
+                ) => signer::add_signer_address_of_fn(module, compilation_ctx, module_id)?,
                 _ => {
                     return Err(NativeFunctionError::NativeFunctionNotSupported(
                         *module_id,
