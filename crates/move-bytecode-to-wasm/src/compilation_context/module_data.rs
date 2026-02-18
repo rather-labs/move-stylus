@@ -47,6 +47,7 @@ use std::{
 use struct_data::StructData;
 
 use super::{CompilationContextError, Result, reserved_modules::SF_MODULE_NAME_TX_CONTEXT};
+use crate::utils::decode_uleb128;
 
 #[derive(Debug)]
 pub enum UserDefinedType {
@@ -183,7 +184,7 @@ impl ModuleData<'_> {
         move_module: &'move_package CompiledUnitWithSource,
         move_module_dependencies: &'move_package [(PackageName, CompiledUnitWithSource)],
         root_compiled_units: &[&'move_package CompiledUnitWithSource],
-        special_attributes: SpecialAttributes,
+        mut special_attributes: SpecialAttributes,
         test_mode: bool,
     ) -> Result<ModuleData<'move_package>> {
         let move_module_unit = &move_module.unit.module;
@@ -251,6 +252,9 @@ impl ModuleData<'_> {
 
         let constants = Self::process_constants(move_module_unit, &datatype_handles_map)?;
 
+        // Resolve #[error] vector<u8> constants to their clever error u64 abort codes
+        // by looking up the constant pool.
+        compute_clever_error_abort_codes(&constants, &mut special_attributes)?;
         Ok(ModuleData {
             id: module_id,
             constants,
@@ -1214,4 +1218,79 @@ fn is_tx_context_ref(
         }
         _ => Ok(false),
     }
+}
+
+/// Computes the clever error u64 abort code for each `#[error]` constant
+/// by looking up its entries in the constant pool.
+///
+/// The Move compiler encodes `#[error]` constants as a u64 bitset (see `ErrorBitset`
+/// in `move-command-line-common/src/error_bitset.rs`):
+///
+/// ```text
+/// |<tagbit>|<reserved>|<line number>|<identifier index>|<constant index>|
+///   1-bit    15-bits       16-bits        16-bits          16-bits
+/// ```
+///
+/// For each `#[error]` constant, the compiler adds **two** entries to the constant pool:
+/// 1. The error message data (`vector<u8>`) → referenced by `constant_index`
+/// 2. The constant's name as a `vector<u8>` string → referenced by `identifier_index`
+///
+/// The line number (bits 47-32) varies depending on where a macro is expanded,
+/// so it is masked out during comparison (see `CLEVER_ERROR_COMPARISON_MASK` in the
+/// test runner). We set it to 0 when constructing the u64.
+fn compute_clever_error_abort_codes(
+    constants: &Vec<Constant>,
+    special_attributes: &mut SpecialAttributes,
+) -> Result<()> {
+    if special_attributes.clever_error_constants.is_empty() {
+        return Ok(());
+    }
+
+    // Build a map from constant pool data content (after ULEB128 length prefix) → pool index,
+    // only for vector<u8> constants.
+    let mut data_to_pool_index: HashMap<&[u8], u16> = HashMap::new();
+    for (idx, constant) in constants.iter().enumerate() {
+        if matches!(
+            &constant.type_,
+            IntermediateType::IVector(inner) if matches!(inner.as_ref(), IntermediateType::IU8)
+        ) && !constant.data.is_empty()
+        {
+            // Data format: [ULEB128 length][bytes...]
+            let mut iter = constant.data.iter();
+            if let Some(len) = decode_uleb128(&mut iter) {
+                let data = iter.as_slice();
+                if data.len() == len {
+                    data_to_pool_index.insert(data, idx as u16);
+                }
+            }
+        }
+    }
+
+    for (name, clever_error) in special_attributes.clever_error_constants.iter_mut() {
+        // Find the constant_index: pool entry whose data matches the error message bytes
+        // This is safe because constants with the same bytes are deduplicated by the compiler.
+        let constant_index = *data_to_pool_index
+            .get(clever_error.bytes.as_slice())
+            .ok_or_else(|| ModuleDataError::CleverErrorConstantDataNotFound {
+                name: name.to_string(),
+            })?;
+
+        // Find the identifier_index: pool entry whose data matches the constant name bytes
+        let name_bytes = name.as_str().as_bytes();
+        let identifier_index = *data_to_pool_index.get(name_bytes).ok_or_else(|| {
+            ModuleDataError::CleverErrorIdentifierNotFound {
+                name: name.to_string(),
+            }
+        })?;
+
+        // Construct the clever error u64:
+        // tag bit (1) at position 63, line_number = 0 (masked out in comparison),
+        // identifier_index at bits 31-16, constant_index at bits 15-0
+        let clever_error_u64 =
+            (1u64 << 63) | ((identifier_index as u64) << 16) | (constant_index as u64);
+
+        clever_error.resolved_u64 = Some(clever_error_u64);
+    }
+
+    Ok(())
 }
