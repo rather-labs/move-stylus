@@ -45,4 +45,14 @@ pub enum ModuleDataError {
 
     #[error("generic field index not found for field instantiation index {0}")]
     InstantiatedFieldGenericIndexNotFound(FieldInstantiationIndex),
+
+    #[error(
+        "could not resolve #[error] constant \"{name}\": its data was not found in the constant pool"
+    )]
+    CleverErrorConstantDataNotFound { name: String },
+
+    #[error(
+        "could not resolve #[error] constant \"{name}\": its identifier was not found in the constant pool"
+    )]
+    CleverErrorIdentifierNotFound { name: String },
 }

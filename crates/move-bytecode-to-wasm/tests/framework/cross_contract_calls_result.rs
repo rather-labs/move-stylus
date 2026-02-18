@@ -591,7 +591,6 @@ fn test_cross_contract_call_with_result_get_result_panic_if_fails<T: SolCall>(
 ) {
     runtime.set_cross_contract_call_success(false);
     let ExecutionData {
-        return_data: _,
         instance,
         mut store,
         ..

@@ -23,11 +23,13 @@ use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store};
 pub struct ModuleData {
     pub data: Vec<u8>,
     pub return_data: Vec<u8>,
+    /// Raw u64 abort code reported by the `set_abort_code` host function.
+    /// Set when an `Abort` bytecode executes in test mode.
+    pub abort_code: Option<u64>,
 }
 
 #[allow(dead_code)]
 pub struct ExecutionData {
-    pub return_data: Vec<u8>,
     pub instance: wasmtime::Instance,
     pub store: Store<ModuleData>,
     pub execution_aborted: bool,
@@ -585,6 +587,18 @@ impl RuntimeSandbox {
         link_test_fn_write_u64_constant!(linker, "set_block_timestamp", current_timestamp);
         link_test_fn_write_u64_constant!(linker, "set_chain_id", current_chain_id);
 
+        // Host function to receive the raw u64 abort code from the Abort bytecode handler.
+        // This replaces the previous approach of storing the abort code at a fixed memory offset.
+        linker
+            .func_wrap(
+                "vm_test_hooks",
+                "set_abort_code",
+                move |mut caller: Caller<'_, ModuleData>, code: i64| {
+                    caller.data_mut().abort_code = Some(code as u64);
+                },
+            )
+            .unwrap();
+
         linker
             .func_wrap("", "print_i64", |param: i64| {
                 println!("--- i64 ---> {param}");
@@ -703,6 +717,7 @@ impl RuntimeSandbox {
             ModuleData {
                 data,
                 return_data: vec![],
+                abort_code: None,
             },
         );
         let instance = self.linker.instantiate(&mut store, &self.module)?;
@@ -713,7 +728,7 @@ impl RuntimeSandbox {
             .call(&mut store, &[], &mut [])
             .map_err(|e| anyhow::anyhow!("error calling entrypoint: {e:?}"))?;
 
-        let error_pointer = Self::read_memory_from(
+        let error_pointer_bytes = Self::read_memory_from(
             &instance,
             &mut store,
             DATA_ABORT_MESSAGE_PTR_OFFSET as usize,
@@ -721,11 +736,12 @@ impl RuntimeSandbox {
         )
         .map_err(|e| anyhow::anyhow!("there was an error reading test memory: {e:?}"))?;
 
+        let execution_aborted = error_pointer_bytes != [0, 0, 0, 0];
+
         Ok(ExecutionData {
-            return_data: store.data().return_data.clone(),
             instance,
             store,
-            execution_aborted: error_pointer != [0, 0, 0, 0],
+            execution_aborted,
         })
     }
 
@@ -739,6 +755,7 @@ impl RuntimeSandbox {
             ModuleData {
                 data,
                 return_data: vec![],
+                abort_code: None,
             },
         );
         let instance = self.linker.instantiate(&mut store, &self.module)?;
@@ -762,6 +779,7 @@ impl RuntimeSandbox {
             ModuleData {
                 data,
                 return_data: vec![],
+                abort_code: None,
             },
         );
         let instance = self.linker.instantiate(&mut store, &self.module)?;
@@ -772,7 +790,7 @@ impl RuntimeSandbox {
             .call(&mut store, data_len)
             .map_err(|e| anyhow::anyhow!("error calling entrypoint: {e:?}"))?;
 
-        let error_pointer = Self::read_memory_from(
+        let error_pointer_bytes = Self::read_memory_from(
             &instance,
             &mut store,
             DATA_ABORT_MESSAGE_PTR_OFFSET as usize,
@@ -780,11 +798,12 @@ impl RuntimeSandbox {
         )
         .map_err(|e| anyhow::anyhow!("there was an error reading test memory: {e:?}"))?;
 
+        let execution_aborted = error_pointer_bytes != [0, 0, 0, 0];
+
         Ok(ExecutionData {
-            return_data: store.data().return_data.clone(),
             instance,
             store,
-            execution_aborted: error_pointer != [0, 0, 0, 0],
+            execution_aborted,
         })
     }
 

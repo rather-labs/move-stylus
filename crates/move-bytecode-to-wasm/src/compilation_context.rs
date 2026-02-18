@@ -35,6 +35,11 @@ pub struct CompilationContext<'a> {
     /// Globals
     /// - Calldata reader pointer
     pub globals: CompilationContextGlobals,
+
+    /// Whether we are compiling in test mode.
+    /// When true, the `Abort` bytecode will emit a host function call to report the
+    /// raw u64 abort code to the test runner instead of storing it in a memory offset.
+    pub test_mode: bool,
 }
 
 impl CompilationContext<'_> {
@@ -45,6 +50,7 @@ impl CompilationContext<'_> {
         memory_id: MemoryId,
         allocator: FunctionId,
         compilation_context_globals: CompilationContextGlobals,
+        test_mode: bool,
     ) -> CompilationContext<'a> {
         CompilationContext::<'a> {
             root_module_data,
@@ -56,6 +62,7 @@ impl CompilationContext<'_> {
                 arguments: Vec::new(),
                 returns: Vec::new(),
             },
+            test_mode,
         }
     }
 

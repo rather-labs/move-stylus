@@ -2607,6 +2607,10 @@ fn translate_instruction(
             // Expect a u64 on the stack
             types_stack.pop_expecting(&IntermediateType::IU64)?;
 
+            // Save the raw u64 abort code to a local before it gets consumed
+            let abort_code_local = module.locals.add(ValType::I64);
+            builder.local_tee(abort_code_local);
+
             // If a clever error is set in the translation context, use it to build a custom error message
             let ptr = if let Some(clever_error) = translate_flow_ctx.clever_error.take() {
                 // Runtime sanity check: the clever error from the translation context should be the same as the one on the stack.
@@ -2651,6 +2655,14 @@ fn translate_instruction(
                         offset: 0,
                     },
                 );
+
+            // In test mode, report the raw u64 abort code to the test runner
+            // via a host function call so it can compare against expected_failure(abort_code = ...).
+            if compilation_ctx.test_mode {
+                let (set_abort_code_fn, _) =
+                    crate::hostio::host_test_functions::set_abort_code(module);
+                builder.local_get(abort_code_local).call(set_abort_code_fn);
+            }
 
             builder.i32_const(1);
             builder.return_();

@@ -34,6 +34,13 @@ pub fn set_chain_id(module: &mut Module) -> (FunctionId, ImportId) {
     get_or_insert_import(module, "set_chain_id", &[ValType::I64], &[])
 }
 
+/// Host function to report the raw u64 abort code to the test runner.
+/// Called from the `Abort` bytecode handler in test mode so the test runner
+/// can compare it against `expected_failure(abort_code = ...)`.
+pub fn set_abort_code(module: &mut Module) -> (FunctionId, ImportId) {
+    get_or_insert_import(module, "set_abort_code", &[ValType::I64], &[])
+}
+
 #[inline]
 fn get_or_insert_import(
     module: &mut walrus::Module,

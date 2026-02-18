@@ -104,6 +104,14 @@ pub enum CompilationContextError {
     #[error("there can be only a single init function per module")]
     DuplicateInitFunction,
 
+    #[error(
+        "could not resolve expected abort code: constant '{constant_name}' not found in module '{module_name}'"
+    )]
+    ExpectedAbortCodeConstantNotFound {
+        module_name: String,
+        constant_name: String,
+    },
+
     #[error("found init funciton with no arguments")]
     InitFunctionNoAguments,
 

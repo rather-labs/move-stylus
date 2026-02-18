@@ -373,13 +373,13 @@ fn test_hash_type_and_key_hashing_data<T: SolCall>(
     #[case] expected_result: Vec<u8>,
 ) {
     let ExecutionData {
-        return_data,
         instance,
         mut store,
         ..
     } = runtime
         .call_entrypoint_with_data(call_data.abi_encode())
         .unwrap();
+    let return_data = &store.data().return_data;
     let last_allocation = i32::from_be_bytes(
         return_data[return_data.len() - 4..return_data.len()]
             .try_into()
