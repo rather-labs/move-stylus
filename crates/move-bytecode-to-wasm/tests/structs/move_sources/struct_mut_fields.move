@@ -229,3 +229,55 @@ entry fun echo_bar_struct_fields(a: u32, b: u128): (u32, u128) {
 
     (foo.p.n, foo.p.o)
 }
+
+fun create_foo(): Foo {
+    Foo {
+        p: Bar { n: 42, o: 4242 },
+        q: @0x7357,
+        r: vector[42],
+        s: vector[43],
+        t: true,
+        u: 1,
+        v: 2,
+        w: 3,
+        x: 4,
+        y: 5,
+        z: 6,
+    }
+}
+
+fun mutate_stack_vec(foo: &mut Foo, r: vector<u32>) {
+    foo.r = r;
+}
+
+entry fun test_mutate_stack_vec(r: vector<u32>): vector<u32> {
+    let mut foo = create_foo();
+    mutate_stack_vec(&mut foo, r);
+    foo.r
+}
+
+fun mutate_heap_vec(foo: &mut Foo, s: vector<u128>) {
+    foo.s = s;
+}
+
+entry fun test_mutate_heap_vec(s: vector<u128>): vector<u128> {
+    let mut foo = create_foo();
+    mutate_heap_vec(&mut foo, s);
+    foo.s
+}
+
+fun deref_and_replace_foo(foo: &mut Foo) {
+    let foo_ = create_foo();
+    *foo = foo_;
+}
+
+// The idea of this test is to create a Foo struct, mutate some of it fields, and then call `deref_and_replace_foo` 
+// which dereferece the &mut Foo argument and replaces it with a new Foo struct.
+// If everything works as expected, we should end up with the same Foo that `create_foo` returns, not the mutated one.
+entry fun test_deref_and_replace_foo(): (u8, u16) {
+    let mut foo = create_foo();
+    foo.u = 11; // Replace the u8 to test that the deref_and_replace_foo function works
+    foo.v = 12; // Replace the u16 to test that the deref_and_replace_foo function works
+    deref_and_replace_foo(&mut foo); // This should set us back to the original vector
+    (foo.u, foo.v)
+}

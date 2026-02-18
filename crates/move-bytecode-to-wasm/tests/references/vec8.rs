@@ -26,6 +26,7 @@ sol!(
     function miscellaneous5() external returns (uint8[]);
     function freezeRef(uint8[] x) external returns (uint8[]);
     function identityVecRef(uint8[] x) external returns (uint8[]);
+    function testCallWriteMutRef(uint8[] x, uint8[] y) external returns (uint8[]);
 );
 
 #[rstest]
@@ -44,6 +45,7 @@ sol!(
 #[case(miscellaneous4Call::new(()), vec![1, 12, 111, 12, 11, 112])]
 #[case(miscellaneous5Call::new(()), vec![1, 12, 112, 11, 112, 113, 112])]
 #[case(identityVecRefCall::new((vec![1, 2, 3],)), vec![1, 2, 3])]
+#[case(testCallWriteMutRefCall::new((vec![1, 2, 3], vec![4, 5, 6])), vec![4, 5, 6])]
 fn test_vec_8_ref<T: SolCall>(
     #[by_ref] runtime: &RuntimeSandbox,
     #[case] call_data: T,

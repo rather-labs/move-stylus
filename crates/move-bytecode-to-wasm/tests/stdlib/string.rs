@@ -18,6 +18,7 @@ sol!(
     function unpackAscii4(string value, uint16[] n, string value2) external returns (bool);
     function packUnpackAscii(string value) external returns (string);
     function packUnpackAscii2(string value, string value2) external returns (string, string);
+    function testInsert() external returns (string);
 );
 
 #[rstest]
@@ -38,6 +39,7 @@ sol!(
         "test string".to_owned(),
     )), true)]
 #[case(packUnpackAsciiCall::new(("test string".to_owned(),)), "test string")]
+#[case(testInsertCall::new(()), "axybcd")]
 fn test_ascii<T: SolCall, V: SolValue>(
     #[by_ref] runtime: &RuntimeSandbox,
     #[case] call_data: T,

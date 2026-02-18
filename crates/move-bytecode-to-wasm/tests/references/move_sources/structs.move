@@ -116,3 +116,12 @@ entry fun freeze_ref(y: Foo): Foo {
     let x_frozen_ref: &Foo = freeze(x_mut_ref);
     *x_frozen_ref
 }
+
+fun write_mut_ref_no_return(x: &mut Bar, y: Bar) {
+  *x = y;
+}
+
+entry fun test_write_mut_ref_no_return(mut x: Bar, y: Bar): Bar {
+  write_mut_ref_no_return(&mut x, y);
+  x
+}

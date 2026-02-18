@@ -117,3 +117,13 @@ entry fun freeze_ref(y: vector<u8>): vector<u8> {
     let x_frozen_ref: &vector<u8> = freeze(x_mut_ref);
     *x_frozen_ref
 }
+
+
+fun write_mut_ref_no_return(x: &mut vector<u8>, y: vector<u8> ) {
+  *x = y;
+}
+
+entry fun test_call_write_mut_ref(mut x: vector<u8>, y: vector<u8>): vector<u8> {
+  write_mut_ref_no_return(&mut x, y);
+  x
+}

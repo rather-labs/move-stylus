@@ -57,3 +57,9 @@ entry fun unpack_ascii_4(value: String, n: vector<u16>, value_2: String): bool {
         && n == vector[3, 1, 4, 1, 5]
         && value_2.as_bytes() == b"test string"
 }
+
+entry fun test_insert(): String {
+    let mut s = b"abcd".to_ascii_string();
+    s.insert(1, b"xy".to_ascii_string());
+    s
+}
