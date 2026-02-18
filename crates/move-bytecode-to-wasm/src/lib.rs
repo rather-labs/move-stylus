@@ -24,7 +24,7 @@ mod test_tools;
 
 use abi_types::{public_function::PublicFunction, unpacking::ObjectKind};
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
-use compilation_context::{ModuleData, ModuleId};
+use compilation_context::{CompilationContextError, ModuleData, ModuleId};
 use constructor::inject_constructor;
 use data::RuntimeErrorData;
 use error::{
@@ -179,6 +179,7 @@ pub fn translate_package<'move_package>(
             memory_id,
             allocator_func,
             compilation_context_globals,
+            test_mode,
         );
 
         let mut runtime_error_data = RuntimeErrorData::new();
@@ -383,6 +384,10 @@ pub fn package_module_data<'move_package>(
         modules_paths.insert(root_compiled_module.source_path.clone(), root_module_id);
     }
 
+    // Resolve ExpectedAbortCode::Constant references to Literal values
+    // by looking up constant values from the referenced module's SpecialAttributes.
+    resolve_expected_abort_codes(&mut modules_data)?;
+
     if errors.is_empty() {
         Ok(PackageModuleData {
             modules_data,
@@ -394,6 +399,68 @@ pub fn package_module_data<'move_package>(
             errors,
         })
     }
+}
+
+/// Resolves `ExpectedAbortCode::Constant(module_name, constant_name)` references
+/// in all test functions by looking up the constant value from the referenced module's
+/// `SpecialAttributes.u64_constants` or `SpecialAttributes.clever_error_constants`.
+///
+/// After this pass, all `Constant` variants are replaced with `Literal(u64)`.
+/// Returns an error if any constant reference cannot be resolved.
+fn resolve_expected_abort_codes(
+    modules_data: &mut HashMap<ModuleId, ModuleData>,
+) -> Result<(), CompilationError> {
+    use move_parse_special_attributes::function_modifiers::ExpectedAbortCode;
+
+    // Collect all constants into an owned map to avoid borrow conflicts.
+    // Maps module_name → (constant_name → value)
+    // Merges both u64_constants and resolved clever_error_constants.
+    let constants_by_module: HashMap<Symbol, HashMap<Symbol, u64>> = modules_data
+        .values()
+        .map(|md| {
+            let mut constants = md.special_attributes.u64_constants.clone();
+
+            // Also include resolved clever error constants
+            for (name, clever_error) in &md.special_attributes.clever_error_constants {
+                if let Some(resolved_u64) = clever_error.resolved_u64 {
+                    constants.insert(*name, resolved_u64);
+                }
+            }
+
+            (md.id.module_name, constants)
+        })
+        .collect();
+
+    // Resolve constant references in test functions
+    for module_data in modules_data.values_mut() {
+        for test_fn in &mut module_data.special_attributes.test_functions {
+            if let Some(ExpectedAbortCode::Constant(module_name, constant_name)) =
+                &test_fn.expected_abort_code
+            {
+                let lookup_module = if module_name.is_empty() {
+                    // Same-module constant reference
+                    &module_data.id.module_name
+                } else {
+                    // Cross-module constant reference
+                    module_name
+                };
+
+                let value = constants_by_module
+                    .get(lookup_module)
+                    .and_then(|constants| constants.get(constant_name).copied())
+                    .ok_or_else(
+                        || CompilationContextError::ExpectedAbortCodeConstantNotFound {
+                            module_name: lookup_module.to_string(),
+                            constant_name: constant_name.to_string(),
+                        },
+                    )?;
+
+                test_fn.expected_abort_code = Some(ExpectedAbortCode::Literal(value));
+            }
+        }
+    }
+
+    Ok(())
 }
 
 /// This functions process the dependency tree for the root module.
