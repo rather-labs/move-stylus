@@ -21,6 +21,7 @@ sol!(
     function miscellaneous1() external returns (uint128[]);
     function freezeRef(uint128 x) external returns (uint128[]);
     function identityU128Ref(uint128 x) external returns (uint128);
+    function testWriteMutRefNoReturn(uint128 x, uint128 y) external returns (uint128);
 );
 
 #[rstest]
@@ -32,6 +33,7 @@ sol!(
 #[case(writeMutRefCall::new((2,)), 1)]
 #[case(freezeRefCall::new((3,)), 3)]
 #[case(identityU128RefCall::new((4,)), 4)]
+#[case(testWriteMutRefNoReturnCall::new((1, 2)), 2)]
 fn test_uint_128_ref<T: SolCall>(
     #[by_ref] runtime: &RuntimeSandbox,
     #[case] call_data: T,

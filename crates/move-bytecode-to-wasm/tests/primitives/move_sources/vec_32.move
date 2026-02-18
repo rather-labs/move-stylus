@@ -151,3 +151,8 @@ entry fun test_remove(v: &mut vector<u32>, index: u64): vector<u32> {
     vector::remove<u32>(v, index);
     *v
 }
+
+entry fun test_insert(v: &mut vector<u32>, index: u64, e: u32): vector<u32> {
+    vector::insert<u32>(v, e, index);
+    *v
+}
