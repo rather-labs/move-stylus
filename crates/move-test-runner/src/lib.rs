@@ -7,6 +7,7 @@ pub mod wasm_runner;
 use std::path::Path;
 
 use move_bytecode_to_wasm::compilation_context::{ModuleData, ModuleId};
+use move_bytecode_to_wasm::data::CLEVER_ERROR_LINE_NUMBER_MASK;
 use move_parse_special_attributes::function_modifiers::ExpectedAbortCode;
 use wasm_runner::RuntimeSandbox;
 
@@ -16,20 +17,9 @@ const RED: &str = "\x1b[31m";
 const CYAN: &str = "\x1b[36m";
 const YELLOW: &str = "\x1b[33m";
 
-/// Mask that zeroes out bits 47-32 of a u64 (the line number in clever errors).
-///
-/// Clever error encoding (see `ErrorBitset` in `move-command-line-common/src/error_bitset.rs`):
-/// ```text
-/// |<tagbit>|<reserved>|<line number>|<identifier index>|<constant index>|
-///   1-bit    15-bits       16-bits        16-bits          16-bits
-/// ```
-/// The line number varies depending on where a macro function is expanded, so we mask it
-/// out when comparing expected vs actual clever error abort codes.
-const CLEVER_ERROR_COMPARISON_MASK: u64 = 0xFFFF_0000_FFFF_FFFF;
-
 /// Compares two abort codes. First tries an exact match. If that fails and both
 /// are clever errors (tag bit `0x8000` set), masks out the line number (bits 47-32)
-/// and compare again.
+/// and compares again.
 fn abort_codes_match(expected: u64, actual: u64) -> bool {
     if expected == actual {
         return true;
@@ -39,7 +29,7 @@ fn abort_codes_match(expected: u64, actual: u64) -> bool {
         return false;
     }
 
-    (expected & CLEVER_ERROR_COMPARISON_MASK) == (actual & CLEVER_ERROR_COMPARISON_MASK)
+    (expected & CLEVER_ERROR_LINE_NUMBER_MASK) == (actual & CLEVER_ERROR_LINE_NUMBER_MASK)
 }
 
 pub fn run_tests(
