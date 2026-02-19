@@ -17,6 +17,17 @@ pub const BAD_F00D: i32 = 0xBADF00D;
 // This constant is used to mark a vector as relocated.
 pub const DEAD_BEEF: i32 = 0xDEADBEEF_u32 as i32;
 
+/// Mask that zeroes out the line-number bits (47-32) of a clever error u64.
+///
+/// ```text
+/// |<tagbit>|<reserved>|<line number>|<identifier index>|<constant index>|
+///   1-bit    15-bits       16-bits        16-bits          16-bits
+/// ```
+///
+/// The line number varies with macro expansion site, so it must be masked
+/// out when comparing clever error abort codes.
+pub const CLEVER_ERROR_LINE_NUMBER_MASK: u64 = 0xFFFF_0000_FFFF_FFFF;
+
 /// Reserved empty memory
 pub const DATA_ZERO_OFFSET: i32 = 0;
 

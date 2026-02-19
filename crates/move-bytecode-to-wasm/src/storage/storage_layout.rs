@@ -284,6 +284,7 @@ mod tests {
             memory_id,
             allocator,
             calldata_reader_pointer_global,
+            false,
         );
         (ctx, module)
     }

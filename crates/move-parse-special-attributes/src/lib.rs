@@ -36,7 +36,8 @@ use function_validation::validate_function;
 use move_compiler::{
     Compiler, PASS_PARSER,
     parser::ast::{
-        Ability_, Definition, Exp_, LeadingNameAccess_, ModuleMember, ModuleUse, Use, Value_,
+        Ability_, Attribute_, Definition, Exp_, LeadingNameAccess_, ModuleMember, ModuleUse, Use,
+        Value_,
     },
     shared::{Identifier, NumericalAddress, files::MappedFiles},
 };
@@ -65,10 +66,11 @@ pub struct Enum_ {
     pub loc: Loc,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TestFunction {
     pub name: Symbol,
     pub expect_failure: bool,
+    pub expected_abort_code: Option<function_modifiers::ExpectedAbortCode>,
 }
 
 #[derive(Debug)]
@@ -83,8 +85,16 @@ pub struct SpecialAttributes {
     pub external_call_structs: HashSet<Symbol>,
     pub abi_errors: HashMap<Symbol, AbiError>,
     pub test_functions: Vec<TestFunction>,
+    /// Module-level u64 constants extracted from the AST (name → value).
+    /// Used to resolve `ExpectedAbortCode::Constant` references.
+    pub u64_constants: HashMap<Symbol, u64>,
+    /// Module-level `#[error]` constant byte strings extracted from the AST (name → byte string symbol).
+    /// The clever error u64 abort codes are resolved later by the compilation context
+    /// (see `ModuleData::clever_error_abort_codes`).
+    pub clever_error_constants: HashMap<Symbol, Symbol>,
 }
 
+// TODO: derive default for this struct
 impl Default for SpecialAttributes {
     fn default() -> Self {
         Self {
@@ -98,6 +108,8 @@ impl Default for SpecialAttributes {
             external_call_structs: HashSet::default(),
             abi_errors: HashMap::default(),
             test_functions: Vec::default(),
+            u64_constants: HashMap::default(),
+            clever_error_constants: HashMap::default(),
         }
     }
 }
@@ -278,24 +290,49 @@ pub fn process_special_attributes(
                         });
                     }
                     ModuleMember::Constant(constant) => {
-                        // Check if any constant is an address literal that exceeds 20 bytes
                         if let Exp_::Value(value) = &constant.value.value {
-                            if let Value_::Address(addr) = &value.value {
-                                if let LeadingNameAccess_::AnonymousAddress(numerical_addr) =
-                                    &addr.value
-                                {
-                                    let addr_bytes: [u8; 32] =
-                                        numerical_addr.into_inner().into_bytes();
+                            match &value.value {
+                                // Check if any constant is an address literal that exceeds 20 bytes
+                                Value_::Address(addr) => {
+                                    if let LeadingNameAccess_::AnonymousAddress(numerical_addr) =
+                                        &addr.value
+                                    {
+                                        let addr_bytes: [u8; 32] =
+                                            numerical_addr.into_inner().into_bytes();
 
-                                    // If the first 12 bytes are not all zero, the address is too large for EVM
-                                    if !addr_bytes[0..12].iter().all(|&b| b == 0) {
-                                        module_errors.push(SpecialAttributeError {
-                                            kind: SpecialAttributeErrorKind::AddressTooLarge,
-                                            line_of_code: addr.loc,
-                                        });
-                                        found_error = true;
+                                        // If the first 12 bytes are not all zero, the address is too large for EVM
+                                        if !addr_bytes[0..12].iter().all(|&b| b == 0) {
+                                            module_errors.push(SpecialAttributeError {
+                                                kind: SpecialAttributeErrorKind::AddressTooLarge,
+                                                line_of_code: addr.loc,
+                                            });
+                                            found_error = true;
+                                        }
                                     }
                                 }
+                                // Extract u64 numeric constants for abort code resolution
+                                Value_::Num(n) => {
+                                    // The Move lexer stores numeric literals as raw strings,
+                                    // so we parse hex (0x...) and decimal formats ourselves.
+                                    let s = n.as_str();
+                                    let parsed = if let Some(hex) = s.strip_prefix("0x") {
+                                        u64::from_str_radix(hex, 16).ok()
+                                    } else {
+                                        s.parse::<u64>().ok()
+                                    };
+                                    if let Some(val) = parsed {
+                                        result.u64_constants.insert(constant.name.value(), val);
+                                    }
+                                }
+                                // Extract #[error] vector<u8> constants for clever error resolution
+                                Value_::ByteString(s) => {
+                                    if is_clever_error(constant) {
+                                        result
+                                            .clever_error_constants
+                                            .insert(constant.name.value(), *s);
+                                    }
+                                }
+                                _ => {}
                             }
                         }
                     }
@@ -513,7 +550,7 @@ pub fn process_special_attributes(
                             let modifiers = attributes
                                 .value
                                 .iter()
-                                .map(|s| FunctionModifier::parse_modifiers(&s.value))
+                                .map(|s| FunctionModifier::parse_modifiers(&s.value, module_name))
                                 .collect::<Result<Vec<Vec<FunctionModifier>>, SpecialAttributeError>>();
 
                             let modifiers = match modifiers {
@@ -630,15 +667,17 @@ pub fn process_special_attributes(
                                         result.test_functions.push(TestFunction {
                                             name: f.name.0.value,
                                             expect_failure: false,
+                                            expected_abort_code: None,
                                         });
                                     }
-                                    FunctionModifier::ExpectedFailure => {
+                                    FunctionModifier::ExpectedFailure(abort_code) => {
                                         if let Some(test_function) = result
                                             .test_functions
                                             .iter_mut()
                                             .find(|tf| tf.name == f.name.0.value)
                                         {
                                             test_function.expect_failure = true;
+                                            test_function.expected_abort_code = abort_code;
                                         } else {
                                             found_error = true;
                                             module_errors.push(SpecialAttributeError {
@@ -698,4 +737,15 @@ pub fn process_special_attributes(
     } else {
         Ok(result)
     }
+}
+
+// Auxiliary function to check if a constant is a clever error.
+// It checks if any of the attributes of the constant is an #[error] attribute.
+fn is_clever_error(constant: &move_compiler::parser::ast::Constant) -> bool {
+    constant.attributes.iter().any(|attrs| {
+        attrs
+            .value
+            .iter()
+            .any(|attr| matches!(&attr.value, Attribute_::Name(n) if n.value.as_str() == "error"))
+    })
 }

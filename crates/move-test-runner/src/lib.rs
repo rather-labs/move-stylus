@@ -7,12 +7,30 @@ pub mod wasm_runner;
 use std::path::Path;
 
 use move_bytecode_to_wasm::compilation_context::{ModuleData, ModuleId};
+use move_bytecode_to_wasm::data::CLEVER_ERROR_LINE_NUMBER_MASK;
+use move_parse_special_attributes::function_modifiers::ExpectedAbortCode;
 use wasm_runner::RuntimeSandbox;
 
 const RESET: &str = "\x1b[0m";
 const GREEN: &str = "\x1b[32m";
 const RED: &str = "\x1b[31m";
 const CYAN: &str = "\x1b[36m";
+const YELLOW: &str = "\x1b[33m";
+
+/// Compares two abort codes. First tries an exact match. If that fails and both
+/// are clever errors (tag bit `0x8000` set), masks out the line number (bits 47-32)
+/// and compares again.
+fn abort_codes_match(expected: u64, actual: u64) -> bool {
+    if expected == actual {
+        return true;
+    }
+
+    if ((expected >> 48) != 0x8000) || ((actual >> 48) != 0x8000) {
+        return false;
+    }
+
+    (expected & CLEVER_ERROR_LINE_NUMBER_MASK) == (actual & CLEVER_ERROR_LINE_NUMBER_MASK)
+}
 
 pub fn run_tests(
     module_id: &ModuleId,
@@ -46,7 +64,7 @@ pub fn run_tests(
         let result = runtime.call_test_function(&test.name).unwrap();
         match (result.execution_aborted, test.expect_failure) {
             (false, true) => {
-                println!("{RED}FAILED{RESET}");
+                println!("{RED}FAILED{RESET} - expected test to abort but it succeeded");
                 failures.push(test.to_owned());
             }
             (false, false) => {
@@ -57,7 +75,35 @@ pub fn run_tests(
                 failures.push(test.to_owned());
             }
             (true, true) => {
-                println!("{GREEN}PASSED{RESET}");
+                // Execution aborted as expected — now check the abort code if specified
+                match &test.expected_abort_code {
+                    Some(ExpectedAbortCode::Literal(expected_code)) => {
+                        if let Some(actual_code) = result.store.data().abort_code {
+                            if abort_codes_match(*expected_code, actual_code) {
+                                println!("{GREEN}PASSED{RESET}");
+                            } else {
+                                println!(
+                                    "{RED}FAILED{RESET} - expected abort code {expected_code} (0x{expected_code:X}), got {actual_code} (0x{actual_code:X})"
+                                );
+                                failures.push(test.to_owned());
+                            }
+                        } else {
+                            println!(
+                                "{YELLOW}PASSED{RESET} (abort code could not be extracted for comparison)"
+                            );
+                        }
+                    }
+                    Some(ExpectedAbortCode::Constant(module_name, constant_name)) => {
+                        // This is unreachable because we have throw an error in the compiler if any constant reference cannot be resolved.
+                        println!(
+                            "{RED}FAILED{RESET} (abort code {module_name}::{constant_name} could not be resolved for comparison)"
+                        );
+                    }
+                    None => {
+                        // No specific abort code expected — any abort is fine
+                        println!("{GREEN}PASSED{RESET}");
+                    }
+                }
             }
         }
     }

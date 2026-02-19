@@ -4,6 +4,7 @@ use move_binary_format::file_format::{
     FieldHandleIndex, FieldInstantiationIndex, SignatureIndex, StructDefInstantiationIndex,
     StructDefinitionIndex,
 };
+use move_symbol_pool::Symbol;
 
 use crate::{
     error::{CompilationError, ICEError, ICEErrorKind},
@@ -103,6 +104,14 @@ pub enum CompilationContextError {
 
     #[error("there can be only a single init function per module")]
     DuplicateInitFunction,
+
+    #[error(
+        r#"could not resolve expected abort code: constant "{constant_name}" not found in module "{module_name}"#
+    )]
+    ExpectedAbortCodeConstantNotFound {
+        module_name: Symbol,
+        constant_name: Symbol,
+    },
 
     #[error("found init funciton with no arguments")]
     InitFunctionNoAguments,

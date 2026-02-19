@@ -1,4 +1,5 @@
 use move_binary_format::file_format::FieldInstantiationIndex;
+use move_symbol_pool::Symbol;
 
 use crate::translation::table::FunctionId;
 
@@ -45,4 +46,14 @@ pub enum ModuleDataError {
 
     #[error("generic field index not found for field instantiation index {0}")]
     InstantiatedFieldGenericIndexNotFound(FieldInstantiationIndex),
+
+    #[error(
+        r#"could not resolve #[error] constant "{name}": its data was not found in the constant pool"#
+    )]
+    CleverErrorConstantDataNotFound { name: Symbol },
+
+    #[error(
+        r#"could not resolve #[error] constant "{name}": its identifier was not found in the constant pool"#
+    )]
+    CleverErrorIdentifierNotFound { name: Symbol },
 }

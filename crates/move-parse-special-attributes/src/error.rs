@@ -75,6 +75,11 @@ pub enum SpecialAttributeErrorKind {
     #[error("Test function is marked as expected failure but it is not #[test].")]
     ExpectedFailureWithoutTest,
 
+    #[error(
+        "Invalid abort_code value in expected_failure attribute. Expected a numeric literal or a module::CONSTANT reference."
+    )]
+    InvalidExpectedFailureAbortCode,
+
     #[error("Address is too large. It usually is 20 bytes long.")]
     AddressTooLarge,
 }
@@ -154,6 +159,13 @@ impl From<&SpecialAttributeError> for Diagnostic {
                 )
             }
             SpecialAttributeErrorKind::RepeatedStorageObject(_) => custom(
+                DIAGNOSTIC_CATEGORY,
+                Severity::BlockingError,
+                3,
+                3,
+                Box::leak(value.to_string().into_boxed_str()),
+            ),
+            SpecialAttributeErrorKind::InvalidExpectedFailureAbortCode => custom(
                 DIAGNOSTIC_CATEGORY,
                 Severity::BlockingError,
                 3,

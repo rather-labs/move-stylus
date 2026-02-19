@@ -24,7 +24,7 @@ mod test_tools;
 
 use abi_types::{public_function::PublicFunction, unpacking::ObjectKind};
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
-use compilation_context::{ModuleData, ModuleId};
+use compilation_context::{CompilationContextError, ModuleData, ModuleId};
 use constructor::inject_constructor;
 use data::RuntimeErrorData;
 use error::{
@@ -47,6 +47,65 @@ use walrus::{GlobalId, Module, RefType};
 use wasm_validation::validate_stylus_wasm;
 
 pub use translation::functions::MappedFunction;
+
+/// Resolves `ExpectedAbortCode::Constant(module_name, constant_name)` references
+/// in all test functions by looking up the constant value from the referenced module's
+/// `SpecialAttributes.u64_constants` or the resolved `clever_error_abort_codes` mapping.
+///
+/// After this pass, all `Constant` variants are replaced with `Literal(u64)`.
+/// Returns an error if any constant reference cannot be resolved.
+fn resolve_expected_abort_codes(
+    modules_data: &mut HashMap<ModuleId, ModuleData>,
+) -> Result<(), CompilationError> {
+    use move_parse_special_attributes::function_modifiers::ExpectedAbortCode;
+
+    // Collect all constants into a flat map keyed by (module_name, constant_name)
+    // to avoid borrow conflicts. Merges both u64_constants and resolved clever_error_abort_codes.
+    let constants: HashMap<(Symbol, Symbol), u64> = modules_data
+        .values()
+        .flat_map(|md| {
+            let module_name = md.id.module_name;
+
+            let regular_constants = md
+                .special_attributes
+                .u64_constants
+                .iter()
+                .map(move |(&name, &value)| ((module_name, name), value));
+
+            let clever_constants = md
+                .clever_errors
+                .iter()
+                .map(move |(&name, &(_, resolved))| ((module_name, name), resolved));
+
+            regular_constants.chain(clever_constants)
+        })
+        .collect();
+
+    // Resolve constant references in test functions
+
+    // Flatten all modules into a single stream of test functions
+    let all_test_fns = modules_data
+        .values_mut()
+        .flat_map(|md| md.special_attributes.test_functions.iter_mut());
+
+    for test_fn in all_test_fns {
+        if let Some(ExpectedAbortCode::Constant(mod_name, const_name)) =
+            &test_fn.expected_abort_code
+        {
+            let value = constants.get(&(*mod_name, *const_name)).copied().ok_or(
+                CompilationContextError::ExpectedAbortCodeConstantNotFound {
+                    module_name: *mod_name,
+                    constant_name: *const_name,
+                },
+            )?;
+
+            // Update the state from Constant to Literal
+            test_fn.expected_abort_code = Some(ExpectedAbortCode::Literal(value));
+        }
+    }
+
+    Ok(())
+}
 
 pub fn translate_single_module<'move_compiled_package>(
     package: &'move_compiled_package CompiledPackage,
@@ -179,6 +238,7 @@ pub fn translate_package<'move_package>(
             memory_id,
             allocator_func,
             compilation_context_globals,
+            test_mode,
         );
 
         let mut runtime_error_data = RuntimeErrorData::new();
@@ -382,6 +442,10 @@ pub fn package_module_data<'move_package>(
         modules_data.insert(root_module_id, root_module_data);
         modules_paths.insert(root_compiled_module.source_path.clone(), root_module_id);
     }
+
+    // Resolve ExpectedAbortCode::Constant references to Literal values
+    // by looking up constant values from the referenced module's SpecialAttributes.
+    resolve_expected_abort_codes(&mut modules_data)?;
 
     if errors.is_empty() {
         Ok(PackageModuleData {

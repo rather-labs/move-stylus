@@ -3,7 +3,10 @@
 
 use crate::{SpecialAttributeError, error::SpecialAttributeErrorKind, types::Type};
 use move_compiler::{
-    parser::ast::{Attribute_, FunctionSignature},
+    parser::ast::{
+        Attribute_, AttributeValue_, FunctionSignature, LeadingNameAccess_, NameAccessChain_,
+        Value_,
+    },
     shared::Identifier,
 };
 use move_ir_types::location::Loc;
@@ -78,13 +81,22 @@ impl SolidityFunctionModifier {
     }
 }
 
+/// Represents the expected abort code for an `#[expected_failure(abort_code = ...)]` attribute.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum ExpectedAbortCode {
+    /// A literal numeric abort code, e.g., `abort_code = 65540`
+    Literal(u64),
+    /// A constant reference like `module::CONSTANT`, e.g., `abort_code = fixed_point32::EDIVISION_BY_ZERO`
+    Constant(Symbol, Symbol),
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum FunctionModifier {
     ExternalCall(Vec<SolidityFunctionModifier>),
     Abi(Vec<SolidityFunctionModifier>),
     Test,
     Skip,
-    ExpectedFailure,
+    ExpectedFailure(Option<ExpectedAbortCode>),
     OwnedObjects(Vec<(Symbol, Loc)>),
     SharedObjects(Vec<(Symbol, Loc)>),
     FrozenObjects(Vec<(Symbol, Loc)>),
@@ -117,14 +129,17 @@ impl FunctionModifier {
             Self::Abi(_) => "abi",
             Self::Test => "test",
             Self::Skip => "skip",
-            Self::ExpectedFailure => "expected_failure",
+            Self::ExpectedFailure(_) => "expected_failure",
             Self::OwnedObjects(_) => "owned_objects",
             Self::SharedObjects(_) => "shared_objects",
             Self::FrozenObjects(_) => "frozen_objects",
         }
     }
 
-    pub fn parse_modifiers(attribute: &Attribute_) -> Result<Vec<Self>, SpecialAttributeError> {
+    pub fn parse_modifiers(
+        attribute: &Attribute_,
+        module_name: Symbol,
+    ) -> Result<Vec<Self>, SpecialAttributeError> {
         let mut result = Vec::new();
 
         match attribute {
@@ -170,16 +185,16 @@ impl FunctionModifier {
                         .collect::<Result<Vec<SolidityFunctionModifier>, SpecialAttributeError>>()?;
                         result.push(Self::ExternalCall(modifiers));
                     }
-                    // TODO: expected_failure(abort_code = ...) — parameters are ignored for now;
-                    // the test runner only checks whether the test aborted.
                     "expected_failure" => {
-                        result.push(Self::ExpectedFailure);
+                        let abort_code =
+                            Self::parse_expected_failure_abort_code(spanned1, module_name)?;
+                        result.push(Self::ExpectedFailure(abort_code));
                     }
                     _ => result.extend(
                         spanned1
                             .value
                             .iter()
-                            .map(|s| Self::parse_modifiers(&s.value))
+                            .map(|s| Self::parse_modifiers(&s.value, module_name))
                             .collect::<Result<Vec<Vec<FunctionModifier>>, SpecialAttributeError>>()?
                             .concat(),
                     ),
@@ -189,7 +204,7 @@ impl FunctionModifier {
                 "external_call" => result.push(Self::ExternalCall(Vec::new())),
                 "test" => result.push(Self::Test),
                 "skip" => result.push(Self::Skip),
-                "expected_failure" => result.push(Self::ExpectedFailure),
+                "expected_failure" => result.push(Self::ExpectedFailure(None)),
                 _ => (),
             },
             _ => (),
@@ -236,5 +251,102 @@ impl FunctionModifier {
                 line_of_code: loc,
             }),
         }
+    }
+
+    /// Parses the `abort_code` parameter from an `expected_failure(abort_code = ...)` attribute.
+    ///
+    /// Supports two forms:
+    /// - Numeric literal: `expected_failure(abort_code = 65540)`
+    /// - Constant reference: `expected_failure(abort_code = fixed_point32::EDIVISION_BY_ZERO)`
+    ///
+    /// Note: Constants can either be declared in the same module or in a different module!
+    fn parse_expected_failure_abort_code(
+        attrs: &move_compiler::parser::ast::Attributes,
+        module_name: Symbol,
+    ) -> Result<Option<ExpectedAbortCode>, SpecialAttributeError> {
+        for attr in &attrs.value {
+            if let Attribute_::Assigned(name, value) = &attr.value {
+                if name.value.as_str() == "abort_code" {
+                    match &value.value {
+                        // Numeric literal: abort_code = 65540 or abort_code = 0x10004
+                        AttributeValue_::Value(v) => match &v.value {
+                            Value_::Num(n) => {
+                                let s = n.as_str();
+                                let code = if let Some(hex) = s.strip_prefix("0x") {
+                                    u64::from_str_radix(hex, 16)
+                                } else {
+                                    s.parse::<u64>()
+                                }.map_err(|_| {
+                                    SpecialAttributeError {
+                                        kind: SpecialAttributeErrorKind::InvalidExpectedFailureAbortCode,
+                                        line_of_code: v.loc,
+                                    }
+                                })?;
+                                return Ok(Some(ExpectedAbortCode::Literal(code)));
+                            }
+                            _ => {
+                                return Err(SpecialAttributeError {
+                                    kind:
+                                        SpecialAttributeErrorKind::InvalidExpectedFailureAbortCode,
+                                    line_of_code: v.loc,
+                                });
+                            }
+                        },
+                        // Module access: abort_code = fixed_point32::EDIVISION_BY_ZERO
+                        //            or: abort_code = std::type_name::ENonModuleType
+                        AttributeValue_::ModuleAccess(chain) => {
+                            // Note: Here we have no information regarding the constant type or value, we need to resolve that later!
+                            match &chain.value {
+                                NameAccessChain_::Path(path) => {
+                                    let entries = &path.entries;
+                                    if entries.is_empty() {
+                                        return Err(SpecialAttributeError {
+                                            kind: SpecialAttributeErrorKind::InvalidExpectedFailureAbortCode,
+                                            line_of_code: chain.loc,
+                                        });
+                                    }
+
+                                    // The constant name is always the last entry.
+                                    let constant_name = entries.last().unwrap().name.value;
+
+                                    // The module name is:
+                                    // - For 2-segment paths (module::CONST): root is the module
+                                    // - For 3+ segment paths (addr::module::CONST): second-to-last entry is the module
+                                    let module_name = if entries.len() == 1 {
+                                        // 2-segment: root::CONST → root is the module
+                                        match &path.root.name.value {
+                                            LeadingNameAccess_::Name(n) => n.value,
+                                            _ => {
+                                                return Err(SpecialAttributeError {
+                                                    kind: SpecialAttributeErrorKind::InvalidExpectedFailureAbortCode,
+                                                    line_of_code: chain.loc,
+                                                });
+                                            }
+                                        }
+                                    } else {
+                                        // 3+ segment: addr::module::CONST → entries[len-2] is the module
+                                        entries[entries.len() - 2].name.value
+                                    };
+
+                                    return Ok(Some(ExpectedAbortCode::Constant(
+                                        module_name,
+                                        constant_name,
+                                    )));
+                                }
+                                NameAccessChain_::Single(entry) => {
+                                    // Single name constant from the same module
+                                    return Ok(Some(ExpectedAbortCode::Constant(
+                                        module_name,
+                                        entry.name.value,
+                                    )));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // No abort_code parameter found — bare expected_failure
+        Ok(None)
     }
 }

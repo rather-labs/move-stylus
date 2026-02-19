@@ -231,6 +231,7 @@ macro_rules! test_compilation_context {
                 arguments: Vec::new(),
                 returns: Vec::new(),
             },
+            test_mode: true,
         }
     };
 }

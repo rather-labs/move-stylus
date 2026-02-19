@@ -92,9 +92,6 @@ pub enum AbiError {
         "storage object (FrozenStorageObject, OwnedStorageObject, SharedStorageObject) has invalid type paramter"
     )]
     StorageObjectHasInvalidType,
-
-    #[error("invalid error data format")]
-    InvalidErrorData,
 }
 
 impl From<AbiError> for CompilationError {
