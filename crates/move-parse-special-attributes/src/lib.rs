@@ -564,7 +564,7 @@ pub fn process_special_attributes(
                             let modifiers = attributes
                                 .value
                                 .iter()
-                                .map(|s| FunctionModifier::parse_modifiers(&s.value))
+                                .map(|s| FunctionModifier::parse_modifiers(&s.value, module_name))
                                 .collect::<Result<Vec<Vec<FunctionModifier>>, SpecialAttributeError>>();
 
                             let modifiers = match modifiers {

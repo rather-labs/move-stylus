@@ -59,49 +59,53 @@ fn resolve_expected_abort_codes(
 ) -> Result<(), CompilationError> {
     use move_parse_special_attributes::function_modifiers::ExpectedAbortCode;
 
-    // Collect all constants into an owned map to avoid borrow conflicts.
-    // Maps module_name → (constant_name → value)
-    // Merges both u64_constants and resolved clever_error_constants.
-    let constants_by_module: HashMap<Symbol, HashMap<Symbol, u64>> = modules_data
+    // Collect all constants into a flat map keyed by (module_name, constant_name)
+    // to avoid borrow conflicts. Merges both u64_constants and resolved clever_error_constants.
+    let constants: HashMap<(Symbol, Symbol), u64> = modules_data
         .values()
-        .map(|md| {
-            let mut constants = md.special_attributes.u64_constants.clone();
+        .flat_map(|md| {
+            let module_name = md.id.module_name;
 
-            // Also include resolved clever error constants
-            for (name, clever_error) in &md.special_attributes.clever_error_constants {
-                if let Some(resolved_u64) = clever_error.resolved_u64 {
-                    constants.insert(*name, resolved_u64);
-                }
-            }
+            let regular_constants = md
+                .special_attributes
+                .u64_constants
+                .iter()
+                .map(move |(&name, &value)| ((module_name, name), value));
 
-            (md.id.module_name, constants)
+            let clever_constants = md
+                .special_attributes
+                .clever_error_constants
+                .iter()
+                .filter_map(move |(&name, clever_error)| {
+                    clever_error
+                        .resolved_u64
+                        .map(|resolved| ((module_name, name), resolved))
+                });
+
+            regular_constants.chain(clever_constants)
         })
         .collect();
 
     // Resolve constant references in test functions
-    for module_data in modules_data.values_mut() {
-        for test_fn in &mut module_data.special_attributes.test_functions {
-            if let Some(ExpectedAbortCode::Constant(module_name, constant_name)) =
-                &test_fn.expected_abort_code
-            {
-                let lookup_module = if module_name.is_empty() {
-                    // Same-module constant reference
-                    &module_data.id.module_name
-                } else {
-                    // Cross-module constant reference
-                    module_name
-                };
 
-                let value = constants_by_module
-                    .get(lookup_module)
-                    .and_then(|constants| constants.get(constant_name).copied())
-                    .ok_or(CompilationContextError::ExpectedAbortCodeConstantNotFound {
-                        module_name: *lookup_module,
-                        constant_name: *constant_name,
-                    })?;
+    // Flatten all modules into a single stream of test functions
+    let all_test_fns = modules_data
+        .values_mut()
+        .flat_map(|md| md.special_attributes.test_functions.iter_mut());
 
-                test_fn.expected_abort_code = Some(ExpectedAbortCode::Literal(value));
-            }
+    for test_fn in all_test_fns {
+        if let Some(ExpectedAbortCode::Constant(mod_name, const_name)) =
+            &test_fn.expected_abort_code
+        {
+            let value = constants.get(&(*mod_name, *const_name)).copied().ok_or(
+                CompilationContextError::ExpectedAbortCodeConstantNotFound {
+                    module_name: *mod_name,
+                    constant_name: *const_name,
+                },
+            )?;
+
+            // Update the state from Constant to Literal
+            test_fn.expected_abort_code = Some(ExpectedAbortCode::Literal(value));
         }
     }
 

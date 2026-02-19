@@ -136,7 +136,10 @@ impl FunctionModifier {
         }
     }
 
-    pub fn parse_modifiers(attribute: &Attribute_) -> Result<Vec<Self>, SpecialAttributeError> {
+    pub fn parse_modifiers(
+        attribute: &Attribute_,
+        module_name: Symbol,
+    ) -> Result<Vec<Self>, SpecialAttributeError> {
         let mut result = Vec::new();
 
         match attribute {
@@ -183,14 +186,15 @@ impl FunctionModifier {
                         result.push(Self::ExternalCall(modifiers));
                     }
                     "expected_failure" => {
-                        let abort_code = Self::parse_expected_failure_abort_code(spanned1)?;
+                        let abort_code =
+                            Self::parse_expected_failure_abort_code(spanned1, module_name)?;
                         result.push(Self::ExpectedFailure(abort_code));
                     }
                     _ => result.extend(
                         spanned1
                             .value
                             .iter()
-                            .map(|s| Self::parse_modifiers(&s.value))
+                            .map(|s| Self::parse_modifiers(&s.value, module_name))
                             .collect::<Result<Vec<Vec<FunctionModifier>>, SpecialAttributeError>>()?
                             .concat(),
                     ),
@@ -258,6 +262,7 @@ impl FunctionModifier {
     /// Note: Constants can either be declared in the same module or in a different module!
     fn parse_expected_failure_abort_code(
         attrs: &move_compiler::parser::ast::Attributes,
+        module_name: Symbol,
     ) -> Result<Option<ExpectedAbortCode>, SpecialAttributeError> {
         for attr in &attrs.value {
             if let Attribute_::Assigned(name, value) = &attr.value {
@@ -331,7 +336,7 @@ impl FunctionModifier {
                                 NameAccessChain_::Single(entry) => {
                                     // Single name constant from the same module
                                     return Ok(Some(ExpectedAbortCode::Constant(
-                                        Symbol::from(""),
+                                        module_name,
                                         entry.name.value,
                                     )));
                                 }
