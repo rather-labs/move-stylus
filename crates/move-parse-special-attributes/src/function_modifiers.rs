@@ -83,11 +83,20 @@ impl SolidityFunctionModifier {
 
 /// Represents the expected abort code for an `#[expected_failure(abort_code = ...)]` attribute.
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum ExpectedAbortCode {
+pub enum AbortCode {
     /// A literal numeric abort code, e.g., `abort_code = 65540`
     Literal(u64),
     /// A constant reference like `module::CONSTANT`, e.g., `abort_code = fixed_point32::EDIVISION_BY_ZERO`
     Constant(Symbol, Symbol),
+}
+
+/// Represents the kind of expected failure in an `#[expected_failure(...)]` attribute.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum ExpectedFailureKind {
+    /// An explicit abort code, e.g., `expected_failure(abort_code = 65540)`
+    AbortCode(AbortCode),
+    /// An arithmetic error, e.g., `expected_failure(arithmetic_error, location = std::u8)`
+    ArithmeticError,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -96,7 +105,7 @@ pub enum FunctionModifier {
     Abi(Vec<SolidityFunctionModifier>),
     Test,
     Skip,
-    ExpectedFailure(Option<ExpectedAbortCode>),
+    ExpectedFailure(Option<ExpectedFailureKind>),
     OwnedObjects(Vec<(Symbol, Loc)>),
     SharedObjects(Vec<(Symbol, Loc)>),
     FrozenObjects(Vec<(Symbol, Loc)>),
@@ -143,63 +152,62 @@ impl FunctionModifier {
         let mut result = Vec::new();
 
         match attribute {
-            Attribute_::Parameterized(name, spanned1) => {
-                match name.value.as_str() {
-                    "owned_objects" => {
-                        let ids = spanned1
-                            .value
-                            .iter()
-                            .map(|s| Self::parse_identifiers(&s.value, s.loc))
-                            .collect::<Result<Vec<(Symbol, Loc)>, SpecialAttributeError>>()?;
-                        result.push(Self::OwnedObjects(ids));
-                    }
-                    "shared_objects" => {
-                        let ids = spanned1
-                            .value
-                            .iter()
-                            .map(|s| Self::parse_identifiers(&s.value, s.loc))
-                            .collect::<Result<Vec<(Symbol, Loc)>, SpecialAttributeError>>()?;
-                        result.push(Self::SharedObjects(ids));
-                    }
-                    "frozen_objects" => {
-                        let ids = spanned1
-                            .value
-                            .iter()
-                            .map(|s| Self::parse_identifiers(&s.value, s.loc))
-                            .collect::<Result<Vec<(Symbol, Loc)>, SpecialAttributeError>>()?;
-                        result.push(Self::FrozenObjects(ids));
-                    }
-                    "abi" => {
-                        let modifiers = spanned1
+            Attribute_::Parameterized(name, spanned1) => match name.value.as_str() {
+                "owned_objects" => {
+                    let ids = spanned1
                         .value
                         .iter()
-                        .map(|s| Self::parse_solidity_modifier(&s.value, s.loc))
-                        .collect::<Result<Vec<SolidityFunctionModifier>, SpecialAttributeError>>()?;
-                        result.push(Self::Abi(modifiers));
-                    }
-                    "external_call" => {
-                        let modifiers = spanned1
-                        .value
-                        .iter()
-                        .map(|s| Self::parse_solidity_modifier(&s.value, s.loc))
-                        .collect::<Result<Vec<SolidityFunctionModifier>, SpecialAttributeError>>()?;
-                        result.push(Self::ExternalCall(modifiers));
-                    }
-                    "expected_failure" => {
-                        let abort_code =
-                            Self::parse_expected_failure_abort_code(spanned1, module_name)?;
-                        result.push(Self::ExpectedFailure(abort_code));
-                    }
-                    _ => result.extend(
-                        spanned1
-                            .value
-                            .iter()
-                            .map(|s| Self::parse_modifiers(&s.value, module_name))
-                            .collect::<Result<Vec<Vec<FunctionModifier>>, SpecialAttributeError>>()?
-                            .concat(),
-                    ),
+                        .map(|s| Self::parse_identifiers(&s.value, s.loc))
+                        .collect::<Result<Vec<(Symbol, Loc)>, SpecialAttributeError>>()?;
+                    result.push(Self::OwnedObjects(ids));
                 }
-            }
+                "shared_objects" => {
+                    let ids = spanned1
+                        .value
+                        .iter()
+                        .map(|s| Self::parse_identifiers(&s.value, s.loc))
+                        .collect::<Result<Vec<(Symbol, Loc)>, SpecialAttributeError>>()?;
+                    result.push(Self::SharedObjects(ids));
+                }
+                "frozen_objects" => {
+                    let ids = spanned1
+                        .value
+                        .iter()
+                        .map(|s| Self::parse_identifiers(&s.value, s.loc))
+                        .collect::<Result<Vec<(Symbol, Loc)>, SpecialAttributeError>>()?;
+                    result.push(Self::FrozenObjects(ids));
+                }
+                "abi" => {
+                    let modifiers = spanned1
+                        .value
+                        .iter()
+                        .map(|s| Self::parse_solidity_modifier(&s.value, s.loc))
+                        .collect::<Result<Vec<SolidityFunctionModifier>, SpecialAttributeError>>(
+                        )?;
+                    result.push(Self::Abi(modifiers));
+                }
+                "external_call" => {
+                    let modifiers = spanned1
+                        .value
+                        .iter()
+                        .map(|s| Self::parse_solidity_modifier(&s.value, s.loc))
+                        .collect::<Result<Vec<SolidityFunctionModifier>, SpecialAttributeError>>(
+                        )?;
+                    result.push(Self::ExternalCall(modifiers));
+                }
+                "expected_failure" => {
+                    let failure_kind = Self::parse_expected_failure_kind(spanned1, module_name)?;
+                    result.push(Self::ExpectedFailure(failure_kind));
+                }
+                _ => result.extend(
+                    spanned1
+                        .value
+                        .iter()
+                        .map(|s| Self::parse_modifiers(&s.value, module_name))
+                        .collect::<Result<Vec<Vec<FunctionModifier>>, SpecialAttributeError>>()?
+                        .concat(),
+                ),
+            },
             Attribute_::Name(name) => match name.value.as_str() {
                 "external_call" => result.push(Self::ExternalCall(Vec::new())),
                 "test" => result.push(Self::Test),
@@ -253,18 +261,26 @@ impl FunctionModifier {
         }
     }
 
-    /// Parses the `abort_code` parameter from an `expected_failure(abort_code = ...)` attribute.
+    /// Parses the expected failure kind from the inner attributes of an `expected_failure(...)` attribute.
     ///
-    /// Supports two forms:
-    /// - Numeric literal: `expected_failure(abort_code = 65540)`
-    /// - Constant reference: `expected_failure(abort_code = fixed_point32::EDIVISION_BY_ZERO)`
+    /// Supports these forms:
+    /// - Abort code with numeric literal: `expected_failure(abort_code = 65540)`
+    /// - Abort code with constant reference: `expected_failure(abort_code = fixed_point32::EDIVISION_BY_ZERO)`
+    /// - Arithmetic error: `expected_failure(arithmetic_error, location = std::u8)`
     ///
-    /// Note: Constants can either be declared in the same module or in a different module!
-    fn parse_expected_failure_abort_code(
+    /// Returns `None` for a bare `expected_failure` with no inner parameters.
+    fn parse_expected_failure_kind(
         attrs: &move_compiler::parser::ast::Attributes,
         module_name: Symbol,
-    ) -> Result<Option<ExpectedAbortCode>, SpecialAttributeError> {
+    ) -> Result<Option<ExpectedFailureKind>, SpecialAttributeError> {
         for attr in &attrs.value {
+            // Check for bare name attributes like `arithmetic_error`
+            if let Attribute_::Name(name) = &attr.value {
+                if name.value.as_str() == "arithmetic_error" {
+                    return Ok(Some(ExpectedFailureKind::ArithmeticError));
+                }
+            }
+
             if let Attribute_::Assigned(name, value) = &attr.value {
                 if name.value.as_str() == "abort_code" {
                     match &value.value {
@@ -282,7 +298,9 @@ impl FunctionModifier {
                                         line_of_code: v.loc,
                                     }
                                 })?;
-                                return Ok(Some(ExpectedAbortCode::Literal(code)));
+                                return Ok(Some(ExpectedFailureKind::AbortCode(
+                                    AbortCode::Literal(code),
+                                )));
                             }
                             _ => {
                                 return Err(SpecialAttributeError {
@@ -328,16 +346,14 @@ impl FunctionModifier {
                                         entries[entries.len() - 2].name.value
                                     };
 
-                                    return Ok(Some(ExpectedAbortCode::Constant(
-                                        module_name,
-                                        constant_name,
+                                    return Ok(Some(ExpectedFailureKind::AbortCode(
+                                        AbortCode::Constant(module_name, constant_name),
                                     )));
                                 }
                                 NameAccessChain_::Single(entry) => {
                                     // Single name constant from the same module
-                                    return Ok(Some(ExpectedAbortCode::Constant(
-                                        module_name,
-                                        entry.name.value,
+                                    return Ok(Some(ExpectedFailureKind::AbortCode(
+                                        AbortCode::Constant(module_name, entry.name.value),
                                     )));
                                 }
                             }
