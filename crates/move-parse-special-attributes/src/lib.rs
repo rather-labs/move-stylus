@@ -66,7 +66,7 @@ pub struct Enum_ {
     pub loc: Loc,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TestFunction {
     pub name: Symbol,
     pub expect_failure: bool,
@@ -94,7 +94,6 @@ pub struct SpecialAttributes {
     pub clever_error_constants: HashMap<Symbol, Symbol>,
 }
 
-// TODO: derive default for this struct
 impl Default for SpecialAttributes {
     fn default() -> Self {
         Self {
