@@ -23,8 +23,8 @@ use std::{
 };
 
 use walrus::{
-    FunctionBuilder, FunctionId as WasmFunctionId, GlobalId, ImportId, InstrSeqBuilder, LocalId,
-    Module, TableId, ValType,
+    FunctionBuilder, FunctionId as WasmFunctionId, GlobalId, InstrSeqBuilder, LocalId, Module,
+    TableId, ValType,
     ir::{BinaryOp, InstrSeqId, InstrSeqType, LoadKind, MemArg, StoreKind, UnaryOp},
 };
 
@@ -2647,7 +2647,13 @@ fn translate_instruction(
             // In test mode, report the raw u64 abort code to the test runner
             // via a host function call so it can compare against expected_failure(abort_code = ...).
             if compilation_ctx.test_mode {
-                let (set_abort_code_fn, _) = set_abort_code(module);
+                let (set_abort_code_fn, _) = crate::utils::get_or_insert_import(
+                    module,
+                    crate::hostio::host_test_functions::TEST_HOST_MODULE_NAME,
+                    "set_abort_code",
+                    &[ValType::I64],
+                    &[],
+                );
                 builder.local_get(abort_code_local).call(set_abort_code_fn);
             }
 
@@ -3692,26 +3698,4 @@ fn get_expected_vec_inner(
     } else {
         Ok(expected_vec_inner)
     }
-}
-
-/// Host function to report the raw u64 abort code to the test runner.
-/// Called from the `Abort` bytecode handler in test mode so the test runner
-/// can compare it against `expected_failure(abort_code = ...)`.
-pub fn set_abort_code(module: &mut Module) -> (WasmFunctionId, ImportId) {
-    let test_host_module_name = crate::hostio::host_test_functions::TEST_HOST_MODULE_NAME;
-    if let Ok(function_id) = module
-        .imports
-        .get_func(test_host_module_name, "set_abort_code")
-    {
-        for import in module.imports.iter() {
-            if let walrus::ImportKind::Function(func_id) = import.kind {
-                if func_id == function_id {
-                    return (function_id, import.id());
-                }
-            }
-        }
-    }
-
-    let ty = module.types.add(&[ValType::I64], &[]);
-    module.add_import_func(test_host_module_name, "set_abort_code", ty)
 }
