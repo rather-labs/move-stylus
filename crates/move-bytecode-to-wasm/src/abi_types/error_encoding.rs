@@ -339,36 +339,23 @@ pub fn build_abort_error_message(
     Ok(ptr)
 }
 
-/// Builds an ABI-encoded error message directly from constant data.
-///
-/// This function takes constant data in the format: [length: u8][data: u8*]
-/// and builds the ABI-encoded error message.
+/// Builds an ABI-encoded error message from raw error message bytes.
 ///
 /// # Arguments
 /// * `builder` - WASM instruction sequence builder
 /// * `module` - WASM module being built
 /// * `compilation_ctx` - Compilation context with memory and allocator info
-/// * `error_data` - Constant data bytes: first byte is length, rest is the error message
+/// * `error_bytes` - Raw error message bytes (no length prefix)
 ///
 /// # Returns
 /// * Pointer to the ABI-encoded error message in memory
-pub fn build_abort_error_message_from_constant(
+pub fn build_abort_error_message_from_bytes(
     builder: &mut InstrSeqBuilder,
     module: &mut Module,
     compilation_ctx: &CompilationContext,
-    error_data: &[u8],
+    error_bytes: &[u8],
 ) -> Result<LocalId, AbiError> {
-    if error_data.is_empty() {
-        return Err(AbiError::InvalidErrorData);
-    }
-
-    // Extract length from first byte
-    let error_len = error_data[0] as i32;
-    let error_bytes = &error_data[1..];
-
-    if error_bytes.len() != error_len as usize {
-        return Err(AbiError::InvalidErrorData);
-    }
+    let error_len = error_bytes.len() as i32;
 
     // Create a local for error_len (needed by build_abi_error_structure)
     let error_len_local = module.locals.add(ValType::I32);

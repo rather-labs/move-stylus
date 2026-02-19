@@ -34,15 +34,14 @@ use move_binary_format::{
     file_format::{Bytecode, CodeUnit},
     internals::ModuleIndex,
 };
+use move_symbol_pool::Symbol;
 
 #[cfg(debug_assertions)]
 use crate::hasher::get_hasher;
 
 use crate::{
     CompilationContext,
-    abi_types::error_encoding::{
-        build_abort_error_message, build_abort_error_message_from_constant,
-    },
+    abi_types::error_encoding::{build_abort_error_message, build_abort_error_message_from_bytes},
     compilation_context::{ModuleData, ModuleId},
     data::{DATA_ABORT_MESSAGE_PTR_OFFSET, RuntimeErrorData},
     generics::{replace_type_parameters, type_contains_generics},
@@ -188,7 +187,7 @@ struct TranslateFlowContext<'a> {
     dynamic_fields_global_variables: &'a mut Vec<(GlobalId, IntermediateType)>,
     result_block_id: InstrSeqId,
     result_local_id: LocalId,
-    clever_error: Option<u64>,
+    clever_error: Option<(Symbol, u64)>,
 }
 
 /// Translates a move function to WASM
@@ -607,12 +606,12 @@ fn translate_instruction(
             // they vary with macro expansion site).
             use crate::data::CLEVER_ERROR_LINE_NUMBER_MASK;
             let masked = literal & CLEVER_ERROR_LINE_NUMBER_MASK;
-            if module_data
+            if let Some((error_bytes, _)) = module_data
                 .clever_errors
                 .values()
-                .any(|(_, resolved)| *resolved == masked)
+                .find(|(_, resolved)| *resolved == masked)
             {
-                translate_flow_ctx.clever_error = Some(*literal);
+                translate_flow_ctx.clever_error = Some((*error_bytes, *literal));
             }
             builder.i64_const(*literal as i64);
             types_stack.push(IntermediateType::IU64);
@@ -2609,7 +2608,9 @@ fn translate_instruction(
             builder.local_tee(abort_code_local);
 
             // If a clever error is set in the translation context, use it to build a custom error message
-            let ptr = if let Some(clever_error) = translate_flow_ctx.clever_error.take() {
+            let ptr = if let Some((error_bytes_symbol, clever_error)) =
+                translate_flow_ctx.clever_error.take()
+            {
                 // Runtime sanity check: the clever error from the translation context should be the same as the one on the stack.
                 builder
                     .i64_const(clever_error as i64)
@@ -2622,19 +2623,9 @@ fn translate_instruction(
                         },
                     );
 
-                // Extract the constant index from the lower 16 bits of the encoded error constant using a 0xFFFF mask
-                let error_constant_index = (clever_error & 0xFFFF) as u32;
-                // Get the actual error constant from the constants vec in the module data
-                let error_constant = &module_data.constants[error_constant_index as usize];
-
-                // Build the ABI-encoded error message directly from the constant data
-                // The constant data format is: [length: u8][data: u8*]
-                build_abort_error_message_from_constant(
-                    builder,
-                    module,
-                    compilation_ctx,
-                    error_constant.data,
-                )?
+                // Build the ABI-encoded error message directly from the stored error bytes
+                let error_bytes = error_bytes_symbol.as_str().as_bytes();
+                build_abort_error_message_from_bytes(builder, module, compilation_ctx, error_bytes)?
             } else {
                 // Returns a ptr to the encoded error message
                 build_abort_error_message(builder, module, compilation_ctx)?
