@@ -1271,17 +1271,13 @@ fn compute_clever_error_abort_codes(
         // This is safe because constants with the same bytes are deduplicated by the compiler.
         let constant_index = *data_to_pool_index
             .get(clever_error.bytes.as_slice())
-            .ok_or_else(|| ModuleDataError::CleverErrorConstantDataNotFound {
-                name: name.to_string(),
-            })?;
+            .ok_or(ModuleDataError::CleverErrorConstantDataNotFound { name: *name })?;
 
         // Find the identifier_index: pool entry whose data matches the constant name bytes
         let name_bytes = name.as_str().as_bytes();
-        let identifier_index = *data_to_pool_index.get(name_bytes).ok_or_else(|| {
-            ModuleDataError::CleverErrorIdentifierNotFound {
-                name: name.to_string(),
-            }
-        })?;
+        let identifier_index = *data_to_pool_index
+            .get(name_bytes)
+            .ok_or(ModuleDataError::CleverErrorIdentifierNotFound { name: *name })?;
 
         // Construct the clever error u64:
         // tag bit (1) at position 63, line_number = 0 (masked out in comparison),

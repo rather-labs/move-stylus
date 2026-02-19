@@ -448,12 +448,10 @@ fn resolve_expected_abort_codes(
                 let value = constants_by_module
                     .get(lookup_module)
                     .and_then(|constants| constants.get(constant_name).copied())
-                    .ok_or_else(
-                        || CompilationContextError::ExpectedAbortCodeConstantNotFound {
-                            module_name: lookup_module.to_string(),
-                            constant_name: constant_name.to_string(),
-                        },
-                    )?;
+                    .ok_or(CompilationContextError::ExpectedAbortCodeConstantNotFound {
+                        module_name: *lookup_module,
+                        constant_name: *constant_name,
+                    })?;
 
                 test_fn.expected_abort_code = Some(ExpectedAbortCode::Literal(value));
             }
