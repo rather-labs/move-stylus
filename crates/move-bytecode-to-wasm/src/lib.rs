@@ -50,7 +50,7 @@ pub use translation::functions::MappedFunction;
 
 /// Resolves `ExpectedAbortCode::Constant(module_name, constant_name)` references
 /// in all test functions by looking up the constant value from the referenced module's
-/// `SpecialAttributes.u64_constants` or `SpecialAttributes.clever_error_constants`.
+/// `SpecialAttributes.u64_constants` or the resolved `clever_error_abort_codes` mapping.
 ///
 /// After this pass, all `Constant` variants are replaced with `Literal(u64)`.
 /// Returns an error if any constant reference cannot be resolved.
@@ -60,7 +60,7 @@ fn resolve_expected_abort_codes(
     use move_parse_special_attributes::function_modifiers::ExpectedAbortCode;
 
     // Collect all constants into a flat map keyed by (module_name, constant_name)
-    // to avoid borrow conflicts. Merges both u64_constants and resolved clever_error_constants.
+    // to avoid borrow conflicts. Merges both u64_constants and resolved clever_error_abort_codes.
     let constants: HashMap<(Symbol, Symbol), u64> = modules_data
         .values()
         .flat_map(|md| {
@@ -73,14 +73,9 @@ fn resolve_expected_abort_codes(
                 .map(move |(&name, &value)| ((module_name, name), value));
 
             let clever_constants = md
-                .special_attributes
-                .clever_error_constants
+                .clever_errors
                 .iter()
-                .filter_map(move |(&name, clever_error)| {
-                    clever_error
-                        .resolved_u64
-                        .map(|resolved| ((module_name, name), resolved))
-                });
+                .map(move |(&name, &(_, resolved))| ((module_name, name), resolved));
 
             regular_constants.chain(clever_constants)
         })

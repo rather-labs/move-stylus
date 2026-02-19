@@ -73,16 +73,6 @@ pub struct TestFunction {
     pub expected_abort_code: Option<function_modifiers::ExpectedAbortCode>,
 }
 
-/// An `#[error]` constant whose byte data is known from AST parsing,
-/// and whose clever error u64 abort code is resolved after compilation.
-#[derive(Debug, Clone)]
-pub struct CleverErrorConstant {
-    /// The raw byte string value from the source (e.g., b"Overflow from an arithmetic operation").
-    pub bytes: Vec<u8>,
-    /// The resolved clever error u64 abort code. `None` until resolved against the constant pool.
-    pub resolved_u64: Option<u64>,
-}
-
 #[derive(Debug)]
 pub struct SpecialAttributes {
     pub module_name: Symbol,
@@ -98,10 +88,10 @@ pub struct SpecialAttributes {
     /// Module-level u64 constants extracted from the AST (name → value).
     /// Used to resolve `ExpectedAbortCode::Constant` references.
     pub u64_constants: HashMap<Symbol, u64>,
-    /// Module-level clever error constants extracted from the AST.
-    /// Initially only the byte data is known (from parsing); the u64 abort code is resolved
-    /// later when the compiled module's constant pool is available.
-    pub clever_error_constants: HashMap<Symbol, CleverErrorConstant>,
+    /// Module-level `#[error]` constant byte strings extracted from the AST (name → byte string symbol).
+    /// The clever error u64 abort codes are resolved later by the compilation context
+    /// (see `ModuleData::clever_error_abort_codes`).
+    pub clever_error_constants: HashMap<Symbol, Symbol>,
 }
 
 // TODO: derive default for this struct
@@ -337,13 +327,9 @@ pub fn process_special_attributes(
                                 // Extract #[error] vector<u8> constants for clever error resolution
                                 Value_::ByteString(s) => {
                                     if is_clever_error(constant) {
-                                        result.clever_error_constants.insert(
-                                            constant.name.value(),
-                                            CleverErrorConstant {
-                                                bytes: s.as_str().as_bytes().to_vec(),
-                                                resolved_u64: None,
-                                            },
-                                        );
+                                        result
+                                            .clever_error_constants
+                                            .insert(constant.name.value(), *s);
                                     }
                                 }
                                 _ => {}
