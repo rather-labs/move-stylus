@@ -431,6 +431,20 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
         runtime_error_data: &mut RuntimeErrorData,
         runtime_error: RuntimeError,
     ) -> &mut Self {
+        // In test mode, report the runtime error identifier to the test runner
+        // so it can match against expected_failure(arithmetic_error), etc.
+        if compilation_ctx.test_mode {
+            let (set_runtime_error_fn, _) = crate::utils::get_or_insert_import(
+                module,
+                crate::hostio::host_test_functions::TEST_HOST_MODULE_NAME,
+                "set_runtime_error",
+                &[ValType::I32],
+                &[],
+            );
+            self.i32_const(runtime_error as i32)
+                .call(set_runtime_error_fn);
+        }
+
         self.i32_const(runtime_error_data.get(module, compilation_ctx.memory_id, runtime_error));
 
         self.add_handle_error_instructions(module, compilation_ctx, return_type);

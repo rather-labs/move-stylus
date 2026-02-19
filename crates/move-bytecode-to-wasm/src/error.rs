@@ -153,6 +153,7 @@ impl From<&CodeError> for Diagnostic {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(i32)]
 pub enum RuntimeError {
     /// Attempted to share an object that is frozen.
     FrozenObjectsCannotBeShared,
@@ -180,7 +181,35 @@ pub enum RuntimeError {
     VectorNotEmpty,
 }
 
+impl TryFrom<i32> for RuntimeError {
+    type Error = i32;
+
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::FrozenObjectsCannotBeShared),
+            1 => Ok(Self::SharedObjectsCannotBeFrozen),
+            2 => Ok(Self::FrozenObjectsCannotBeTransferred),
+            3 => Ok(Self::SharedObjectsCannotBeTransferred),
+            4 => Ok(Self::StorageObjectNotFound),
+            5 => Ok(Self::FrozenObjectsCannotBeDeleted),
+            6 => Ok(Self::StorageObjectTypeMismatch),
+            7 => Ok(Self::Overflow),
+            8 => Ok(Self::OutOfBounds),
+            9 => Ok(Self::MemoryAccessOutOfBounds),
+            10 => Ok(Self::EnumSizeTooLarge),
+            11 => Ok(Self::VectorNotEmpty),
+            _ => Err(value),
+        }
+    }
+}
+
 impl RuntimeError {
+    /// Returns whether this runtime error is an arithmetic error
+    /// (i.e. the kind matched by `expected_failure(arithmetic_error)`).
+    pub fn is_arithmetic_error(&self) -> bool {
+        matches!(self, Self::Overflow)
+    }
+
     pub fn as_bytes(&self) -> &[u8] {
         match self {
             RuntimeError::FrozenObjectsCannotBeShared => b"Frozen objects cannot be shared",

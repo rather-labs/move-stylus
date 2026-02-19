@@ -8,7 +8,6 @@ use std::path::Path;
 
 use move_bytecode_to_wasm::compilation_context::{ModuleData, ModuleId};
 use move_bytecode_to_wasm::data::CLEVER_ERROR_LINE_NUMBER_MASK;
-use move_bytecode_to_wasm::error::RuntimeError;
 use move_parse_special_attributes::function_modifiers::{AbortCode, ExpectedFailureKind};
 use wasm_runner::RuntimeSandbox;
 
@@ -102,6 +101,23 @@ pub fn run_tests(
                         println!(
                             "{RED}FAILED{RESET} (abort code {module_name}::{constant_name} could not be resolved for comparison)"
                         );
+                    }
+                    Some(ExpectedFailureKind::ArithmeticError) => {
+                        if let Some(runtime_error) = &result.store.data().runtime_error {
+                            if runtime_error.is_arithmetic_error() {
+                                println!("{GREEN}PASSED{RESET}");
+                            } else {
+                                println!(
+                                    "{RED}FAILED{RESET} - expected arithmetic error, got runtime error: {runtime_error:?}"
+                                );
+                                failures.push(test.to_owned());
+                            }
+                        } else {
+                            println!(
+                                "{RED}FAILED{RESET} - expected arithmetic error, but got a non-runtime abort"
+                            );
+                            failures.push(test.to_owned());
+                        }
                     }
                     None => {
                         // No specific abort code expected — any abort is fine

@@ -17,7 +17,7 @@ use crate::constants::{
 };
 use alloy_primitives::{FixedBytes, U256, keccak256};
 use anyhow::Result;
-use move_bytecode_to_wasm::data::DATA_ABORT_MESSAGE_PTR_OFFSET;
+use move_bytecode_to_wasm::{data::DATA_ABORT_MESSAGE_PTR_OFFSET, error::RuntimeError};
 use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store};
 
 pub struct ModuleData {
@@ -26,6 +26,9 @@ pub struct ModuleData {
     /// Raw u64 abort code reported by the `set_abort_code` host function.
     /// Set when an `Abort` bytecode executes in test mode.
     pub abort_code: Option<u64>,
+    /// Runtime error reported by the `set_runtime_error` host function.
+    /// Set when a runtime error (e.g., overflow) occurs in test mode.
+    pub runtime_error: Option<RuntimeError>,
 }
 
 #[allow(dead_code)]
@@ -599,6 +602,19 @@ impl RuntimeSandbox {
             )
             .unwrap();
 
+        // Host function to receive the runtime error identifier from return_error().
+        linker
+            .func_wrap(
+                "vm_test_hooks",
+                "set_runtime_error",
+                move |mut caller: Caller<'_, ModuleData>, error_id: i32| {
+                    let err = RuntimeError::try_from(error_id)
+                        .unwrap_or_else(|id| panic!("Invalid runtime error ID: {id}"));
+                    caller.data_mut().runtime_error = Some(err);
+                },
+            )
+            .unwrap();
+
         linker
             .func_wrap("", "print_i64", |param: i64| {
                 println!("--- i64 ---> {param}");
@@ -718,6 +734,7 @@ impl RuntimeSandbox {
                 data,
                 return_data: vec![],
                 abort_code: None,
+                runtime_error: None,
             },
         );
         let instance = self.linker.instantiate(&mut store, &self.module)?;
@@ -756,6 +773,7 @@ impl RuntimeSandbox {
                 data,
                 return_data: vec![],
                 abort_code: None,
+                runtime_error: None,
             },
         );
         let instance = self.linker.instantiate(&mut store, &self.module)?;
@@ -780,6 +798,7 @@ impl RuntimeSandbox {
                 data,
                 return_data: vec![],
                 abort_code: None,
+                runtime_error: None,
             },
         );
         let instance = self.linker.instantiate(&mut store, &self.module)?;
