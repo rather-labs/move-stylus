@@ -213,6 +213,12 @@ impl RuntimeError {
         matches!(self, Self::Overflow | Self::DivisionByZero)
     }
 
+    /// Returns whether this runtime error is a vector error
+    /// (i.e. the kind matched by `expected_failure(vector_error)`).
+    pub fn is_vector_error(&self) -> bool {
+        matches!(self, Self::VectorNotEmpty | Self::OutOfBounds)
+    }
+
     pub fn as_bytes(&self) -> &[u8] {
         match self {
             RuntimeError::FrozenObjectsCannotBeShared => b"Frozen objects cannot be shared",

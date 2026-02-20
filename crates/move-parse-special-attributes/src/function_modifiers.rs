@@ -97,6 +97,8 @@ pub enum ExpectedFailureKind {
     AbortCode(AbortCode),
     /// An arithmetic error, e.g., `expected_failure(arithmetic_error, location = std::u8)`
     ArithmeticError,
+    /// A vector error, e.g., `expected_failure(vector_error, minor_status = 1, location = Self)`
+    VectorError,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -267,6 +269,7 @@ impl FunctionModifier {
     /// - Abort code with numeric literal: `expected_failure(abort_code = 65540)`
     /// - Abort code with constant reference: `expected_failure(abort_code = fixed_point32::EDIVISION_BY_ZERO)`
     /// - Arithmetic error: `expected_failure(arithmetic_error, location = std::u8)`
+    /// - Vector error: `expected_failure(vector_error, minor_status = 1, location = Self)`
     ///
     /// Returns `None` for a bare `expected_failure` with no inner parameters.
     fn parse_expected_failure_kind(
@@ -274,10 +277,12 @@ impl FunctionModifier {
         module_name: Symbol,
     ) -> Result<Option<ExpectedFailureKind>, SpecialAttributeError> {
         for attr in &attrs.value {
-            // Check for bare name attributes like `arithmetic_error`
+            // Check for bare name attributes like `arithmetic_error` or `vector_error`
             if let Attribute_::Name(name) = &attr.value {
-                if name.value.as_str() == "arithmetic_error" {
-                    return Ok(Some(ExpectedFailureKind::ArithmeticError));
+                match name.value.as_str() {
+                    "arithmetic_error" => return Ok(Some(ExpectedFailureKind::ArithmeticError)),
+                    "vector_error" => return Ok(Some(ExpectedFailureKind::VectorError)),
+                    _ => {}
                 }
             }
 

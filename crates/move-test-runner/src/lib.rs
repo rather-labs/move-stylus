@@ -119,6 +119,23 @@ pub fn run_tests(
                             failures.push(test.to_owned());
                         }
                     }
+                    Some(ExpectedFailureKind::VectorError) => {
+                        if let Some(runtime_error) = &result.store.data().runtime_error {
+                            if runtime_error.is_vector_error() {
+                                println!("{GREEN}PASSED{RESET}");
+                            } else {
+                                println!(
+                                    "{RED}FAILED{RESET} - expected vector error, got runtime error: {runtime_error:?}"
+                                );
+                                failures.push(test.to_owned());
+                            }
+                        } else {
+                            println!(
+                                "{RED}FAILED{RESET} - expected vector error, but got a non-runtime abort"
+                            );
+                            failures.push(test.to_owned());
+                        }
+                    }
                     None => {
                         // No specific abort code expected — any abort is fine
                         println!("{GREEN}PASSED{RESET}");
