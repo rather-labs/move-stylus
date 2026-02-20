@@ -741,25 +741,46 @@ impl RuntimeSandbox {
 
         let entrypoint = instance.get_func(&mut store, function_name).unwrap();
 
-        entrypoint
-            .call(&mut store, &[], &mut [])
-            .map_err(|e| anyhow::anyhow!("error calling entrypoint: {e:?}"))?;
+        match entrypoint.call(&mut store, &[], &mut []) {
+            Ok(()) => {
+                let error_pointer_bytes = Self::read_memory_from(
+                    &instance,
+                    &mut store,
+                    DATA_ABORT_MESSAGE_PTR_OFFSET as usize,
+                    4,
+                )
+                .map_err(|e| anyhow::anyhow!("there was an error reading test memory: {e:?}"))?;
 
-        let error_pointer_bytes = Self::read_memory_from(
-            &instance,
-            &mut store,
-            DATA_ABORT_MESSAGE_PTR_OFFSET as usize,
-            4,
-        )
-        .map_err(|e| anyhow::anyhow!("there was an error reading test memory: {e:?}"))?;
+                let execution_aborted = error_pointer_bytes != [0, 0, 0, 0];
 
-        let execution_aborted = error_pointer_bytes != [0, 0, 0, 0];
-
-        Ok(ExecutionData {
-            instance,
-            store,
-            execution_aborted,
-        })
+                Ok(ExecutionData {
+                    instance,
+                    store,
+                    execution_aborted,
+                })
+            }
+            Err(err) => {
+                // Check if it's a Wasm trap we can classify
+                if let Some(trap) = err.downcast_ref::<wasmtime::Trap>() {
+                    match trap {
+                        wasmtime::Trap::IntegerDivisionByZero => {
+                            store.data_mut().runtime_error = Some(RuntimeError::DivisionByZero);
+                        }
+                        wasmtime::Trap::IntegerOverflow => {
+                            store.data_mut().runtime_error = Some(RuntimeError::Overflow);
+                        }
+                        _ => {}
+                    }
+                    return Ok(ExecutionData {
+                        instance,
+                        store,
+                        execution_aborted: true,
+                    });
+                }
+                // Not a Wasm trap — propagate as a real error
+                Err(anyhow::anyhow!("error calling entrypoint: {err:?}"))
+            }
+        }
     }
 
     /// Crates a temporary runtime sandbox instance and calls the entrypoint with the given data.

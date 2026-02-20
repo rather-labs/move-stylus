@@ -179,6 +179,8 @@ pub enum RuntimeError {
     EnumSizeTooLarge,
     /// The vector is NOT empty. Thrown by vector::destroy_empty.
     VectorNotEmpty,
+    /// Division by zero.
+    DivisionByZero,
 }
 
 impl TryFrom<i32> for RuntimeError {
@@ -198,6 +200,7 @@ impl TryFrom<i32> for RuntimeError {
             9 => Ok(Self::MemoryAccessOutOfBounds),
             10 => Ok(Self::EnumSizeTooLarge),
             11 => Ok(Self::VectorNotEmpty),
+            12 => Ok(Self::DivisionByZero),
             _ => Err(value),
         }
     }
@@ -207,7 +210,7 @@ impl RuntimeError {
     /// Returns whether this runtime error is an arithmetic error
     /// (i.e. the kind matched by `expected_failure(arithmetic_error)`).
     pub fn is_arithmetic_error(&self) -> bool {
-        matches!(self, Self::Overflow)
+        matches!(self, Self::Overflow | Self::DivisionByZero)
     }
 
     pub fn as_bytes(&self) -> &[u8] {
@@ -228,6 +231,7 @@ impl RuntimeError {
             RuntimeError::MemoryAccessOutOfBounds => b"Memory access out of bounds",
             RuntimeError::EnumSizeTooLarge => b"Enum size too large",
             RuntimeError::VectorNotEmpty => b"Attempted to destroy an non-empty vector",
+            RuntimeError::DivisionByZero => b"Division by zero",
         }
     }
 
