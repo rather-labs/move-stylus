@@ -95,9 +95,9 @@ pub enum AbortCode {
 pub enum ExpectedFailureKind {
     /// An explicit abort code, e.g., `expected_failure(abort_code = 65540)`
     AbortCode(AbortCode),
-    /// An arithmetic error, e.g., `expected_failure(arithmetic_error, location = std::u8)`
+    /// An arithmetic error, e.g., `expected_failure(arithmetic_error)`
     ArithmeticError,
-    /// A vector error, e.g., `expected_failure(vector_error, minor_status = 1, location = Self)`
+    /// A vector error, e.g., `expected_failure(vector_error)`
     VectorError,
 }
 
