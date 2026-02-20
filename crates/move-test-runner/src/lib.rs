@@ -8,7 +8,7 @@ use std::path::Path;
 
 use move_bytecode_to_wasm::compilation_context::{ModuleData, ModuleId};
 use move_bytecode_to_wasm::data::CLEVER_ERROR_LINE_NUMBER_MASK;
-use move_parse_special_attributes::function_modifiers::ExpectedAbortCode;
+use move_parse_special_attributes::function_modifiers::{AbortCode, ExpectedFailureKind};
 use wasm_runner::RuntimeSandbox;
 
 const RESET: &str = "\x1b[0m";
@@ -75,9 +75,9 @@ pub fn run_tests(
                 failures.push(test.to_owned());
             }
             (true, true) => {
-                // Execution aborted as expected — now check the abort code if specified
-                match &test.expected_abort_code {
-                    Some(ExpectedAbortCode::Literal(expected_code)) => {
+                // Execution aborted as expected — now check the failure kind if specified
+                match &test.expected_failure_kind {
+                    Some(ExpectedFailureKind::AbortCode(AbortCode::Literal(expected_code))) => {
                         if let Some(actual_code) = result.store.data().abort_code {
                             if abort_codes_match(*expected_code, actual_code) {
                                 println!("{GREEN}PASSED{RESET}");
@@ -93,11 +93,48 @@ pub fn run_tests(
                             );
                         }
                     }
-                    Some(ExpectedAbortCode::Constant(module_name, constant_name)) => {
+                    Some(ExpectedFailureKind::AbortCode(AbortCode::Constant(
+                        module_name,
+                        constant_name,
+                    ))) => {
                         // This is unreachable because we have throw an error in the compiler if any constant reference cannot be resolved.
                         println!(
                             "{RED}FAILED{RESET} (abort code {module_name}::{constant_name} could not be resolved for comparison)"
                         );
+                    }
+                    Some(ExpectedFailureKind::ArithmeticError) => {
+                        if let Some(runtime_error) = &result.store.data().runtime_error {
+                            if runtime_error.is_arithmetic_error() {
+                                println!("{GREEN}PASSED{RESET}");
+                            } else {
+                                println!(
+                                    "{RED}FAILED{RESET} - expected arithmetic error, got runtime error: {runtime_error:?}"
+                                );
+                                failures.push(test.to_owned());
+                            }
+                        } else {
+                            println!(
+                                "{RED}FAILED{RESET} - expected arithmetic error, but got a non-runtime abort"
+                            );
+                            failures.push(test.to_owned());
+                        }
+                    }
+                    Some(ExpectedFailureKind::VectorError) => {
+                        if let Some(runtime_error) = &result.store.data().runtime_error {
+                            if runtime_error.is_vector_error() {
+                                println!("{GREEN}PASSED{RESET}");
+                            } else {
+                                println!(
+                                    "{RED}FAILED{RESET} - expected vector error, got runtime error: {runtime_error:?}"
+                                );
+                                failures.push(test.to_owned());
+                            }
+                        } else {
+                            println!(
+                                "{RED}FAILED{RESET} - expected vector error, but got a non-runtime abort"
+                            );
+                            failures.push(test.to_owned());
+                        }
                     }
                     None => {
                         // No specific abort code expected — any abort is fine

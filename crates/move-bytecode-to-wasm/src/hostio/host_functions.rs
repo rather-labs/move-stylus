@@ -1,9 +1,16 @@
+use crate::utils::get_or_insert_import;
 use walrus::{FunctionId, ImportId, Module, ValType};
 
 pub const HOST_MODULE_NAME: &str = "vm_hooks";
 
 pub fn add_pay_for_memory_grow(module: &mut Module) -> (FunctionId, ImportId) {
-    get_or_insert_import(module, "pay_for_memory_grow", &[ValType::I32], &[])
+    get_or_insert_import(
+        module,
+        HOST_MODULE_NAME,
+        "pay_for_memory_grow",
+        &[ValType::I32],
+        &[],
+    )
 }
 
 /// Host function to read the arguments to memory
@@ -15,7 +22,7 @@ pub fn add_pay_for_memory_grow(module: &mut Module) -> (FunctionId, ImportId) {
 ///
 /// Receives a pointer to the memory, and writes the length of the arguments to it
 pub fn read_args(module: &mut Module) -> (FunctionId, ImportId) {
-    get_or_insert_import(module, "read_args", &[ValType::I32], &[])
+    get_or_insert_import(module, HOST_MODULE_NAME, "read_args", &[ValType::I32], &[])
 }
 
 /// Host function to write the result to memory
@@ -26,7 +33,13 @@ pub fn read_args(module: &mut Module) -> (FunctionId, ImportId) {
 ///
 /// Receives a pointer to the memory and the length of the result
 pub fn write_result(module: &mut Module) -> (FunctionId, ImportId) {
-    get_or_insert_import(module, "write_result", &[ValType::I32, ValType::I32], &[])
+    get_or_insert_import(
+        module,
+        HOST_MODULE_NAME,
+        "write_result",
+        &[ValType::I32, ValType::I32],
+        &[],
+    )
 }
 
 /// Reads a 32-byte value from permanent storage. Stylus's storage format is identical to
@@ -40,6 +53,7 @@ pub fn write_result(module: &mut Module) -> (FunctionId, ImportId) {
 pub fn storage_load_bytes32(module: &mut Module) -> (FunctionId, ImportId) {
     get_or_insert_import(
         module,
+        HOST_MODULE_NAME,
         "storage_load_bytes32",
         &[ValType::I32, ValType::I32],
         &[],
@@ -56,6 +70,7 @@ pub fn storage_load_bytes32(module: &mut Module) -> (FunctionId, ImportId) {
 pub fn storage_cache_bytes32(module: &mut Module) -> (FunctionId, ImportId) {
     get_or_insert_import(
         module,
+        HOST_MODULE_NAME,
         "storage_cache_bytes32",
         &[ValType::I32, ValType::I32],
         &[],
@@ -69,7 +84,13 @@ pub fn storage_cache_bytes32(module: &mut Module) -> (FunctionId, ImportId) {
 ///
 /// param: clear: bool -> clear the cache if true
 pub fn storage_flush_cache(module: &mut Module) -> (FunctionId, ImportId) {
-    get_or_insert_import(module, "storage_flush_cache", &[ValType::I32], &[])
+    get_or_insert_import(
+        module,
+        HOST_MODULE_NAME,
+        "storage_flush_cache",
+        &[ValType::I32],
+        &[],
+    )
 }
 
 /// Gets the top-level sender of the transaction. The semantics are equivalent to that of the
@@ -77,7 +98,7 @@ pub fn storage_flush_cache(module: &mut Module) -> (FunctionId, ImportId) {
 ///
 /// [`ORIGIN`]: https://www.evm.codes/#32
 pub fn tx_origin(module: &mut Module) -> (FunctionId, ImportId) {
-    get_or_insert_import(module, "tx_origin", &[ValType::I32], &[])
+    get_or_insert_import(module, HOST_MODULE_NAME, "tx_origin", &[ValType::I32], &[])
 }
 
 /// Emits an EVM log with the given number of topics and data, the first bytes of which should
@@ -93,6 +114,7 @@ pub fn tx_origin(module: &mut Module) -> (FunctionId, ImportId) {
 pub fn emit_log(module: &mut Module) -> (FunctionId, ImportId) {
     get_or_insert_import(
         module,
+        HOST_MODULE_NAME,
         "emit_log",
         &[ValType::I32, ValType::I32, ValType::I32],
         &[],
@@ -110,7 +132,7 @@ pub fn emit_log(module: &mut Module) -> (FunctionId, ImportId) {
 /// [`DELEGATE_CALL`]: https://www.evm.codes/#f4
 /// [`Retryable Ticket Address Aliasing`]: https://developer.arbitrum.io/arbos/l1-to-l2-messaging#address-aliasing
 pub fn msg_sender(module: &mut Module) -> (FunctionId, ImportId) {
-    get_or_insert_import(module, "msg_sender", &[ValType::I32], &[])
+    get_or_insert_import(module, HOST_MODULE_NAME, "msg_sender", &[ValType::I32], &[])
 }
 
 /// Get the ETH value in wei sent to the program. The semantics are equivalent to that of the
@@ -118,7 +140,7 @@ pub fn msg_sender(module: &mut Module) -> (FunctionId, ImportId) {
 ///
 /// [`CALLVALUE`]: https://www.evm.codes/#34
 pub fn msg_value(module: &mut Module) -> (FunctionId, ImportId) {
-    get_or_insert_import(module, "msg_value", &[ValType::I32], &[])
+    get_or_insert_import(module, HOST_MODULE_NAME, "msg_value", &[ValType::I32], &[])
 }
 
 /// Gets a bounded estimate of the L1 block number at which the Sequencer sequenced the
@@ -127,7 +149,13 @@ pub fn msg_value(module: &mut Module) -> (FunctionId, ImportId) {
 ///
 /// [`Block Numbers and Time`]: https://developer.arbitrum.io/time
 pub fn block_number(module: &mut Module) -> (FunctionId, ImportId) {
-    get_or_insert_import(module, "block_number", &[], &[ValType::I64])
+    get_or_insert_import(
+        module,
+        HOST_MODULE_NAME,
+        "block_number",
+        &[],
+        &[ValType::I64],
+    )
 }
 
 /// Gets the basefee of the current block. The semantics are equivalent to that of the EVM's
@@ -135,7 +163,13 @@ pub fn block_number(module: &mut Module) -> (FunctionId, ImportId) {
 ///
 /// [`BASEFEE`]: https://www.evm.codes/#48
 pub fn block_basefee(module: &mut Module) -> (FunctionId, ImportId) {
-    get_or_insert_import(module, "block_basefee", &[ValType::I32], &[])
+    get_or_insert_import(
+        module,
+        HOST_MODULE_NAME,
+        "block_basefee",
+        &[ValType::I32],
+        &[],
+    )
 }
 
 /// Gets the gas limit of the current block. The semantics are equivalent to that of the EVM's
@@ -146,7 +180,13 @@ pub fn block_basefee(module: &mut Module) -> (FunctionId, ImportId) {
 /// [`GAS_LIMIT`]: https://www.evm.codes/#45
 /// [`The Ethereum Yellow Paper`]: https://ethereum.github.io/yellowpaper/paper.pdf
 pub fn block_gas_limit(module: &mut Module) -> (FunctionId, ImportId) {
-    get_or_insert_import(module, "block_gas_limit", &[], &[ValType::I64])
+    get_or_insert_import(
+        module,
+        HOST_MODULE_NAME,
+        "block_gas_limit",
+        &[],
+        &[ValType::I64],
+    )
 }
 
 /// Gets a bounded estimate of the Unix timestamp at which the Sequencer sequenced the
@@ -155,7 +195,13 @@ pub fn block_gas_limit(module: &mut Module) -> (FunctionId, ImportId) {
 ///
 /// [`Block Numbers and Time`]: https://developer.arbitrum.io/time
 pub fn block_timestamp(module: &mut Module) -> (FunctionId, ImportId) {
-    get_or_insert_import(module, "block_timestamp", &[], &[ValType::I64])
+    get_or_insert_import(
+        module,
+        HOST_MODULE_NAME,
+        "block_timestamp",
+        &[],
+        &[ValType::I64],
+    )
 }
 
 /// Gets the unique chain identifier of the Arbitrum chain. The semantics are equivalent to
@@ -163,7 +209,7 @@ pub fn block_timestamp(module: &mut Module) -> (FunctionId, ImportId) {
 ///
 /// [`CHAIN_ID`]: https://www.evm.codes/#46
 pub fn chain_id(module: &mut Module) -> (FunctionId, ImportId) {
-    get_or_insert_import(module, "chainid", &[], &[ValType::I64])
+    get_or_insert_import(module, HOST_MODULE_NAME, "chainid", &[], &[ValType::I64])
 }
 
 /// Gets the gas price in wei per gas, which on Arbitrum chains equals the basefee. The
@@ -171,7 +217,13 @@ pub fn chain_id(module: &mut Module) -> (FunctionId, ImportId) {
 ///
 /// [`GAS_PRICE`]: https://www.evm.codes/#3A
 pub fn tx_gas_price(module: &mut Module) -> (FunctionId, ImportId) {
-    get_or_insert_import(module, "tx_gas_price", &[ValType::I32], &[])
+    get_or_insert_import(
+        module,
+        HOST_MODULE_NAME,
+        "tx_gas_price",
+        &[ValType::I32],
+        &[],
+    )
 }
 
 /// Efficiently computes the [`keccak256`] hash of the given preimage.
@@ -183,6 +235,7 @@ pub fn tx_gas_price(module: &mut Module) -> (FunctionId, ImportId) {
 pub fn native_keccak256(module: &mut Module) -> (FunctionId, ImportId) {
     get_or_insert_import(
         module,
+        HOST_MODULE_NAME,
         "native_keccak256",
         &[ValType::I32, ValType::I32, ValType::I32],
         &[],
@@ -206,6 +259,7 @@ pub fn native_keccak256(module: &mut Module) -> (FunctionId, ImportId) {
 pub fn call_contract(module: &mut Module) -> (FunctionId, ImportId) {
     get_or_insert_import(
         module,
+        HOST_MODULE_NAME,
         "call_contract",
         &[
             // Contract address
@@ -243,6 +297,7 @@ pub fn call_contract(module: &mut Module) -> (FunctionId, ImportId) {
 pub fn static_call_contract(module: &mut Module) -> (FunctionId, ImportId) {
     get_or_insert_import(
         module,
+        HOST_MODULE_NAME,
         "static_call_contract",
         &[
             // Contract address
@@ -278,6 +333,7 @@ pub fn static_call_contract(module: &mut Module) -> (FunctionId, ImportId) {
 pub fn delegate_call_contract(module: &mut Module) -> (FunctionId, ImportId) {
     get_or_insert_import(
         module,
+        HOST_MODULE_NAME,
         "delegate_call_contract",
         &[
             // Contract address
@@ -306,6 +362,7 @@ pub fn delegate_call_contract(module: &mut Module) -> (FunctionId, ImportId) {
 pub fn read_return_data(module: &mut Module) -> (FunctionId, ImportId) {
     get_or_insert_import(
         module,
+        HOST_MODULE_NAME,
         "read_return_data",
         &[
             // Dest
@@ -327,6 +384,7 @@ pub fn read_return_data(module: &mut Module) -> (FunctionId, ImportId) {
 pub fn account_code_size(module: &mut Module) -> (FunctionId, ImportId) {
     get_or_insert_import(
         module,
+        HOST_MODULE_NAME,
         "account_code_size",
         &[ValType::I32],
         &[ValType::I32],
@@ -340,29 +398,9 @@ pub fn account_code_size(module: &mut Module) -> (FunctionId, ImportId) {
 pub fn account_balance(module: &mut Module) -> (FunctionId, ImportId) {
     get_or_insert_import(
         module,
+        HOST_MODULE_NAME,
         "account_balance",
         &[ValType::I32, ValType::I32],
         &[],
     )
-}
-
-#[inline]
-fn get_or_insert_import(
-    module: &mut walrus::Module,
-    name: &str,
-    params: &[walrus::ValType],
-    results: &[walrus::ValType],
-) -> (walrus::FunctionId, walrus::ImportId) {
-    if let Ok(function_id) = module.imports.get_func(HOST_MODULE_NAME, name) {
-        for import in module.imports.iter() {
-            if let walrus::ImportKind::Function(func_id) = import.kind {
-                if func_id == function_id {
-                    return (function_id, import.id());
-                }
-            }
-        }
-    }
-
-    let ty = module.types.add(params, results);
-    module.add_import_func(HOST_MODULE_NAME, name, ty)
 }

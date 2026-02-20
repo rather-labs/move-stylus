@@ -112,3 +112,26 @@ pub fn keccak_string_to_memory(
             );
     }
 }
+
+// Helper function to get or insert an import function
+#[inline]
+pub fn get_or_insert_import(
+    module: &mut walrus::Module,
+    module_name: &str,
+    name: &str,
+    params: &[walrus::ValType],
+    results: &[walrus::ValType],
+) -> (walrus::FunctionId, walrus::ImportId) {
+    if let Ok(function_id) = module.imports.get_func(module_name, name) {
+        for import in module.imports.iter() {
+            if let walrus::ImportKind::Function(func_id) = import.kind {
+                if func_id == function_id {
+                    return (function_id, import.id());
+                }
+            }
+        }
+    }
+
+    let ty = module.types.add(params, results);
+    module.add_import_func(module_name, name, ty)
+}

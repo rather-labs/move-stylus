@@ -66,11 +66,11 @@ pub struct Enum_ {
     pub loc: Loc,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TestFunction {
     pub name: Symbol,
     pub expect_failure: bool,
-    pub expected_abort_code: Option<function_modifiers::ExpectedAbortCode>,
+    pub expected_failure_kind: Option<function_modifiers::ExpectedFailureKind>,
 }
 
 #[derive(Debug)]
@@ -94,7 +94,6 @@ pub struct SpecialAttributes {
     pub clever_error_constants: HashMap<Symbol, Symbol>,
 }
 
-// TODO: derive default for this struct
 impl Default for SpecialAttributes {
     fn default() -> Self {
         Self {
@@ -667,17 +666,17 @@ pub fn process_special_attributes(
                                         result.test_functions.push(TestFunction {
                                             name: f.name.0.value,
                                             expect_failure: false,
-                                            expected_abort_code: None,
+                                            expected_failure_kind: None,
                                         });
                                     }
-                                    FunctionModifier::ExpectedFailure(abort_code) => {
+                                    FunctionModifier::ExpectedFailure(failure_kind) => {
                                         if let Some(test_function) = result
                                             .test_functions
                                             .iter_mut()
                                             .find(|tf| tf.name == f.name.0.value)
                                         {
                                             test_function.expect_failure = true;
-                                            test_function.expected_abort_code = abort_code;
+                                            test_function.expected_failure_kind = failure_kind;
                                         } else {
                                             found_error = true;
                                             module_errors.push(SpecialAttributeError {

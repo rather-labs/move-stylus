@@ -57,7 +57,7 @@ pub use translation::functions::MappedFunction;
 fn resolve_expected_abort_codes(
     modules_data: &mut HashMap<ModuleId, ModuleData>,
 ) -> Result<(), CompilationError> {
-    use move_parse_special_attributes::function_modifiers::ExpectedAbortCode;
+    use move_parse_special_attributes::function_modifiers::{AbortCode, ExpectedFailureKind};
 
     // Collect all constants into a flat map keyed by (module_name, constant_name)
     // to avoid borrow conflicts. Merges both u64_constants and resolved clever_error_abort_codes.
@@ -89,8 +89,8 @@ fn resolve_expected_abort_codes(
         .flat_map(|md| md.special_attributes.test_functions.iter_mut());
 
     for test_fn in all_test_fns {
-        if let Some(ExpectedAbortCode::Constant(mod_name, const_name)) =
-            &test_fn.expected_abort_code
+        if let Some(ExpectedFailureKind::AbortCode(AbortCode::Constant(mod_name, const_name))) =
+            &test_fn.expected_failure_kind
         {
             let value = constants.get(&(*mod_name, *const_name)).copied().ok_or(
                 CompilationContextError::ExpectedAbortCodeConstantNotFound {
@@ -100,7 +100,8 @@ fn resolve_expected_abort_codes(
             )?;
 
             // Update the state from Constant to Literal
-            test_fn.expected_abort_code = Some(ExpectedAbortCode::Literal(value));
+            test_fn.expected_failure_kind =
+                Some(ExpectedFailureKind::AbortCode(AbortCode::Literal(value)));
         }
     }
 

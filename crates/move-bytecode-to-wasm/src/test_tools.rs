@@ -46,11 +46,16 @@ where
     U: wasmtime::WasmResults,
     T: wasmtime::WasmParams,
 {
-    let linker = if let Some(linker) = linker {
+    let mut linker = if let Some(linker) = linker {
         linker
     } else {
         Linker::new(&Engine::default())
     };
+
+    // Provide a no-op implementation of set_runtime_error so that modules
+    // compiled with test_mode=true (which import vm_test_hooks::set_runtime_error)
+    // can be instantiated in unit tests.
+    let _ = linker.func_wrap("vm_test_hooks", "set_runtime_error", |_error_id: i32| {});
 
     let engine = linker.engine();
 

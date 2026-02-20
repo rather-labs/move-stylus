@@ -52,9 +52,9 @@ fun test_divide_and_round_up() {
     integer_tests::test_divide_and_round_up!(MAX, CASES);
 }
 
-#[test, expected_failure(arithmetic_error, location = std::u8)]
+#[test, expected_failure(arithmetic_error, location = std::u32)]
 fun test_divide_and_round_up_error() {
-    1u8.divide_and_round_up(0);
+    1u32.divide_and_round_up(0);
 }
 
 #[test]
