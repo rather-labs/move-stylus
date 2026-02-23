@@ -10,10 +10,11 @@ use clap::Parser;
 use eyre::Result;
 use std::path::PathBuf;
 
-use crate::{common::{AuthOpts, CommonConfig}, constants::ARB_WASM_ADDRESS, deploy::{
-     DataFeeOpts, check::check_activate,
-    greyln, util::color::DebugColor,
-}};
+use crate::{
+    common::{AuthOpts, CommonConfig},
+    constants::ARB_WASM_ADDRESS,
+    deploy::{DataFeeOpts, check::check_activate, greyln, util::color::DebugColor},
+};
 
 sol! {
     #[sol(rpc)]
@@ -68,9 +69,7 @@ pub struct PrivateKeyArgs {
 impl Activate {
     pub fn execute(self) -> anyhow::Result<()> {
         let Self {
-            address,
-            endpoint,
-            ..
+            address, endpoint, ..
         } = &self;
 
         println!(

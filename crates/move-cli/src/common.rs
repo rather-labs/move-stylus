@@ -67,7 +67,7 @@ impl GasFeeConfig for CommonConfig {
 }
 
 #[derive(Clone, Debug, Args)]
-#[clap(group(ArgGroup::new("key").required(true).args(&["private_key_path", "private_key", "keystore_path"])))]
+#[clap(group(ArgGroup::new("key").required(true).args(&["private_key_path", "private_key"])))]
 pub struct AuthOpts {
     /// File path to a text file containing a hex-encoded private key.
     #[arg(long)]

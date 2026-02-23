@@ -210,9 +210,7 @@ pub async fn check_activate(
         Ok(result) => result,
         Err(e) => {
             if e.to_string().contains("pay_for_memory_grow") {
-                bail!(
-                    "Contract could not be activated as it is missing an entrypoint."
-                );
+                bail!("Contract could not be activated as it is missing an entrypoint.");
             } else {
                 return Err(e.into());
             }

@@ -5,10 +5,8 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use crate::base::reroot_path;
-use crate::deploy::{
-    CheckConfig, DataFeeOpts, DeployConfig, STYLUS_DEPLOYER_ADDRESS,
-};
 use crate::common::{AuthOpts, CommonConfig};
+use crate::deploy::{CheckConfig, DataFeeOpts, DeployConfig, STYLUS_DEPLOYER_ADDRESS};
 
 /// Deploys a contract
 #[derive(Parser)]

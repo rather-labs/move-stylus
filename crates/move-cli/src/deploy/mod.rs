@@ -6,18 +6,16 @@ pub mod check;
 pub mod project;
 pub mod util;
 
-use std::{path::PathBuf};
+use std::path::PathBuf;
 
 use crate::common::{AuthOpts, CommonConfig, GasFeeConfig};
-use crate::constants::{ARB_WASM_ADDRESS};
+use crate::constants::ARB_WASM_ADDRESS;
 use crate::deploy::{
     check::ContractCheck,
-    util::{
-        color::{Color, DebugColor},
-    },
+    util::color::{Color, DebugColor},
 };
 use alloy::{
-    network::{TransactionBuilder},
+    network::TransactionBuilder,
     primitives::{
         Address, B256, U256,
         utils::{format_units, parse_ether},
@@ -27,7 +25,7 @@ use alloy::{
     sol,
     sol_types::SolCall,
 };
-use clap::{Args};
+use clap::Args;
 use eyre::{Result, WrapErr, bail, eyre};
 
 macro_rules! greyln {
@@ -40,18 +38,11 @@ macro_rules! greyln {
 macro_rules! mintln {
     ($($msg:expr),*) => {{
         let msg = format!($($msg),*);
-        println!("{}", msg.mint())
+        println!("{}", $crate::deploy::util::color::Color::mint(&msg))
     }};
 }
 
-macro_rules! egreyln {
-    ($($msg:expr),*) => {{
-        let msg = format!($($msg),*);
-        eprintln!("{}", msg.grey())
-    }};
-}
-
-pub(crate) use {egreyln, greyln};
+pub(crate) use greyln;
 
 pub mod deployer;
 
