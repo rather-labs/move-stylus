@@ -87,6 +87,7 @@ pub async fn check(cfg: &CheckConfig) -> Result<ContractCheck> {
 pub enum ContractCheck {
     /// Contract already exists onchain.
     Active { code: Vec<u8> },
+
     /// Contract can be activated with the given data fee.
     Ready { code: Vec<u8>, fee: U256 },
 }
@@ -217,6 +218,7 @@ pub async fn check_activate(
             }
         }
     };
+
     let ArbWasm::activateProgramReturn {
         dataFee: data_fee, ..
     } = result;

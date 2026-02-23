@@ -13,22 +13,14 @@ pub struct CommonConfig {
     /// Arbitrum RPC endpoint.
     #[arg(short, long, default_value = DEFAULT_ENDPOINT)]
     pub endpoint: String,
+
     /// Whether to print debug info.
     #[arg(long)]
     pub verbose: bool,
-    /// The path to source files to include in the project hash, which
-    /// is included in the contract deployment init code transaction
-    /// to be used for verification of deployment integrity.
-    /// If not provided, all .rs files and Cargo.toml and Cargo.lock files
-    /// in project's directory tree are included.
-    #[arg(long)]
-    pub source_files_for_project_hash: Vec<String>,
-    #[arg(long)]
+
     /// Optional max fee per gas in gwei units.
-    pub max_fee_per_gas_gwei: Option<String>,
-    /// Specifies the features to use when building the Stylus binary.
     #[arg(long)]
-    pub features: Option<String>,
+    pub max_fee_per_gas_gwei: Option<String>,
 }
 
 pub trait GasFeeConfig {

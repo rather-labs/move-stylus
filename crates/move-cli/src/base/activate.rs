@@ -130,9 +130,7 @@ fn from_deploy_args(activate: Activate) -> ActivateConfig {
     let common_cfg = CommonConfig {
         endpoint,
         verbose,
-        source_files_for_project_hash: vec![],
         max_fee_per_gas_gwei,
-        features: None,
     };
 
     ActivateConfig {

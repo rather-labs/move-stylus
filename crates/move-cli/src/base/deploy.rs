@@ -98,9 +98,7 @@ fn from_deploy_args(deploy: Deploy, wasm_file: PathBuf) -> DeployConfig {
         common_cfg: CommonConfig {
             endpoint,
             verbose,
-            source_files_for_project_hash: vec![],
             max_fee_per_gas_gwei,
-            features: None,
         },
         data_fee: DataFeeOpts {
             data_fee_bump_percent,
