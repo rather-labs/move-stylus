@@ -124,11 +124,10 @@ pub fn get_or_insert_import(
 ) -> (walrus::FunctionId, walrus::ImportId) {
     if let Ok(function_id) = module.imports.get_func(module_name, name) {
         for import in module.imports.iter() {
-            if let walrus::ImportKind::Function(func_id) = import.kind {
-                if func_id == function_id {
+            if let walrus::ImportKind::Function(func_id) = import.kind
+                && func_id == function_id {
                     return (function_id, import.id());
                 }
-            }
         }
     }
 

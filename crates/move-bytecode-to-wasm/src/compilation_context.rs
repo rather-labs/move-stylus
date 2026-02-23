@@ -66,7 +66,7 @@ impl CompilationContext<'_> {
         }
     }
 
-    pub fn get_module_data_by_id(&self, module_id: &ModuleId) -> Result<&ModuleData> {
+    pub fn get_module_data_by_id(&self, module_id: &ModuleId) -> Result<&ModuleData<'_>> {
         if let Some(m) = self.deps_data.get(module_id) {
             Ok(m)
         } else if &self.root_module_data.id == module_id {
@@ -109,7 +109,7 @@ impl CompilationContext<'_> {
     pub fn get_struct_by_intermediate_type(
         &self,
         itype: &IntermediateType,
-    ) -> Result<Cow<IStruct>> {
+    ) -> Result<Cow<'_, IStruct>> {
         match itype {
             IntermediateType::IStruct {
                 module_id, index, ..
@@ -131,7 +131,7 @@ impl CompilationContext<'_> {
         }
     }
 
-    pub fn get_enum_by_intermediate_type(&self, itype: &IntermediateType) -> Result<Cow<IEnum>> {
+    pub fn get_enum_by_intermediate_type(&self, itype: &IntermediateType) -> Result<Cow<'_, IEnum>> {
         match itype {
             IntermediateType::IEnum { module_id, index } => {
                 let enum_ = self.get_enum_by_index(module_id, *index)?;

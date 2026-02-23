@@ -17,7 +17,7 @@ use crate::deploy::{
 use alloy::{
     json_abi::Constructor, network::{EthereumWallet, TransactionBuilder}, primitives::{Address, B256, FixedBytes, U256, utils::{format_units, parse_ether}}, providers::{Provider, ProviderBuilder}, rpc::types::{TransactionReceipt, TransactionRequest}, signers::{Signer, local::{LocalSigner, PrivateKeySigner}}, sol, sol_types::SolCall
 };
-use clap::{ArgGroup, Args, command};
+use clap::{ArgGroup, Args};
 use eyre::{Result, WrapErr, bail, eyre};
 
 macro_rules! greyln {
@@ -41,7 +41,7 @@ macro_rules! egreyln {
     }};
 }
 
-pub(crate) use {egreyln, greyln, mintln};
+pub(crate) use {egreyln, greyln};
 
 pub mod deployer;
 
@@ -287,7 +287,7 @@ pub async fn print_gas_estimate(name: &str, gas: u64, gas_price: u128) -> Result
 
 pub fn print_cache_notice(contract_addr: Address) {
     let contract_addr = hex::encode(contract_addr);
-    println!("");
+    println!();
     mintln!(
         r#"NOTE: We recommend running cargo stylus cache bid {contract_addr} 0 to cache your activated contract in ArbOS.
 Cached contracts benefit from cheaper calls. To read more about the Stylus contract cache, see

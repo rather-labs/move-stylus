@@ -1117,8 +1117,8 @@ pub fn add_check_and_delete_struct_tto_fields_fn(
                 .local_get(parent_struct_ptr)
                 .local_get(child_struct_ptr)
                 .call(delete_tto_object_fn);
-        } else if let IntermediateType::IVector(inner) = field {
-            if matches!(
+        } else if let IntermediateType::IVector(inner) = field
+            && matches!(
                 inner.as_ref(),
                 IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. }
             ) {
@@ -1226,7 +1226,6 @@ pub fn add_check_and_delete_struct_tto_fields_fn(
                     });
                 });
             }
-        }
         offset += 4;
     }
 

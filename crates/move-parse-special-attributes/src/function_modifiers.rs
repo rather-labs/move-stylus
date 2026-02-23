@@ -286,8 +286,8 @@ impl FunctionModifier {
                 }
             }
 
-            if let Attribute_::Assigned(name, value) = &attr.value {
-                if name.value.as_str() == "abort_code" {
+            if let Attribute_::Assigned(name, value) = &attr.value
+                && name.value.as_str() == "abort_code" {
                     match &value.value {
                         // Numeric literal: abort_code = 65540 or abort_code = 0x10004
                         AttributeValue_::Value(v) => match &v.value {
@@ -365,7 +365,6 @@ impl FunctionModifier {
                         }
                     }
                 }
-            }
         }
         // No abort_code parameter found — bare expected_failure
         Ok(None)
