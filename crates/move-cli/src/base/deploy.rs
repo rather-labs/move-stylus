@@ -1,10 +1,10 @@
 use alloy::primitives::{Address, U256};
 use anyhow::anyhow;
 use clap::Parser;
+use std::path::Path;
 use std::path::PathBuf;
-use std::{path::Path};
 
-use crate::base::{reroot_path};
+use crate::base::reroot_path;
 use crate::deploy::{
     AuthOpts, CheckConfig, CommonConfig, DataFeeOpts, DeployConfig, STYLUS_DEPLOYER_ADDRESS,
 };
@@ -83,15 +83,11 @@ fn from_deploy_args(deploy: Deploy, wasm_file: PathBuf) -> DeployConfig {
         AuthOpts {
             private_key_path: None,
             private_key,
-            keystore_path: None,
-            keystore_password_path: None,
         }
     } else if private_key_path.is_some() {
         AuthOpts {
             private_key_path,
             private_key: None,
-            keystore_path: None,
-            keystore_password_path: None,
         }
     } else {
         panic!("Either --private-key or --private-key-path must be provided");
@@ -148,7 +144,9 @@ impl Deploy {
         let wasm_file = get_wasm_file_with_path(contract_name, manifest.package.name.as_str())?;
         let deploy_config = from_deploy_args(self, wasm_file);
 
-        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()?;
         rt.block_on(async move {
             crate::deploy::deploy(deploy_config).await.unwrap();
         });

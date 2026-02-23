@@ -64,6 +64,21 @@ example-delegated-counter-named-id:
 example-revert-errors:
 	cargo run -p move-hello-world-example --bin revert_errors
 
+example-all:
+	$(MAKE) example-interaction
+	$(MAKE) example-interaction-2
+	$(MAKE) example-interaction-primitives
+	$(MAKE) example-counter
+	$(MAKE) example-counter-named-id
+	$(MAKE) example-counter-with-init
+	$(MAKE) example-dog-walker
+	$(MAKE) example-erc20
+	$(MAKE) example-erc721
+	$(MAKE) example-cross-contract-call
+	$(MAKE) example-delegated-counter
+	$(MAKE) example-delegated-counter-named-id
+	$(MAKE) example-revert-errors
+
 deploy:
 	cargo run -p move-cli -- deploy -p ./example \
 		--endpoint 'http://localhost:8547' \

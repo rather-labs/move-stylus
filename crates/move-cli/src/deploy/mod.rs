@@ -24,10 +24,7 @@ use alloy::{
     },
     providers::{Provider, ProviderBuilder},
     rpc::types::{TransactionReceipt, TransactionRequest},
-    signers::{
-        Signer,
-        local::{LocalSigner, PrivateKeySigner},
-    },
+    signers::{Signer, local::PrivateKeySigner},
     sol,
     sol_types::SolCall,
 };
@@ -37,7 +34,7 @@ use eyre::{Result, WrapErr, bail, eyre};
 macro_rules! greyln {
     ($($msg:expr),*) => {{
         let msg = format!($($msg),*);
-        println!("{}", msg.grey())
+        println!("{}", $crate::deploy::util::color::Color::grey(&msg))
     }};
 }
 
@@ -77,7 +74,6 @@ pub async fn deploy(cfg: DeployConfig) -> Result<()> {
         .await
         .expect("cargo stylus check failed");
     let verbose = cfg.check_config.common_cfg.verbose;
-
 
     let provider = ProviderBuilder::new()
         .connect(&cfg.check_config.common_cfg.endpoint)
@@ -139,7 +135,6 @@ cargo stylus activate --address {}"#,
         }
         ContractCheck::Active { .. } => greyln!("wasm already activated!"),
     }
-    print_cache_notice(contract_addr);
     Ok(())
 }
 
@@ -269,16 +264,6 @@ pub async fn print_gas_estimate(name: &str, gas: u64, gas_price: u128) -> Result
     Ok(())
 }
 
-pub fn print_cache_notice(contract_addr: Address) {
-    let contract_addr = hex::encode(contract_addr);
-    println!();
-    mintln!(
-        r#"NOTE: We recommend running cargo stylus cache bid {contract_addr} 0 to cache your activated contract in ArbOS.
-Cached contracts benefit from cheaper calls. To read more about the Stylus contract cache, see
-https://docs.arbitrum.io/stylus/how-tos/caching-contracts"#
-    );
-}
-
 pub async fn run_tx(
     name: &str,
     tx: TransactionRequest,
@@ -394,7 +379,8 @@ pub struct DeployConfig {
     /// If specified, will not run the command in a reproducible docker container. Useful for local
     /// builds, but at the risk of not having a reproducible contract for verification purposes.
     #[arg(long)]
-    pub no_verify: bool, /// Cargo stylus version when deploying reproducibly to downloads the corresponding cargo-stylus-base Docker image.
+    pub no_verify: bool,
+    /// Cargo stylus version when deploying reproducibly to downloads the corresponding cargo-stylus-base Docker image.
     /// If not set, uses the default version of the local cargo stylus binary.
     #[arg(long)]
     pub cargo_stylus_version: Option<String>,
@@ -498,12 +484,6 @@ pub struct AuthOpts {
     /// Private key as a hex string. Warning: this exposes your key to shell history.
     #[arg(long)]
     pub private_key: Option<String>,
-    /// Path to an Ethereum wallet keystore file (e.g. clef).
-    #[arg(long)]
-    pub keystore_path: Option<String>,
-    /// Keystore password file.
-    #[arg(long)]
-    pub keystore_password_path: Option<PathBuf>,
 }
 
 /// Loads a wallet for signing transactions.
@@ -527,15 +507,6 @@ impl AuthOpts {
             return Ok(EthereumWallet::new(signer));
         }
 
-        let keystore = self.keystore_path.as_ref().ok_or(eyre!("no keystore"))?;
-        let password = self
-            .keystore_password_path
-            .as_ref()
-            .map(fs::read_to_string)
-            .unwrap_or(Ok("".into()))?;
-
-        let signer =
-            LocalSigner::decrypt_keystore(keystore, password)?.with_chain_id(Some(chain_id));
-        Ok(EthereumWallet::new(signer))
+        Err(eyre!("no private key provided"))
     }
 }

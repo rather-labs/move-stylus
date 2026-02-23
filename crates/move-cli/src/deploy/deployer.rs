@@ -166,7 +166,6 @@ pub async fn deploy(
     }
     let tx_hash = receipt.transaction_hash.debug_lavender();
     greyln!("deployment tx hash: {tx_hash}");
-    super::print_cache_notice(contract);
     Ok(())
 }
 

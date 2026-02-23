@@ -116,12 +116,3 @@ pub fn get_build_directory(
         ))
     }
 }
-
-pub fn cargo_stylus_installed() -> bool {
-    Command::new("sh")
-        .arg("-c")
-        .arg("command -v cargo-stylus > /dev/null")
-        .status()
-        .map(|status| status.success())
-        .unwrap_or(false)
-}
