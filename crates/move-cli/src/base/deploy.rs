@@ -1,11 +1,10 @@
 use alloy::primitives::{Address, U256};
 use anyhow::anyhow;
 use clap::Parser;
-use tokio::runtime::Runtime;
 use std::path::PathBuf;
-use std::{path::Path, process::Command};
+use std::{path::Path};
 
-use crate::base::{cargo_stylus_installed, reroot_path};
+use crate::base::{reroot_path};
 use crate::deploy::{
     AuthOpts, CheckConfig, CommonConfig, DataFeeOpts, DeployConfig, STYLUS_DEPLOYER_ADDRESS,
 };

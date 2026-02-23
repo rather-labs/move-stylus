@@ -1,3 +1,7 @@
+PRIVATE_KEY ?= 0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659
+CONTRACT_NAME ?= hello_world
+CONTRACT_ENV_VAR ?= CONTRACT_ADDRESS
+
 test-move-bytecode-to-wasm:
 	cargo test -p move-bytecode-to-wasm
 
@@ -60,123 +64,71 @@ example-delegated-counter-named-id:
 example-revert-errors:
 	cargo run -p move-hello-world-example --bin revert_errors
 
+deploy:
+	cargo run -p move-cli -- deploy -p ./example \
+		--endpoint 'http://localhost:8547' \
+		--private-key "$(PRIVATE_KEY)" \
+		--contract-name "$(CONTRACT_NAME)" \
+		| tee /dev/tty | ./update_contract_env.sh $(CONTRACT_ENV_VAR)
+
 deploy-example:
-	cargo stylus deploy \
-		--endpoint='http://localhost:8547' \
-		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/example/wasm/hello_world.wasm \
-		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS
+	$(MAKE) deploy CONTRACT_NAME=hello_world_2 CONTRACT_ENV_VAR=CONTRACT_ADDRESS_2
 
 deploy-example-2:
-	cargo stylus deploy \
-		--endpoint='http://localhost:8547' \
-		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/example/wasm/hello_world_2.wasm \
-		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_2
+	$(MAKE) deploy CONTRACT_NAME=hello_world_2 CONTRACT_ENV_VAR=CONTRACT_ADDRESS_2
 
 deploy-example-primitives:
-	cargo stylus deploy \
-		--endpoint='http://localhost:8547' \
-		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/example/wasm/primitives_and_operations.wasm \
-		--no-verify \
-		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_PRIMITIVES
+	$(MAKE) deploy CONTRACT_NAME=primitives_and_operations CONTRACT_ENV_VAR=CONTRACT_ADDRESS_PRIMITIVES
 
 deploy-erc20:
-	cargo stylus deploy \
-		--endpoint='http://localhost:8547' \
-		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/example/wasm/erc20.wasm \
-		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_ERC20
+	$(MAKE) deploy CONTRACT_NAME=erc20 CONTRACT_ENV_VAR=CONTRACT_ADDRESS_ERC20
 
 deploy-erc721:
-	cargo stylus deploy \
-		--endpoint='http://localhost:8547' \
-		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/example/wasm/erc721.wasm \
-		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_ERC721
-	cargo stylus deploy \
-		--endpoint='http://localhost:8547' \
-		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/example/wasm/erc721_receiver.wasm \
-		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_ERC721_RECEIVER
+	$(MAKE) deploy CONTRACT_NAME=erc721 CONTRACT_ENV_VAR=CONTRACT_ADDRESS_ERC721
+	$(MAKE) deploy CONTRACT_NAME=erc721_receiver CONTRACT_ENV_VAR=CONTRACT_ADDRESS_ERC721_RECEIVER
 
 deploy-counter:
-	cargo stylus deploy \
-		--endpoint='http://localhost:8547' \
-		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/example/wasm/counter.wasm \
-		--no-verify \
-		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_COUNTER
+	$(MAKE) deploy CONTRACT_NAME=counter CONTRACT_ENV_VAR=CONTRACT_ADDRESS_COUNTER
 
 deploy-counter-named-id:
-	cargo stylus deploy \
-		--endpoint='http://localhost:8547' \
-		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/example/wasm/counter_named_id.wasm \
-		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_COUNTER_NAMED_ID
+	$(MAKE) deploy CONTRACT_NAME=counter_named_id CONTRACT_ENV_VAR=CONTRACT_ADDRESS_COUNTER_NAMED_ID
 
 deploy-counter-with-init:
-	cargo stylus deploy \
-		--endpoint='http://localhost:8547' \
-		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/example/wasm/counter_with_init.wasm \
-		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_COUNTER_WITH_INIT
+	$(MAKE) deploy CONTRACT_NAME=counter_with_init CONTRACT_ENV_VAR=CONTRACT_ADDRESS_COUNTER_WITH_INIT
 
 deploy-dog-walker:
-	cargo stylus deploy \
-		--endpoint='http://localhost:8547' \
-		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/example/wasm/dog_walker.wasm \
-		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_DOG_WALKER
+	$(MAKE) deploy CONTRACT_NAME=dog_walker CONTRACT_ENV_VAR=CONTRACT_ADDRESS_DOG_WALKER
 
 deploy-cross-contract-call:
-	cargo stylus deploy \
-		--endpoint='http://localhost:8547' \
-		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/example/wasm/cross_contract_call.wasm \
-		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_CROSS_CALL
+	$(MAKE) deploy CONTRACT_NAME=cross_contract_call CONTRACT_ENV_VAR=CONTRACT_ADDRESS_CROSS_CALL
 
 deploy-delegated-counter:
-	cargo stylus deploy \
-		--endpoint='http://localhost:8547' \
-		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/example/wasm/delegated_counter_logic_1.wasm \
-		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_DELEGATED_COUNTER_LOGIC_1
-	cargo stylus deploy \
-		--endpoint='http://localhost:8547' \
-		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/example/wasm/delegated_counter_logic_2.wasm \
-		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_DELEGATED_COUNTER_LOGIC_2
-	cargo stylus deploy \
-		--endpoint='http://localhost:8547' \
-		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/example/wasm/delegated_counter.wasm \
-		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_DELEGATED_COUNTER
+	$(MAKE) deploy CONTRACT_NAME=delegated_counter_logic_1 CONTRACT_ENV_VAR=CONTRACT_ADDRESS_DELEGATED_COUNTER_LOGIC_1
+	$(MAKE) deploy CONTRACT_NAME=delegated_counter_logic_2 CONTRACT_ENV_VAR=CONTRACT_ADDRESS_DELEGATED_COUNTER_LOGIC_2
+	$(MAKE) deploy CONTRACT_NAME=delegated_counter CONTRACT_ENV_VAR=CONTRACT_ADDRESS_DELEGATED_COUNTER
 
 deploy-delegated-counter-named-id:
-	cargo stylus deploy \
-		--endpoint='http://localhost:8547' \
-		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/example/wasm/delegated_counter_named_id_logic_1.wasm \
-		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_DELEGATED_COUNTER_NAMED_ID_LOGIC_1
-	cargo stylus deploy \
-		--endpoint='http://localhost:8547' \
-		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/example/wasm/delegated_counter_named_id_logic_2.wasm \
-		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_DELEGATED_COUNTER_NAMED_ID_LOGIC_2
-	cargo stylus deploy \
-		--endpoint='http://localhost:8547' \
-		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/example/wasm/delegated_counter_named_id.wasm \
-		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_DELEGATED_COUNTER_NAMED_ID
+	$(MAKE) deploy CONTRACT_NAME=delegated_counter_named_id_logic_1 CONTRACT_ENV_VAR=CONTRACT_ADDRESS_DELEGATED_COUNTER_NAMED_ID_LOGIC_1
+	$(MAKE) deploy CONTRACT_NAME=delegated_counter_named_id_logic_2 CONTRACT_ENV_VAR=CONTRACT_ADDRESS_DELEGATED_COUNTER_NAMED_ID_LOGIC_2
+	$(MAKE) deploy CONTRACT_NAME=delegated_counter_named_id CONTRACT_ENV_VAR=CONTRACT_ADDRESS_DELEGATED_COUNTER_NAMED_ID
 
 deploy-revert-errors:
-	cargo stylus deploy \
-		--endpoint='http://localhost:8547' \
-		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/example/wasm/revert_errors.wasm \
-		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_REVERT_ERRORS
+	$(MAKE) deploy CONTRACT_NAME=revert_errors CONTRACT_ENV_VAR=CONTRACT_ADDRESS_REVERT_ERRORS
+
+deploy-all:
+	$(MAKE) deploy-example
+	$(MAKE) deploy-example-2
+	$(MAKE) deploy-example-primitives
+	$(MAKE) deploy-erc20
+	$(MAKE) deploy-erc721
+	$(MAKE) deploy-counter
+	$(MAKE) deploy-counter-named-id
+	$(MAKE) deploy-counter-with-init
+	$(MAKE) deploy-dog-walker
+	$(MAKE) deploy-cross-contract-call
+	$(MAKE) deploy-delegated-counter
+	$(MAKE) deploy-delegated-counter-named_id
+	$(MAKE) deploy-revert-errors
 
 setup-stylus:
 	RUSTFLAGS="-C link-args=-rdynamic" cargo install --force --version 0.10.0 cargo-stylus

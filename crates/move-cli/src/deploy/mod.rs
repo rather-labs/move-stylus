@@ -3,7 +3,6 @@
 
 pub mod check;
 pub mod constants;
-pub mod export_abi;
 pub mod project;
 pub mod util;
 
@@ -18,7 +17,6 @@ use crate::deploy::{
     },
 };
 use alloy::{
-    json_abi::Constructor,
     network::{EthereumWallet, TransactionBuilder},
     primitives::{
         Address, B256, FixedBytes, U256,
@@ -79,33 +77,7 @@ pub async fn deploy(cfg: DeployConfig) -> Result<()> {
         .await
         .expect("cargo stylus check failed");
     let verbose = cfg.check_config.common_cfg.verbose;
-    let use_wasm_file = cfg.check_config.wasm_file.is_some();
 
-    let constructor = if use_wasm_file {
-        if let Some(signature) = &cfg.constructor_signature {
-            Some(Constructor::parse(signature)?)
-        } else {
-            None
-        }
-    } else {
-        if cfg.constructor_signature.is_some() {
-            bail!("cannot set constructor signature without --wasm-file");
-        }
-        export_abi::get_constructor_signature()?
-    };
-
-    let deployer_args = match constructor {
-        Some(constructor) => {
-            let args = deployer::parse_constructor_args(&cfg, &constructor, &contract).await?;
-            Some(args)
-        }
-        None => None,
-    };
-
-    // Check constructor flags for contracts without constructor
-    if deployer_args.is_none() && !cfg.constructor_args.is_empty() {
-        bail!("constructor arguments set but constructor was not found");
-    }
 
     let provider = ProviderBuilder::new()
         .connect(&cfg.check_config.common_cfg.endpoint)
@@ -142,10 +114,6 @@ pub async fn deploy(cfg: DeployConfig) -> Result<()> {
                 "https://docs.arbitrum.io/stylus/stylus-quickstart".yellow(),
             );
         }
-    }
-
-    if let Some(deployer_args) = deployer_args {
-        return deployer::deploy(&cfg, deployer_args, from_address, &provider).await;
     }
 
     let contract_addr = cfg
