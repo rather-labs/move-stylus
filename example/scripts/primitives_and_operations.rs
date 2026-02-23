@@ -134,7 +134,7 @@ async fn main() -> eyre::Result<()> {
         .andU64(u64::MAX, 0xF000FFFFFFFF000Fu64)
         .call()
         .await?;
-    let expected_and = u64::MAX & 0xF000FFFFFFFF000Fu64;
+    let expected_and = 0xF000FFFFFFFF000Fu64;
     println!("andU64(u64::MAX, 0xF000FFFFFFFF000F): 0x{res:x}");
     assert_eq!(
         res, expected_and,
