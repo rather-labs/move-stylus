@@ -33,6 +33,22 @@ move-evm-abi-generator.workspace = true
 move-test-runner.workspace = true
 wasm-opt = "0.116.1"
 wasmprinter.workspace = true
+thiserror.workspace = true
+alloy = { version = "1.0", features = ["essentials", "signer-keystore", "getrandom", "provider-trace-api", "provider-debug-api"] }
+eyre = "0.6.12"
+bytesize = "2.3.1"
+brotli2 = "0.3.2"
+tiny-keccak = "2.0.2"
+toml = "1.0.3"
+wasm-encoder = "0.245.1"
+wasm-parser = "0.2.2"
+glob = "0.3.3"
+rustc-host = "0.1.7"
+hex = "0.4.3"
+wasmparser = "0.245.1"
+wasmer = "7.0.1"
+tempfile = "3.25.0"
+wasm-gen = "0.1.4"
 
 [[bin]]
 name = "move-stylus"
