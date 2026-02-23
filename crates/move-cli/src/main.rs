@@ -8,6 +8,7 @@ use anyhow::Result;
 pub mod base;
 pub(crate) mod build_config;
 pub mod common;
+pub mod constants;
 pub mod deploy;
 pub(crate) mod error;
 

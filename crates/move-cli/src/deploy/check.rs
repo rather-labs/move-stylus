@@ -2,10 +2,10 @@
 // Modified by Rather Labs, Inc. in 2026.
 // For licensing, see https://github.com/OffchainLabs/cargo-stylus/blob/main/licenses/COPYRIGHT.md
 
+use crate::constants::ARB_WASM_ADDRESS;
 use crate::deploy::{
     CheckConfig, DataFeeOpts,
     check::ArbWasm::ArbWasmErrors,
-    constants::ARB_WASM_ADDRESS,
     greyln, project,
     util::color::{Color, GREY, LAVENDER, MINT, PINK, YELLOW},
 };

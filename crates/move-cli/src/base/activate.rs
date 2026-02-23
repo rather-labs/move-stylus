@@ -10,10 +10,10 @@ use clap::Parser;
 use eyre::Result;
 use std::path::PathBuf;
 
-use crate::deploy::{
-    AuthOpts, CommonConfig, DataFeeOpts, check::check_activate, constants::ARB_WASM_ADDRESS,
+use crate::{common::{AuthOpts, CommonConfig}, constants::ARB_WASM_ADDRESS, deploy::{
+     DataFeeOpts, check::check_activate,
     greyln, util::color::DebugColor,
-};
+}};
 
 sol! {
     #[sol(rpc)]
