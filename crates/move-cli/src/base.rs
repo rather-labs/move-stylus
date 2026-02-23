@@ -23,7 +23,6 @@ use move_package::{
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
-    process::Command,
 };
 
 pub fn reroot_path(path: Option<&Path>) -> anyhow::Result<PathBuf> {

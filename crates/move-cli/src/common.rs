@@ -1,10 +1,10 @@
 use std::{fs, path::PathBuf};
 
+use alloy::signers::Signer;
 use alloy::{network::EthereumWallet, primitives::FixedBytes, signers::local::PrivateKeySigner};
 use clap::{ArgGroup, Args};
-use eyre::{Context, Result, bail};
-use alloy::signers::Signer;
 use eyre::eyre;
+use eyre::{Context, Result, bail};
 
 use crate::{constants::DEFAULT_ENDPOINT, deploy::util::text::decode0x};
 

@@ -45,13 +45,8 @@ sol! {
 /// Checks that a contract is valid and can be deployed onchain.
 /// Returns whether the WASM is already up-to-date and activated onchain, and the data fee.
 pub async fn check(cfg: &CheckConfig) -> Result<ContractCheck> {
-    if cfg.common_cfg.endpoint == "https://stylus-testnet.arbitrum.io/rpc" {
-        let version = "cargo stylus version 0.2.1".to_string().red();
-        bail!("The old Stylus testnet is no longer supported.\nPlease downgrade to {version}",);
-    }
-
     let verbose = cfg.common_cfg.verbose;
-    let (wasm, project_hash) = cfg.build_wasm().wrap_err("failed to build wasm")?;
+    let (wasm, project_hash) = cfg.build_wasm()?;
 
     if verbose {
         greyln!("reading wasm file at {}", wasm.to_string_lossy().lavender());
@@ -74,6 +69,7 @@ pub async fn check(cfg: &CheckConfig) -> Result<ContractCheck> {
     let provider = ProviderBuilder::new()
         .connect(&cfg.common_cfg.endpoint)
         .await?;
+
     let codehash = alloy::primitives::keccak256(&code);
 
     if contract_exists(codehash, &provider).await? {
@@ -82,6 +78,7 @@ pub async fn check(cfg: &CheckConfig) -> Result<ContractCheck> {
 
     let address = cfg.contract_address.unwrap_or(Address::random());
     let fee = check_activate(code.clone().into(), address, &cfg.data_fee, &provider).await?;
+
     Ok(ContractCheck::Ready { code, fee })
 }
 
@@ -101,6 +98,7 @@ impl ContractCheck {
             Self::Ready { code, .. } => code,
         }
     }
+
     pub fn suggest_fee(&self) -> U256 {
         match self {
             Self::Active { .. } => U256::default(),
@@ -114,10 +112,8 @@ impl CheckConfig {
         if let Some(wasm) = self.wasm_file.clone() {
             return Ok((wasm, [0u8; 32]));
         }
-        project::build_wasm_from_features(
-            self.common_cfg.features.clone(),
-            self.common_cfg.source_files_for_project_hash.clone(),
-        )
+
+        Err(eyre!("no wasm file provided"))
     }
 }
 
@@ -214,8 +210,7 @@ pub async fn check_activate(
         Err(e) => {
             if e.to_string().contains("pay_for_memory_grow") {
                 bail!(
-                    "Contract could not be activated as it is missing an entrypoint. \
-                Please ensure that your contract has an #[entrypoint] defined on your main struct"
+                    "Contract could not be activated as it is missing an entrypoint."
                 );
             } else {
                 return Err(e.into());

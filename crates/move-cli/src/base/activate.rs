@@ -70,10 +70,7 @@ impl Activate {
         let Self {
             address,
             endpoint,
-            private_key,
-            verbose,
-            estimate_gas,
-            max_fee_per_gas_gwei,
+            ..
         } = &self;
 
         println!(
