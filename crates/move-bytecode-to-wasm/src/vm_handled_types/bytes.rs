@@ -52,9 +52,10 @@ impl Bytes {
     pub fn validate_identifier(identifier: &str) -> bool {
         if let Some(num_str) = identifier.strip_prefix("Bytes")
             && let Ok(n) = num_str.parse::<u8>()
-                && (1..=32).contains(&n) {
-                    return true;
-                }
+            && (1..=32).contains(&n)
+        {
+            return true;
+        }
         false
     }
 }

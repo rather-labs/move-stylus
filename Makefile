@@ -106,6 +106,7 @@ deploy-counter:
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
 		--wasm-file=./example/build/example/wasm/counter.wasm \
+		--no-verify \
 		| tee /dev/tty | ./update_contract_env.sh CONTRACT_ADDRESS_COUNTER
 
 deploy-counter-named-id:
@@ -187,7 +188,7 @@ parse-rust-example:
 	wasm-tools print ./example-rust/target/wasm32-unknown-unknown/release/stylus_hello_world.wasm -o ./example-rust/target/wasm32-unknown-unknown/release/stylus_hello_world.wat
 
 install:
-	@which cargo-stylus > /dev/null || (echo "Installing mdbook..." && $(MAKE) setup-stylus)
+	# @which cargo-stylus > /dev/null || (echo "Installing mdbook..." && $(MAKE) setup-stylus)
 	cargo install --locked --path crates/move-cli
 
 .PHONY: test setup-stylus install deploy-*

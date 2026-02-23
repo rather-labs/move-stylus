@@ -2,9 +2,9 @@
 // For licensing, see https://github.com/OffchainLabs/cargo-stylus/blob/main/licenses/COPYRIGHT.md
 
 use crate::deploy::util::{color::Color, sys};
-use crate::deploy::{greyln, egreyln};
+use crate::deploy::{egreyln, greyln};
 use alloy::json_abi::Constructor;
-use eyre::{bail, Result, WrapErr};
+use eyre::{Result, WrapErr, bail};
 use std::{
     io::Write,
     path::PathBuf,

@@ -49,6 +49,7 @@ wasmparser = "0.245.1"
 wasmer = "7.0.1"
 tempfile = "3.25.0"
 wasm-gen = "0.1.4"
+tokio = "1"
 
 [[bin]]
 name = "move-stylus"

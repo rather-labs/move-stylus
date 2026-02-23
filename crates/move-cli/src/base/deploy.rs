@@ -1,8 +1,14 @@
+use alloy::primitives::{Address, U256};
 use anyhow::anyhow;
 use clap::Parser;
+use tokio::runtime::Runtime;
+use std::path::PathBuf;
 use std::{path::Path, process::Command};
 
 use crate::base::{cargo_stylus_installed, reroot_path};
+use crate::deploy::{
+    AuthOpts, CheckConfig, CommonConfig, DataFeeOpts, DeployConfig, STYLUS_DEPLOYER_ADDRESS,
+};
 
 /// Deploys a contract
 #[derive(Parser)]
@@ -33,15 +39,15 @@ pub struct Deploy {
     max_fee_per_gas_gwei: Option<String>,
 
     /// Percent to bump the estimated activation data fee by [default: 20]
-    #[clap(
-        long = "data-fee-bump-percent",
-        value_name = "<DATA_FEE_BUMP_PERCENT>",
-        default_value = "20"
-    )]
-    data_fee_bump_percent: String,
+    #[arg(long, default_value = "20")]
+    data_fee_bump_percent: u64,
 
     #[clap(flatten)]
     private_key: PrivateKeyArgs,
+
+    /// The address of the deployer contract that deploys, activates, and initializes the stylus constructor.
+    #[arg(long, value_name = "DEPLOYER_ADDRESS", default_value_t = STYLUS_DEPLOYER_ADDRESS)]
+    deployer_address: Address,
 }
 
 #[derive(Debug, clap::Args)]
@@ -53,7 +59,73 @@ pub struct PrivateKeyArgs {
 
     /// File path to a text file containing a hex-encoded private key
     #[clap(long = "private-key-path")]
-    private_key_path: Option<String>,
+    private_key_path: Option<PathBuf>,
+}
+
+fn from_deploy_args(deploy: Deploy, wasm_file: PathBuf) -> DeployConfig {
+    let Deploy {
+        contract_name: _,
+        endpoint,
+        private_key,
+        verbose,
+        estimate_gas,
+        no_activate,
+        max_fee_per_gas_gwei,
+        data_fee_bump_percent,
+        deployer_address,
+    } = deploy;
+
+    let PrivateKeyArgs {
+        private_key,
+        private_key_path,
+    } = private_key;
+
+    let auth = if private_key.is_some() {
+        AuthOpts {
+            private_key_path: None,
+            private_key,
+            keystore_path: None,
+            keystore_password_path: None,
+        }
+    } else if private_key_path.is_some() {
+        AuthOpts {
+            private_key_path,
+            private_key: None,
+            keystore_path: None,
+            keystore_password_path: None,
+        }
+    } else {
+        panic!("Either --private-key or --private-key-path must be provided");
+    };
+
+    let check_config = CheckConfig {
+        common_cfg: CommonConfig {
+            endpoint,
+            verbose,
+            source_files_for_project_hash: vec![],
+            max_fee_per_gas_gwei,
+            features: None,
+        },
+        data_fee: DataFeeOpts {
+            data_fee_bump_percent,
+        },
+        contract_address: None,
+        wasm_file: Some(wasm_file),
+    };
+
+    DeployConfig {
+        check_config,
+        auth,
+        estimate_gas,
+        no_verify: true,
+        no_activate,
+        cargo_stylus_version: None,
+        deployer_address,
+        deployer_salt: alloy::primitives::FixedBytes::<32>::default(),
+        constructor_args: vec![],
+        constructor_value: U256::ZERO,
+        constructor_signature: None,
+    }
 }
 
 impl Deploy {
@@ -61,13 +133,8 @@ impl Deploy {
         let Self {
             contract_name,
             endpoint,
-            private_key,
-            verbose,
-            estimate_gas,
-            no_activate,
-            max_fee_per_gas_gwei,
-            data_fee_bump_percent,
-        } = self;
+            ..
+        } = &self;
 
         let rerooted_path = reroot_path(path)?;
         let manifest =
@@ -75,75 +142,17 @@ impl Deploy {
                 &rerooted_path.join("Move.toml"),
             )?;
 
-        if !cargo_stylus_installed() {
-            return Err(anyhow!(
-                "cargo stylus is not installed.\nPlease follow this guide to install it: https://docs.arbitrum.io/stylus/using-cli"
-            ));
-        }
-
         println!(
             "Deploying contract '{contract_name}' to endpoint '{endpoint}' using provided private key...",
         );
 
-        let mut command = Command::new("cargo-stylus");
-        command
-            .arg("--")
-            .arg("deploy")
-            .arg("--wasm-file")
-            .arg(get_wasm_file_with_path(
-                &contract_name,
-                manifest.package.name.as_str(),
-            )?)
-            .arg("--endpoint")
-            .arg(&endpoint)
-            .arg("--data-fee-bump-percent")
-            .arg(data_fee_bump_percent)
-            .arg("--no-verify");
+        let wasm_file = get_wasm_file_with_path(contract_name, manifest.package.name.as_str())?;
+        let deploy_config = from_deploy_args(self, wasm_file);
 
-        if verbose {
-            command.arg("--verbose");
-        }
-
-        if estimate_gas {
-            command.arg("--estimate-gas");
-        }
-
-        if no_activate {
-            command.arg("--no-activate");
-        }
-
-        if let Some(max_fee_per_gas_gwei) = max_fee_per_gas_gwei {
-            command
-                .arg("--max-fee-per-gas-gwei")
-                .arg(max_fee_per_gas_gwei);
-        }
-
-        match private_key {
-            PrivateKeyArgs {
-                private_key: Some(key),
-                ..
-            } => {
-                command.arg("--private-key").arg(key);
-            }
-            PrivateKeyArgs {
-                private_key_path: Some(path),
-                ..
-            } => {
-                command.arg("--private-key-path").arg(path);
-            }
-            _ => {}
-        }
-
-        let result = command.output()?;
-        if result.status.success() {
-            println!("{}", String::from_utf8_lossy(&result.stdout));
-            println!("Contract deployed successfully.");
-        } else {
-            eprintln!(
-                "Failed to deploy contract. Error: {}",
-                String::from_utf8_lossy(&result.stderr)
-            );
-        }
+        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
+        rt.block_on(async move {
+            crate::deploy::deploy(deploy_config).await.unwrap();
+        });
 
         Ok(())
     }
@@ -152,7 +161,7 @@ impl Deploy {
 fn get_wasm_file_with_path(
     contract_name: &str,
     package_name: &str,
-) -> Result<String, anyhow::Error> {
+) -> Result<PathBuf, anyhow::Error> {
     let name = if contract_name.ends_with(".move") {
         contract_name.replace(".move", ".wasm")
     } else {
@@ -168,5 +177,5 @@ fn get_wasm_file_with_path(
         ));
     }
 
-    Ok(file_path)
+    Ok(file_path.into())
 }

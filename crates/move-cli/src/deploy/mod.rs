@@ -3,19 +3,35 @@
 
 pub mod check;
 pub mod constants;
+pub mod export_abi;
 pub mod project;
 pub mod util;
-pub mod export_abi;
 
 use std::{fs, path::PathBuf};
 
 use crate::deploy::{
     check::ContractCheck,
     constants::{ARB_WASM_ADDRESS, DEFAULT_ENDPOINT},
-    util::{color::{Color, DebugColor}, text::decode0x},
+    util::{
+        color::{Color, DebugColor},
+        text::decode0x,
+    },
 };
 use alloy::{
-    json_abi::Constructor, network::{EthereumWallet, TransactionBuilder}, primitives::{Address, B256, FixedBytes, U256, utils::{format_units, parse_ether}}, providers::{Provider, ProviderBuilder}, rpc::types::{TransactionReceipt, TransactionRequest}, signers::{Signer, local::{LocalSigner, PrivateKeySigner}}, sol, sol_types::SolCall
+    json_abi::Constructor,
+    network::{EthereumWallet, TransactionBuilder},
+    primitives::{
+        Address, B256, FixedBytes, U256,
+        utils::{format_units, parse_ether},
+    },
+    providers::{Provider, ProviderBuilder},
+    rpc::types::{TransactionReceipt, TransactionRequest},
+    signers::{
+        Signer,
+        local::{LocalSigner, PrivateKeySigner},
+    },
+    sol,
+    sol_types::SolCall,
 };
 use clap::{ArgGroup, Args};
 use eyre::{Result, WrapErr, bail, eyre};
@@ -379,50 +395,50 @@ pub fn calculate_fee_per_gas<T: GasFeeConfig>(config: &T, gas_price: u128) -> Re
 #[derive(Args, Clone, Debug)]
 pub struct CheckConfig {
     #[command(flatten)]
-    common_cfg: CommonConfig,
+    pub(crate) common_cfg: CommonConfig,
     #[command(flatten)]
-    data_fee: DataFeeOpts,
+    pub data_fee: DataFeeOpts,
     /// The WASM to check (defaults to any found in the current directory).
     #[arg(long)]
-    wasm_file: Option<PathBuf>,
+    pub wasm_file: Option<PathBuf>,
     /// Where to deploy and activate the contract (defaults to a random address).
     #[arg(long)]
-    contract_address: Option<Address>,
+    pub contract_address: Option<Address>,
 }
 
 #[derive(Clone, Debug, Args)]
-struct DataFeeOpts {
+pub struct DataFeeOpts {
     /// Percent to bump the estimated activation data fee by.
     #[arg(long, default_value = "20")]
-    data_fee_bump_percent: u64,
+    pub data_fee_bump_percent: u64,
 }
+
 #[derive(Args, Clone, Debug)]
-struct DeployConfig {
+pub struct DeployConfig {
     #[command(flatten)]
-    check_config: CheckConfig,
+    pub check_config: CheckConfig,
     /// Wallet source to use.
     #[command(flatten)]
-    auth: AuthOpts,
+    pub auth: AuthOpts,
     /// Only perform gas estimation.
     #[arg(long)]
-    estimate_gas: bool,
+    pub estimate_gas: bool,
     /// If specified, will not run the command in a reproducible docker container. Useful for local
     /// builds, but at the risk of not having a reproducible contract for verification purposes.
     #[arg(long)]
-    no_verify: bool,
-    /// Cargo stylus version when deploying reproducibly to downloads the corresponding cargo-stylus-base Docker image.
+    pub no_verify: bool, /// Cargo stylus version when deploying reproducibly to downloads the corresponding cargo-stylus-base Docker image.
     /// If not set, uses the default version of the local cargo stylus binary.
     #[arg(long)]
-    cargo_stylus_version: Option<String>,
+    pub cargo_stylus_version: Option<String>,
     /// If set, do not activate the program after deploying it
     #[arg(long)]
-    no_activate: bool,
+    pub no_activate: bool,
     /// The address of the deployer contract that deploys, activates, and initializes the stylus constructor.
     #[arg(long, value_name = "DEPLOYER_ADDRESS", default_value_t = STYLUS_DEPLOYER_ADDRESS)]
-    deployer_address: Address,
+    pub deployer_address: Address,
     /// The salt passed to the stylus deployer.
     #[arg(long, default_value_t = B256::ZERO)]
-    deployer_salt: B256,
+    pub deployer_salt: B256,
     /// The constructor arguments.
     #[arg(
         long,
@@ -430,13 +446,13 @@ struct DeployConfig {
         value_name = "ARGS",
         allow_hyphen_values = true,
     )]
-    constructor_args: Vec<String>,
+    pub constructor_args: Vec<String>,
     /// The amount of Ether sent to the contract through the constructor.
     #[arg(long, value_parser = parse_ether, default_value = "0")]
-    constructor_value: U256,
+    pub constructor_value: U256,
     /// The constructor signature when using the --wasm-file flag.
     #[arg(long)]
-    constructor_signature: Option<String>,
+    pub constructor_signature: Option<String>,
 }
 
 pub trait GasFeeConfig {
@@ -445,26 +461,26 @@ pub trait GasFeeConfig {
 }
 
 #[derive(Args, Clone, Debug)]
-struct CommonConfig {
+pub struct CommonConfig {
     /// Arbitrum RPC endpoint.
     #[arg(short, long, default_value = DEFAULT_ENDPOINT)]
-    endpoint: String,
+    pub endpoint: String,
     /// Whether to print debug info.
     #[arg(long)]
-    verbose: bool,
+    pub verbose: bool,
     /// The path to source files to include in the project hash, which
     /// is included in the contract deployment init code transaction
     /// to be used for verification of deployment integrity.
     /// If not provided, all .rs files and Cargo.toml and Cargo.lock files
     /// in project's directory tree are included.
     #[arg(long)]
-    source_files_for_project_hash: Vec<String>,
+    pub source_files_for_project_hash: Vec<String>,
     #[arg(long)]
     /// Optional max fee per gas in gwei units.
-    max_fee_per_gas_gwei: Option<String>,
+    pub max_fee_per_gas_gwei: Option<String>,
     /// Specifies the features to use when building the Stylus binary.
     #[arg(long)]
-    features: Option<String>,
+    pub features: Option<String>,
 }
 
 impl GasFeeConfig for CommonConfig {
@@ -493,7 +509,9 @@ fn convert_gwei_to_wei(fee_str: &str) -> Result<u128> {
 
     let wei = gwei * 1e9;
     if !wei.is_finite() {
-        bail!("Overflow occurred in floating point multiplication of --max-fee-per-gas-gwei converting");
+        bail!(
+            "Overflow occurred in floating point multiplication of --max-fee-per-gas-gwei converting"
+        );
     }
 
     if wei < 0.0 || wei >= u128::MAX as f64 {
@@ -505,19 +523,19 @@ fn convert_gwei_to_wei(fee_str: &str) -> Result<u128> {
 
 #[derive(Clone, Debug, Args)]
 #[clap(group(ArgGroup::new("key").required(true).args(&["private_key_path", "private_key", "keystore_path"])))]
-struct AuthOpts {
+pub struct AuthOpts {
     /// File path to a text file containing a hex-encoded private key.
     #[arg(long)]
-    private_key_path: Option<PathBuf>,
+    pub private_key_path: Option<PathBuf>,
     /// Private key as a hex string. Warning: this exposes your key to shell history.
     #[arg(long)]
-    private_key: Option<String>,
+    pub private_key: Option<String>,
     /// Path to an Ethereum wallet keystore file (e.g. clef).
     #[arg(long)]
-    keystore_path: Option<String>,
+    pub keystore_path: Option<String>,
     /// Keystore password file.
     #[arg(long)]
-    keystore_password_path: Option<PathBuf>,
+    pub keystore_password_path: Option<PathBuf>,
 }
 
 /// Loads a wallet for signing transactions.

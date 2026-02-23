@@ -274,12 +274,13 @@ pub fn prepare_function_arguments(
             ) {
                 // If this argument is a mutable reference to a vector, record the original address it points to.
                 if let IntermediateType::IMutRef(inner) = arg_ty
-                    && let IntermediateType::IVector(_) = **inner {
-                        let mut_ref_vec_local =
-                            inner.add_stack_to_local_instructions(module, builder)?;
-                        mut_ref_vec_locals.push(mut_ref_vec_local);
-                        builder.local_get(mut_ref_vec_local);
-                    }
+                    && let IntermediateType::IVector(_) = **inner
+                {
+                    let mut_ref_vec_local =
+                        inner.add_stack_to_local_instructions(module, builder)?;
+                    mut_ref_vec_locals.push(mut_ref_vec_local);
+                    builder.local_get(mut_ref_vec_local);
+                }
 
                 // If the argument is a Ref, load the pointer
                 builder.load(

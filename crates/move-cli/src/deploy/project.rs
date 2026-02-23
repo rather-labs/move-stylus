@@ -6,7 +6,7 @@ use crate::deploy::constants::{
     TOOLCHAIN_FILE_NAME,
 };
 use crate::deploy::util::{color::Color, sys};
-use crate::deploy::{greyln, egreyln};
+use crate::deploy::{egreyln, greyln};
 use brotli2::read::BrotliEncoder;
 use eyre::{Result, WrapErr, bail, eyre};
 use glob::glob;

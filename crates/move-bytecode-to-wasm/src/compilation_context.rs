@@ -131,7 +131,10 @@ impl CompilationContext<'_> {
         }
     }
 
-    pub fn get_enum_by_intermediate_type(&self, itype: &IntermediateType) -> Result<Cow<'_, IEnum>> {
+    pub fn get_enum_by_intermediate_type(
+        &self,
+        itype: &IntermediateType,
+    ) -> Result<Cow<'_, IEnum>> {
         match itype {
             IntermediateType::IEnum { module_id, index } => {
                 let enum_ = self.get_enum_by_index(module_id, *index)?;

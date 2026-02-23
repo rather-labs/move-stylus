@@ -1061,11 +1061,11 @@ impl ModuleData<'_> {
         if let Some(first_arg) = move_function_arguments.0.first()
             && let Ok(arg) =
                 IntermediateType::try_from_signature_token(first_arg, datatype_handles_map)
-                && !is_tx_context_ref(&arg, move_module_dependencies)
-                    .map_err(CompilationContextError::from)?
-                {
-                    return Err(CompilationContextError::ReceiveFunctionNonTxContextArgument);
-                }
+            && !is_tx_context_ref(&arg, move_module_dependencies)
+                .map_err(CompilationContextError::from)?
+        {
+            return Err(CompilationContextError::ReceiveFunctionNonTxContextArgument);
+        }
 
         // Must have no return values
         if !move_function_return.is_empty() {

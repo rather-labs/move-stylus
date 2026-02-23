@@ -1121,111 +1121,112 @@ pub fn add_check_and_delete_struct_tto_fields_fn(
             && matches!(
                 inner.as_ref(),
                 IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. }
-            ) {
-                let vector_ptr = module.locals.add(ValType::I32);
-                let len = module.locals.add(ValType::I32);
+            )
+        {
+            let vector_ptr = module.locals.add(ValType::I32);
+            let len = module.locals.add(ValType::I32);
 
-                // Get the pointer to the vector
-                builder
-                    .local_get(parent_struct_ptr)
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: offset as u32,
-                        },
-                    )
-                    .local_tee(vector_ptr);
+            // Get the pointer to the vector
+            builder
+                .local_get(parent_struct_ptr)
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: offset as u32,
+                    },
+                )
+                .local_tee(vector_ptr);
 
-                // Load vector length from its header
-                builder
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    )
-                    .local_set(len);
+            // Load vector length from its header
+            builder
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
+                .local_set(len);
 
-                let delete_tto_objects_fn = RuntimeFunction::CheckAndDeleteStructTtoFields
-                    .get_generic(
-                        module,
-                        compilation_ctx,
-                        Some(runtime_error_data),
-                        &[inner.as_ref()],
-                    )?;
-
-                let delete_tto_object_fn = RuntimeFunction::DeleteTtoObject.get_generic(
+            let delete_tto_objects_fn = RuntimeFunction::CheckAndDeleteStructTtoFields
+                .get_generic(
                     module,
                     compilation_ctx,
                     Some(runtime_error_data),
                     &[inner.as_ref()],
                 )?;
-                // Outer block: if the vector length is 0, we skip to the end
-                builder.block(None, |outer_block| {
-                    let outer_block_id = outer_block.id();
 
-                    // Check if length == 0
-                    outer_block
-                        .local_get(len)
-                        .unop(UnaryOp::I32Eqz)
-                        .br_if(outer_block_id);
+            let delete_tto_object_fn = RuntimeFunction::DeleteTtoObject.get_generic(
+                module,
+                compilation_ctx,
+                Some(runtime_error_data),
+                &[inner.as_ref()],
+            )?;
+            // Outer block: if the vector length is 0, we skip to the end
+            builder.block(None, |outer_block| {
+                let outer_block_id = outer_block.id();
 
-                    outer_block.block(None, |inner_block| {
-                        let inner_block_id = inner_block.id();
+                // Check if length == 0
+                outer_block
+                    .local_get(len)
+                    .unop(UnaryOp::I32Eqz)
+                    .br_if(outer_block_id);
 
-                        let i = module.locals.add(ValType::I32);
-                        let elem_ptr = module.locals.add(ValType::I32);
+                outer_block.block(None, |inner_block| {
+                    let inner_block_id = inner_block.id();
 
-                        // Set the aux locals to 0 to start the loop
-                        inner_block.i32_const(0).local_set(i);
-                        inner_block.loop_(None, |loop_| {
-                            let loop_id = loop_.id();
+                    let i = module.locals.add(ValType::I32);
+                    let elem_ptr = module.locals.add(ValType::I32);
 
-                            loop_
-                                .vec_elem_ptr(vector_ptr, i, 4)
-                                .load(
-                                    compilation_ctx.memory_id,
-                                    LoadKind::I32 { atomic: false },
-                                    MemArg {
-                                        align: 0,
-                                        offset: 0,
-                                    },
-                                )
-                                .local_set(elem_ptr);
+                    // Set the aux locals to 0 to start the loop
+                    inner_block.i32_const(0).local_set(i);
+                    inner_block.loop_(None, |loop_| {
+                        let loop_id = loop_.id();
 
-                            // Call the function recursively to delete any recently tto objects within the vector element struct
+                        loop_
+                            .vec_elem_ptr(vector_ptr, i, 4)
+                            .load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I32 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            )
+                            .local_set(elem_ptr);
 
-                            loop_.local_get(elem_ptr).call(delete_tto_objects_fn);
+                        // Call the function recursively to delete any recently tto objects within the vector element struct
 
-                            loop_
-                                .local_get(parent_struct_ptr)
-                                .local_get(elem_ptr)
-                                .call(delete_tto_object_fn);
+                        loop_.local_get(elem_ptr).call(delete_tto_objects_fn);
 
-                            // Exit after processing all elements
-                            loop_
-                                .local_get(i)
-                                .local_get(len)
-                                .i32_const(1)
-                                .binop(BinaryOp::I32Sub)
-                                .binop(BinaryOp::I32Eq)
-                                .br_if(inner_block_id);
+                        loop_
+                            .local_get(parent_struct_ptr)
+                            .local_get(elem_ptr)
+                            .call(delete_tto_object_fn);
 
-                            // i = i + 1 and continue the loop
-                            loop_
-                                .local_get(i)
-                                .i32_const(1)
-                                .binop(BinaryOp::I32Add)
-                                .local_set(i)
-                                .br(loop_id);
-                        });
+                        // Exit after processing all elements
+                        loop_
+                            .local_get(i)
+                            .local_get(len)
+                            .i32_const(1)
+                            .binop(BinaryOp::I32Sub)
+                            .binop(BinaryOp::I32Eq)
+                            .br_if(inner_block_id);
+
+                        // i = i + 1 and continue the loop
+                        loop_
+                            .local_get(i)
+                            .i32_const(1)
+                            .binop(BinaryOp::I32Add)
+                            .local_set(i)
+                            .br(loop_id);
                     });
                 });
-            }
+            });
+        }
         offset += 4;
     }
 
