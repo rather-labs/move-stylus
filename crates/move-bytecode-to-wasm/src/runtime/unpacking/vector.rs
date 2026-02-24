@@ -244,7 +244,8 @@ mod tests {
     };
     use alloy_primitives::{Address, U256, address};
     use alloy_sol_types::{SolType, sol};
-    use std::{fs::write, sync::Arc};
+    use std::sync::Arc;
+    use std::{cell::RefCell, panic::AssertUnwindSafe, rc::Rc};
     use walrus::{FunctionBuilder, ValType};
 
     /// Test helper for unpacking vector types
@@ -511,6 +512,19 @@ mod tests {
     }
 
     #[test]
+    fn test_unpack_vector_vector_u32_empty() {
+        type SolType = sol!((uint32[][],));
+        let int_type = IntermediateType::IVector(Arc::new(IntermediateType::IVector(Arc::new(
+            IntermediateType::IU32,
+        ))));
+
+        let data = SolType::abi_encode_params(&(vec![] as Vec<Vec<u32>>,));
+        let expected_result_bytes =
+            [0u32.to_le_bytes().as_slice(), 0u32.to_le_bytes().as_slice()].concat();
+        unpack_vec(&data, int_type, &expected_result_bytes);
+    }
+
+    #[test]
     fn test_unpack_vector_vector_u128() {
         type SolType = sol!((uint128[][],));
         let int_type = IntermediateType::IVector(Arc::new(IntermediateType::IVector(Arc::new(
@@ -566,9 +580,6 @@ mod tests {
 
     #[test]
     fn test_unpack_vector_u8_fuzz() {
-        use alloy_sol_types::SolValue;
-        use std::{cell::RefCell, panic::AssertUnwindSafe, rc::Rc};
-
         let vector_type = IntermediateType::IVector(Arc::new(IntermediateType::IU8));
 
         let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
@@ -665,9 +676,6 @@ mod tests {
 
     #[test]
     fn test_unpack_vector_u16_fuzz() {
-        use alloy_sol_types::SolValue;
-        use std::{cell::RefCell, panic::AssertUnwindSafe, rc::Rc};
-
         let vector_type = IntermediateType::IVector(Arc::new(IntermediateType::IU16));
 
         let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
@@ -772,9 +780,6 @@ mod tests {
 
     #[test]
     fn test_unpack_vector_u32_fuzz() {
-        use alloy_sol_types::SolValue;
-        use std::{cell::RefCell, panic::AssertUnwindSafe, rc::Rc};
-
         let vector_type = IntermediateType::IVector(Arc::new(IntermediateType::IU32));
 
         let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
@@ -879,9 +884,6 @@ mod tests {
 
     #[test]
     fn test_unpack_vector_u64_fuzz() {
-        use alloy_sol_types::SolValue;
-        use std::{cell::RefCell, panic::AssertUnwindSafe, rc::Rc};
-
         let vector_type = IntermediateType::IVector(Arc::new(IntermediateType::IU64));
 
         let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
@@ -986,9 +988,6 @@ mod tests {
 
     #[test]
     fn test_unpack_vector_u128_fuzz() {
-        use alloy_sol_types::SolValue;
-        use std::{cell::RefCell, panic::AssertUnwindSafe, rc::Rc};
-
         let vector_type = IntermediateType::IVector(Arc::new(IntermediateType::IU128));
 
         let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(Some(10000));
@@ -1365,7 +1364,7 @@ mod tests {
             IntermediateType::IU32,
         ))));
 
-        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(Some(10000));
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(Some(40000));
         let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
         let mut runtime_error_data = RuntimeErrorData::new();
 
@@ -1427,7 +1426,6 @@ mod tests {
                     .unwrap();
 
                 let result_ptr: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
-                println!("Result ptr {result_ptr}");
 
                 let outer_len = values.len() as u32;
                 let mut outer_header = vec![0; 8 + outer_len as usize * 4];
@@ -1494,7 +1492,7 @@ mod tests {
             IntermediateType::IU128,
         ))));
 
-        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(Some(10000));
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(Some(40000));
         let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
         let mut runtime_error_data = RuntimeErrorData::new();
 
