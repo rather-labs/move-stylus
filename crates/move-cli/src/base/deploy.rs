@@ -1,4 +1,4 @@
-use alloy::primitives::{Address, U256};
+use alloy::primitives::{Address, B256, U256, utils::parse_ether};
 use anyhow::anyhow;
 use clap::Parser;
 use std::path::Path;
@@ -40,94 +40,43 @@ pub struct Deploy {
     #[arg(long, default_value = "20")]
     data_fee_bump_percent: u64,
 
-    #[clap(flatten)]
-    private_key: PrivateKeyArgs,
-
     /// The address of the deployer contract that deploys, activates, and initializes the stylus constructor.
     #[arg(long, value_name = "DEPLOYER_ADDRESS", default_value_t = STYLUS_DEPLOYER_ADDRESS)]
     deployer_address: Address,
-}
 
-#[derive(Debug, clap::Args)]
-#[group(required = true, multiple = false)]
-pub struct PrivateKeyArgs {
-    /// Private key as a hex string. Warning: this exposes your key to shell history
-    #[clap(long = "private-key")]
-    private_key: Option<String>,
+    /// If specified, will not run the command in a reproducible docker container. Useful for local
+    /// builds, but at the risk of not having a reproducible contract for verification purposes.
+    #[arg(long)]
+    no_verify: bool,
 
-    /// File path to a text file containing a hex-encoded private key
-    #[clap(long = "private-key-path")]
-    private_key_path: Option<PathBuf>,
-}
+    /// Cargo stylus version when deploying reproducibly to download the corresponding
+    /// cargo-stylus-base Docker image. If not set, uses the default version of the local
+    /// cargo stylus binary.
+    #[arg(long)]
+    cargo_stylus_version: Option<String>,
 
-fn from_deploy_args(deploy: Deploy, wasm_file: PathBuf) -> DeployConfig {
-    let Deploy {
-        contract_name: _,
-        endpoint,
-        private_key,
-        verbose,
-        estimate_gas,
-        no_activate,
-        max_fee_per_gas_gwei,
-        data_fee_bump_percent,
-        deployer_address,
-    } = deploy;
+    /// The salt passed to the stylus deployer.
+    #[arg(long, default_value_t = B256::ZERO)]
+    deployer_salt: B256,
 
-    let PrivateKeyArgs {
-        private_key,
-        private_key_path,
-    } = private_key;
+    /// The constructor arguments.
+    #[arg(long, num_args(0..), value_name = "ARGS", allow_hyphen_values = true)]
+    constructor_args: Vec<String>,
 
-    let auth = if private_key.is_some() {
-        AuthOpts {
-            private_key_path: None,
-            private_key,
-        }
-    } else if private_key_path.is_some() {
-        AuthOpts {
-            private_key_path,
-            private_key: None,
-        }
-    } else {
-        panic!("Either --private-key or --private-key-path must be provided");
-    };
+    /// The amount of Ether sent to the contract through the constructor.
+    #[arg(long, value_parser = parse_ether, default_value = "0")]
+    constructor_value: U256,
 
-    let check_config = CheckConfig {
-        common_cfg: CommonConfig {
-            endpoint,
-            verbose,
-            max_fee_per_gas_gwei,
-        },
-        data_fee: DataFeeOpts {
-            data_fee_bump_percent,
-        },
-        contract_address: None,
-        wasm_file: Some(wasm_file),
-    };
+    /// The constructor signature when using the --wasm-file flag.
+    #[arg(long)]
+    constructor_signature: Option<String>,
 
-    DeployConfig {
-        check_config,
-        auth,
-        estimate_gas,
-        no_verify: true,
-        no_activate,
-        cargo_stylus_version: None,
-        deployer_address,
-        deployer_salt: alloy::primitives::FixedBytes::<32>::default(),
-        constructor_args: vec![],
-        constructor_value: U256::ZERO,
-        constructor_signature: None,
-    }
+    #[clap(flatten)]
+    auth: AuthOpts,
 }
 
 impl Deploy {
     pub fn execute(self, path: Option<&Path>) -> anyhow::Result<()> {
-        let Self {
-            contract_name,
-            endpoint,
-            ..
-        } = &self;
-
         let rerooted_path = reroot_path(path)?;
         let manifest =
             move_package::source_package::manifest_parser::parse_move_manifest_from_file(
@@ -135,11 +84,55 @@ impl Deploy {
             )?;
 
         println!(
-            "Deploying contract '{contract_name}' to endpoint '{endpoint}' using provided private key...",
+            "Deploying contract '{}' to endpoint '{}' using provided private key...",
+            self.contract_name, self.endpoint,
         );
 
-        let wasm_file = get_wasm_file_with_path(contract_name, manifest.package.name.as_str())?;
-        let deploy_config = from_deploy_args(self, wasm_file);
+        let wasm_file =
+            get_wasm_file_with_path(&self.contract_name, manifest.package.name.as_str())?;
+
+        let Deploy {
+            contract_name: _,
+            endpoint,
+            verbose,
+            estimate_gas,
+            no_activate,
+            max_fee_per_gas_gwei,
+            data_fee_bump_percent,
+            deployer_address,
+            no_verify,
+            cargo_stylus_version,
+            deployer_salt,
+            constructor_args,
+            constructor_value,
+            constructor_signature,
+            auth,
+        } = self;
+
+        let deploy_config = DeployConfig {
+            check_config: CheckConfig {
+                common_cfg: CommonConfig {
+                    endpoint,
+                    verbose,
+                    max_fee_per_gas_gwei,
+                },
+                data_fee: DataFeeOpts {
+                    data_fee_bump_percent,
+                },
+                contract_address: None,
+                wasm_file: Some(wasm_file),
+            },
+            auth,
+            estimate_gas,
+            no_verify,
+            no_activate,
+            cargo_stylus_version,
+            deployer_address,
+            deployer_salt,
+            constructor_args,
+            constructor_value,
+            constructor_signature,
+        };
 
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
