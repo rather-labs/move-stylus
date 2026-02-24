@@ -302,20 +302,6 @@ pub fn contract_deployment_calldata(code: &[u8]) -> Vec<u8> {
     deploy
 }
 
-pub fn extract_contract_evm_deployment_prelude(calldata: &[u8]) -> Vec<u8> {
-    // The length of the prelude, version part is 42 + 1 as per the code
-    let metadata_length = 42 + 1;
-    // Extract and return the metadata part
-    calldata[0..metadata_length].to_vec()
-}
-
-pub fn extract_compressed_wasm(calldata: &[u8]) -> Vec<u8> {
-    // The length of the prelude, version part is 42 + 1 as per the code
-    let metadata_length = 42 + 1;
-    // Extract and return the metadata part
-    calldata[metadata_length..].to_vec()
-}
-
 pub fn format_gas(gas: u64) -> String {
     let text = format!("{gas} gas");
     if gas <= 3_000_000 {
