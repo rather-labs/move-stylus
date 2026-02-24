@@ -23,7 +23,6 @@ use move_package::{
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
-    process::Command,
 };
 
 pub fn reroot_path(path: Option<&Path>) -> anyhow::Result<PathBuf> {
@@ -115,13 +114,4 @@ pub fn get_build_directory(
             package.compiled_package_info.package_name
         ))
     }
-}
-
-pub fn cargo_stylus_installed() -> bool {
-    Command::new("sh")
-        .arg("-c")
-        .arg("command -v cargo-stylus > /dev/null")
-        .status()
-        .map(|status| status.success())
-        .unwrap_or(false)
 }

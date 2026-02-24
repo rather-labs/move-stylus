@@ -50,12 +50,11 @@ impl VmHandledType for Bytes {
 impl Bytes {
     // Returns true if the identifier matches "BytesN" with N in 1..=32
     pub fn validate_identifier(identifier: &str) -> bool {
-        if let Some(num_str) = identifier.strip_prefix("Bytes") {
-            if let Ok(n) = num_str.parse::<u8>() {
-                if (1..=32).contains(&n) {
-                    return true;
-                }
-            }
+        if let Some(num_str) = identifier.strip_prefix("Bytes")
+            && let Ok(n) = num_str.parse::<u8>()
+            && (1..=32).contains(&n)
+        {
+            return true;
         }
         false
     }

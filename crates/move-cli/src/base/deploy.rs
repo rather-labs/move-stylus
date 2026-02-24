@@ -1,149 +1,108 @@
+use alloy::primitives::{Address, B256};
 use anyhow::anyhow;
 use clap::Parser;
-use std::{path::Path, process::Command};
+use std::path::Path;
+use std::path::PathBuf;
 
-use crate::base::{cargo_stylus_installed, reroot_path};
+use crate::base::reroot_path;
+use crate::common::{AuthOpts, GasFeeConfig};
+use crate::deploy::STYLUS_DEPLOYER_ADDRESS;
 
 /// Deploys a contract
-#[derive(Parser)]
+#[derive(Parser, Clone, Debug)]
 #[clap(name = "deploy")]
 pub struct Deploy {
     /// Contract's name to be deployed. The .move extension is optional.
     #[clap(long = "contract-name")]
-    contract_name: String,
+    pub contract_name: String,
 
     /// Arbitrum RPC endpoint [default: http://localhost:8547]
     #[clap(long = "endpoint", default_value = "http://localhost:8547")]
-    endpoint: String,
+    pub endpoint: String,
 
     /// Whether to print debug info
     #[clap(long = "verbose", default_value = "false")]
-    verbose: bool,
+    pub verbose: bool,
 
     /// Only perform gas estimation
     #[clap(long = "estimate-gas", default_value = "false")]
-    estimate_gas: bool,
+    pub estimate_gas: bool,
 
     /// If set, do not activate the program after deploying it
     #[clap(long = "no-activate", default_value = "false")]
-    no_activate: bool,
+    pub no_activate: bool,
 
     /// Optional max fee per gas in gwei units
     #[clap(long = "max-fee-per-gas-gwei", value_name = "<MAX_FEE_PER_GAS_GWEI>")]
-    max_fee_per_gas_gwei: Option<String>,
+    pub max_fee_per_gas_gwei: Option<String>,
 
     /// Percent to bump the estimated activation data fee by [default: 20]
-    #[clap(
-        long = "data-fee-bump-percent",
-        value_name = "<DATA_FEE_BUMP_PERCENT>",
-        default_value = "20"
-    )]
-    data_fee_bump_percent: String,
+    #[arg(long, default_value = "20")]
+    pub data_fee_bump_percent: u64,
+
+    /// The address of the deployer contract that deploys, activates, and initializes the stylus constructor.
+    #[arg(long, value_name = "DEPLOYER_ADDRESS", default_value_t = STYLUS_DEPLOYER_ADDRESS)]
+    pub deployer_address: Address,
+
+    /// The salt passed to the stylus deployer.
+    #[arg(long, default_value_t = B256::ZERO)]
+    pub deployer_salt: B256,
+
+    /// The constructor arguments.
+    #[arg(long, num_args(0..), value_name = "ARGS", allow_hyphen_values = true)]
+    pub constructor_args: Vec<String>,
+
+    /// The WASM to check (defaults to any found in the current directory).
+    #[arg(long)]
+    pub wasm_file: Option<PathBuf>,
+
+    /// Where to deploy and activate the contract (defaults to a random address).
+    #[arg(long)]
+    pub contract_address: Option<Address>,
 
     #[clap(flatten)]
-    private_key: PrivateKeyArgs,
+    pub auth: AuthOpts,
 }
 
-#[derive(Debug, clap::Args)]
-#[group(required = true, multiple = false)]
-pub struct PrivateKeyArgs {
-    /// Private key as a hex string. Warning: this exposes your key to shell history
-    #[clap(long = "private-key")]
-    private_key: Option<String>,
+impl GasFeeConfig for Deploy {
+    fn get_fee_str(&self) -> &Option<String> {
+        &self.max_fee_per_gas_gwei
+    }
 
-    /// File path to a text file containing a hex-encoded private key
-    #[clap(long = "private-key-path")]
-    private_key_path: Option<String>,
+    fn get_max_fee_per_gas_wei(&self) -> anyhow::Result<Option<u128>> {
+        match self.get_fee_str() {
+            Some(fee_str) => Ok(Some(crate::common::convert_gwei_to_wei(fee_str)?)),
+            None => Ok(None),
+        }
+    }
 }
 
 impl Deploy {
-    pub fn execute(self, path: Option<&Path>) -> anyhow::Result<()> {
-        let Self {
-            contract_name,
-            endpoint,
-            private_key,
-            verbose,
-            estimate_gas,
-            no_activate,
-            max_fee_per_gas_gwei,
-            data_fee_bump_percent,
-        } = self;
-
+    pub fn execute(mut self, path: Option<&Path>) -> anyhow::Result<()> {
         let rerooted_path = reroot_path(path)?;
         let manifest =
             move_package::source_package::manifest_parser::parse_move_manifest_from_file(
                 &rerooted_path.join("Move.toml"),
             )?;
 
-        if !cargo_stylus_installed() {
-            return Err(anyhow!(
-                "cargo stylus is not installed.\nPlease follow this guide to install it: https://docs.arbitrum.io/stylus/using-cli"
-            ));
-        }
-
         println!(
-            "Deploying contract '{contract_name}' to endpoint '{endpoint}' using provided private key...",
+            "Deploying contract '{}' to endpoint '{}' using provided private key...",
+            self.contract_name, self.endpoint,
         );
 
-        let mut command = Command::new("cargo-stylus");
-        command
-            .arg("--")
-            .arg("deploy")
-            .arg("--wasm-file")
-            .arg(get_wasm_file_with_path(
-                &contract_name,
+        if self.wasm_file.is_none() {
+            self.wasm_file = Some(get_wasm_file_with_path(
+                &self.contract_name,
                 manifest.package.name.as_str(),
-            )?)
-            .arg("--endpoint")
-            .arg(&endpoint)
-            .arg("--data-fee-bump-percent")
-            .arg(data_fee_bump_percent)
-            .arg("--no-verify");
-
-        if verbose {
-            command.arg("--verbose");
+            )?);
         }
 
-        if estimate_gas {
-            command.arg("--estimate-gas");
-        }
-
-        if no_activate {
-            command.arg("--no-activate");
-        }
-
-        if let Some(max_fee_per_gas_gwei) = max_fee_per_gas_gwei {
-            command
-                .arg("--max-fee-per-gas-gwei")
-                .arg(max_fee_per_gas_gwei);
-        }
-
-        match private_key {
-            PrivateKeyArgs {
-                private_key: Some(key),
-                ..
-            } => {
-                command.arg("--private-key").arg(key);
-            }
-            PrivateKeyArgs {
-                private_key_path: Some(path),
-                ..
-            } => {
-                command.arg("--private-key-path").arg(path);
-            }
-            _ => {}
-        }
-
-        let result = command.output()?;
-        if result.status.success() {
-            println!("{}", String::from_utf8_lossy(&result.stdout));
-            println!("Contract deployed successfully.");
-        } else {
-            eprintln!(
-                "Failed to deploy contract. Error: {}",
-                String::from_utf8_lossy(&result.stderr)
-            );
-        }
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()?;
+        rt.block_on(async move {
+            crate::deploy::deploy(self).await.unwrap();
+        });
 
         Ok(())
     }
@@ -152,7 +111,7 @@ impl Deploy {
 fn get_wasm_file_with_path(
     contract_name: &str,
     package_name: &str,
-) -> Result<String, anyhow::Error> {
+) -> Result<PathBuf, anyhow::Error> {
     let name = if contract_name.ends_with(".move") {
         contract_name.replace(".move", ".wasm")
     } else {
@@ -168,5 +127,5 @@ fn get_wasm_file_with_path(
         ));
     }
 
-    Ok(file_path)
+    Ok(file_path.into())
 }

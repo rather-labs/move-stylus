@@ -20,8 +20,7 @@ use std::{
 
 use crate::error::{AbiGeneratorError, AbiGeneratorErrorKind};
 use move_binary_format::file_format::{
-    Bytecode, CompiledModule, DatatypeHandleIndex, FunctionHandleIndex, SignatureToken,
-    StructDefInstantiationIndex, StructDefinitionIndex,
+    Bytecode, CompiledModule, FunctionHandleIndex, SignatureToken,
 };
 use move_bytecode_to_wasm::{
     PackageModuleData, compilation_context as ctx,
@@ -338,42 +337,6 @@ fn parse_error(
             kind: AbiGeneratorErrorKind::InvalidRevertType(token.clone()),
         })
     }
-}
-
-/// Maps a `DatatypeHandleIndex` to a `StructDefInstantiationIndex` by finding the struct definition
-/// and then searching for a matching instantiation. Matches both the struct definition and type parameters.
-fn find_struct_def_instantiation_index(
-    module: &CompiledModule,
-    datatype_handle_index: DatatypeHandleIndex,
-    type_parameters: &[SignatureToken],
-) -> Option<StructDefInstantiationIndex> {
-    // 1. Locate the StructDefinitionIndex
-    let struct_def_index = module
-        .struct_defs()
-        .iter()
-        .position(|d| d.struct_handle == datatype_handle_index)
-        .map(|idx| StructDefinitionIndex::new(idx as u16))?;
-
-    // 2. Find the instantiation matching both the index and the type parameters
-    module
-        .struct_instantiations()
-        .iter()
-        .enumerate()
-        .find(|(_, inst)| {
-            if inst.def != struct_def_index {
-                return false;
-            }
-
-            let inst_params = &module.signature_at(inst.type_parameters).0;
-
-            // Length check + element-wise comparison
-            inst_params.len() == type_parameters.len()
-                && inst_params
-                    .iter()
-                    .zip(type_parameters)
-                    .all(|(a, b)| signature_tokens_match(a, b))
-        })
-        .map(|(idx, _)| StructDefInstantiationIndex::new(idx as u16))
 }
 
 /// Checks if two signature tokens match (for type parameter comparison)

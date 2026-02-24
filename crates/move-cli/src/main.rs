@@ -7,6 +7,9 @@
 use anyhow::Result;
 pub mod base;
 pub(crate) mod build_config;
+pub mod common;
+pub mod constants;
+pub mod deploy;
 pub(crate) mod error;
 
 use base::{
@@ -43,11 +46,9 @@ pub struct Move {
     pub build_config: BuildConfig,
 }
 
-/// MoveCLI is the CLI that will be executed by the `move-cli` command
-/// The `cmd` argument is added here rather than in `Move` to make it
-/// easier for other crates to extend `move-cli`
+/// MoveStylus is the CLI that will be executed by the `move-stylus` command
 #[derive(Parser)]
-pub struct MoveCLI {
+pub struct MoveStylus {
     #[clap(flatten)]
     pub move_args: Move,
 
@@ -104,6 +105,6 @@ pub fn run_cli(move_args: Move, cmd: Command) -> Result<()> {
 }
 
 fn main() -> Result<()> {
-    let args = MoveCLI::parse();
+    let args = MoveStylus::parse();
     run_cli(args.move_args, args.cmd)
 }

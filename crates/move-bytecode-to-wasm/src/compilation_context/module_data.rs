@@ -1058,16 +1058,13 @@ impl ModuleData<'_> {
         if move_function_arguments.len() > 1 {
             return Err(CompilationContextError::ReceiveFunctionTooManyArguments);
         }
-        if let Some(first_arg) = move_function_arguments.0.first() {
-            if let Ok(arg) =
+        if let Some(first_arg) = move_function_arguments.0.first()
+            && let Ok(arg) =
                 IntermediateType::try_from_signature_token(first_arg, datatype_handles_map)
-            {
-                if !is_tx_context_ref(&arg, move_module_dependencies)
-                    .map_err(CompilationContextError::from)?
-                {
-                    return Err(CompilationContextError::ReceiveFunctionNonTxContextArgument);
-                }
-            }
+            && !is_tx_context_ref(&arg, move_module_dependencies)
+                .map_err(CompilationContextError::from)?
+        {
+            return Err(CompilationContextError::ReceiveFunctionNonTxContextArgument);
         }
 
         // Must have no return values

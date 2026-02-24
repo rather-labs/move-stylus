@@ -286,81 +286,79 @@ impl FunctionModifier {
                 }
             }
 
-            if let Attribute_::Assigned(name, value) = &attr.value {
-                if name.value.as_str() == "abort_code" {
-                    match &value.value {
-                        // Numeric literal: abort_code = 65540 or abort_code = 0x10004
-                        AttributeValue_::Value(v) => match &v.value {
-                            Value_::Num(n) => {
-                                let s = n.as_str();
-                                let code = if let Some(hex) = s.strip_prefix("0x") {
-                                    u64::from_str_radix(hex, 16)
-                                } else {
-                                    s.parse::<u64>()
-                                }.map_err(|_| {
-                                    SpecialAttributeError {
-                                        kind: SpecialAttributeErrorKind::InvalidExpectedFailureAbortCode,
-                                        line_of_code: v.loc,
-                                    }
-                                })?;
-                                return Ok(Some(ExpectedFailureKind::AbortCode(
-                                    AbortCode::Literal(code),
-                                )));
+            if let Attribute_::Assigned(name, value) = &attr.value
+                && name.value.as_str() == "abort_code"
+            {
+                match &value.value {
+                    // Numeric literal: abort_code = 65540 or abort_code = 0x10004
+                    AttributeValue_::Value(v) => match &v.value {
+                        Value_::Num(n) => {
+                            let s = n.as_str();
+                            let code = if let Some(hex) = s.strip_prefix("0x") {
+                                u64::from_str_radix(hex, 16)
+                            } else {
+                                s.parse::<u64>()
                             }
-                            _ => {
-                                return Err(SpecialAttributeError {
-                                    kind:
-                                        SpecialAttributeErrorKind::InvalidExpectedFailureAbortCode,
-                                    line_of_code: v.loc,
-                                });
-                            }
-                        },
-                        // Module access: abort_code = fixed_point32::EDIVISION_BY_ZERO
-                        //            or: abort_code = std::type_name::ENonModuleType
-                        AttributeValue_::ModuleAccess(chain) => {
-                            // Note: Here we have no information regarding the constant type or value, we need to resolve that later!
-                            match &chain.value {
-                                NameAccessChain_::Path(path) => {
-                                    let entries = &path.entries;
-                                    if entries.is_empty() {
-                                        return Err(SpecialAttributeError {
+                            .map_err(|_| SpecialAttributeError {
+                                kind: SpecialAttributeErrorKind::InvalidExpectedFailureAbortCode,
+                                line_of_code: v.loc,
+                            })?;
+                            return Ok(Some(ExpectedFailureKind::AbortCode(AbortCode::Literal(
+                                code,
+                            ))));
+                        }
+                        _ => {
+                            return Err(SpecialAttributeError {
+                                kind: SpecialAttributeErrorKind::InvalidExpectedFailureAbortCode,
+                                line_of_code: v.loc,
+                            });
+                        }
+                    },
+                    // Module access: abort_code = fixed_point32::EDIVISION_BY_ZERO
+                    //            or: abort_code = std::type_name::ENonModuleType
+                    AttributeValue_::ModuleAccess(chain) => {
+                        // Note: Here we have no information regarding the constant type or value, we need to resolve that later!
+                        match &chain.value {
+                            NameAccessChain_::Path(path) => {
+                                let entries = &path.entries;
+                                if entries.is_empty() {
+                                    return Err(SpecialAttributeError {
                                             kind: SpecialAttributeErrorKind::InvalidExpectedFailureAbortCode,
                                             line_of_code: chain.loc,
                                         });
-                                    }
+                                }
 
-                                    // The constant name is always the last entry.
-                                    let constant_name = entries.last().unwrap().name.value;
+                                // The constant name is always the last entry.
+                                let constant_name = entries.last().unwrap().name.value;
 
-                                    // The module name is:
-                                    // - For 2-segment paths (module::CONST): root is the module
-                                    // - For 3+ segment paths (addr::module::CONST): second-to-last entry is the module
-                                    let module_name = if entries.len() == 1 {
-                                        // 2-segment: root::CONST → root is the module
-                                        match &path.root.name.value {
-                                            LeadingNameAccess_::Name(n) => n.value,
-                                            _ => {
-                                                return Err(SpecialAttributeError {
+                                // The module name is:
+                                // - For 2-segment paths (module::CONST): root is the module
+                                // - For 3+ segment paths (addr::module::CONST): second-to-last entry is the module
+                                let module_name = if entries.len() == 1 {
+                                    // 2-segment: root::CONST → root is the module
+                                    match &path.root.name.value {
+                                        LeadingNameAccess_::Name(n) => n.value,
+                                        _ => {
+                                            return Err(SpecialAttributeError {
                                                     kind: SpecialAttributeErrorKind::InvalidExpectedFailureAbortCode,
                                                     line_of_code: chain.loc,
                                                 });
-                                            }
                                         }
-                                    } else {
-                                        // 3+ segment: addr::module::CONST → entries[len-2] is the module
-                                        entries[entries.len() - 2].name.value
-                                    };
+                                    }
+                                } else {
+                                    // 3+ segment: addr::module::CONST → entries[len-2] is the module
+                                    entries[entries.len() - 2].name.value
+                                };
 
-                                    return Ok(Some(ExpectedFailureKind::AbortCode(
-                                        AbortCode::Constant(module_name, constant_name),
-                                    )));
-                                }
-                                NameAccessChain_::Single(entry) => {
-                                    // Single name constant from the same module
-                                    return Ok(Some(ExpectedFailureKind::AbortCode(
-                                        AbortCode::Constant(module_name, entry.name.value),
-                                    )));
-                                }
+                                return Ok(Some(ExpectedFailureKind::AbortCode(
+                                    AbortCode::Constant(module_name, constant_name),
+                                )));
+                            }
+                            NameAccessChain_::Single(entry) => {
+                                // Single name constant from the same module
+                                return Ok(Some(ExpectedFailureKind::AbortCode(
+                                    AbortCode::Constant(module_name, entry.name.value),
+                                )));
                             }
                         }
                     }

@@ -17,7 +17,6 @@ pub mod table;
 
 use std::{
     collections::{HashMap, HashSet},
-    hash::{Hash, Hasher},
     rc::Rc,
     sync::Arc,
 };
@@ -38,6 +37,8 @@ use move_symbol_pool::Symbol;
 
 #[cfg(debug_assertions)]
 use crate::hasher::get_hasher;
+#[cfg(debug_assertions)]
+use std::hash::{Hash, Hasher};
 
 use crate::{
     CompilationContext,
