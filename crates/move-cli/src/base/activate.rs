@@ -8,12 +8,11 @@ use alloy::{
 };
 use anyhow::Result;
 use clap::Parser;
-use std::path::PathBuf;
 
 use crate::{
-    common::{AuthOpts, CommonConfig},
+    common::AuthOpts,
     constants::ARB_WASM_ADDRESS,
-    deploy::{DataFeeOpts, check::check_activate, greyln, util::color::DebugColor},
+    deploy::{check::check_activate, greyln, util::color::DebugColor},
 };
 
 sol! {
@@ -50,20 +49,12 @@ pub struct Activate {
     #[clap(long = "max-fee-per-gas-gwei", value_name = "<MAX_FEE_PER_GAS_GWEI>")]
     max_fee_per_gas_gwei: Option<String>,
 
+    /// Percent to bump the estimated activation data fee by [default: 20]
+    #[clap(long = "data-fee-bump-percent", default_value = "20")]
+    data_fee_bump_percent: u64,
+
     #[clap(flatten)]
-    private_key: PrivateKeyArgs,
-}
-
-#[derive(Debug, clap::Args)]
-#[group(required = true, multiple = false)]
-pub struct PrivateKeyArgs {
-    /// Private key as a hex string. Warning: this exposes your key to shell history
-    #[clap(long = "private-key")]
-    private_key: Option<String>,
-
-    /// File path to a text file containing a hex-encoded private key
-    #[clap(long = "private-key-path")]
-    private_key_path: Option<PathBuf>,
+    auth: AuthOpts,
 }
 
 impl Activate {
@@ -76,88 +67,27 @@ impl Activate {
             "Activating contract address '{address}' to endpoint '{endpoint}' using provided private key...",
         );
 
-        let activate_config = from_deploy_args(self);
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()?;
-        rt.block_on(async move { activate_contract(&activate_config).await.unwrap() });
+        rt.block_on(async move { activate_contract(&self).await.unwrap() });
         Ok(())
     }
 }
 
-pub struct ActivateConfig {
-    common_cfg: CommonConfig,
-
-    data_fee: DataFeeOpts,
-
-    auth: AuthOpts,
-
-    address: Address,
-
-    estimate_gas: bool,
-}
-
-fn from_deploy_args(activate: Activate) -> ActivateConfig {
-    let Activate {
-        endpoint,
-        private_key,
-        verbose,
-        estimate_gas,
-        max_fee_per_gas_gwei,
-        address,
-    } = activate;
-
-    let PrivateKeyArgs {
-        private_key,
-        private_key_path,
-    } = private_key;
-
-    let auth = if private_key.is_some() {
-        AuthOpts {
-            private_key_path: None,
-            private_key,
-        }
-    } else if private_key_path.is_some() {
-        AuthOpts {
-            private_key_path,
-            private_key: None,
-        }
-    } else {
-        panic!("Either --private-key or --private-key-path must be provided");
-    };
-
-    let common_cfg = CommonConfig {
-        endpoint,
-        verbose,
-        max_fee_per_gas_gwei,
-    };
-
-    ActivateConfig {
-        common_cfg,
-        data_fee: DataFeeOpts {
-            data_fee_bump_percent: 20,
-        },
-        auth,
-        address,
-        estimate_gas,
-    }
-}
-
 /// Activates an already deployed Stylus contract by address.
-pub async fn activate_contract(cfg: &ActivateConfig) -> Result<()> {
-    let provider = ProviderBuilder::new()
-        .connect(&cfg.common_cfg.endpoint)
-        .await?;
+pub async fn activate_contract(cfg: &Activate) -> Result<()> {
+    let provider = ProviderBuilder::new().connect(&cfg.endpoint).await?;
     let chain_id = provider.get_chain_id().await?;
     let wallet = cfg.auth.alloy_wallet(chain_id)?;
     let from_address = wallet.default_signer().address();
     let provider = ProviderBuilder::new()
         .wallet(wallet)
-        .connect(&cfg.common_cfg.endpoint)
+        .connect(&cfg.endpoint)
         .await?;
 
     let code = provider.get_code_at(cfg.address).await?;
-    let data_fee = check_activate(code, cfg.address, &cfg.data_fee, &provider).await?;
+    let data_fee = check_activate(code, cfg.address, cfg.data_fee_bump_percent, &provider).await?;
 
     let arbwasm = ArbWasm::new(ARB_WASM_ADDRESS, &provider);
     let activate_call = arbwasm

@@ -2,9 +2,12 @@
 // Modified by Rather Labs, Inc. in 2026.
 // For licensing, see https://github.com/OffchainLabs/cargo-stylus/blob/main/licenses/COPYRIGHT.md
 
-use crate::deploy::{
-    DeployConfig, calculate_fee_per_gas,
-    util::color::{Color, DebugColor},
+use crate::{
+    base::deploy::Deploy,
+    deploy::{
+        calculate_fee_per_gas,
+        util::color::{Color, DebugColor},
+    },
 };
 use alloy::{
     network::TransactionBuilder,
@@ -45,12 +48,12 @@ pub struct DeployerArgs {
 
 /// Deploys, activates, and initializes the contract using the Stylus deployer.
 pub async fn deploy(
-    cfg: &DeployConfig,
+    cfg: &Deploy,
     deployer: DeployerArgs,
     sender: Address,
     provider: &impl Provider,
 ) -> Result<()> {
-    if cfg.check_config.common_cfg.verbose {
+    if cfg.verbose {
         greyln!(
             "deploying contract using deployer at address: {}",
             deployer.address.debug_lavender()
@@ -69,14 +72,14 @@ pub async fn deploy(
 
     let gas_price = provider.get_gas_price().await?;
 
-    if cfg.check_config.common_cfg.verbose || cfg.estimate_gas {
+    if cfg.verbose || cfg.estimate_gas {
         super::print_gas_estimate("deployer deploy, activate, and init", gas, gas_price).await?;
     }
     if cfg.estimate_gas {
         return Ok(());
     }
 
-    let fee_per_gas = calculate_fee_per_gas(&cfg.check_config.common_cfg, gas_price)?;
+    let fee_per_gas = calculate_fee_per_gas(cfg, gas_price)?;
 
     let receipt = super::run_tx(
         "deploy_activate_init",
@@ -84,13 +87,13 @@ pub async fn deploy(
         Some(gas),
         fee_per_gas,
         provider,
-        cfg.check_config.common_cfg.verbose,
+        cfg.verbose,
     )
     .await?;
     let contract = get_address_from_receipt(&receipt)?;
     let address = contract.debug_lavender();
 
-    if cfg.check_config.common_cfg.verbose {
+    if cfg.verbose {
         let gas = super::format_gas(receipt.gas_used);
         greyln!(
             "deployed code at address: {address} {} {gas}",

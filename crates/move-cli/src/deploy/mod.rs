@@ -6,9 +6,8 @@ pub mod check;
 pub mod project;
 pub mod util;
 
-use std::path::PathBuf;
-
-use crate::common::{AuthOpts, CommonConfig, GasFeeConfig};
+use crate::base::deploy::Deploy;
+use crate::common::GasFeeConfig;
 use crate::constants::ARB_WASM_ADDRESS;
 use crate::deploy::{
     check::ContractCheck,
@@ -16,17 +15,13 @@ use crate::deploy::{
 };
 use alloy::{
     network::TransactionBuilder,
-    primitives::{
-        Address, B256, U256,
-        utils::{format_units, parse_ether},
-    },
+    primitives::{Address, U256, utils::format_units},
     providers::{Provider, ProviderBuilder},
     rpc::types::{TransactionReceipt, TransactionRequest},
     sol,
     sol_types::SolCall,
 };
 use anyhow::{Context, Result, anyhow, bail};
-use clap::Args;
 
 macro_rules! greyln {
     ($($msg:expr),*) => {{
@@ -59,28 +54,24 @@ sol! {
 }
 
 /// Deploys a stylus contract, activating if needed.
-pub async fn deploy(cfg: DeployConfig) -> Result<()> {
-    let contract = check::check(&cfg.check_config)
-        .await
-        .expect("cargo stylus check failed");
-    let verbose = cfg.check_config.common_cfg.verbose;
+pub async fn deploy(cfg: Deploy) -> Result<()> {
+    let contract = check::check(&cfg).await.expect("cargo stylus check failed");
+    let verbose = cfg.verbose;
 
-    let provider = ProviderBuilder::new()
-        .connect(&cfg.check_config.common_cfg.endpoint)
-        .await?;
+    let provider = ProviderBuilder::new().connect(&cfg.endpoint).await?;
     let chain_id = provider.get_chain_id().await?;
     let wallet = cfg.auth.alloy_wallet(chain_id)?;
     let from_address = wallet.default_signer().address();
     let provider = ProviderBuilder::new()
         .wallet(wallet)
-        .connect(&cfg.check_config.common_cfg.endpoint)
+        .connect(&cfg.endpoint)
         .await?;
 
     if verbose {
         greyln!("sender address: {}", from_address.debug_lavender());
     }
 
-    let data_fee = contract.suggest_fee() + cfg.constructor_value;
+    let data_fee = contract.suggest_fee();
 
     if let ContractCheck::Ready { .. } = &contract {
         // check balance early
@@ -128,7 +119,7 @@ cargo stylus activate --address {}"#,
     Ok(())
 }
 
-impl DeployConfig {
+impl Deploy {
     async fn deploy_contract(
         &self,
         code: &[u8],
@@ -141,12 +132,12 @@ impl DeployConfig {
             .with_from(sender)
             .with_deploy_code(init_code);
 
-        let verbose = self.check_config.common_cfg.verbose;
+        let verbose = self.verbose;
         let gas = provider.estimate_gas(tx.clone()).await?;
 
         let gas_price = provider.get_gas_price().await?;
 
-        if self.check_config.common_cfg.verbose || self.estimate_gas {
+        if self.verbose || self.estimate_gas {
             print_gas_estimate("deployment", gas, gas_price).await?;
         }
         if self.estimate_gas {
@@ -154,17 +145,9 @@ impl DeployConfig {
             return Ok(sender.create(nonce));
         }
 
-        let fee_per_gas = calculate_fee_per_gas(&self.check_config.common_cfg, gas_price)?;
+        let fee_per_gas = calculate_fee_per_gas(self, gas_price)?;
 
-        let receipt = run_tx(
-            "deploy",
-            tx,
-            Some(gas),
-            fee_per_gas,
-            provider,
-            self.check_config.common_cfg.verbose,
-        )
-        .await?;
+        let receipt = run_tx("deploy", tx, Some(gas), fee_per_gas, provider, self.verbose).await?;
         let contract = receipt.contract_address.ok_or(anyhow!("missing address"))?;
         let address = contract.debug_lavender();
 
@@ -189,7 +172,7 @@ impl DeployConfig {
         data_fee: U256,
         client: &impl Provider,
     ) -> Result<()> {
-        let verbose = self.check_config.common_cfg.verbose;
+        let verbose = self.verbose;
 
         let data = ArbWasm::activateProgramCall {
             program: contract_addr,
@@ -209,21 +192,13 @@ impl DeployConfig {
 
         let gas_price = client.get_gas_price().await?;
 
-        if self.check_config.common_cfg.verbose || self.estimate_gas {
+        if self.verbose || self.estimate_gas {
             greyln!("activation gas estimate: {}", format_gas(gas));
         }
 
-        let fee_per_gas = calculate_fee_per_gas(&self.check_config.common_cfg, gas_price)?;
+        let fee_per_gas = calculate_fee_per_gas(self, gas_price)?;
 
-        let receipt = run_tx(
-            "activate",
-            tx,
-            Some(gas),
-            fee_per_gas,
-            client,
-            self.check_config.common_cfg.verbose,
-        )
-        .await?;
+        let receipt = run_tx("activate", tx, Some(gas), fee_per_gas, client, self.verbose).await?;
 
         if verbose {
             let gas = format_gas(receipt.gas_used);
@@ -319,68 +294,4 @@ pub fn calculate_fee_per_gas<T: GasFeeConfig>(config: &T, gas_price: u128) -> Re
         None => gas_price,
     };
     Ok(fee_per_gas)
-}
-
-#[derive(Args, Clone, Debug)]
-pub struct CheckConfig {
-    #[command(flatten)]
-    pub(crate) common_cfg: CommonConfig,
-    #[command(flatten)]
-    pub data_fee: DataFeeOpts,
-    /// The WASM to check (defaults to any found in the current directory).
-    #[arg(long)]
-    pub wasm_file: Option<PathBuf>,
-    /// Where to deploy and activate the contract (defaults to a random address).
-    #[arg(long)]
-    pub contract_address: Option<Address>,
-}
-
-#[derive(Clone, Debug, Args)]
-pub struct DataFeeOpts {
-    /// Percent to bump the estimated activation data fee by.
-    #[arg(long, default_value = "20")]
-    pub data_fee_bump_percent: u64,
-}
-
-#[derive(Args, Clone, Debug)]
-pub struct DeployConfig {
-    #[command(flatten)]
-    pub check_config: CheckConfig,
-    /// Wallet source to use.
-    #[command(flatten)]
-    pub auth: AuthOpts,
-    /// Only perform gas estimation.
-    #[arg(long)]
-    pub estimate_gas: bool,
-    /// If specified, will not run the command in a reproducible docker container. Useful for local
-    /// builds, but at the risk of not having a reproducible contract for verification purposes.
-    #[arg(long)]
-    pub no_verify: bool,
-    /// Cargo stylus version when deploying reproducibly to downloads the corresponding cargo-stylus-base Docker image.
-    /// If not set, uses the default version of the local cargo stylus binary.
-    #[arg(long)]
-    pub cargo_stylus_version: Option<String>,
-    /// If set, do not activate the program after deploying it
-    #[arg(long)]
-    pub no_activate: bool,
-    /// The address of the deployer contract that deploys, activates, and initializes the stylus constructor.
-    #[arg(long, value_name = "DEPLOYER_ADDRESS", default_value_t = STYLUS_DEPLOYER_ADDRESS)]
-    pub deployer_address: Address,
-    /// The salt passed to the stylus deployer.
-    #[arg(long, default_value_t = B256::ZERO)]
-    pub deployer_salt: B256,
-    /// The constructor arguments.
-    #[arg(
-        long,
-        num_args(0..),
-        value_name = "ARGS",
-        allow_hyphen_values = true,
-    )]
-    pub constructor_args: Vec<String>,
-    /// The amount of Ether sent to the contract through the constructor.
-    #[arg(long, value_parser = parse_ether, default_value = "0")]
-    pub constructor_value: U256,
-    /// The constructor signature when using the --wasm-file flag.
-    #[arg(long)]
-    pub constructor_signature: Option<String>,
 }

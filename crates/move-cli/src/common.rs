@@ -31,7 +31,7 @@ pub trait GasFeeConfig {
     fn get_fee_str(&self) -> &Option<String>;
 }
 
-fn convert_gwei_to_wei(fee_str: &str) -> Result<u128> {
+pub fn convert_gwei_to_wei(fee_str: &str) -> Result<u128> {
     let gwei = match fee_str.parse::<f64>() {
         Ok(fee) if fee >= 0.0 => fee,
         Ok(_) => bail!("Max fee per gas must be non-negative"),

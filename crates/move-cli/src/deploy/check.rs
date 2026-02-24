@@ -2,12 +2,14 @@
 // Modified by Rather Labs, Inc. in 2026.
 // For licensing, see https://github.com/OffchainLabs/cargo-stylus/blob/main/licenses/COPYRIGHT.md
 
-use crate::constants::ARB_WASM_ADDRESS;
-use crate::deploy::{
-    CheckConfig, DataFeeOpts,
-    check::ArbWasm::ArbWasmErrors,
-    greyln, project,
-    util::color::{Color, GREY, LAVENDER, MINT, PINK, YELLOW},
+use crate::{
+    base::deploy::Deploy,
+    constants::ARB_WASM_ADDRESS,
+    deploy::{
+        check::ArbWasm::ArbWasmErrors,
+        greyln, project,
+        util::color::{Color, GREY, LAVENDER, MINT, PINK, YELLOW},
+    },
 };
 use alloy::{
     contract::Error,
@@ -44,8 +46,8 @@ sol! {
 
 /// Checks that a contract is valid and can be deployed onchain.
 /// Returns whether the WASM is already up-to-date and activated onchain, and the data fee.
-pub async fn check(cfg: &CheckConfig) -> Result<ContractCheck> {
-    let verbose = cfg.common_cfg.verbose;
+pub async fn check(cfg: &Deploy) -> Result<ContractCheck> {
+    let verbose = cfg.verbose;
     let (wasm, project_hash) = cfg.build_wasm()?;
 
     if verbose {
@@ -62,13 +64,11 @@ pub async fn check(cfg: &CheckConfig) -> Result<ContractCheck> {
             "wasm size: {}",
             format_file_size(wasm_file_bytes.len(), 96, 128)
         );
-        greyln!("connecting to RPC: {}", &cfg.common_cfg.endpoint.lavender());
+        greyln!("connecting to RPC: {}", &cfg.endpoint.lavender());
     }
 
     // Check if the contract already exists.
-    let provider = ProviderBuilder::new()
-        .connect(&cfg.common_cfg.endpoint)
-        .await?;
+    let provider = ProviderBuilder::new().connect(&cfg.endpoint).await?;
 
     let codehash = alloy::primitives::keccak256(&code);
 
@@ -77,7 +77,13 @@ pub async fn check(cfg: &CheckConfig) -> Result<ContractCheck> {
     }
 
     let address = cfg.contract_address.unwrap_or(Address::random());
-    let fee = check_activate(code.clone().into(), address, &cfg.data_fee, &provider).await?;
+    let fee = check_activate(
+        code.clone().into(),
+        address,
+        cfg.data_fee_bump_percent,
+        &provider,
+    )
+    .await?;
 
     Ok(ContractCheck::Ready { code, fee })
 }
@@ -108,7 +114,7 @@ impl ContractCheck {
     }
 }
 
-impl CheckConfig {
+impl Deploy {
     fn build_wasm(&self) -> Result<(PathBuf, [u8; 32])> {
         if let Some(wasm) = self.wasm_file.clone() {
             return Ok((wasm, [0u8; 32]));
@@ -190,7 +196,7 @@ async fn contract_exists(codehash: B256, provider: &impl Provider) -> Result<boo
 pub async fn check_activate(
     code: Bytes,
     address: Address,
-    opts: &DataFeeOpts,
+    data_fee_bump_percent: u64,
     provider: &impl Provider,
 ) -> Result<U256> {
     let arbwasm = ArbWasm::new(ARB_WASM_ADDRESS, provider);
@@ -221,10 +227,9 @@ pub async fn check_activate(
         dataFee: data_fee, ..
     } = result;
 
-    let bump = opts.data_fee_bump_percent;
-    let adjusted_data_fee = data_fee * U256::from(100 + bump) / U256::from(100);
+    let adjusted_data_fee = data_fee * U256::from(100 + data_fee_bump_percent) / U256::from(100);
     greyln!(
-        "wasm data fee: {} {GREY}(originally {}{GREY} with {LAVENDER}{bump}%{GREY} bump)",
+        "wasm data fee: {} {GREY}(originally {}{GREY} with {LAVENDER}{data_fee_bump_percent}%{GREY} bump)",
         format_data_fee(adjusted_data_fee),
         format_data_fee(data_fee)
     );
