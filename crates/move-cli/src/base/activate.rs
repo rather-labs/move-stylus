@@ -6,8 +6,8 @@ use alloy::{
     providers::{Provider, ProviderBuilder},
     sol,
 };
+use anyhow::Result;
 use clap::Parser;
-use eyre::Result;
 use std::path::PathBuf;
 
 use crate::{

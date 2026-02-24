@@ -1,10 +1,11 @@
 // Copyright 2023-2024, Offchain Labs, Inc.
+// Modified by Rather Labs, Inc. in 2026.
 // For licensing, see https://github.com/OffchainLabs/cargo-stylus/blob/main/licenses/COPYRIGHT.md
 
 use crate::constants::{BROTLI_COMPRESSION_LEVEL, EOF_PREFIX_NO_DICT, PROJECT_HASH_SECTION_NAME};
 use crate::deploy::greyln;
+use anyhow::{Context, Result, anyhow};
 use brotli2::read::BrotliEncoder;
-use eyre::{Result, WrapErr, eyre};
 use std::ops::Range;
 use std::{fs, io::Read, path::PathBuf};
 use wasm_encoder::{Module, RawSection};
@@ -12,15 +13,15 @@ use wasmparser::{Parser, Payload};
 
 /// Reads a WASM file at a specified path and returns its brotli compressed bytes.
 pub fn compress_wasm(wasm: &PathBuf, project_hash: [u8; 32]) -> Result<(Vec<u8>, Vec<u8>)> {
-    let wasm =
-        fs::read(wasm).wrap_err_with(|| eyre!("failed to read Wasm {}", wasm.to_string_lossy()))?;
+    let wasm = fs::read(wasm)
+        .with_context(|| format!("failed to read Wasm {}", wasm.to_string_lossy()))?;
 
     // We convert the WASM from binary to text and back to binary as this trick removes any dangling
     // mentions of reference types in the wasm body, which are not yet supported by Arbitrum chain backends.
-    let wat_str =
-        wasmprinter::print_bytes(&wasm).map_err(|e| eyre!("failed to convert Wasm to Wat: {e}"))?;
+    let wat_str = wasmprinter::print_bytes(&wasm)
+        .map_err(|e| anyhow!("failed to convert Wasm to Wat: {e}"))?;
     let wasm = wasmer::wat2wasm(wat_str.as_bytes())
-        .map_err(|e| eyre!("failed to convert Wat to Wasm: {e}"))?;
+        .map_err(|e| anyhow!("failed to convert Wat to Wasm: {e}"))?;
 
     // We include the project's hash as a custom section
     // in the user's WASM so it can be verified by Cargo stylus'
@@ -28,18 +29,18 @@ pub fn compress_wasm(wasm: &PathBuf, project_hash: [u8; 32]) -> Result<(Vec<u8>,
     // ignored by WASM runtimes, so it will only exist in the file
     // for metadata purposes.
     let wasm = add_project_hash_to_wasm_file(&wasm, project_hash)
-        .wrap_err("failed to add project hash to wasm file as custom section")?;
+        .context("failed to add project hash to wasm file as custom section")?;
 
     let wasm =
-        strip_user_metadata(&wasm).wrap_err("failed to strip user metadata from wasm file")?;
+        strip_user_metadata(&wasm).context("failed to strip user metadata from wasm file")?;
 
-    let wasm = wasmer::wat2wasm(&wasm).wrap_err("failed to parse Wasm")?;
+    let wasm = wasmer::wat2wasm(&wasm).context("failed to parse Wasm")?;
 
     let mut compressor = BrotliEncoder::new(&*wasm, BROTLI_COMPRESSION_LEVEL);
     let mut compressed_bytes = vec![];
     compressor
         .read_to_end(&mut compressed_bytes)
-        .wrap_err("failed to compress WASM bytes")?;
+        .context("failed to compress WASM bytes")?;
 
     let mut contract_code = hex::decode(EOF_PREFIX_NO_DICT).unwrap();
     contract_code.extend(compressed_bytes);

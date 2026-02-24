@@ -14,7 +14,7 @@ use alloy::{
     sol,
     sol_types::SolEvent,
 };
-use eyre::{Context, Result, bail, eyre};
+use anyhow::{Context, Result, anyhow, bail};
 
 pub const STYLUS_DEPLOYER_ADDRESS: Address = address!("cEcba2F1DC234f70Dd89F2041029807F8D03A990");
 
@@ -65,7 +65,7 @@ pub async fn deploy(
     let gas = provider
         .estimate_gas(tx.clone())
         .await
-        .wrap_err("deployment failed during gas estimation")?;
+        .context("deployment failed during gas estimation")?;
 
     let gas_price = provider.get_gas_price().await?;
 
@@ -117,5 +117,5 @@ fn get_address_from_receipt(receipt: &TransactionReceipt) -> Result<Address> {
             }
         }
     }
-    Err(eyre!("contract address not found in receipt"))
+    Err(anyhow!("contract address not found in receipt"))
 }

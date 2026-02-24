@@ -25,8 +25,8 @@ use alloy::{
     sol,
     sol_types::SolCall,
 };
+use anyhow::{Context, Result, anyhow, bail};
 use clap::Args;
-use eyre::{Result, WrapErr, bail, eyre};
 
 macro_rules! greyln {
     ($($msg:expr),*) => {{
@@ -165,7 +165,7 @@ impl DeployConfig {
             self.check_config.common_cfg.verbose,
         )
         .await?;
-        let contract = receipt.contract_address.ok_or(eyre!("missing address"))?;
+        let contract = receipt.contract_address.ok_or(anyhow!("missing address"))?;
         let address = contract.debug_lavender();
 
         if verbose {
@@ -205,7 +205,7 @@ impl DeployConfig {
         let gas = client
             .estimate_gas(tx.clone())
             .await
-            .map_err(|e| eyre!("did not estimate correctly: {e}"))?;
+            .map_err(|e| anyhow!("did not estimate correctly: {e}"))?;
 
         let gas_price = client.get_gas_price().await?;
 
@@ -275,7 +275,7 @@ pub async fn run_tx(
     if verbose {
         greyln!("sent {name} tx: {}", tx_hash.debug_lavender());
     }
-    let receipt = tx.get_receipt().await.wrap_err("tx failed to complete")?;
+    let receipt = tx.get_receipt().await.context("tx failed to complete")?;
     if !receipt.status() {
         bail!("{name} tx reverted {}", tx_hash.debug_red());
     }

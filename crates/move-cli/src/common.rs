@@ -1,10 +1,13 @@
+// Copyright 2023-2024, Offchain Labs, Inc.
+// Modified by Rather Labs, Inc. in 2026.
+// For licensing, see https://github.com/OffchainLabs/cargo-stylus/blob/main/licenses/COPYRIGHT.md
+
 use std::{fs, path::PathBuf};
 
 use alloy::signers::Signer;
 use alloy::{network::EthereumWallet, primitives::FixedBytes, signers::local::PrivateKeySigner};
+use anyhow::{Context, Result, anyhow, bail};
 use clap::{ArgGroup, Args};
-use eyre::eyre;
-use eyre::{Context, Result, bail};
 
 use crate::{constants::DEFAULT_ENDPOINT, deploy::util::text::decode0x};
 
@@ -82,7 +85,7 @@ impl AuthOpts {
     pub fn alloy_wallet(&self, chain_id: u64) -> Result<EthereumWallet> {
         if let Some(key) = &self.private_key {
             if key.is_empty() {
-                return Err(eyre!("empty private key"));
+                return Err(anyhow!("empty private key"));
             }
             let priv_key_bytes: FixedBytes<32> = FixedBytes::from_slice(decode0x(key)?.as_slice());
             let signer =
@@ -91,13 +94,13 @@ impl AuthOpts {
         }
 
         if let Some(file) = &self.private_key_path {
-            let key = fs::read_to_string(file).wrap_err("could not open private key file")?;
+            let key = fs::read_to_string(file).context("could not open private key file")?;
             let priv_key_bytes: FixedBytes<32> = FixedBytes::from_slice(decode0x(key)?.as_slice());
             let signer =
                 PrivateKeySigner::from_bytes(&priv_key_bytes)?.with_chain_id(Some(chain_id));
             return Ok(EthereumWallet::new(signer));
         }
 
-        Err(eyre!("no private key provided"))
+        Err(anyhow!("no private key provided"))
     }
 }

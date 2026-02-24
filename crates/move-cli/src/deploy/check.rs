@@ -16,8 +16,8 @@ use alloy::{
     rpc::types::state::{AccountOverride, StateOverride},
     sol,
 };
+use anyhow::{Context, Result, anyhow, bail};
 use bytesize::ByteSize;
-use eyre::{ErrReport, Result, WrapErr, bail, eyre};
 use std::path::PathBuf;
 
 sol! {
@@ -53,7 +53,7 @@ pub async fn check(cfg: &CheckConfig) -> Result<ContractCheck> {
     }
 
     let (wasm_file_bytes, code) =
-        project::compress_wasm(&wasm, project_hash).wrap_err("failed to compress WASM")?;
+        project::compress_wasm(&wasm, project_hash).context("failed to compress WASM")?;
 
     greyln!("contract size: {}", format_file_size(code.len(), 16, 24));
 
@@ -114,7 +114,7 @@ impl CheckConfig {
             return Ok((wasm, [0u8; 32]));
         }
 
-        Err(eyre!("no wasm file provided"))
+        Err(anyhow!("no wasm file provided"))
     }
 }
 
@@ -154,9 +154,9 @@ pub struct EthCallError {
     pub msg: String,
 }
 
-impl From<EthCallError> for ErrReport {
+impl From<EthCallError> for anyhow::Error {
     fn from(value: EthCallError) -> Self {
-        eyre!(value.msg)
+        anyhow!(value.msg)
     }
 }
 

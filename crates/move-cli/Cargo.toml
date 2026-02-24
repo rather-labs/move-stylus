@@ -35,7 +35,6 @@ wasm-opt = "0.116.1"
 wasmprinter.workspace = true
 thiserror.workspace = true
 alloy = { version = "1.0", features = ["essentials", "signer-keystore", "getrandom", "provider-trace-api", "provider-debug-api"] }
-eyre = "0.6.12"
 bytesize = "2.3.1"
 brotli2 = "0.3.2"
 tiny-keccak = "2.0.2"
