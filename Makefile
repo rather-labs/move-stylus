@@ -142,14 +142,10 @@ deploy-all:
 	$(MAKE) deploy-delegated-counter-named-id
 	$(MAKE) deploy-revert-errors
 
-setup-stylus:
-	RUSTFLAGS="-C link-args=-rdynamic" cargo install --force --version 0.10.0 cargo-stylus
-
 install-wasm-tools:
 	cargo install --locked wasm-tools
 
 install:
-	# @which cargo-stylus > /dev/null || (echo "Installing mdbook..." && $(MAKE) setup-stylus)
 	cargo install --locked --path crates/move-cli
 
 .PHONY: test setup-stylus install deploy-* example-* disassemble* unit-test check-example build-example

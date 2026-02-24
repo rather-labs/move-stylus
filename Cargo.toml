@@ -6,7 +6,7 @@ members = [
     "example",
 ]
 
-exclude = ["example-rust", "cargo-stylus"]
+exclude = ["example-rust"]
 
 # Dependencies that should be kept in sync through the whole workspace
 [workspace.dependencies]
