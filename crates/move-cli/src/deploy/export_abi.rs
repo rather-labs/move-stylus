@@ -1,5 +1,4 @@
 // Copyright 2023-2024, Offchain Labs, Inc.
-// For licensing, see https://github.com/OffchainLabs/cargo-stylus/blob/main/licenses/COPYRIGHT.md
 
 use crate::deploy::util::{color::Color, sys};
 use crate::deploy::{egreyln, greyln};

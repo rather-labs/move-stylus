@@ -1,6 +1,5 @@
 // Copyright 2023-2024, Offchain Labs, Inc.
 // Modified by Rather Labs, Inc. in 2026.
-// For licensing, see https://github.com/OffchainLabs/cargo-stylus/blob/main/licenses/COPYRIGHT.md
 
 use crate::{
     base::deploy::Deploy,

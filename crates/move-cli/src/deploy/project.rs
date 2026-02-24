@@ -1,6 +1,5 @@
 // Copyright 2023-2024, Offchain Labs, Inc.
 // Modified by Rather Labs, Inc. in 2026.
-// For licensing, see https://github.com/OffchainLabs/cargo-stylus/blob/main/licenses/COPYRIGHT.md
 
 use crate::constants::{BROTLI_COMPRESSION_LEVEL, EOF_PREFIX_NO_DICT, PROJECT_HASH_SECTION_NAME};
 use crate::deploy::greyln;
