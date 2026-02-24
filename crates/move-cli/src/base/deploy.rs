@@ -1,4 +1,4 @@
-use alloy::primitives::{Address, B256, U256, utils::parse_ether};
+use alloy::primitives::{Address, B256};
 use anyhow::anyhow;
 use clap::Parser;
 use std::path::Path;

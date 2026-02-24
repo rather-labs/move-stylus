@@ -106,7 +106,7 @@ pub async fn deploy(cfg: Deploy) -> Result<()> {
             if cfg.no_activate {
                 mintln!(
                     r#"NOTE: You must activate the stylus contract before calling it. To do so, we recommend running:
-cargo stylus activate --address {}"#,
+move-stylus activate --address {}"#,
                     hex::encode(contract_addr)
                 );
             } else {

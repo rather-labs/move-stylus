@@ -16,7 +16,7 @@ pub const ARB_WASM_ADDRESS: Address = address!("00000000000000000000000000000000
 /// Address of the ArbWasmCache precompile.
 pub const ARB_WASM_CACHE_ADDRESS: Address = address!("0000000000000000000000000000000000000072");
 
-/// Name of the custom wasm section that is added to contracts deployed with cargo stylus
+/// Name of the custom wasm section that is added to contracts deployed
 /// to include a hash of the Rust project's source files for reproducible verification of builds.
 pub const PROJECT_HASH_SECTION_NAME: &str = "project_hash";
 
