@@ -63,20 +63,6 @@ impl EnumData {
             .ok_or(CompilationContextError::EnumNotFound(*enum_index as u16))
     }
 
-    pub fn get_enum_by_variant_instantiation_handle_idx(
-        &self,
-        idx: &VariantInstantiationHandleIndex,
-    ) -> Result<&IEnum> {
-        let VariantInstantiationData { enum_index, .. } = self
-            .variants_instantiation_to_enum
-            .get(idx)
-            .ok_or(CompilationContextError::EnumWithVariantIdxNotFound(idx.0))?;
-
-        self.enums
-            .get(*enum_index)
-            .ok_or(CompilationContextError::EnumNotFound(*enum_index as u16))
-    }
-
     pub fn get_variant_position_by_variant_handle_idx(
         &self,
         idx: &VariantHandleIndex,

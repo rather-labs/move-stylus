@@ -19,9 +19,6 @@ disassemble-module:
 %:
 	@:
 
-check-example:
-	cargo stylus check --wasm-file=./example/build/wasm/hello_world.wasm --endpoint http://127.0.0.1:8547
-
 build-example:
 	cargo run -p move-cli -- build -p ./example
 
@@ -87,7 +84,7 @@ deploy:
 		| tee /dev/tty | ./update_contract_env.sh $(CONTRACT_ENV_VAR)
 
 deploy-example:
-	$(MAKE) deploy CONTRACT_NAME=hello_world_2 CONTRACT_ENV_VAR=CONTRACT_ADDRESS_2
+	$(MAKE) deploy CONTRACT_NAME=hello_world CONTRACT_ENV_VAR=CONTRACT_ADDRESS
 
 deploy-example-2:
 	$(MAKE) deploy CONTRACT_NAME=hello_world_2 CONTRACT_ENV_VAR=CONTRACT_ADDRESS_2
@@ -142,7 +139,7 @@ deploy-all:
 	$(MAKE) deploy-dog-walker
 	$(MAKE) deploy-cross-contract-call
 	$(MAKE) deploy-delegated-counter
-	$(MAKE) deploy-delegated-counter-named_id
+	$(MAKE) deploy-delegated-counter-named-id
 	$(MAKE) deploy-revert-errors
 
 setup-stylus:
@@ -151,11 +148,8 @@ setup-stylus:
 install-wasm-tools:
 	cargo install --locked wasm-tools
 
-parse-rust-example:
-	wasm-tools print ./example-rust/target/wasm32-unknown-unknown/release/stylus_hello_world.wasm -o ./example-rust/target/wasm32-unknown-unknown/release/stylus_hello_world.wat
-
 install:
 	# @which cargo-stylus > /dev/null || (echo "Installing mdbook..." && $(MAKE) setup-stylus)
 	cargo install --locked --path crates/move-cli
 
-.PHONY: test setup-stylus install deploy-*
+.PHONY: test setup-stylus install deploy-* example-* disassemble* unit-test check-example build-example

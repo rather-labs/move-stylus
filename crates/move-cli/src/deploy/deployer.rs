@@ -4,18 +4,15 @@
 
 use crate::deploy::{
     DeployConfig, calculate_fee_per_gas,
-    check::ContractCheck,
-    util::color::{Color, DebugColor, GREY},
+    util::color::{Color, DebugColor},
 };
 use alloy::{
-    dyn_abi::{DynSolValue, JsonAbiExt, Specifier},
-    json_abi::{Constructor, StateMutability},
     network::TransactionBuilder,
-    primitives::{Address, U256, address, utils::format_ether},
-    providers::{Provider, ProviderBuilder},
+    primitives::{Address, U256, address},
+    providers::Provider,
     rpc::types::{TransactionReceipt, TransactionRequest},
     sol,
-    sol_types::{SolCall, SolEvent},
+    sol_types::SolEvent,
 };
 use eyre::{Context, Result, bail, eyre};
 
@@ -44,69 +41,6 @@ pub struct DeployerArgs {
     tx_value: U256,
     /// Calldata to be sent in the tx
     tx_calldata: Vec<u8>,
-}
-
-/// Parses the constructor arguments and returns the data to deploy the contract using the deployer.
-pub async fn parse_constructor_args(
-    cfg: &DeployConfig,
-    constructor: &Constructor,
-    contract: &ContractCheck,
-) -> Result<DeployerArgs> {
-    if !cfg.constructor_value.is_zero() {
-        greyln!(
-            "value sent to the constructor: {} {GREY}Ether",
-            format_ether(cfg.constructor_value).debug_lavender()
-        );
-    }
-    let constructor_value = cfg.constructor_value;
-    if constructor.state_mutability != StateMutability::Payable && !constructor_value.is_zero() {
-        bail!("attempting to send Ether to non-payable constructor");
-    }
-    let tx_value = contract.suggest_fee() + constructor_value;
-
-    let args = &cfg.constructor_args;
-    let params = &constructor.inputs;
-    if args.len() != params.len() {
-        bail!(
-            "mismatch number of constructor arguments (want {}; got {})",
-            params.len(),
-            args.len()
-        );
-    }
-
-    let mut arg_values = Vec::<DynSolValue>::with_capacity(args.len());
-    for (arg, param) in args.iter().zip(params) {
-        let ty = param
-            .resolve()
-            .wrap_err_with(|| format!("could not resolve constructor arg: {param}"))?;
-        let value = ty
-            .coerce_str(arg)
-            .wrap_err_with(|| format!("could not parse constructor arg: {param}"))?;
-        arg_values.push(value);
-    }
-    let calldata_args = constructor.abi_encode_input_raw(&arg_values)?;
-
-    let mut constructor_calldata = Vec::from(stylus_constructorCall::SELECTOR);
-    constructor_calldata.extend(calldata_args);
-
-    let bytecode = super::contract_deployment_calldata(contract.code());
-    let provider = ProviderBuilder::new()
-        .connect(&cfg.check_config.common_cfg.endpoint)
-        .await?;
-    let deployer = StylusDeployer::new(Address::ZERO, provider);
-    let deploy_call = deployer.deploy_call(
-        bytecode.into(),
-        constructor_calldata.into(),
-        constructor_value,
-        cfg.deployer_salt,
-    );
-
-    let tx_calldata = deploy_call.calldata().to_vec();
-    Ok(DeployerArgs {
-        address: cfg.deployer_address,
-        tx_value,
-        tx_calldata,
-    })
 }
 
 /// Deploys, activates, and initializes the contract using the Stylus deployer.
@@ -184,8 +118,4 @@ fn get_address_from_receipt(receipt: &TransactionReceipt) -> Result<Address> {
         }
     }
     Err(eyre!("contract address not found in receipt"))
-}
-
-pub fn decode_deploy_call(calldata: &[u8]) -> Result<StylusDeployer::deployCall> {
-    StylusDeployer::deployCall::abi_decode(calldata).map_err(|e| e.into())
 }
