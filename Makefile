@@ -9,18 +9,18 @@ test:
 	cargo test
 
 disassemble:
-	cargo run -p move-cli -- disassemble --name hello_world -p ./example --Xdebug
+	cargo run -p move-stylus -- disassemble --name hello_world -p ./example --Xdebug
 
 unit-test:
-	cargo run -p move-cli -- test -p ./example
+	cargo run -p move-stylus -- test -p ./example
 
 disassemble-module:
-	cargo run -p move-cli -- disassemble --name $(filter-out $@,$(MAKECMDGOALS)) -p ./example --Xdebug
+	cargo run -p move-stylus -- disassemble --name $(filter-out $@,$(MAKECMDGOALS)) -p ./example --Xdebug
 %:
 	@:
 
 build-example:
-	cargo run -p move-cli -- build -p ./example
+	cargo run -p move-stylus -- build -p ./example
 
 example-interaction:
 	cargo run -p move-hello-world-example --bin interaction
@@ -77,7 +77,7 @@ example-all:
 	$(MAKE) example-revert-errors
 
 deploy:
-	cargo run -p move-cli -- deploy -p ./example \
+	cargo run -p move-stylus -- deploy -p ./example \
 		--endpoint 'http://localhost:8547' \
 		--private-key "$(PRIVATE_KEY)" \
 		--contract-name "$(CONTRACT_NAME)" \
@@ -146,6 +146,6 @@ install-wasm-tools:
 	cargo install --locked wasm-tools
 
 install:
-	cargo install --locked --path crates/move-cli
+	cargo install --locked --path crates/move-cli --force
 
 .PHONY: test setup-stylus install deploy-* example-* disassemble* unit-test check-example build-example

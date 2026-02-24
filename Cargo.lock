@@ -4119,51 +4119,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "move-cli"
-version = "0.1.0"
-dependencies = [
- "alloy",
- "anyhow",
- "brotli2",
- "bytesize",
- "clap",
- "glob",
- "hex",
- "move-abstract-interpreter",
- "move-binary-format",
- "move-bytecode-source-map",
- "move-bytecode-to-wasm",
- "move-bytecode-viewer",
- "move-command-line-common",
- "move-compiler",
- "move-core-types",
- "move-coverage",
- "move-disassembler",
- "move-docgen",
- "move-evm-abi-generator",
- "move-package",
- "move-packages-build",
- "move-stdlib-natives",
- "move-test-runner",
- "move-unit-test",
- "move-vm-runtime",
- "move-vm-test-utils",
- "rustc-host",
- "tempfile",
- "thiserror 2.0.17",
- "tiny-keccak",
- "tokio",
- "toml 1.0.3+spec-1.1.0",
- "wasm-encoder 0.245.1",
- "wasm-gen",
- "wasm-opt",
- "wasm-parser",
- "wasmer",
- "wasmparser 0.245.1",
- "wasmprinter 0.228.0",
-]
-
-[[package]]
 name = "move-command-line-common"
 version = "0.1.0"
 source = "git+https://github.com/MystenLabs/sui#70379f9cd534b16fe540319bfb194b5a0f14d104"
@@ -4520,6 +4475,51 @@ dependencies = [
  "sha2 0.9.9",
  "sha3 0.9.1",
  "smallvec",
+]
+
+[[package]]
+name = "move-stylus"
+version = "0.1.0"
+dependencies = [
+ "alloy",
+ "anyhow",
+ "brotli2",
+ "bytesize",
+ "clap",
+ "glob",
+ "hex",
+ "move-abstract-interpreter",
+ "move-binary-format",
+ "move-bytecode-source-map",
+ "move-bytecode-to-wasm",
+ "move-bytecode-viewer",
+ "move-command-line-common",
+ "move-compiler",
+ "move-core-types",
+ "move-coverage",
+ "move-disassembler",
+ "move-docgen",
+ "move-evm-abi-generator",
+ "move-package",
+ "move-packages-build",
+ "move-stdlib-natives",
+ "move-test-runner",
+ "move-unit-test",
+ "move-vm-runtime",
+ "move-vm-test-utils",
+ "rustc-host",
+ "tempfile",
+ "thiserror 2.0.17",
+ "tiny-keccak",
+ "tokio",
+ "toml 1.0.3+spec-1.1.0",
+ "wasm-encoder 0.245.1",
+ "wasm-gen",
+ "wasm-opt",
+ "wasm-parser",
+ "wasmer",
+ "wasmparser 0.245.1",
+ "wasmprinter 0.228.0",
 ]
 
 [[package]]

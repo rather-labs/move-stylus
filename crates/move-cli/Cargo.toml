@@ -1,5 +1,5 @@
 [package]
-name = "move-cli"
+name = "move-stylus"
 version = "0.1.0"
 authors = ["Diem Association <opensource@diem.com>"]
 description = "CLI frontend for the Move compiler and VM"
