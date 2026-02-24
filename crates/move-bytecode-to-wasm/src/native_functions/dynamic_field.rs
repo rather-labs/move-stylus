@@ -240,7 +240,7 @@ pub fn add_remove_child_object_fn(
         compilation_ctx,
         Some(runtime_error_data),
         &ModuleId::new(STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_DYNAMIC_FIELD),
-        &[itype.clone()],
+        std::slice::from_ref(itype),
     )?;
 
     // Arguments
