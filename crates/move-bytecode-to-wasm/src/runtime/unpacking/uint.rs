@@ -93,6 +93,9 @@ pub fn unpack_u64_function(
 #[cfg(test)]
 mod tests {
     use alloy_sol_types::{SolType, sol};
+    use std::cell::RefCell;
+    use std::panic::AssertUnwindSafe;
+    use std::rc::Rc;
     use walrus::{FunctionBuilder, ValType};
     use wasmtime::WasmResults;
 
@@ -242,5 +245,155 @@ mod tests {
             (IntType::MAX - 1) as i64,
             ValType::I64,
         );
+    }
+
+    #[test]
+    fn test_unpack_u32_fuzz() {
+        type SolType = sol!((uint32,));
+
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
+
+        let args_pointer = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+        func_body.i32_const(INITIAL_MEMORY_OFFSET);
+        func_body.local_set(args_pointer);
+
+        IntermediateType::IU32
+            .add_unpack_instructions(
+                None,
+                &mut func_body,
+                &mut raw_module,
+                None,
+                Some(ValType::I32),
+                args_pointer,
+                args_pointer,
+                &compilation_ctx,
+                None,
+                None,
+            )
+            .unwrap();
+
+        let function = function_builder.finish(vec![], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module::<_, i32>(&mut raw_module, vec![], "test_function", None);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type::<u32>()
+            .cloned()
+            .for_each(|value: u32| {
+                let data = SolType::abi_encode_params(&(value,));
+
+                // Write the encoded data to memory at INITIAL_MEMORY_OFFSET
+                memory
+                    .write(
+                        &mut *store.0.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &data,
+                    )
+                    .unwrap();
+
+                let result: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+
+                assert_eq!(
+                    result, value as i32,
+                    "Unpacked u32 did not match expected result for value {value}",
+                );
+
+                reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+            });
+    }
+
+    #[test]
+    fn test_unpack_u64_fuzz() {
+        type SolType = sol!((uint64,));
+
+        let (mut raw_module, allocator_func, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
+        let compilation_ctx =
+            test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I64]);
+
+        let args_pointer = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+        func_body.i32_const(INITIAL_MEMORY_OFFSET);
+        func_body.local_set(args_pointer);
+
+        IntermediateType::IU64
+            .add_unpack_instructions(
+                None,
+                &mut func_body,
+                &mut raw_module,
+                None,
+                Some(ValType::I64),
+                args_pointer,
+                args_pointer,
+                &compilation_ctx,
+                None,
+                None,
+            )
+            .unwrap();
+
+        let function = function_builder.finish(vec![], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module::<_, i64>(&mut raw_module, vec![], "test_function", None);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type::<u64>()
+            .cloned()
+            .for_each(|value: u64| {
+                let data = SolType::abi_encode_params(&(value,));
+
+                // Write the encoded data to memory at INITIAL_MEMORY_OFFSET
+                memory
+                    .write(
+                        &mut *store.0.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &data,
+                    )
+                    .unwrap();
+
+                let result: i64 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+
+                assert_eq!(
+                    result, value as i64,
+                    "Unpacked u64 did not match expected result for value {value}",
+                );
+
+                reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+            });
     }
 }

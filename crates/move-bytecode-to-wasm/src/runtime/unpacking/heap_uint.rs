@@ -122,7 +122,11 @@ pub fn unpack_address_function(
 #[cfg(test)]
 mod tests {
     use alloy_primitives::{Address, U256, address};
+    use alloy_sol_types::SolValue;
     use alloy_sol_types::{SolType, sol};
+    use std::cell::RefCell;
+    use std::panic::AssertUnwindSafe;
+    use std::rc::Rc;
     use walrus::{FunctionBuilder, ValType};
 
     use crate::{
@@ -255,5 +259,258 @@ mod tests {
         let data =
             SolType::abi_encode_params(&(address!("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE"),));
         unpack_heap_uint(&data, int_type.clone(), &data);
+    }
+
+    #[test]
+    fn test_unpack_u128_fuzz() {
+        type SolType = sol!((uint128,));
+
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+        let mut runtime_error_data = RuntimeErrorData::new();
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
+
+        let args_pointer = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+        func_body.i32_const(INITIAL_MEMORY_OFFSET);
+        func_body.local_set(args_pointer);
+
+        IntermediateType::IU128
+            .add_unpack_instructions(
+                None,
+                &mut func_body,
+                &mut raw_module,
+                None,
+                Some(ValType::I32),
+                args_pointer,
+                args_pointer,
+                &compilation_ctx,
+                Some(&mut runtime_error_data),
+                None,
+            )
+            .unwrap();
+
+        let function = function_builder.finish(vec![], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type::<u128>()
+            .cloned()
+            .for_each(|value: u128| {
+                let data = SolType::abi_encode_params(&(value,));
+
+                // Write the encoded data to memory at INITIAL_MEMORY_OFFSET
+                memory
+                    .write(
+                        &mut *store.0.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &data,
+                    )
+                    .unwrap();
+
+                let result_ptr: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+
+                let mut result_memory_data = vec![0; 16];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        result_ptr as usize,
+                        &mut result_memory_data,
+                    )
+                    .unwrap();
+
+                let expected = value.to_le_bytes();
+                assert_eq!(
+                    result_memory_data, expected,
+                    "Unpacked u128 did not match expected result for value {value}",
+                );
+
+                reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+            });
+    }
+
+    #[test]
+    fn test_unpack_u256_fuzz() {
+        type SolType = sol!((uint256,));
+
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+        let mut runtime_error_data = RuntimeErrorData::new();
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
+
+        let args_pointer = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+        func_body.i32_const(INITIAL_MEMORY_OFFSET);
+        func_body.local_set(args_pointer);
+
+        IntermediateType::IU256
+            .add_unpack_instructions(
+                None,
+                &mut func_body,
+                &mut raw_module,
+                None,
+                Some(ValType::I32),
+                args_pointer,
+                args_pointer,
+                &compilation_ctx,
+                Some(&mut runtime_error_data),
+                None,
+            )
+            .unwrap();
+
+        let function = function_builder.finish(vec![], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type::<[u8; 32]>()
+            .cloned()
+            .for_each(|bytes: [u8; 32]| {
+                let value = U256::from_le_bytes(bytes);
+
+                let data = SolType::abi_encode_params(&(value,));
+
+                // Write the encoded data to memory at INITIAL_MEMORY_OFFSET
+                memory
+                    .write(
+                        &mut *store.0.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &data,
+                    )
+                    .unwrap();
+
+                let result_ptr: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+
+                let mut result_memory_data = vec![0; 32];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        result_ptr as usize,
+                        &mut result_memory_data,
+                    )
+                    .unwrap();
+
+                let expected = value.to_le_bytes::<32>();
+                assert_eq!(
+                    result_memory_data, expected,
+                    "Unpacked U256 did not match expected result for value {value}",
+                );
+
+                reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+            });
+    }
+
+    #[test]
+    fn test_unpack_address_fuzz() {
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+        let mut runtime_error_data = RuntimeErrorData::new();
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
+
+        let args_pointer = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+        func_body.i32_const(INITIAL_MEMORY_OFFSET);
+        func_body.local_set(args_pointer);
+
+        IntermediateType::IAddress
+            .add_unpack_instructions(
+                None,
+                &mut func_body,
+                &mut raw_module,
+                None,
+                Some(ValType::I32),
+                args_pointer,
+                args_pointer,
+                &compilation_ctx,
+                Some(&mut runtime_error_data),
+                None,
+            )
+            .unwrap();
+
+        let function = function_builder.finish(vec![], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type::<[u8; 20]>()
+            .cloned()
+            .for_each(|bytes: [u8; 20]| {
+                let value = Address::from_slice(&bytes);
+
+                let data = value.abi_encode();
+
+                // Write the encoded data to memory at INITIAL_MEMORY_OFFSET
+                memory
+                    .write(
+                        &mut *store.0.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &data,
+                    )
+                    .unwrap();
+
+                let result_ptr: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+
+                let mut result_memory_data = vec![0; 32];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        result_ptr as usize,
+                        &mut result_memory_data,
+                    )
+                    .unwrap();
+
+                assert_eq!(
+                    result_memory_data, data,
+                    "Unpacked address did not match expected result for value {value}",
+                );
+
+                reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+            });
     }
 }
