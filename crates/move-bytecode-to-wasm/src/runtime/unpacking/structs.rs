@@ -762,30 +762,23 @@ mod tests {
                     ]) as usize;
 
                     let mut u64_data = [0u8; 8];
-                    if memory
+                    memory
                         .read(&mut *store.0.borrow_mut(), u64_ptr, &mut u64_data)
-                        .is_err()
-                    {
-                        return;
-                    }
+                        .unwrap();
+
                     assert_eq!(u64::from_le_bytes(u64_data), a, "u64 field mismatch");
 
                     let mut u128_data = [0u8; 16];
-                    if memory
+                    memory
                         .read(&mut *store.0.borrow_mut(), u128_ptr, &mut u128_data)
-                        .is_err()
-                    {
-                        return;
-                    }
+                        .unwrap();
+
                     assert_eq!(u128::from_le_bytes(u128_data), b, "u128 field mismatch");
 
                     let mut bool_data = [0u8; 1];
-                    if memory
+                    memory
                         .read(&mut *store.0.borrow_mut(), bool_ptr, &mut bool_data)
-                        .is_err()
-                    {
-                        return;
-                    }
+                        .unwrap();
 
                     // Verify vec<u128>
                     let mut vec_u128_header = [0u8; 8];
@@ -808,33 +801,25 @@ mod tests {
                     for (i, &expected_val) in vec_u128.iter().enumerate() {
                         let ptr_offset = vec_u128_ptr + 8 + (i * 4);
                         let mut ptr_bytes = [0u8; 4];
-                        if memory
+                        memory
                             .read(&mut *store.0.borrow_mut(), ptr_offset, &mut ptr_bytes)
-                            .is_err()
-                        {
-                            return;
-                        }
+                            .unwrap();
                         let element_ptr = u32::from_le_bytes(ptr_bytes) as usize;
 
                         let mut element_data = [0u8; 16];
-                        if memory
+                        memory
                             .read(&mut *store.0.borrow_mut(), element_ptr, &mut element_data)
-                            .is_err()
-                        {
-                            return;
-                        }
+                            .unwrap();
+
                         let stored_val = u128::from_le_bytes(element_data);
                         assert_eq!(stored_val, expected_val, "vec<u128>[{i}] mismatch");
                     }
 
                     // Verify vec<u32>
                     let mut vec_u32_header = [0u8; 8];
-                    if memory
+                    memory
                         .read(&mut *store.0.borrow_mut(), vec_u32_ptr, &mut vec_u32_header)
-                        .is_err()
-                    {
-                        return;
-                    }
+                        .unwrap();
                     let vec_u32_len = u32::from_le_bytes([
                         vec_u32_header[0],
                         vec_u32_header[1],
@@ -847,12 +832,9 @@ mod tests {
                     for (i, &expected_val) in vec_u32.iter().enumerate() {
                         let val_offset = vec_u32_ptr + 8 + (i * 4);
                         let mut val_bytes = [0u8; 4];
-                        if memory
+                        memory
                             .read(&mut *store.0.borrow_mut(), val_offset, &mut val_bytes)
-                            .is_err()
-                        {
-                            return;
-                        }
+                            .unwrap();
                         let stored_val = u32::from_le_bytes(val_bytes);
                         assert_eq!(stored_val, expected_val, "vec<u32>[{i}] mismatch");
                     }
@@ -1264,35 +1246,26 @@ mod tests {
                     ]) as usize;
 
                     let mut u64_data = [0u8; 8];
-                    if memory
+                    memory
                         .read(&mut *store.0.borrow_mut(), u64_ptr, &mut u64_data)
-                        .is_err()
-                    {
-                        return;
-                    }
+                        .unwrap();
                     assert_eq!(u64::from_le_bytes(u64_data), a, "u64 field mismatch");
 
                     let mut u128_data = [0u8; 16];
-                    if memory
+                    memory
                         .read(&mut *store.0.borrow_mut(), u128_ptr, &mut u128_data)
-                        .is_err()
-                    {
-                        return;
-                    }
+                        .unwrap();
                     assert_eq!(u128::from_le_bytes(u128_data), b, "u128 field mismatch");
 
                     // Read the substruct pointer array (2 pointers for 2 vectors)
                     let mut substruct_data = vec![0; 8];
-                    if memory
+                    memory
                         .read(
                             &mut *store.0.borrow_mut(),
                             substruct_ptr,
                             &mut substruct_data,
                         )
-                        .is_err()
-                    {
-                        return;
-                    }
+                        .unwrap();
 
                     let vec_u128_ptr = u32::from_le_bytes([
                         substruct_data[0],
@@ -1309,16 +1282,14 @@ mod tests {
 
                     // Verify vec<u128> field
                     let mut vec_u128_header = [0u8; 8];
-                    if memory
+                    memory
                         .read(
                             &mut *store.0.borrow_mut(),
                             vec_u128_ptr,
                             &mut vec_u128_header,
                         )
-                        .is_err()
-                    {
-                        return;
-                    }
+                        .unwrap();
+
                     let vec_u128_len = u32::from_le_bytes([
                         vec_u128_header[0],
                         vec_u128_header[1],
@@ -1335,12 +1306,9 @@ mod tests {
                     if vec_u128_len > 0 {
                         let ptr_array_ptr = vec_u128_ptr + 8;
                         let mut ptr_array = vec![0u8; vec_u128_len * 4];
-                        if memory
+                        memory
                             .read(&mut *store.0.borrow_mut(), ptr_array_ptr, &mut ptr_array)
-                            .is_err()
-                        {
-                            return;
-                        }
+                            .unwrap();
 
                         for (i, &expected_val) in vec_u128.iter().enumerate() {
                             let val_ptr = u32::from_le_bytes([
@@ -1350,12 +1318,9 @@ mod tests {
                                 ptr_array[i * 4 + 3],
                             ]) as usize;
                             let mut val_bytes = [0u8; 16];
-                            if memory
+                            memory
                                 .read(&mut *store.0.borrow_mut(), val_ptr, &mut val_bytes)
-                                .is_err()
-                            {
-                                return;
-                            }
+                                .unwrap();
                             assert_eq!(
                                 u128::from_le_bytes(val_bytes),
                                 expected_val,
@@ -1367,12 +1332,9 @@ mod tests {
 
                     // Verify vec<u32> field
                     let mut vec_u32_header = [0u8; 8];
-                    if memory
+                    memory
                         .read(&mut *store.0.borrow_mut(), vec_u32_ptr, &mut vec_u32_header)
-                        .is_err()
-                    {
-                        return;
-                    }
+                        .unwrap();
                     let vec_u32_len = u32::from_le_bytes([
                         vec_u32_header[0],
                         vec_u32_header[1],
@@ -1391,12 +1353,10 @@ mod tests {
                         for (i, &expected_val) in vec_u32.iter().enumerate() {
                             let val_offset = vec_u32_data_ptr + (i * 4);
                             let mut val_bytes = [0u8; 4];
-                            if memory
+                            memory
                                 .read(&mut *store.0.borrow_mut(), val_offset, &mut val_bytes)
-                                .is_err()
-                            {
-                                return;
-                            }
+                                .unwrap();
+
                             assert_eq!(
                                 u32::from_le_bytes(val_bytes),
                                 expected_val,
