@@ -257,7 +257,11 @@ mod tests {
 
         // Call unpack_string_function
         let unpack_string_func = RuntimeFunction::UnpackString
-            .get(&mut raw_module, Some(&compilation_ctx), Some(&mut runtime_error_data))
+            .get(
+                &mut raw_module,
+                Some(&compilation_ctx),
+                Some(&mut runtime_error_data),
+            )
             .unwrap();
         func_body
             .local_get(reader_pointer)
@@ -323,7 +327,11 @@ mod tests {
 
         // Call unpack_string_function
         let unpack_string_func = RuntimeFunction::UnpackString
-            .get(&mut raw_module, Some(&compilation_ctx), Some(&mut runtime_error_data))
+            .get(
+                &mut raw_module,
+                Some(&compilation_ctx),
+                Some(&mut runtime_error_data),
+            )
             .unwrap();
         func_body
             .local_get(reader_pointer)

@@ -256,7 +256,8 @@ mod tests {
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 
-        let mut function_builder = FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
 
         let args_pointer = raw_module.locals.add(ValType::I32);
 
@@ -303,7 +304,11 @@ mod tests {
 
                 // Write the encoded data to memory at INITIAL_MEMORY_OFFSET
                 memory
-                    .write(&mut *store.0.borrow_mut(), INITIAL_MEMORY_OFFSET as usize, &data)
+                    .write(
+                        &mut *store.0.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &data,
+                    )
                     .unwrap();
 
                 let result: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
@@ -326,7 +331,8 @@ mod tests {
         let compilation_ctx =
             test_compilation_context!(memory_id, allocator_func, calldata_reader_pointer_global);
 
-        let mut function_builder = FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I64]);
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I64]);
 
         let args_pointer = raw_module.locals.add(ValType::I32);
 
@@ -373,7 +379,11 @@ mod tests {
 
                 // Write the encoded data to memory at INITIAL_MEMORY_OFFSET
                 memory
-                    .write(&mut *store.0.borrow_mut(), INITIAL_MEMORY_OFFSET as usize, &data)
+                    .write(
+                        &mut *store.0.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &data,
+                    )
                     .unwrap();
 
                 let result: i64 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();

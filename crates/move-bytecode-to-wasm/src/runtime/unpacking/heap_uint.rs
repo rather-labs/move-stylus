@@ -122,12 +122,12 @@ pub fn unpack_address_function(
 #[cfg(test)]
 mod tests {
     use alloy_primitives::{Address, U256, address};
+    use alloy_sol_types::SolValue;
     use alloy_sol_types::{SolType, sol};
     use std::cell::RefCell;
     use std::panic::AssertUnwindSafe;
     use std::rc::Rc;
     use walrus::{FunctionBuilder, ValType};
-    use alloy_sol_types::SolValue;
 
     use crate::{
         abi_types::unpacking::Unpackable,
@@ -317,7 +317,11 @@ mod tests {
 
                 // Write the encoded data to memory at INITIAL_MEMORY_OFFSET
                 memory
-                    .write(&mut *store.0.borrow_mut(), INITIAL_MEMORY_OFFSET as usize, &data)
+                    .write(
+                        &mut *store.0.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &data,
+                    )
                     .unwrap();
 
                 let result_ptr: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
@@ -399,7 +403,11 @@ mod tests {
 
                 // Write the encoded data to memory at INITIAL_MEMORY_OFFSET
                 memory
-                    .write(&mut *store.0.borrow_mut(), INITIAL_MEMORY_OFFSET as usize, &data)
+                    .write(
+                        &mut *store.0.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &data,
+                    )
                     .unwrap();
 
                 let result_ptr: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
@@ -479,7 +487,11 @@ mod tests {
 
                 // Write the encoded data to memory at INITIAL_MEMORY_OFFSET
                 memory
-                    .write(&mut *store.0.borrow_mut(), INITIAL_MEMORY_OFFSET as usize, &data)
+                    .write(
+                        &mut *store.0.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &data,
+                    )
                     .unwrap();
 
                 let result_ptr: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
