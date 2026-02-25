@@ -206,3 +206,201 @@ pub fn unpack_string_function(
         &mut module.funcs,
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use alloy_sol_types::SolValue;
+    use rstest::rstest;
+    use std::cell::RefCell;
+    use std::panic::AssertUnwindSafe;
+    use std::rc::Rc;
+    use walrus::{FunctionBuilder, ValType};
+
+    use crate::{
+        data::RuntimeErrorData,
+        runtime::RuntimeFunction,
+        test_compilation_context,
+        test_tools::{INITIAL_MEMORY_OFFSET, build_module, setup_wasmtime_module},
+    };
+
+    #[rstest]
+    #[case::empty("", "".abi_encode())]
+    #[case::short("hello", "hello".abi_encode())]
+    #[case::medium("Hello, World!", "Hello, World!".abi_encode())]
+    #[case::long("This is a longer string that will test padding and multiple 32-byte chunks", "This is a longer string that will test padding and multiple 32-byte chunks".abi_encode())]
+    #[case::exactly_32_bytes("12345678901234567890123456789012", "12345678901234567890123456789012".abi_encode())]
+    #[case::exactly_31_bytes("1234567890123456789012345678901", "1234567890123456789012345678901".abi_encode())]
+    #[case::exactly_33_bytes("123456789012345678901234567890123", "123456789012345678901234567890123".abi_encode())]
+    #[case::special_characters("Hello\nWorld\tTest\x00", "Hello\nWorld\tTest\x00".abi_encode())]
+    #[case::unicode("Hello 世界 🌍", "Hello 世界 🌍".abi_encode())]
+    #[case::multiple_chunks("This string is long enough to require multiple 32-byte chunks when encoded according to Solidity ABI encoding rules", "This string is long enough to require multiple 32-byte chunks when encoded according to Solidity ABI encoding rules".abi_encode())]
+    fn test_string_unpacking(#[case] expected_string: &str, #[case] abi_encoded: Vec<u8>) {
+        let (mut raw_module, alloc_function, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
+
+        let compilation_ctx =
+            test_compilation_context!(memory_id, alloc_function, calldata_reader_pointer_global);
+        let mut runtime_error_data = RuntimeErrorData::new();
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
+
+        let reader_pointer = raw_module.locals.add(ValType::I32);
+        let calldata_reference_pointer = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        // Set reader pointer to start of memory
+        func_body.i32_const(INITIAL_MEMORY_OFFSET);
+        func_body.local_tee(reader_pointer);
+        func_body.local_set(calldata_reference_pointer);
+
+        // Call unpack_string_function
+        let unpack_string_func = RuntimeFunction::UnpackString
+            .get(&mut raw_module, Some(&compilation_ctx), Some(&mut runtime_error_data))
+            .unwrap();
+        func_body
+            .local_get(reader_pointer)
+            .local_get(calldata_reference_pointer)
+            .call(unpack_string_func);
+
+        let function = function_builder.finish(vec![], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, abi_encoded, "test_function", None);
+
+        // Call the function - returns pointer to String struct
+        let string_ptr: i32 = entrypoint.call(&mut store, ()).unwrap();
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        // Read the vector pointer from the String struct
+        let mut vector_ptr_bytes = [0u8; 4];
+        memory
+            .read(&mut store, string_ptr as usize, &mut vector_ptr_bytes)
+            .unwrap();
+        let vector_ptr = i32::from_le_bytes(vector_ptr_bytes);
+
+        // Read the length from the vector (first 4 bytes)
+        let mut len_bytes = [0u8; 4];
+        memory
+            .read(&mut store, vector_ptr as usize, &mut len_bytes)
+            .unwrap();
+        let len = i32::from_le_bytes(len_bytes);
+
+        // Read the string data (skip 8 bytes for length + capacity)
+        let mut string_bytes = vec![0u8; len as usize];
+        memory
+            .read(&mut store, (vector_ptr + 8) as usize, &mut string_bytes)
+            .unwrap();
+
+        let result_string = String::from_utf8(string_bytes).unwrap();
+        assert_eq!(result_string, expected_string);
+    }
+
+    #[test]
+    fn test_string_unpacking_fuzz() {
+        let (mut raw_module, alloc_function, memory_id, calldata_reader_pointer_global) =
+            build_module(None);
+
+        let compilation_ctx =
+            test_compilation_context!(memory_id, alloc_function, calldata_reader_pointer_global);
+        let mut runtime_error_data = RuntimeErrorData::new();
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
+
+        let reader_pointer = raw_module.locals.add(ValType::I32);
+        let calldata_reference_pointer = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        // Set reader pointer to start of memory
+        func_body.i32_const(INITIAL_MEMORY_OFFSET);
+        func_body.local_tee(reader_pointer);
+        func_body.local_set(calldata_reference_pointer);
+
+        // Call unpack_string_function
+        let unpack_string_func = RuntimeFunction::UnpackString
+            .get(&mut raw_module, Some(&compilation_ctx), Some(&mut runtime_error_data))
+            .unwrap();
+        func_body
+            .local_get(reader_pointer)
+            .local_get(calldata_reference_pointer)
+            .call(unpack_string_func);
+
+        let function = function_builder.finish(vec![], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
+        let reset_memory = Rc::new(AssertUnwindSafe(
+            instance
+                .get_typed_func::<(), ()>(&mut store, "reset_memory")
+                .unwrap(),
+        ));
+        let store = Rc::new(AssertUnwindSafe(RefCell::new(store)));
+        let entrypoint = Rc::new(AssertUnwindSafe(entrypoint));
+
+        bolero::check!()
+            .with_type::<String>()
+            .for_each(|input_string: &String| {
+                let abi_encoded = input_string.abi_encode();
+
+                // Write the encoded data to memory at INITIAL_MEMORY_OFFSET
+                memory
+                    .write(
+                        &mut *store.0.borrow_mut(),
+                        INITIAL_MEMORY_OFFSET as usize,
+                        &abi_encoded,
+                    )
+                    .unwrap();
+
+                let string_ptr: i32 = entrypoint.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+
+                // Read the vector pointer from the String struct
+                let mut vector_ptr_bytes = [0u8; 4];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        string_ptr as usize,
+                        &mut vector_ptr_bytes,
+                    )
+                    .unwrap();
+                let vector_ptr = i32::from_le_bytes(vector_ptr_bytes);
+
+                // Read the length from the vector (first 4 bytes)
+                let mut len_bytes = [0u8; 4];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        vector_ptr as usize,
+                        &mut len_bytes,
+                    )
+                    .unwrap();
+                let len = i32::from_le_bytes(len_bytes);
+
+                // Read the string data (skip 8 bytes for length + capacity)
+                let mut string_bytes = vec![0u8; len as usize];
+                memory
+                    .read(
+                        &mut *store.0.borrow_mut(),
+                        (vector_ptr + 8) as usize,
+                        &mut string_bytes,
+                    )
+                    .unwrap();
+
+                let result_string = String::from_utf8(string_bytes).unwrap();
+                assert_eq!(
+                    result_string, *input_string,
+                    "Unpacked string did not match expected result for value {input_string}",
+                );
+
+                reset_memory.0.call(&mut *store.0.borrow_mut(), ()).unwrap();
+            });
+    }
+}
