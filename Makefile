@@ -1,6 +1,7 @@
 PRIVATE_KEY ?= 0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659
 CONTRACT_NAME ?= hello_world
 CONTRACT_ENV_VAR ?= CONTRACT_ADDRESS
+PACKAGE_VERSION=$(shell cat ./crates/move-cli/Cargo.toml | grep version | head -n 1 | awk '{print $$3}' | sed -e 's/"//g')
 
 test-move-bytecode-to-wasm:
 	cargo test -p move-bytecode-to-wasm
@@ -148,4 +149,31 @@ install-wasm-tools:
 install:
 	cargo install --locked --path crates/move-cli --force
 
-.PHONY: test setup-stylus install deploy-* example-* disassemble* unit-test check-example build-example
+release-x86_64:
+	rustup target add x86_64-unknown-linux-gnu
+	CC=x86_64-linux-gnu-gcc \
+		CXX=x86_64-linux-gnu-g++ \
+		RUSTFLAGS='-C linker=x86_64-linux-gnu-gcc' \
+		cargo build --release -p move-stylus --target x86_64-unknown-linux-gnu
+	mkdir -p dist
+	tar -czvf ./dist/move-stylus-x86_64-linux-$(PACKAGE_VERSION).tar.gz -C target/x86_64-unknown-linux-gnu/release move-stylus
+
+release-aarch64_linux:
+	rustup target add aarch64-unknown-linux-gnu
+	CC=aarch64-linux-gnu-gcc \
+		CXX=aarch64-linux-gnu-g++ \
+		RUSTFLAGS='-C linker=aarch64-linux-gnu-gcc' \
+		cargo build --release -p move-stylus --target aarch64-unknown-linux-gnu
+	mkdir -p dist
+	tar -czvf ./dist/move-stylus-aarch64-linux-$(PACKAGE_VERSION).tar.gz -C target/aarch64-unknown-linux-gnu/release move-stylus
+
+release-macos:
+	cargo build --release -p move-stylus --target aarch64-apple-darwin
+	mkdir -p dist
+	tar -czvf ./dist/move-stylus-aarch64-macos-$(PACKAGE_VERSION).tar.gz -C target/aarch64-apple-darwin/release move-stylus
+
+release-linux:
+	$(MAKE) release-x86_64
+	$(MAKE) release-aarch64_linux
+
+.PHONY: test setup-stylus install deploy-* example-* disassemble* unit-test check-example build-example release-aarch64_macos release-aarch64_linux release-x86_64 release-all

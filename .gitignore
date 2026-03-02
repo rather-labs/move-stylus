@@ -1,4 +1,5 @@
 target
+dist/
 example/build
 stylus-framework/build
 nitro-devnode
