@@ -13,11 +13,11 @@ use walrus::{
 /// converts each chunk to big-endian, and writes them to the output in the correct order,
 /// left-padded to 32 bytes as required by the Solidity ABI specification.
 ///
-/// # WASM Function Arguments:
+/// # WASM Function Arguments
 /// * `value_pointer` (i32) - pointer to the heap memory location containing the u128 value
 /// * `writer_pointer` (i32) - pointer to the memory location where the packed value will be written
 ///
-/// # WASM Function Returns:
+/// # WASM Function Returns
 /// * None - the result is written directly to memory at the writer_pointer location
 pub fn pack_u128_function(
     module: &mut Module,
@@ -73,11 +73,11 @@ pub fn pack_u128_function(
 /// converts each chunk to big-endian, and writes them to the output in the correct order
 /// as required by the Solidity ABI specification (32 bytes total).
 ///
-/// # WASM Function Arguments:
+/// # WASM Function Arguments
 /// * `value_pointer` (i32) - pointer to the heap memory location containing the u256 value
 /// * `writer_pointer` (i32) - pointer to the memory location where the packed value will be written
 ///
-/// # WASM Function Returns:
+/// # WASM Function Returns
 /// * None - the result is written directly to memory at the writer_pointer location
 pub fn pack_u256_function(
     module: &mut Module,
@@ -132,11 +132,11 @@ pub fn pack_u256_function(
 /// required for addresses. The address is right-aligned in the 32-byte slot with 12 zero bytes
 /// of padding on the left, as required by the Solidity ABI specification.
 ///
-/// # WASM Function Arguments:
+/// # WASM Function Arguments
 /// * `value_pointer` (i32) - pointer to the heap memory location containing the address value (32 bytes with padding)
 /// * `writer_pointer` (i32) - pointer to the memory location where the packed value will be written
 ///
-/// # WASM Function Returns:
+/// # WASM Function Returns
 /// * None - the result is written directly to memory at the writer_pointer location
 pub fn pack_address_function(
     module: &mut Module,

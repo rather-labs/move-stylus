@@ -9,6 +9,18 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg},
 };
 
+/// Generates a runtime function that unpacks a Solidity ABI `uint32` value.
+///
+/// The function reads a 32-byte ABI slot from calldata, extracts the low 4 bytes,
+/// converts from big-endian to little-endian, returns the decoded `u32` value,
+/// and advances the calldata reader pointer by the provided encoded size.
+///
+/// # WASM Function Arguments
+/// * `reader_pointer` - (i32): pointer to the current ABI slot in calldata
+/// * `encoded_size` - (i32): number of bytes to advance the calldata reader pointer
+///
+/// # WASM Function Returns
+/// * `value` - (i32): decoded `u32` value
 pub fn unpack_u32_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -51,6 +63,17 @@ pub fn unpack_u32_function(
     Ok(function.finish(vec![reader_pointer, encoded_size], &mut module.funcs))
 }
 
+/// Generates a runtime function that unpacks a Solidity ABI `uint64` value.
+///
+/// The function reads the low 8 bytes of a 32-byte ABI slot, converts from big-endian
+/// to little-endian, returns the decoded `u64` value, and advances the calldata reader
+/// pointer by one ABI word.
+///
+/// # WASM Function Arguments
+/// * `reader_pointer` - (i32): pointer to the current ABI slot in calldata
+///
+/// # WASM Function Returns
+/// * `value` - (i64): decoded `u64` value
 pub fn unpack_u64_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,

@@ -19,12 +19,12 @@ use walrus::{
 /// 2. The string length at the allocated location (32 bytes)
 /// 3. The UTF-8 string data, padded to the next 32-byte boundary
 ///
-/// # WASM Function Arguments:
+/// # WASM Function Arguments
 /// * `string_pointer` (i32) - pointer to the Move string structure (contains pointer to inner vector)
 /// * `writer_pointer` (i32) - pointer where the offset to the packed string should be written
 /// * `calldata_reference_pointer` (i32) - reference point for calculating relative offsets
 ///
-/// # WASM Function Returns:
+/// # WASM Function Returns
 /// * None - the result is written directly to memory, with an offset at writer_pointer and the string data at the end of calldata
 pub fn pack_string_function(
     module: &mut Module,

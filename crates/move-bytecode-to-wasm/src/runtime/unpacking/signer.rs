@@ -4,6 +4,17 @@ use crate::{
 };
 use walrus::{FunctionBuilder, FunctionId, Module, ValType, ir::BinaryOp};
 
+/// Generates a runtime function that injects the transaction signer into the stack.
+///
+/// The function allocates a signer object, calls the host `tx_origin` function to write
+/// the caller address (with the expected 12-byte left padding), and
+/// returns the signer pointer.
+///
+/// # WASM Function Arguments
+/// * None
+///
+/// # WASM Function Returns
+/// * `signer_pointer` - (i32): pointer to the injected signer value
 pub fn inject_signer(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
     let mut function = FunctionBuilder::new(&mut module.types, &[], &[ValType::I32]);
     let mut builder = function
