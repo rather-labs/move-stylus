@@ -157,6 +157,7 @@ release-x86_64:
 		cargo build --release -p move-stylus --target x86_64-unknown-linux-gnu
 	mkdir -p dist
 	tar -czvf ./dist/move-stylus-x86_64-linux-$(PACKAGE_VERSION).tar.gz -C target/x86_64-unknown-linux-gnu/release move-stylus
+	sha256sum ./dist/move-stylus-x86_64-linux-$(PACKAGE_VERSION).tar.gz > ./dist/move-stylus-x86_64-linux-$(PACKAGE_VERSION).tar.gz.sha256
 
 release-aarch64_linux:
 	rustup target add aarch64-unknown-linux-gnu
@@ -166,11 +167,13 @@ release-aarch64_linux:
 		cargo build --release -p move-stylus --target aarch64-unknown-linux-gnu
 	mkdir -p dist
 	tar -czvf ./dist/move-stylus-aarch64-linux-$(PACKAGE_VERSION).tar.gz -C target/aarch64-unknown-linux-gnu/release move-stylus
+	sha256sum ./dist/move-stylus-aarch64-linux-$(PACKAGE_VERSION).tar.gz > ./dist/move-stylus-aarch64-linux-$(PACKAGE_VERSION).tar.gz.sha256
 
 release-macos:
 	cargo build --release -p move-stylus --target aarch64-apple-darwin
 	mkdir -p dist
 	tar -czvf ./dist/move-stylus-aarch64-macos-$(PACKAGE_VERSION).tar.gz -C target/aarch64-apple-darwin/release move-stylus
+	sha256sum ./dist/move-stylus-aarch64-macos-$(PACKAGE_VERSION).tar.gz > ./dist/move-stylus-aarch64-macos-$(PACKAGE_VERSION).tar.gz.sha256
 
 release-linux:
 	$(MAKE) release-x86_64
