@@ -90,13 +90,6 @@ pub fn add_native_sender_fn(
     function.finish(vec![], &mut module.funcs)
 }
 
-/// Generates the native wrapper for `tx_context::msg_value()`.
-///
-/// # WASM Function Arguments
-/// * None
-///
-/// # WASM Function Returns
-/// * `value_ptr` - (i32): pointer to 32-byte call value (`u256`)
 define_host_fn_native_fn_wrapper!(
     add_native_msg_value_fn,
     msg_value,
@@ -104,13 +97,6 @@ define_host_fn_native_fn_wrapper!(
     IU256::HEAP_SIZE
 );
 
-/// Generates the native wrapper for `tx_context::block_basefee()`.
-///
-/// # WASM Function Arguments
-/// * None
-///
-/// # WASM Function Returns
-/// * `basefee_ptr` - (i32): pointer to 32-byte base fee (`u256`)
 define_host_fn_native_fn_wrapper!(
     add_native_block_basefee_fn,
     block_basefee,
@@ -118,13 +104,6 @@ define_host_fn_native_fn_wrapper!(
     IU256::HEAP_SIZE
 );
 
-/// Generates the native wrapper for `tx_context::gas_price()`.
-///
-/// # WASM Function Arguments
-/// * None
-///
-/// # WASM Function Returns
-/// * `gas_price_ptr` - (i32): pointer to 32-byte gas price (`u256`)
 define_host_fn_native_fn_wrapper!(
     add_native_tx_gas_price_fn,
     tx_gas_price,
