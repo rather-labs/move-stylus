@@ -18,6 +18,17 @@ use walrus::{
     ir::{MemArg, StoreKind},
 };
 
+/// Generates the native implementation of `std::type_name::get<T>()`.
+///
+/// The concrete type `T` is known at compile time. This function computes its fully
+/// qualified type name string, allocates `TypeName`/`String`/`vector<u8>` structures,
+/// writes the bytes into memory, and returns the resulting `TypeName` pointer.
+///
+/// # WASM Function Arguments
+/// * None
+///
+/// # WASM Function Returns
+/// * `type_name_ptr` - (i32): pointer to the allocated `TypeName` value
 pub fn add_type_name_get_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,

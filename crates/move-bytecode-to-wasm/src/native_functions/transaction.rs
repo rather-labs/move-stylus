@@ -50,6 +50,16 @@ macro_rules! define_host_fn_native_fn_wrapper {
     };
 }
 
+/// Generates the native wrapper for `tx_context::sender()`.
+///
+/// It allocates memory for a 32-byte address, calls the host `msg_sender`, and returns
+/// a pointer to the allocated address value.
+///
+/// # WASM Function Arguments
+/// * None
+///
+/// # WASM Function Returns
+/// * `address_ptr` - (i32): pointer to sender address bytes
 pub fn add_native_sender_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -80,6 +90,13 @@ pub fn add_native_sender_fn(
     function.finish(vec![], &mut module.funcs)
 }
 
+/// Generates the native wrapper for `tx_context::msg_value()`.
+///
+/// # WASM Function Arguments
+/// * None
+///
+/// # WASM Function Returns
+/// * `value_ptr` - (i32): pointer to 32-byte call value (`u256`)
 define_host_fn_native_fn_wrapper!(
     add_native_msg_value_fn,
     msg_value,
@@ -87,6 +104,13 @@ define_host_fn_native_fn_wrapper!(
     IU256::HEAP_SIZE
 );
 
+/// Generates the native wrapper for `tx_context::block_basefee()`.
+///
+/// # WASM Function Arguments
+/// * None
+///
+/// # WASM Function Returns
+/// * `basefee_ptr` - (i32): pointer to 32-byte base fee (`u256`)
 define_host_fn_native_fn_wrapper!(
     add_native_block_basefee_fn,
     block_basefee,
@@ -94,6 +118,13 @@ define_host_fn_native_fn_wrapper!(
     IU256::HEAP_SIZE
 );
 
+/// Generates the native wrapper for `tx_context::gas_price()`.
+///
+/// # WASM Function Arguments
+/// * None
+///
+/// # WASM Function Returns
+/// * `gas_price_ptr` - (i32): pointer to 32-byte gas price (`u256`)
 define_host_fn_native_fn_wrapper!(
     add_native_tx_gas_price_fn,
     tx_gas_price,
@@ -101,6 +132,16 @@ define_host_fn_native_fn_wrapper!(
     IU256::HEAP_SIZE
 );
 
+/// Generates the native wrapper for `tx_context::data()`.
+///
+/// It reads calldata pointer/length from runtime metadata and converts the raw bytes into
+/// an internal `vector<u8>` representation through `RuntimeFunction::BytesToVec`.
+///
+/// # WASM Function Arguments
+/// * None
+///
+/// # WASM Function Returns
+/// * `vec_ptr` - (i32): pointer to `vector<u8>` containing calldata bytes
 pub fn add_native_data_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,

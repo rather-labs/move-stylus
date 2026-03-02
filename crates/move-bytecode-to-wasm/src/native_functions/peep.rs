@@ -16,14 +16,17 @@ use walrus::{
     ir::{LoadKind, MemArg, StoreKind},
 };
 
-/// This function allows to peek into the storage of another address.
+/// Generates the native `peep` function to read another owner's object.
 ///
-// # WASM Function Aguments:
-// * `owner_address_ptr` - pointer to the owner address
-// * `uid_ptr` - pointer to the object id
-//
-// # WASM Function Returns:
-// * reference to the object in memory
+/// It computes the owner/UID storage slot, verifies that an object exists there,
+/// decodes it from storage format, wraps it as a reference, and returns that reference.
+///
+/// # WASM Function Arguments
+/// * `owner_address_ptr` - (i32): pointer to owner address bytes
+/// * `uid_ptr` - (i32): pointer to UID reference/value
+///
+/// # WASM Function Returns
+/// * `ref_ptr` - (i32): pointer to a reference to the decoded object
 pub fn add_peep_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,

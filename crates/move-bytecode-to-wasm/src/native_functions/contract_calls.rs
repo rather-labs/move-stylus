@@ -41,6 +41,13 @@ use super::error::NativeFunctionError;
 /// the `value` argument as the first argument. Additionally, if the function is declared with the
 /// `gas` argument, it will be passed to the `call_contract` functions, otherwise, the maximum gas
 /// (u64::MAX) will be used.
+///
+/// # WASM Function Arguments
+/// * `self` and call args - layout depends on generated external-call signature
+/// * `named_ids` - additional named-id arguments appended to the signature
+///
+/// # WASM Function Returns
+/// * `result_ptr` - (i32): pointer to decoded call result value
 #[allow(clippy::too_many_arguments)]
 pub fn add_external_contract_call_fn(
     module: &mut Module,
