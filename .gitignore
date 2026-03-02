@@ -9,5 +9,7 @@ __fuzz__
 .env
 .env.bak
 
+*.bak
+
 .DS_Store
 move-packages/**/build
