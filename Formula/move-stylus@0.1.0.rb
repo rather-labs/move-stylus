@@ -7,17 +7,17 @@ class MoveStylusAT010 < Formula
   on_macos do
     if Hardware::CPU.arm?
       url "https://github.com/rather-labs/move-stylus/releases/download/v#{version}/move-stylus-aarch64-macos-#{version}.tar.gz"
-      sha256 "3a9017795e13fdb07e17b7f461f4e84cf852966468a4d5856c83b4c84a896947"
+      sha256 "0e9a7ce52f37fb9c4281af6eb6bbefdc6e2104b0294f8cc756477470cfbf9c2b"
     end
   end
 
   on_linux do
     if Hardware::CPU.arm?
       url "https://github.com/rather-labs/move-stylus/releases/download/v#{version}/move-stylus-aarch64-linux-#{version}.tar.gz"
-      sha256 "1b87e6b194672983841356ccbf2f6c10117f115574366cc10956f9ff506f303e"
+      sha256 "05d00bd4de1b639fecfaae8616eb3d0cee0d916cd7030bfd6b0d5f96d5dbe246"
     elsif Hardware::CPU.intel?
       url "https://github.com/rather-labs/move-stylus/releases/download/v#{version}/move-stylus-x86_64-linux-#{version}.tar.gz"
-      sha256 "e651ca1dbfd9665287a9e53c86f8787e180a6fbd61b757bb397d68db24415774"
+      sha256 "4980c8bae72e59ca27fb9768e79666dff4f577f43052e0ffa4a9c0fdae5dad83"
     end
   end
 

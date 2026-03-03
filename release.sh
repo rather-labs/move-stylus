@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PACKAGE_VERSION=$(cat ./crates/move-cli/Cargo.toml | grep version | head -n 1 | awk '{print $$3}' | sed -e 's/"//g' | cut -d ' '  -f3)
+PACKAGE_VERSION=$(cat ./crates/move-cli/Cargo.toml | grep version | head -n 1 | sed -e 's/"//g' | cut -d ' '  -f3)
 RED="\033[0;31m"
 NC="\033[0m"
 
