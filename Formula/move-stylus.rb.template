@@ -1,0 +1,31 @@
+class {{CLASS_NAME}} < Formula
+  desc "Move compiler for Arbitrum's Stylus"
+  homepage "https://move-stylus.ratherlabs.com/"
+  version "{{VERSION}}"
+  license "BUSL-1.1"
+
+  on_macos do
+    if Hardware::CPU.arm?
+      url "https://github.com/rather-labs/move-stylus/releases/download/v#{version}/move-stylus-aarch64-macos-#{version}.tar.gz"
+      sha256 "{{MACOS_SHA256}}"
+    end
+  end
+
+  on_linux do
+    if Hardware::CPU.arm?
+      url "https://github.com/rather-labs/move-stylus/releases/download/v#{version}/move-stylus-aarch64-linux-#{version}.tar.gz"
+      sha256 "{{LINUX_ARM64_SHA256}}"
+    elsif Hardware::CPU.intel?
+      url "https://github.com/rather-labs/move-stylus/releases/download/v#{version}/move-stylus-x86_64-linux-#{version}.tar.gz"
+      sha256 "{{LINUX_X86_64_SHA256}}"
+    end
+  end
+
+  def install
+    bin.install "move-stylus"
+  end
+
+  test do
+    system "#{bin}/move-stylus", "--version"
+  end
+end

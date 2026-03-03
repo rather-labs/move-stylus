@@ -1,4 +1,5 @@
 target
+dist/
 example/build
 stylus-framework/build
 nitro-devnode
@@ -7,6 +8,8 @@ __fuzz__
 
 .env
 .env.bak
+
+*.bak
 
 .DS_Store
 move-packages/**/build
