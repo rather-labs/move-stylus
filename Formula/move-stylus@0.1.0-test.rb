@@ -1,4 +1,4 @@
-class MoveStylus < Formula
+class MoveStylusAT010-test < Formula
   desc "Move compiler for Arbitrum's Stylus"
   homepage "https://move-stylus.ratherlabs.com/"
   version "0.1.0-test"
