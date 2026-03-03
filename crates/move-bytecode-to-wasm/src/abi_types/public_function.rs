@@ -8,6 +8,7 @@ use walrus::{
 
 use crate::{
     CompilationContext,
+    compilation_context::reserved_modules::{SF_MODULE_NAME_TX_CONTEXT, STYLUS_FRAMEWORK_ADDRESS},
     data::RuntimeErrorData,
     translation::{
         functions::add_unpack_function_return_values_instructions,
@@ -35,6 +36,11 @@ pub enum PublicFunctionValidationError {
         r#"error in argument {0} of function "{1}", complex types can't contain the type "signer""#
     )]
     ComplexTypeContainsSigner(usize, String),
+
+    #[error(
+        r#"error in argument {0} of function "{1}", "TxContext" argument must be the last one"#
+    )]
+    TxContextArgumentPosition(usize, String),
 }
 
 /// This struct wraps a Move function interface and its internal WASM representation
@@ -211,6 +217,8 @@ impl<'a> PublicFunction<'a> {
     ///   first argument](https://move-language.github.io/move/signer.html#comparison-to-address).
     /// - It has any complex type (i.e: vector) that contains a signer type: The signer is
     ///   injected by the VM only if the first argument of the function is a `signer`.
+    /// - It has a `TxContext` argument but it is not the last argument: The `TxContext` is
+    ///   injected by the VM only if it is the last argument of the function.
     fn check_signature_arguments(
         function_name: &str,
         arguments: &[IntermediateType],
@@ -231,7 +239,12 @@ impl<'a> PublicFunction<'a> {
                         function_name.to_owned(),
                     ));
                 }
-                // TODO: add TxContext as last parameter
+                _ if Self::is_tx_context_argument(argument) && i != arguments.len() - 1 => {
+                    return Err(PublicFunctionValidationError::TxContextArgumentPosition(
+                        i + 1,
+                        function_name.to_owned(),
+                    ));
+                }
                 _ => continue,
             }
         }
@@ -250,6 +263,19 @@ impl<'a> PublicFunction<'a> {
             _ => false,
         }
     }
+
+    fn is_tx_context_argument(argument: &IntermediateType) -> bool {
+        match argument {
+            IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
+                Self::is_tx_context_argument(inner)
+            }
+            IntermediateType::IStruct { module_id, .. } => {
+                module_id.address == STYLUS_FRAMEWORK_ADDRESS
+                    && module_id.module_name.as_str() == SF_MODULE_NAME_TX_CONTEXT
+            }
+            _ => false,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -264,10 +290,17 @@ mod tests {
     use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store, TypedFunc};
 
     use crate::{
+        ModuleId,
         compilation_context::globals::CompilationContextGlobals,
+        compilation_context::reserved_modules::{
+            SF_MODULE_NAME_TX_CONTEXT, STYLUS_FRAMEWORK_ADDRESS,
+        },
         test_compilation_context,
         test_tools::build_module,
-        translation::{functions::prepare_function_return, intermediate_types::IntermediateType},
+        translation::{
+            functions::prepare_function_return,
+            intermediate_types::{IntermediateType, VmHandledStruct},
+        },
         utils::display_module,
     };
 
@@ -921,6 +954,51 @@ mod tests {
         };
         assert_eq!(
             PublicFunctionValidationError::ComplexTypeContainsSigner(3, "test_function".to_owned()),
+            err
+        );
+    }
+
+    #[test]
+    fn test_fail_public_function_tx_context_not_last() {
+        let (mut raw_module, allocator, memory_id, ctx_globals) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator, ctx_globals);
+
+        let function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[ValType::I32, ValType::I64], &[]);
+
+        let param1 = raw_module.locals.add(ValType::I32);
+        let param2 = raw_module.locals.add(ValType::I64);
+        let param3 = raw_module.locals.add(ValType::I32);
+
+        let function = function_builder.finish(vec![param1, param2, param3], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let tx_context = IntermediateType::IStruct {
+            module_id: ModuleId::new(STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TX_CONTEXT),
+            index: 0,
+            vm_handled_struct: VmHandledStruct::None,
+        };
+        let signature = ISignature {
+            arguments: vec![tx_context, IntermediateType::IU64, IntermediateType::IBool],
+            returns: vec![],
+        };
+
+        let err = PublicFunction::new(
+            function,
+            "test_function",
+            &signature,
+            &compilation_ctx,
+            None,
+        )
+        .err()
+        .unwrap();
+
+        let err = match err {
+            AbiError::PublicFunction(e) => e,
+            _ => panic!("expected PublicFunctionValidationError"),
+        };
+        assert_eq!(
+            PublicFunctionValidationError::TxContextArgumentPosition(1, "test_function".to_owned()),
             err
         );
     }

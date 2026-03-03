@@ -156,8 +156,8 @@ entry fun balance_of(account: address, balance: &Balance): u256 {
 entry fun transfer(
     recipient: address,
     amount: u256,
-    tx_context: &TxContext,
     balance: &mut Balance,
+    tx_context: &TxContext,
 ): bool {
     let sender_balance = field::borrow_mut<BALANCE_, address, u256>(
         &mut balance.id,
