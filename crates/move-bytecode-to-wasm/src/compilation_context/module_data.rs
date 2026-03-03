@@ -318,7 +318,7 @@ impl ModuleData<'_> {
                     datatype_handles_map.insert(
                         idx,
                         UserDefinedType::Struct {
-                            module_id: *module_id, // TODO: clone
+                            module_id: *module_id,
                             index: position as u16,
                         },
                     );

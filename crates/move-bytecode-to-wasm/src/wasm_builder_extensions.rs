@@ -371,8 +371,8 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
                 }
             }
 
-            // TODO: could we eventually need a u64 here? For example when propagating the error from within a runtime function
-            // which returns a ValType::I64?
+            // We might need a u64 here in the future, for example when propagating the error from within a runtime function
+            // which returns a ValType::I64
             if let Some(return_block_id) = return_block_id {
                 b.br(return_block_id);
             } else {

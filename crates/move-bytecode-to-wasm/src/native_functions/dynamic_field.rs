@@ -135,7 +135,7 @@ pub fn add_borrow_object_fn(
         compilation_ctx,
         Some(runtime_error_data),
         &ModuleId::new(STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_DYNAMIC_FIELD),
-        &[itype.clone()],
+        std::slice::from_ref(itype),
     )?;
     let write_object_slot_fn =
         RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx), None)?;
