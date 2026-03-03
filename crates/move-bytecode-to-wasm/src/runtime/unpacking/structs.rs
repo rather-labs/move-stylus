@@ -78,6 +78,19 @@ use walrus::{
 //
 // For more information:
 // https://docs.soliditylang.org/en/develop/abi-spec.html#formal-specification-of-the-encoding
+///
+/// Generates a runtime function that unpacks a Move struct from ABI-encoded calldata.
+///
+/// The function supports both static and dynamic ABI struct layouts, unpacks each field
+/// recursively, stores field pointers in a newly allocated Move struct representation, and
+/// advances the calldata reader pointer according to the struct ABI shape.
+///
+/// # WASM Function Arguments
+/// * `reader_pointer` - (i32): pointer to the struct argument head in calldata
+/// * `calldata_reader_pointer` - (i32): base pointer used to resolve dynamic field offsets
+///
+/// # WASM Function Returns
+/// * `struct_ptr` - (i32): pointer to the allocated unpacked Move struct
 pub fn unpack_struct_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -259,6 +272,13 @@ pub fn unpack_struct_function(
 ///   - It calls `LocateStorageData(uid_ptr, unpack_frozen)` which searches multiple mappings
 ///
 /// The function name includes the object kind as a suffix to distinguish different variants.
+///
+/// # WASM Function Arguments
+/// * `uid_ptr` - (i32): pointer to the object UID used to locate storage data
+/// * `unpack_frozen` - (i32): flag used only when `object_kind` is `None`
+///
+/// # WASM Function Returns
+/// * `struct_ptr` - (i32): pointer to the decoded storage struct in Move memory
 pub fn unpack_storage_struct_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,

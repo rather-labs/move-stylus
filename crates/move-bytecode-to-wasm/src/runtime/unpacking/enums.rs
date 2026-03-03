@@ -13,6 +13,20 @@ use walrus::{
     ir::{BinaryOp, MemArg, StoreKind},
 };
 
+/// Generates a runtime function that unpacks a simple enum from ABI-encoded calldata.
+///
+/// A simple enum is represented as a single discriminant value, encoded as `uint8` in ABI
+/// calldata and stored in memory as a 4-byte `u32`. This function:
+/// 1. Reads the enum variant number from the reader pointer
+/// 2. Verifies the variant is within the declared enum bounds
+/// 3. Allocates 4 bytes and stores the variant number as the enum representation
+/// 4. Returns a pointer to the allocated enum value
+///
+/// # WASM Function Arguments
+/// * `reader_pointer` - (i32): pointer to the current position in ABI-encoded calldata
+///
+/// # WASM Function Returns
+/// * `enum_ptr` - (i32): pointer to the allocated enum value in memory
 pub fn unpack_enum_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -106,7 +120,7 @@ mod tests {
     use std::rc::Rc;
     use walrus::FunctionBuilder;
 
-    // Helper function to create a test enum with a specific number of variants
+    /// Test helper that creates a simple enum with `variant_count` variants.
     fn create_test_enum(
         variant_count: usize,
         module_data: &mut crate::ModuleData,

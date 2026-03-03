@@ -35,6 +35,12 @@ use super::{NativeFunction, error::NativeFunctionError};
 ///   memory region and placed in the corresponding topic.
 /// * Otherwise, if it is part of the event data, the encoded memory is copied into the data section
 ///   of the event
+///
+/// # WASM Function Arguments
+/// * `struct_ptr` - (i32): pointer to the event struct value in memory
+///
+/// # WASM Function Returns
+/// * None - encoded event is emitted through host `emit_log`
 pub fn add_emit_log_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,

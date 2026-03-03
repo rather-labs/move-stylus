@@ -15,12 +15,12 @@ use walrus::{FunctionBuilder, FunctionId, Module, ValType, ir::BinaryOp};
 /// at the writer_pointer location, then writes the array length followed by the packed elements.
 /// For dynamic inner types (vectors, structs, etc.), it writes offsets to the actual data.
 ///
-/// # WASM Function Arguments:
+/// # WASM Function Arguments
 /// * `vector_pointer` (i32) - pointer to the Move vector structure (contains length, capacity, and data)
 /// * `writer_pointer` (i32) - pointer where the offset to the packed array should be written
 /// * `calldata_reference_pointer` (i32) - reference point for calculating relative offsets
 ///
-/// # WASM Function Returns:
+/// # WASM Function Returns
 /// * None - the result is written directly to memory, with an offset at writer_pointer and the array data at the end of calldata
 pub fn pack_vector_function(
     module: &mut Module,

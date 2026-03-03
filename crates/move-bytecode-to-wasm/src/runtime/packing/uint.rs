@@ -12,11 +12,11 @@ use walrus::{
 /// The function converts the value from little-endian to big-endian and left-pads
 /// it to 32 bytes as required by the Solidity ABI specification.
 ///
-/// # WASM Function Arguments:
+/// # WASM Function Arguments
 /// * `value` (i32) - the u32 value to pack
 /// * `writer_pointer` (i32) - pointer to the memory location where the packed value will be written
 ///
-/// # WASM Function Returns:
+/// # WASM Function Returns
 /// * None - the result is written directly to memory at the writer_pointer location
 pub fn pack_u32_function(
     module: &mut Module,
@@ -61,11 +61,11 @@ pub fn pack_u32_function(
 /// The function converts the value from little-endian to big-endian and left-pads
 /// it to 32 bytes as required by the Solidity ABI specification.
 ///
-/// # WASM Function Arguments:
+/// # WASM Function Arguments
 /// * `value` (i64) - the u64 value to pack
 /// * `writer_pointer` (i32) - pointer to the memory location where the packed value will be written
 ///
-/// # WASM Function Returns:
+/// # WASM Function Returns
 /// * None - the result is written directly to memory at the writer_pointer location
 pub fn pack_u64_function(
     module: &mut Module,

@@ -14,9 +14,17 @@ use crate::{
 
 use super::{NativeFunction, error::NativeFunctionError};
 
-/// Adds the native 'revert' function.
-/// Expects the error type to be a struct. Each field of the error struct is loaded from memory and ABI-encoded to construct a revert reason message.
-/// The encoding format follows the ABI convention for custom errors, as if calling a function named after the error type with its fields as parameters.
+/// Generates the native `revert` function for a concrete ABI error type.
+///
+/// The error type must be an ABI error struct. Each struct field is loaded from memory,
+/// ABI-encoded as custom error payload, and forwarded to the runtime error handler so
+/// execution terminates with the encoded revert data.
+///
+/// # WASM Function Arguments
+/// * `error_struct_ptr` - (i32): pointer to the ABI error struct instance in memory
+///
+/// # WASM Function Returns
+/// * None - execution reverts through runtime error handling
 pub fn add_revert_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,

@@ -17,8 +17,18 @@ use walrus::{
 
 use super::{NativeFunction, error::NativeFunctionError};
 
-/// Adds the instructions to transfer an object to a recipient.
-/// This implies deleting the object from the original owner's mapping and adding it to the recipient's mapping.
+/// Generates the native function that transfers an object to a recipient.
+///
+/// It validates ownership constraints, removes the object from the previous owner mapping
+/// when needed, updates in-memory ownership metadata, and persists the object into the
+/// recipient mapping slot.
+///
+/// # WASM Function Arguments
+/// * `struct_ptr` - (i32): pointer to the object struct in memory
+/// * `recipient_ptr` - (i32): pointer to recipient address bytes
+///
+/// # WASM Function Returns
+/// * None
 pub fn add_transfer_object_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -172,7 +182,17 @@ pub fn add_transfer_object_fn(
     Ok(function.finish(vec![struct_ptr, recipient_ptr], &mut module.funcs))
 }
 
-/// Adds the instructions to share an object.
+/// Generates the native function that shares an object.
+///
+/// The function converts an owned object into shared ownership, preventing invalid
+/// transitions (for example from frozen state), updates storage mappings, and persists
+/// the new shared ownership state.
+///
+/// # WASM Function Arguments
+/// * `struct_ptr` - (i32): pointer to the object struct in memory
+///
+/// # WASM Function Returns
+/// * None
 pub fn add_share_object_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -306,7 +326,16 @@ pub fn add_share_object_fn(
     Ok(function.finish(vec![struct_ptr], &mut module.funcs))
 }
 
-/// Adds the instructions to freeze an object.
+/// Generates the native function that freezes an object.
+///
+/// It prevents invalid state transitions (for example shared-to-frozen), updates owner
+/// metadata to the frozen mapping key, and writes the object to the frozen storage mapping.
+///
+/// # WASM Function Arguments
+/// * `struct_ptr` - (i32): pointer to the object struct in memory
+///
+/// # WASM Function Returns
+/// * None
 pub fn add_freeze_object_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,

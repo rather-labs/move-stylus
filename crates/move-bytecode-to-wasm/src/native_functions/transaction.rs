@@ -50,6 +50,16 @@ macro_rules! define_host_fn_native_fn_wrapper {
     };
 }
 
+/// Generates the native wrapper for `tx_context::sender()`.
+///
+/// It allocates memory for a 32-byte address, calls the host `msg_sender`, and returns
+/// a pointer to the allocated address value.
+///
+/// # WASM Function Arguments
+/// * None
+///
+/// # WASM Function Returns
+/// * `address_ptr` - (i32): pointer to sender address bytes
 pub fn add_native_sender_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -101,6 +111,16 @@ define_host_fn_native_fn_wrapper!(
     IU256::HEAP_SIZE
 );
 
+/// Generates the native wrapper for `tx_context::data()`.
+///
+/// It reads calldata pointer/length from runtime metadata and converts the raw bytes into
+/// an internal `vector<u8>` representation through `RuntimeFunction::BytesToVec`.
+///
+/// # WASM Function Arguments
+/// * None
+///
+/// # WASM Function Returns
+/// * `vec_ptr` - (i32): pointer to `vector<u8>` containing calldata bytes
 pub fn add_native_data_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,

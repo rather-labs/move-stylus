@@ -4,6 +4,13 @@ use crate::{
 };
 use walrus::{FunctionBuilder, FunctionId, Module, ValType, ir::BinaryOp};
 
+/// Generates a runtime function that unpacks the ABI head for `bytes`.
+///
+/// # WASM Function Arguments
+/// * `reader_pointer` - (i32): pointer to the current ABI head slot
+///
+/// # WASM Function Returns
+/// * `data_pointer` - (i32): pointer to the bytes data region in calldata
 pub fn unpack_bytes_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,

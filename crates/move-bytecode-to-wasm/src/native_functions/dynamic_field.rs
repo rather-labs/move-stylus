@@ -25,11 +25,17 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
-/// Adds a dynamic field for a given parent and child ID
+/// Generates the native function that stores a child object under a parent object.
 ///
-/// # Arguments
-/// * `parent_address` - i32 pointer to the parent object's address in memory
-/// * `child_ptr` - i32 pointer to the child object's data in memory
+/// It computes the destination slot from `(parent_address, child_id)` and stores the
+/// encoded child object into that slot.
+///
+/// # WASM Function Arguments
+/// * `parent_address` - (i32): pointer to parent address bytes
+/// * `child_ptr` - (i32): pointer to child object struct in memory
+///
+/// # WASM Function Returns
+/// * None
 pub fn add_child_object_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -96,18 +102,18 @@ pub fn add_child_object_fn(
 
 // TODO: Check if object exists
 // TODO: Check object type
-/// Borrows a dynamic field's value for a given parent and child ID
+/// Generates the native function that borrows a child object from dynamic fields.
 ///
-/// NOTE: This function is used for both `borrow_child_object` and `borrow_child_object_mut` since
-/// the underlying implementation is the same. The mutability is handled at a higher level in the
-/// using the type system and does not affect the WebAssembly code generation.
+/// The same implementation is used for mutable and immutable borrows. It computes the
+/// child slot from parent UID and child ID, decodes the child object from storage, and
+/// returns a reference wrapper to the decoded object.
 ///
-/// # Arguments
-/// * `parent_uid` - i32 pointer to the parent object's UID in memory
-/// * `child_id` - i32 pointer to the child ID in memory
+/// # WASM Function Arguments
+/// * `parent_uid` - (i32): pointer to parent UID reference/value
+/// * `child_id` - (i32): pointer to child ID bytes
 ///
-/// Returns
-/// * i32 pointer to a reference to the borrowed object's data in memory
+/// # WASM Function Returns
+/// * `result` - (i32): pointer to reference of borrowed child object
 pub fn add_borrow_object_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -210,6 +216,17 @@ pub fn add_borrow_object_fn(
     Ok(function.finish(vec![parent_uid, child_id], &mut module.funcs))
 }
 
+/// Generates the native function that removes and returns a child object.
+///
+/// It reuses the borrow path to fetch and decode the child object, then clears the
+/// corresponding dynamic-field storage slot.
+///
+/// # WASM Function Arguments
+/// * `parent_uid` - (i32): pointer to parent UID reference/value
+/// * `child_id` - (i32): pointer to child ID bytes
+///
+/// # WASM Function Returns
+/// * `child_ptr` - (i32): pointer to removed child object value
 pub fn add_remove_child_object_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -266,14 +283,14 @@ pub fn add_remove_child_object_fn(
     Ok(function.finish(vec![parent_uid, child_id], &mut module.funcs))
 }
 
-/// Checks if a child object exists for a given parent and child ID
+/// Generates the native function that checks dynamic-field child existence.
 ///
-/// # Arguments
-/// * `parent_address` - i32 pointer to the parent object's address in memory (e.g. parent_object.to_address())
-/// * `child_address` - i32 pointer to the child address in memory (e.g. hash_type_and_key(parent_address, field_name))
+/// # WASM Function Arguments
+/// * `parent_address` - (i32): pointer to parent address bytes
+/// * `child_address` - (i32): pointer to child key/address bytes
 ///
-/// Returns
-/// * i32 - 1 if the child object exists, 0 otherwise
+/// # WASM Function Returns
+/// * `exists` - (i32): `1` if child exists, `0` otherwise
 pub fn add_has_child_object_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -322,15 +339,17 @@ pub fn add_has_child_object_fn(
     Ok(function.finish(vec![parent_address, child_address], &mut module.funcs))
 }
 
-/// Checks if a child object exists for a given parent and child ID, with type validation.
-/// The provided generic type is hashed and compared to the child object's type hash if found in the storage.
+/// Generates the native function that checks child existence and child type hash.
 ///
-/// # Arguments
-/// * `parent_address` - i32 pointer to the parent object's address in memory (e.g. parent_object.to_address())
-/// * `child_address` - i32 pointer to the child address in memory (e.g. hash_type_and_key(parent_address, field_name))
+/// It first resolves the child slot under a parent, then verifies that the stored type
+/// hash matches the provided generic type before returning existence.
 ///
-/// Returns
-/// * i32 - 1 if the child object exists, 0 otherwise
+/// # WASM Function Arguments
+/// * `parent_address` - (i32): pointer to parent address bytes
+/// * `child_address` - (i32): pointer to child key/address bytes
+///
+/// # WASM Function Returns
+/// * `exists` - (i32): `1` if child exists with matching type, `0` otherwise
 pub fn add_has_child_object_with_ty_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -398,17 +417,17 @@ pub fn add_has_child_object_with_ty_fn(
     Ok(function.finish(vec![parent_address, child_address], &mut module.funcs))
 }
 
-/// Computes a keccak256 hash from:
-/// * parent address (32 bytes)
-/// * key (variable size)
-/// * Key type name
+/// Generates the native function that hashes `(parent_address, key, key_type)`.
 ///
-/// # Arguments
-/// * `parent_address` - i32 pointer to the parent address in memory
-/// * `key` - i32 pointer to the key in memory
+/// The resulting hash is used as deterministic dynamic-field key/address when looking up
+/// child objects.
 ///
-/// # Returns
-/// * i32 pointer to the resulting hash in memory
+/// # WASM Function Arguments
+/// * `parent_address` - (i32): pointer to parent address bytes
+/// * `key` - (i32 / i64): key value or pointer, depending on key type
+///
+/// # WASM Function Returns
+/// * `hash_ptr` - (i32): pointer to resulting 32-byte hash
 pub fn add_hash_type_and_key_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,

@@ -12,6 +12,16 @@ use crate::{
 };
 use walrus::{FunctionBuilder, FunctionId, Module, ValType, ir::BinaryOp};
 
+/// Generates the native wrapper for `account::code_size(address)`.
+///
+/// The function expects a 32-byte ABI-style address in memory, skips the 12-byte
+/// left padding, calls the host `account_code_size`, and returns the result.
+///
+/// # WASM Function Arguments
+/// * `address_ptr` - (i32): pointer to a 32-byte address value in memory
+///
+/// # WASM Function Returns
+/// * `code_size` - (i32): deployed bytecode size for the target account
 pub fn add_native_account_code_size_fn(
     module: &mut Module,
     _compilation_ctx: &CompilationContext,
@@ -40,6 +50,17 @@ pub fn add_native_account_code_size_fn(
     function.finish(vec![address_ptr], &mut module.funcs)
 }
 
+/// Generates the native wrapper for `account::balance(address)`.
+///
+/// The function calls the host `account_balance` using the 20-byte address payload,
+/// allocates 32 bytes for the balance, converts the returned big-endian bytes to the
+/// internal little-endian representation, and returns the balance pointer.
+///
+/// # WASM Function Arguments
+/// * `address_ptr` - (i32): pointer to a 32-byte address value in memory
+///
+/// # WASM Function Returns
+/// * `balance_ptr` - (i32): pointer to a 32-byte balance value in memory
 pub fn add_native_account_balance_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,

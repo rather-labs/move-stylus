@@ -12,7 +12,13 @@ use crate::{
 
 use super::NativeFunction;
 
-/// Adds unit tests poison function
+/// Generates a unit-test native function that always traps.
+///
+/// # WASM Function Arguments
+/// * None
+///
+/// # WASM Function Returns
+/// * None - execution always reaches `unreachable`
 pub fn add_poison_fn(module: &mut Module, module_id: &ModuleId) -> FunctionId {
     let name = NativeFunction::get_function_name(NativeFunction::NATIVE_POISON, module_id);
 
@@ -25,6 +31,13 @@ pub fn add_poison_fn(module: &mut Module, module_id: &ModuleId) -> FunctionId {
     function.finish(vec![], &mut module.funcs)
 }
 
+/// Generates a unit-test helper that injects a fresh transaction context.
+///
+/// # WASM Function Arguments
+/// * None
+///
+/// # WASM Function Returns
+/// * `tx_context_ptr` - (i32): pointer to injected `TxContext`
 pub fn add_new_tx_context_fn(
     module: &mut Module,
     module_id: &ModuleId,
@@ -40,6 +53,13 @@ pub fn add_new_tx_context_fn(
     Ok(function.finish(vec![], &mut module.funcs))
 }
 
+/// Generates a no-op drop function for storage objects in tests.
+///
+/// # WASM Function Arguments
+/// * `_obj_ptr` - (i32): pointer to object to drop
+///
+/// # WASM Function Returns
+/// * None
 pub fn add_drop_storage_object_fn(module: &mut Module, module_id: &ModuleId) -> FunctionId {
     let name =
         NativeFunction::get_function_name(NativeFunction::NATIVE_DROP_STORAGE_OBJECT, module_id);
