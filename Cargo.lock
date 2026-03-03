@@ -3931,7 +3931,7 @@ dependencies = [
 
 [[package]]
 name = "move-bytecode-to-wasm"
-version = "0.1.0-test"
+version = "0.1.0"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -4155,7 +4155,7 @@ dependencies = [
 
 [[package]]
 name = "move-evm-abi-generator"
-version = "0.1.0-test"
+version = "0.1.0"
 dependencies = [
  "move-binary-format",
  "move-bytecode-to-wasm",
@@ -4284,14 +4284,14 @@ dependencies = [
 
 [[package]]
 name = "move-packages-build"
-version = "0.1.0-test"
+version = "0.1.0"
 dependencies = [
  "move-package",
 ]
 
 [[package]]
 name = "move-parse-special-attributes"
-version = "0.1.0-test"
+version = "0.1.0"
 dependencies = [
  "move-compiler",
  "move-ir-types",
@@ -4311,7 +4311,7 @@ dependencies = [
 
 [[package]]
 name = "move-stylus"
-version = "0.1.0-test"
+version = "0.1.0"
 dependencies = [
  "alloy",
  "anyhow",
@@ -4351,7 +4351,7 @@ dependencies = [
 
 [[package]]
 name = "move-test-runner"
-version = "0.1.0-test"
+version = "0.1.0"
 dependencies = [
  "alloy-primitives",
  "anyhow",
