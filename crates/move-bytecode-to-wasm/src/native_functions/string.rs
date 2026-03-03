@@ -13,6 +13,16 @@ use crate::{
 
 use super::{NativeFunction, error::NativeFunctionError};
 
+/// Generates the native implementation of `internal_check_utf8(&vector<u8>) -> bool`.
+///
+/// The function validates UTF-8 encoding by iterating over bytes and checking each code
+/// point prefix and continuation bytes according to UTF-8 rules.
+///
+/// # WASM Function Arguments
+/// * `vec_ptr` - (i32): pointer to `vector<u8>` bytes
+///
+/// # WASM Function Returns
+/// * `is_valid` - (i32): `1` when valid UTF-8, `0` otherwise
 pub fn add_internal_check_utf8(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -329,7 +339,14 @@ pub fn add_internal_check_utf8(
     Ok(function.finish(vec![vec_ptr], &mut module.funcs))
 }
 
-/// Implementation of `native fun internal_is_char_boundary(v: &vector<u8>, index: u64): bool;`
+/// Generates the native implementation of `internal_is_char_boundary`.
+///
+/// # WASM Function Arguments
+/// * `vec_ptr` - (i32): pointer to `vector<u8>` bytes
+/// * `char_index` - (i64): candidate byte offset
+///
+/// # WASM Function Returns
+/// * `is_boundary` - (i32): `1` if `char_index` is UTF-8 boundary, `0` otherwise
 pub fn add_internal_is_char_boundary(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -431,7 +448,14 @@ pub fn add_internal_is_char_boundary(
     Ok(function.finish(vec![vec_ptr, char_index], &mut module.funcs))
 }
 
-/// Implementation of `native fun internal_index_of(v: &vector<u8>, r: &vector<u8>): u64;`
+/// Generates the native implementation of `internal_index_of`.
+///
+/// # WASM Function Arguments
+/// * `vec_ptr` - (i32): pointer to source `vector<u8>`
+/// * `pattern_ptr` - (i32): pointer to pattern `vector<u8>`
+///
+/// # WASM Function Returns
+/// * `index` - (i64): first pattern index, or source length when not found
 pub fn add_internal_index_of(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -610,7 +634,15 @@ pub fn add_internal_index_of(
     Ok(function.finish(vec![vec_ptr, pattern_ptr], &mut module.funcs))
 }
 
-/// Implementation of `native fun internal_sub_string(v: &vector<u8>, i: u64, j: u64): vector<u8>;`
+/// Generates the native implementation of `internal_sub_string`.
+///
+/// # WASM Function Arguments
+/// * `vec_ptr` - (i32): pointer to source `vector<u8>`
+/// * `start_index` - (i64): start byte offset
+/// * `end_index` - (i64): end byte offset (exclusive)
+///
+/// # WASM Function Returns
+/// * `new_vec_ptr` - (i32): pointer to substring `vector<u8>`
 pub fn add_internal_sub_string(
     module: &mut Module,
     compilation_ctx: &CompilationContext,

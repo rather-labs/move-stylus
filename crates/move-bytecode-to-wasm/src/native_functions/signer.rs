@@ -11,9 +11,16 @@ use crate::{
 };
 use walrus::{FunctionBuilder, FunctionId, Module, ValType};
 
-/// Returns the signer's address.
+/// Generates the native implementation of `std::signer::address_of`.
 ///
-/// It allocates fresh memory and copy the 32-byte address data into it.
+/// It allocates fresh memory, copies the signer address bytes into that region, and
+/// returns an independent pointer to the copied address.
+///
+/// # WASM Function Arguments
+/// * `signer_ptr` - (i32): pointer to the signer value in memory
+///
+/// # WASM Function Returns
+/// * `new_ptr` - (i32): pointer to a copied 32-byte address value
 pub fn add_signer_address_of_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,

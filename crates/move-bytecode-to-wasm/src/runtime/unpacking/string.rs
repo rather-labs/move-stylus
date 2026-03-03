@@ -9,6 +9,18 @@ use walrus::{
     ir::{BinaryOp, ExtendedLoad, LoadKind, MemArg, StoreKind},
 };
 
+/// Generates a runtime function that unpacks an ABI-encoded Solidity `string` into Move `String`.
+///
+/// The function resolves the dynamic string offset, reads string length and bytes from calldata,
+/// allocates a vector<u8> and copies all bytes, wraps the vector in the Move `String`
+/// struct layout, and returns the resulting struct pointer.
+///
+/// # WASM Function Arguments
+/// * `reader_pointer` - (i32): pointer to the ABI head slot containing the dynamic offset
+/// * `calldata_reader_pointer` - (i32): pointer to the start of calldata argument region
+///
+/// # WASM Function Returns
+/// * `struct_ptr` - (i32): pointer to the allocated Move `String` struct
 pub fn unpack_string_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,

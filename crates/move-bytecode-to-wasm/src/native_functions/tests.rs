@@ -11,6 +11,16 @@ use crate::{
 };
 use walrus::{FunctionBuilder, FunctionId, Module, ValType};
 
+/// Generates a debug-only native function that returns current heap position.
+///
+/// It calls the allocator with size `0` to read the next free memory pointer without
+/// allocating additional memory.
+///
+/// # WASM Function Arguments
+/// * None
+///
+/// # WASM Function Returns
+/// * `ptr` - (i32): current last memory position
 pub fn add_get_last_memory_position_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -34,6 +44,17 @@ pub fn add_get_last_memory_position_fn(
     function.finish(vec![], &mut module.funcs)
 }
 
+/// Generates a debug-only native function to read and decode a storage slot.
+///
+/// The function delegates to `ReadAndDecodeFromStorage` for the given generic type and
+/// returns a pointer to the decoded value.
+///
+/// # WASM Function Arguments
+/// * `slot_ptr` - (i32): pointer to the storage slot key
+/// * `uid_ptr` - (i32): pointer to object UID bytes
+///
+/// # WASM Function Returns
+/// * `value_ptr` - (i32): pointer to the decoded value in memory
 pub fn add_read_slot_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,

@@ -21,12 +21,12 @@ use walrus::{
 /// References to type parameters and nested references (ref of ref) are not supported and
 /// will return an error.
 ///
-/// # WASM Function Arguments:
+/// # WASM Function Arguments
 /// * `reference_pointer` (i32) - pointer to the reference (contains pointer to the actual value)
 /// * `writer_pointer` (i32) - pointer where the packed value should be written
 /// * `calldata_reference_pointer` (i32) - reference point for calculating relative offsets
 ///
-/// # WASM Function Returns:
+/// # WASM Function Returns
 /// * None - the result is written directly to memory at writer_pointer
 pub fn pack_reference_function(
     module: &mut Module,

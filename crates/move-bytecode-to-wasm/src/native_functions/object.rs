@@ -17,6 +17,16 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
+/// Generates a native function that computes a deterministic named ID for a struct type.
+///
+/// The ID is derived from the struct identifier hash and returned as a 32-byte address-like
+/// value in heap memory.
+///
+/// # WASM Function Arguments
+/// * None
+///
+/// # WASM Function Returns
+/// * `id_ptr` - (i32): pointer to the computed named ID bytes
 pub fn add_compute_named_id_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -66,9 +76,16 @@ pub fn add_compute_named_id_fn(
     }
 }
 
-/// Takes a reference of a NamedId<T> and returns it casted as a UID
+/// Generates a native cast from `&NamedId<T>` to `&UID`.
 ///
-/// This function is used internally by the stylus framework
+/// It wraps the incoming NamedId pointer into a UID reference layout used by the
+/// Stylus framework internals.
+///
+/// # WASM Function Arguments
+/// * `named_id_ptr` - (i32): pointer to `&NamedId<T>`
+///
+/// # WASM Function Returns
+/// * `uid_ref` - (i32): pointer to `&UID`
 pub fn add_as_uid_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -105,6 +122,17 @@ pub fn add_as_uid_fn(
     function.finish(vec![named_id_ptr], &mut module.funcs)
 }
 
+/// Generates a native function that creates a fresh object ID.
+///
+/// The ID is computed from block timestamp, block number, and a persistent storage counter.
+/// The counter is loaded, incremented modulo `u32::MAX + 1`, written back, and the final
+/// entropy buffer is hashed via Keccak-256.
+///
+/// # WASM Function Arguments
+/// * None
+///
+/// # WASM Function Returns
+/// * `id_ptr` - (i32): pointer to the fresh 32-byte object ID
 pub fn add_native_fresh_id_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -276,6 +304,16 @@ pub fn add_native_fresh_id_fn(
     function.finish(vec![], &mut module.funcs)
 }
 
+/// Generates a native function that borrows `&UID` from an object reference.
+///
+/// The UID is assumed to be the first field of the object struct; this function loads it
+/// and wraps it as a reference value.
+///
+/// # WASM Function Arguments
+/// * `obj_ptr` - (i32): pointer to `&Obj`
+///
+/// # WASM Function Returns
+/// * `uid_ref` - (i32): pointer to `&UID`
 pub fn add_borrow_uid_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,

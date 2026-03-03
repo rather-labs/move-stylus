@@ -10,6 +10,18 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
+/// Generates a runtime function that packs a Move enum into Solidity ABI format.
+///
+/// The enum value is represented in Move memory as a 32-bit variant index. This function
+/// validates that the variant fits into Solidity's supported `uint8` enum range, converts it
+/// to ABI big-endian representation, and stores it left-padded into a 32-byte slot.
+///
+/// # WASM Function Arguments
+/// * `enum_ptr` - (i32): pointer to the enum value in Move memory
+/// * `writer_pointer` - (i32): pointer where the ABI-encoded enum should be written
+///
+/// # WASM Function Returns
+/// * None - the packed enum is written directly to memory at `writer_pointer`
 pub fn pack_enum_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,

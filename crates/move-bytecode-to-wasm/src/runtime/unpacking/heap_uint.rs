@@ -6,6 +6,17 @@ use crate::{
 use alloy_sol_types::{SolType, sol_data};
 use walrus::{FunctionBuilder, FunctionId, Module, ValType, ir::BinaryOp};
 
+/// Generates a runtime function that unpacks a Solidity ABI `uint128` value.
+///
+/// The function reads a 32-byte ABI word, skips the 16-byte left padding, converts the
+/// remaining 16 bytes to little-endian, stores them in newly allocated heap memory, and
+/// returns a pointer to the unpacked value.
+///
+/// # WASM Function Arguments
+/// * `reader_pointer` - (i32): pointer to the current ABI slot in calldata
+///
+/// # WASM Function Returns
+/// * `unpacked_pointer` - (i32): pointer to the allocated `u128` bytes in Move memory
 pub fn unpack_u128_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -46,6 +57,16 @@ pub fn unpack_u128_function(
     Ok(function.finish(vec![reader_pointer], &mut module.funcs))
 }
 
+/// Generates a runtime function that unpacks a Solidity ABI `uint256` value.
+///
+/// The function reads a full 32-byte ABI word, converts it from big-endian to little-endian,
+/// stores it in newly allocated heap memory, and returns a pointer to the unpacked value.
+///
+/// # WASM Function Arguments
+/// * `reader_pointer` - (i32): pointer to the current ABI slot in calldata
+///
+/// # WASM Function Returns
+/// * `unpacked_pointer` - (i32): pointer to the allocated `u256` bytes in Move memory
 pub fn unpack_u256_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -82,6 +103,16 @@ pub fn unpack_u256_function(
     Ok(function.finish(vec![reader_pointer], &mut module.funcs))
 }
 
+/// Generates a runtime function that unpacks a Solidity ABI `address` value.
+///
+/// The function copies the full 32-byte ABI address word into newly allocated memory and
+/// returns its pointer. The representation remains right-aligned (12 zero bytes + 20 bytes).
+///
+/// # WASM Function Arguments
+/// * `reader_pointer` - (i32): pointer to the current ABI slot in calldata
+///
+/// # WASM Function Returns
+/// * `unpacked_pointer` - (i32): pointer to the allocated address bytes in Move memory
 pub fn unpack_address_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,

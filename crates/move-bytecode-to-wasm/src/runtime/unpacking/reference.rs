@@ -8,6 +8,19 @@ use crate::{
 };
 use walrus::{FunctionBuilder, FunctionId, Module, ValType, ir::MemArg};
 
+/// Generates a runtime function that unpacks a Move reference value.
+///
+/// For immediate inner types, this function unpacks the pointed value from calldata,
+/// allocates memory for it, stores it, and returns the resulting pointer. Heap-backed
+/// inner types are intentionally rejected here because their reference handling is
+/// delegated to higher-level unpacking paths.
+///
+/// # WASM Function Arguments
+/// * `reader_pointer` - (i32): pointer to current calldata position
+/// * `calldata_reader_pointer` - (i32): base pointer used for dynamic offset resolution
+///
+/// # WASM Function Returns
+/// * `reference_pointer` - (i32): pointer to the unpacked referenced value in memory
 pub fn unpack_reference_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
