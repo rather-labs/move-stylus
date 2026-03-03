@@ -336,8 +336,18 @@ fn translate_flow(
                     },
                 );
 
-                // First translate the instuctions associated with the simple flow itself
-                for instruction in *instructions {
+                // First translate the instructions associated with the simple flow itself
+                for (instruction_index, instruction) in instructions.iter().enumerate() {
+                    if matches!(instruction, Bytecode::Ret)
+                        && instruction_index + 1 != instructions.len()
+                    {
+                        inner_result = Err(TranslationError::AtInstruction(
+                            instruction.clone(),
+                            Rc::new(TranslationError::ReturnInstructionNotLastInBlock),
+                        ));
+                        break;
+                    }
+
                     match translate_instruction(instruction, ctx, block, module, branches) {
                         Ok(mut fns_to_link) => {
                             functions_to_link.extend(fns_to_link.drain(..));
@@ -1903,7 +1913,6 @@ fn translate_instruction(
             builder.drop();
             types_stack.pop()?;
         }
-        // TODO: ensure this is the last instruction in the move code
         Bytecode::Ret => {
             // If the function is entry and received as an argument an struct that must be saved in
             // storage, we must persist it in case it had some change.

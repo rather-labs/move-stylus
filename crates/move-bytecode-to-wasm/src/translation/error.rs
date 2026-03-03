@@ -223,6 +223,9 @@ pub enum TranslationError {
     #[error("multiple WASM return values not supported, found {0} return values")]
     MultipleWasmReturnValues(usize),
 
+    #[error("return instruction must be the last instruction in the basic block")]
+    ReturnInstructionNotLastInBlock,
+
     #[error("generic function {0}::{1} has no type instantiations")]
     GenericFunctionNoTypeInstantiations(ModuleId, Symbol),
 }
