@@ -750,6 +750,7 @@ impl ModuleData<'_> {
         let mut init: Option<FunctionId> = None;
         let mut receive: Option<FunctionId> = None;
         let mut fallback: Option<FunctionId> = None;
+        let tx_context_external_module = find_tx_context_external_module(move_module_dependencies);
 
         for (index, function) in move_module.function_handles().iter().enumerate() {
             let move_function_arguments = &move_module.signature_at(function.parameters);
@@ -838,7 +839,7 @@ impl ModuleData<'_> {
                     move_function_return,
                     function_def,
                     datatype_handles_map,
-                    move_module_dependencies,
+                    tx_context_external_module,
                     test_mode,
                 )?;
 
@@ -866,7 +867,7 @@ impl ModuleData<'_> {
                     function_def,
                     function_sa,
                     datatype_handles_map,
-                    move_module_dependencies,
+                    tx_context_external_module,
                 )?;
 
                 if is_receive && receive.replace(function_id.clone()).is_some() {
@@ -879,7 +880,7 @@ impl ModuleData<'_> {
                     move_function_return,
                     function_def,
                     datatype_handles_map,
-                    move_module_dependencies,
+                    tx_context_external_module,
                 )?;
 
                 if is_fallback && fallback.replace(function_id.clone()).is_some() {
@@ -975,7 +976,7 @@ impl ModuleData<'_> {
         move_function_return: &Signature,
         function_def: &FunctionDefinition,
         datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
-        move_module_dependencies: &[(PackageName, CompiledUnitWithSource)],
+        tx_context_external_module: Option<&CompiledModule>,
         test_mode: bool,
     ) -> Result<bool> {
         // Constants
@@ -1007,7 +1008,7 @@ impl ModuleData<'_> {
             .and_then(|last| {
                 IntermediateType::try_from_signature_token(last, datatype_handles_map).ok()
             })
-            .map(|arg| is_tx_context_ref(&arg, move_module_dependencies))
+            .map(|arg| is_tx_context_ref(&arg, tx_context_external_module))
             .transpose()
             .map_err(CompilationContextError::from)?
             .unwrap_or(false);
@@ -1034,7 +1035,7 @@ impl ModuleData<'_> {
         function_def: &FunctionDefinition,
         function_sa: &Function,
         datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
-        move_module_dependencies: &[(PackageName, CompiledUnitWithSource)],
+        tx_context_external_module: Option<&CompiledModule>,
     ) -> Result<bool> {
         // Receive function definition (see https://docs.soliditylang.org/en/latest/contracts.html#receive-ether-function):
         // - A contract can have at most one receive function, declared using receive() external payable { ... } (without the function keyword).
@@ -1061,7 +1062,7 @@ impl ModuleData<'_> {
         if let Some(first_arg) = move_function_arguments.0.first()
             && let Ok(arg) =
                 IntermediateType::try_from_signature_token(first_arg, datatype_handles_map)
-            && !is_tx_context_ref(&arg, move_module_dependencies)
+            && !is_tx_context_ref(&arg, tx_context_external_module)
                 .map_err(CompilationContextError::from)?
         {
             return Err(CompilationContextError::ReceiveFunctionNonTxContextArgument);
@@ -1092,7 +1093,7 @@ impl ModuleData<'_> {
         move_function_return: &Signature,
         function_def: &FunctionDefinition,
         datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
-        move_module_dependencies: &[(PackageName, CompiledUnitWithSource)],
+        tx_context_external_module: Option<&CompiledModule>,
     ) -> Result<bool> {
         // Fallback function definition (see https://docs.soliditylang.org/en/latest/contracts.html#fallback-function):
         // - A contract can have at most one fallback function, declared using either fallback () external [payable]
@@ -1131,7 +1132,7 @@ impl ModuleData<'_> {
                     })
                     .ok_or(CompilationContextError::FallbackFunctionInvalidArgumentType)?;
 
-                if !is_tx_context_ref(&first_arg, move_module_dependencies)
+                if !is_tx_context_ref(&first_arg, tx_context_external_module)
                     .map_err(CompilationContextError::from)?
                 {
                     return Err(CompilationContextError::FallbackFunctionInvalidArgumentType);
@@ -1185,42 +1186,41 @@ fn is_vector_u8_ref(argument: &IntermediateType) -> bool {
 /// Helper function to check if the argument is a reference to the TxContext.
 fn is_tx_context_ref(
     argument: &IntermediateType,
-    move_module_dependencies: &[(PackageName, CompiledUnitWithSource)],
+    tx_context_external_module: Option<&CompiledModule>,
 ) -> std::result::Result<bool, ModuleDataError> {
     match argument {
-        IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
-            match inner.as_ref() {
-                IntermediateType::IStruct {
-                    module_id, index, ..
-                } if module_id.module_name.as_str() == SF_MODULE_NAME_TX_CONTEXT
-                    && module_id.address == STYLUS_FRAMEWORK_ADDRESS =>
-                {
-                    // TODO: Look for this external module one time and pass it down to this
-                    // function
-                    let external_module_source = &move_module_dependencies
-                        .iter()
-                        .find(|(_, m)| {
-                            m.unit.name().as_str() == "tx_context"
-                                && Address::from(m.unit.address.into_bytes())
-                                    == STYLUS_FRAMEWORK_ADDRESS
-                        })
-                        .ok_or(ModuleDataError::StylusFrameworkDependencyNotFound)?
-                        .1
-                        .unit
-                        .module;
+        IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => match inner.as_ref() {
+            IntermediateType::IStruct {
+                module_id, index, ..
+            } if module_id.module_name.as_str() == SF_MODULE_NAME_TX_CONTEXT
+                && module_id.address == STYLUS_FRAMEWORK_ADDRESS =>
+            {
+                let external_module_source = tx_context_external_module
+                    .ok_or(ModuleDataError::StylusFrameworkDependencyNotFound)?;
 
-                    let struct_ =
-                        external_module_source.struct_def_at(StructDefinitionIndex::new(*index));
-                    let handle = external_module_source.datatype_handle_at(struct_.struct_handle);
-                    let identifier = external_module_source.identifier_at(handle.name);
-                    Ok(identifier.as_str() == "TxContext")
-                }
-
-                _ => Ok(false),
+                let struct_ =
+                    external_module_source.struct_def_at(StructDefinitionIndex::new(*index));
+                let handle = external_module_source.datatype_handle_at(struct_.struct_handle);
+                let identifier = external_module_source.identifier_at(handle.name);
+                Ok(identifier.as_str() == "TxContext")
             }
-        }
+
+            _ => Ok(false),
+        },
         _ => Ok(false),
     }
+}
+
+fn find_tx_context_external_module(
+    move_module_dependencies: &[(PackageName, CompiledUnitWithSource)],
+) -> Option<&CompiledModule> {
+    move_module_dependencies
+        .iter()
+        .find(|(_, m)| {
+            m.unit.name().as_str() == SF_MODULE_NAME_TX_CONTEXT
+                && Address::from(m.unit.address.into_bytes()) == STYLUS_FRAMEWORK_ADDRESS
+        })
+        .map(|(_, m)| &m.unit.module)
 }
 
 /// Computes the clever error u64 abort code for each `#[error]` constant
