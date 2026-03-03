@@ -9,6 +9,7 @@ use crate::{
         reserved_modules::{SF_MODULE_NAME_DYNAMIC_FIELD, STYLUS_FRAMEWORK_ADDRESS},
     },
     data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET, RuntimeErrorData},
+    error::RuntimeError,
     hostio::host_functions::{native_keccak256, storage_load_bytes32},
     runtime::RuntimeFunction,
     translation::intermediate_types::error::IntermediateTypeError,
@@ -100,8 +101,6 @@ pub fn add_child_object_fn(
     Ok(function.finish(vec![parent_address, child_ptr], &mut module.funcs))
 }
 
-// TODO: Check if object exists
-// TODO: Check object type
 /// Generates the native function that borrows a child object from dynamic fields.
 ///
 /// The same implementation is used for mutable and immutable borrows. It computes the
@@ -130,6 +129,14 @@ pub fn add_borrow_object_fn(
     if let Some(function) = module.funcs.by_name(&name) {
         return Ok(function);
     };
+    let has_child_object_with_ty_fn = NativeFunction::get_generic(
+        NativeFunction::NATIVE_HAS_CHILD_OBJECT_WITH_TY,
+        module,
+        compilation_ctx,
+        Some(runtime_error_data),
+        &ModuleId::new(STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_DYNAMIC_FIELD),
+        &[itype.clone()],
+    )?;
     let write_object_slot_fn =
         RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx), None)?;
     let read_and_decode_from_storage_fn = RuntimeFunction::ReadAndDecodeFromStorage.get_generic(
@@ -180,6 +187,24 @@ pub fn add_borrow_object_fn(
         .local_get(child_id)
         .local_get(slot_ptr)
         .call(write_object_slot_fn);
+
+    // Check if the child object exists and has the expected type.
+    builder.block(None, |block| {
+        let block_id = block.id();
+        block
+            .local_get(parent_uid)
+            .local_get(child_id)
+            .call(has_child_object_with_ty_fn)
+            .br_if(block_id);
+
+        block.return_error(
+            module,
+            compilation_ctx,
+            Some(ValType::I32),
+            runtime_error_data,
+            RuntimeError::StorageObjectTypeMismatch,
+        );
+    });
 
     let result_struct = module.locals.add(ValType::I32);
 
