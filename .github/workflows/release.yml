@@ -93,6 +93,7 @@ jobs:
       - name: Create PR for Formula updates
         uses: peter-evans/create-pull-request@v6
         with:
+          base: main
           commit-message: "chore(formula): update Homebrew formula for ${{ github.ref_name }}"
           branch: "automation/formula-${{ github.ref_name }}"
           title: "chore(formula): update Homebrew formula for ${{ github.ref_name }}"
